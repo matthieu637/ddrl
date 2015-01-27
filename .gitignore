@@ -1,0 +1,16 @@
+*.o
+*.kdev4
+*~
+*/build/
+*.swp
+*/.kdev4/
+*.a
+*.so
+*.dll
+*.lib
+*.kate-swp
+*/.directory
+*/*/.directory
+*/*/*/.directory
+*/*/*/*/.directory
+*/*/*/*/*/.directory
