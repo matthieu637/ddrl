@@ -1,6 +1,8 @@
 #ifndef SINGLETON_HPP
 #define SINGLETON_HPP
 
+#include "Assert.hpp"
+
 ///
 ///\file Singleton.hpp
 ///\brief Template de base pour le pattern singleton
@@ -10,9 +12,6 @@
 ///          et d'ajouter : friend class bib::Singleton<MaClasse>;
 ///
 ///
-
-
-#include <assert.h>
 
 namespace bib {
 
@@ -27,7 +26,8 @@ public:
 ///
     static T* getInstance()
     {
-        assert(_singleton != nullptr);
+
+        ASSERT(_singleton != nullptr, "singleton never created");
         return _singleton;
     }
     

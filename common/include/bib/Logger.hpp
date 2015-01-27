@@ -16,8 +16,7 @@
 #include <list>
 #include <map>
 #include "Singleton.hpp"
-
-
+  
 #define LOG(stream) \
    bib::Logger::getInstance()->isBufferEnable() ? bib::Logger::getInstance()->registerBuffer() << stream : std::cout << stream << std::endl
 
@@ -124,13 +123,13 @@ public:
     }
     
     template <class T>
-    static inline void PRINT_ELEMENTS_FT (const T& coll, const char* optcstr="")
+    static inline void PRINT_ELEMENTS_FT (const T& coll, const char* optcstr="", int width=4, int precision=2)
     {
         typename T::const_iterator pos;
 
-//         LOG_DEBUGS(optcstr);
+        LOG_DEBUGS(optcstr);
         for (pos=coll.begin(); pos!=coll.end(); ++pos)
-            LOG_DEBUGC(std::left << std::setw(4) << std::setfill(' ') << std::setprecision(1) << *pos);
+            LOG_DEBUGC(std::left << std::setw(width) << std::setfill(' ') << std::setprecision(precision) << *pos);
 
         LOG_DEBUGE();
     }

@@ -19,8 +19,7 @@ bool Utils::rand01(float limit) {
 }
 
 float Utils::randin(float a, float b) {
-    assert( b > a);
-//     LOG_DEBUG("rand");
+    ASSERT( b > a, "");
     float random = ((float) rand()) / (float) RAND_MAX;
     float diff = b - a;
     float r = random * diff;
