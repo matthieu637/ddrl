@@ -1,8 +1,15 @@
 
 set(COMMON_DRL_INCLUDE_DIRS ../../common/include)
 
+set(COMMON_DRL_NAME "common-drl")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(LIBRARY_NAME "${COMMON_DRL_NAME}-d")
+elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  set(LIBRARY_NAME "${COMMON_DRL_NAME}-rd")
+endif()
+
 find_library( COMMON_DRL_LIBRARY
-  NAMES common-drl
+  NAMES ${COMMON_DRL_NAME}
   PATHS
   "../../common/lib"
 )
