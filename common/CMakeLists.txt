@@ -10,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif(NOT CMAKE_BUILD_TYPE)
 
 #Boost library
-find_package(Boost COMPONENTS serialization)
+find_package(Boost COMPONENTS serialization program_options)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
 
@@ -36,3 +36,5 @@ endif()
 add_library(${LIBRARY_NAME} SHARED ${all_sources})
 target_link_libraries(${LIBRARY_NAME} optimized ${Boost_LIBRARIES})
 
+add_executable(dummy-simulator src/test/DummySimulator.cpp ${all_include} ${all_sources})
+target_link_libraries(dummy-simulator optimized ${Boost_LIBRARIES})
