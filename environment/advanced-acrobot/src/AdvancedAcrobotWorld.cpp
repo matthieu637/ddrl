@@ -229,9 +229,12 @@ void AdvancedAcrobotWorld::resetPositions()
 
 float AdvancedAcrobotWorld::perf() const
 {
+    float normalize = 2 * BONE_LENGTH * types.size();
+    
     dVector3 result;
     dBodyGetRelPointPos(bones.back()->getID(), 0,0, 0, result);
-    return result[2]-STARTING_Z;
+    
+    return (result[2]-STARTING_Z)/normalize;
 }
 
 
