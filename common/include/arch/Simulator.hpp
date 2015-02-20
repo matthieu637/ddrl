@@ -9,18 +9,23 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/program_options.hpp>
 #include "bib/Logger.hpp"
-#include <bib/Chrono.hpp>
+#include "bib/Utils.hpp"
+#include "bib/Chrono.hpp"
 
 #define DEFAULT_CONFIG_FILE "config.ini"
 #define DEFAULT_END_FILE "time_elapsed"
+#define DEFAULT_DUMP_LEARNING_FILE "learning.data"
+#define DEFAULT_DUMP_TESTING_FILE "testing.data"
 
 using std::string;
 
 namespace arch
 {
+
 template <typename Environment, typename Agent>
 class Simulator
 {
+
 public:
     Simulator() {}
 
@@ -40,44 +45,93 @@ public:
 
         env = new Environment;
         env->unique_invoke(properties);
-	
-	agent = new Agent;
-	agent->unique_invoke(properties);
+
+        agent = new Agent;
+        agent->unique_invoke(properties);
 
         time_spend.start();
         for(unsigned int episode=0; episode < max_episode; episode++) {
 //	learning
-            run_episode(true);
+            run_episode(true, episode);
 
             for(unsigned int test_episode=0; test_episode < test_episode_per_episode ; test_episode++) {
 //	    testing during learning
-                run_episode(true);
+                run_episode(false, episode);
             }
         }
 
         for(unsigned int test_episode=0; test_episode < test_episode_at_end ; test_episode++) {
 // 	testing after learning
-            run_episode(true);
+            run_episode(false, test_episode);
         }
-        
+
         env->unique_destroy();
-	delete env;
+        delete env;
 
         LOG_FILE(DEFAULT_END_FILE, ""<<(float) (time_spend.finish() / 60.f)); //in minutes
     }
 
 private:
 
-    void run_episode(bool learning) {
-	env->reset_episode();
-	std::vector<float> perceptions = env->perceptions();
- 	agent->start_episode(perceptions);
-	
-	while(env->running()){
-	    perceptions = env->perceptions();
-	    const std::vector<float>& actuators = agent->run(perceptions, learning);
-	    env->apply(actuators);
-	}
+    void run_episode(bool learning, unsigned int episode) {
+        env->reset_episode();
+        std::list<float> all_rewards;
+
+        while(env->hasInstance()) {
+
+            std::vector<float> perceptions = env->perceptions();
+            agent->start_episode(perceptions);
+
+            while(env->running()) {
+                perceptions = env->perceptions();
+                float reward = env->performance();
+                const std::vector<float>& actuators = agent->run(reward, perceptions, learning, false);
+                env->apply(actuators);
+                all_rewards.push_back(reward);
+            }
+
+            perceptions = env->perceptions();
+            float reward = env->performance();
+            agent->run(reward, perceptions, learning, true);
+            all_rewards.push_back(reward);
+
+            env->next_instance();
+        }
+
+        dump_and_display(episode, all_rewards, env, agent, learning);
+    }
+
+    template <typename T>
+    struct Dumper {
+        T* env;
+	bool dump_to_std;
+        bool dump_to_file;
+    };
+    
+    void dump_and_display(unsigned int episode, const std::list<float>& all_rewards, Environment* env, Agent* ag, bool learning) {
+        bool display=episode % display_log_each == 0;
+        bool dump=episode % dump_log_each == 0;
+
+        if(dump || display) {
+            bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
+	    Dumper<Environment> env_dump = {env, display, dump};
+	    Dumper<Agent> agent_dump = {ag, display, dump};
+
+            if(display)
+                LOG_INFO((learning?"L ":"T ")<<
+                         std::left << std::setw(7) << std::setfill(' ') << episode <<
+                         std::left << std::setw(8) << std::setfill(' ') << reward_stats.mean <<
+                         std::left << std::setw(8) << std::setfill(' ') << reward_stats.var <<
+                         std::left << std::setw(8) << std::setfill(' ') << reward_stats.max <<
+                         std::left << std::setw(8) << std::setfill(' ') << reward_stats.min
+                        );
+
+            if(dump)
+                LOG_FILE(learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE,
+                         episode << " " << reward_stats.mean << " " << reward_stats.var<< " " <<
+                         reward_stats.max << " "<< reward_stats.min << env_dump << agent_dump
+                        );
+        }
     }
 
     void readCommandArgs(int argc, char **argv, string* s) {
@@ -124,6 +178,7 @@ private:
     unsigned int max_episode;
     unsigned int test_episode_per_episode;
     unsigned int test_episode_at_end;
+
     unsigned int dump_log_each;
     unsigned int display_log_each;
 
@@ -131,7 +186,7 @@ private:
     boost::program_options::variables_map* command_args;
 
     bib::Chrono time_spend;
-    
+
     Environment* env;
     Agent* agent;
 

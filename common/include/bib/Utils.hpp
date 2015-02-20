@@ -41,18 +41,31 @@ public :
 
     static float* genNrand(int N, float max);
 
+    typedef struct {
+        float var;
+        float mean;
+        float max;
+        float min;
+    } V3M;
 
     template<typename T>
-    static std::pair<float, float> mean_and_var(const T& _list) {
+    static V3M statistics(const T& _list) {
 
         float mean = 0.f;
+        float min = *_list.cbegin();
+        float max = *_list.cbegin();
         for(auto it=_list.cbegin(); it != _list.cend(); ++it) {
             float p = *it;
             mean += p;
+
+            if(p > max)
+                max=p;
+            else if (p< min)
+                min=p;
         }
         mean = (float)(mean/(float)_list.size());
 
-        double variance = 0.f;
+        float variance = 0.f;
         for(auto it=_list.cbegin(); it != _list.cend(); ++it) {
             float p = *it;
             variance += p * p;
@@ -60,7 +73,7 @@ public :
         variance = (float)(variance/(float)_list.size());
         variance = variance - mean*mean;
 
-        return {mean, variance};
+        return {variance, mean, max, min};
     }
 
     static float euclidien_dist1D(float x1, float x2);

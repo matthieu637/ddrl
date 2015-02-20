@@ -10,7 +10,8 @@ public:
     }
 
     void unique_invoke(boost::property_tree::ptree* properties) {
-        max_step = properties->get<unsigned int>("environment.max_step");
+        instance_per_episode = properties->get<unsigned int>("environment.instance_per_episode");
+        max_step_per_instance = properties->get<unsigned int>("environment.max_step_per_instance");
     }
 
     void unique_destroy() {
@@ -22,21 +23,58 @@ public:
     }
 
     void reset_episode() {
+        current_instance = 0;
         current_step = 0;
+    }
+
+    void next_instance() {
+        current_step = 0;
+        current_instance++;
     }
 
     void apply(const std::vector<float>&) {
         current_step++;
     }
 
-    bool running() {
-        return current_step < max_step;
+    float performance() {
+        return 0;
     }
 
+    bool running() const {
+        return current_step < max_step_per_instance;
+    }
+
+    bool hasInstance() const {
+        return current_instance < instance_per_episode;
+    }
+
+    std::ostream& dump_file(std::ostream& out) {
+        return out;
+    }
+
+    typedef struct {
+      ExampleEnv* env;
+      bool test;
+    } SE;
+    
+    friend std::ostream& operator<<(std::ostream& out, ExampleEnv::SE &env);
+
+//     friend std::ostream operator
+
     unsigned int current_step=0;
-    unsigned int max_step;
+    unsigned int current_instance=0;
+
+    unsigned int max_step_per_instance;
+    unsigned int instance_per_episode;
     std::vector<float> internal_state;
 };
+
+
+
+std::ostream& operator<< (std::ostream &out, ExampleEnv::SE &env)
+{
+      return out;
+}
 
 class ExampleAgent {
 public:
@@ -54,7 +92,7 @@ public:
 
     }
 
-    const std::vector<float>& run(const std::vector<float>&, bool) {
+    const std::vector<float>& run(float reward, const std::vector<float>&, bool, bool) {
         return {0};
     }
 };
