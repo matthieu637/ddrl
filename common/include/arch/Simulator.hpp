@@ -5,17 +5,18 @@
 
 #include <string>
 #include <vector>
+#include <type_traits>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/program_options.hpp>
 #include "bib/Logger.hpp"
 #include "bib/Utils.hpp"
 #include "bib/Chrono.hpp"
+#include "bib/Dumper.hpp"
 
-#define DEFAULT_CONFIG_FILE "config.ini"
-#define DEFAULT_END_FILE "time_elapsed"
-#define DEFAULT_DUMP_LEARNING_FILE "learning.data"
-#define DEFAULT_DUMP_TESTING_FILE "testing.data"
+#include "arch/AAgent.hpp"
+#include "arch/AEnvironment.hpp"
+#include "arch/DefaultParam.hpp"
 
 using std::string;
 
@@ -25,7 +26,9 @@ namespace arch
 template <typename Environment, typename Agent>
 class Simulator
 {
-
+    static_assert(std::is_base_of<AEnvironment<>, Environment>::value, "Environment should be a base of AEnvironment.");
+    static_assert(std::is_base_of<AAgent<>, Agent>::value, "Agent should be a base of AAgent.");
+  
 public:
     Simulator() {}
 
@@ -101,12 +104,12 @@ private:
         dump_and_display(episode, all_rewards, env, agent, learning);
     }
 
-    template <typename T>
-    struct Dumper {
-        T* env;
-	bool dump_to_std;
-        bool dump_to_file;
-    };
+//     template <typename T>
+//     struct Dumper {
+//         T* env;
+// 	bool dump_to_std;
+//         bool dump_to_file;
+//     };
     
     void dump_and_display(unsigned int episode, const std::list<float>& all_rewards, Environment* env, Agent* ag, bool learning) {
         bool display=episode % display_log_each == 0;
@@ -114,9 +117,9 @@ private:
 
         if(dump || display) {
             bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
-	    Dumper<Environment> env_dump = {env, display, dump};
-	    Dumper<Agent> agent_dump = {ag, display, dump};
-
+	    bib::Dumper<Environment, bool, bool> env_dump(env, display, dump);
+	    bib::Dumper<Agent, bool, bool> agent_dump(ag, display, dump);
+	    
             if(display)
                 LOG_INFO((learning?"L ":"T ")<<
                          std::left << std::setw(7) << std::setfill(' ') << episode <<
