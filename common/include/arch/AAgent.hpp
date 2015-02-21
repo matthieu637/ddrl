@@ -2,11 +2,12 @@
 #define AAGENT_H
 
 #include "arch/Dummy.hpp"
+#include "arch/CommonAE.hpp"
 
 namespace arch {
 
 template <typename ProgOptions = AgentProgOptions>
-class AAgent : public ProgOptions
+class AAgent : public ProgOptions, public CommonAE
 {
 public:
     virtual const std::vector<float>& run(float reward, const std::vector<float>&, bool, bool) = 0;

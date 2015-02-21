@@ -2,11 +2,12 @@
 #define AENVIRONMENT_H
 
 #include "arch/Dummy.hpp"
+#include "arch/CommonAE.hpp"
 
 namespace arch {
 
 template <typename ProgOptions = DummyProgOptions>
-class AEnvironment : public ProgOptions
+class AEnvironment : public ProgOptions, public CommonAE
 {
 public:
     virtual void unique_destroy() {
@@ -47,19 +48,6 @@ public:
     bool hasInstance() const {
         return current_instance < instance_per_episode;
     }
-
-    std::ostream& display(std::ostream& out, bool display, bool dump) {
-        if(display) {
-
-        }
-
-        if(dump) {
-
-        }
-
-        return out;
-    }
-
 
     unsigned int current_step=0;
     unsigned int current_instance=0;

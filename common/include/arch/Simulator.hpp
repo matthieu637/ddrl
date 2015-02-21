@@ -103,13 +103,6 @@ private:
 
         dump_and_display(episode, all_rewards, env, agent, learning);
     }
-
-//     template <typename T>
-//     struct Dumper {
-//         T* env;
-// 	bool dump_to_std;
-//         bool dump_to_file;
-//     };
     
     void dump_and_display(unsigned int episode, const std::list<float>& all_rewards, Environment* env, Agent* ag, bool learning) {
         bool display=episode % display_log_each == 0;
