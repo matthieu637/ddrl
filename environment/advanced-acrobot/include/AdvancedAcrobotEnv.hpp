@@ -43,6 +43,11 @@ public:
     unsigned int number_of_actuators() const {
         return instance->activated_motors();
     }
+    
+    unsigned int number_of_sensors() const {
+        return instance->state().size();
+    }
+
 
 private:
     void _unique_invoke(boost::property_tree::ptree* properties, boost::program_options::variables_map* vm) {

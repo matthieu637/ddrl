@@ -54,5 +54,5 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   set(LIBRARY_NAME "${LIBRARY_NAME}-rd")
 endif()
 
-add_library(${LIBRARY_NAME} SHARED ${all_sources} ${drawstuff_src})
+add_library(${LIBRARY_NAME} SHARED ${all_include} ${all_sources} ${drawstuff_src})
 target_link_libraries(${LIBRARY_NAME} optimized ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_LIBRARY} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})

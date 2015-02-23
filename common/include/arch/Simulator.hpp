@@ -49,7 +49,7 @@ public:
         env = new Environment;
         env->unique_invoke(properties, command_args);
 
-        agent = new Agent(env->number_of_actuators());
+        agent = new Agent(env->number_of_actuators(), env->number_of_sensors());
         agent->unique_invoke(properties, command_args);
 
         time_spend.start();

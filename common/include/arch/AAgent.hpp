@@ -10,6 +10,8 @@ template <typename ProgOptions = AgentProgOptions>
 class AAgent : public ProgOptions, public CommonAE
 {
 public:
+//     virtual AAgent(unsigned int, unsigned int)=0;
+  
     virtual const std::vector<float>& run(float reward, const std::vector<float>&, bool, bool) = 0;
 
     virtual void start_episode(const std::vector<float>&) {

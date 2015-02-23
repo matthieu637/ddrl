@@ -9,9 +9,10 @@ namespace arch {
 
 class ExampleEnv : public arch::AEnvironment<> {
 public:
-  
-    ExampleEnv(){
-      
+
+    ExampleEnv() : internal_state(6) {
+        for(unsigned int i=0; i < internal_state.size(); i++)
+            internal_state[i] = bib::Utils::randin(-1, 1);
     }
 
     const std::vector<float>& perceptions() const
@@ -21,6 +22,10 @@ public:
 
     unsigned int number_of_actuators() const {
         return 3;
+    }
+
+    unsigned int number_of_sensors() const {
+        return internal_state.size();
     }
 
     float performance() {
@@ -37,7 +42,7 @@ public:
 
 class ExampleAgent : public arch::AAgent<> {
 public:
-    ExampleAgent(unsigned int nb_motors): actuator(nb_motors) {
+    ExampleAgent(unsigned int nb_motors, unsigned int): actuator(nb_motors) {
     }
 
     const std::vector<float>& run(float, const std::vector<float>&, bool, bool) {

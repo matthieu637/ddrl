@@ -16,6 +16,8 @@ public:
     virtual const std::vector<float>& perceptions() const = 0;
     
     virtual unsigned int number_of_actuators() const = 0;
+    
+    virtual unsigned int number_of_sensors() const = 0;
 
     virtual float performance() = 0 ;
 
