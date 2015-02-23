@@ -31,6 +31,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -g")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -ffast-math -DNDEBUG")
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -O2 -g -DNDEBUG")
 
+
+#BUILD TEST PROGRAM
 add_executable(internal-visu src/test/InternalView.cpp ${all_include} ${all_sources} ${drawstuff_src})
 target_link_libraries(internal-visu ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_LIBRARY} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})
 
@@ -41,3 +43,16 @@ add_executable(acrobot-env src/test/AcrobotEnv.cpp ${all_include} ${all_sources}
 target_link_libraries(acrobot-env ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_LIBRARY} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})
 
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
+#BUILD THE LIBRARY
+set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
+
+set(LIBRARY_NAME "advanced-acrobot")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(LIBRARY_NAME "${LIBRARY_NAME}-d")
+elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  set(LIBRARY_NAME "${LIBRARY_NAME}-rd")
+endif()
+
+add_library(${LIBRARY_NAME} SHARED ${all_sources} ${drawstuff_src})
+target_link_libraries(${LIBRARY_NAME} optimized ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_LIBRARY} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})

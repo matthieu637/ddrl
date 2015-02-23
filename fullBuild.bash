@@ -99,3 +99,4 @@ fi
 
 buildDir common
 buildDir environment
+buildDir agent
