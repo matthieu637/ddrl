@@ -1,6 +1,6 @@
+#include <bib/Utils.hpp>
 #include "AdvancedAcrobotWorld.hpp"
 #include "ODEFactory.hpp"
-#include <bib/Utils.hpp>
 #include <ode/ode.h>
 #include <functional>
 
@@ -236,19 +236,5 @@ float AdvancedAcrobotWorld::perf() const
     
     return (result[2]-STARTING_Z)/normalize;
 }
-
-
-bool AdvancedAcrobotWorld::end()
-{
-    return goalBeenReached;
-}
-
-bool AdvancedAcrobotWorld::prematureEnd()
-{
-    return goalFailed;
-}
-
-
-
 
 

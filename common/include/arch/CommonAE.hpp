@@ -1,6 +1,9 @@
 #ifndef COMMONAE_H
 #define COMMONAE_H
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+
 class CommonAE
 {
 public :
@@ -14,6 +17,10 @@ public :
         }
 
         return out;
+    }
+    
+    virtual void unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*){
+      
     }
 protected:
     virtual void _display(std::ostream&){

@@ -26,8 +26,8 @@ namespace arch
 template <typename Environment, typename Agent>
 class Simulator
 {
-    static_assert(std::is_base_of<AEnvironment<>, Environment>::value, "Environment should be a base of AEnvironment.");
-    static_assert(std::is_base_of<AAgent<>, Agent>::value, "Agent should be a base of AAgent.");
+//     static_assert(std::is_base_of<AEnvironment<>, Environment>::value, "Environment should be a base of AEnvironment.");
+//     static_assert(std::is_base_of<AAgent<>, Agent>::value, "Agent should be a base of AAgent.");
   
 public:
     Simulator() {}
@@ -47,10 +47,10 @@ public:
         ASSERT(well_init, "Please call init() first on Simulator");
 
         env = new Environment;
-        env->unique_invoke(properties);
+        env->unique_invoke(properties, command_args);
 
-        agent = new Agent;
-        agent->unique_invoke(properties);
+        agent = new Agent(env->number_of_actuators());
+        agent->unique_invoke(properties, command_args);
 
         time_spend.start();
         for(unsigned int episode=0; episode < max_episode; episode++) {
@@ -116,10 +116,10 @@ private:
             if(display)
                 LOG_INFO((learning?"L ":"T ")<<
                          std::left << std::setw(7) << std::setfill(' ') << episode <<
-                         std::left << std::setw(8) << std::setfill(' ') << reward_stats.mean <<
-                         std::left << std::setw(8) << std::setfill(' ') << reward_stats.var <<
-                         std::left << std::setw(8) << std::setfill(' ') << reward_stats.max <<
-                         std::left << std::setw(8) << std::setfill(' ') << reward_stats.min
+                         std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.mean <<
+                         std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) <<reward_stats.var <<
+                         std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) <<reward_stats.max <<
+                         std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) <<reward_stats.min
                         );
 
             if(dump)
@@ -195,3 +195,4 @@ private:
 }
 
 #endif
+

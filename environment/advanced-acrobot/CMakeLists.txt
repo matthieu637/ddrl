@@ -9,7 +9,7 @@ IF(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
    SET(CMAKE_BUILD_TYPE DEBUG)
 ENDIF(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
 
-find_package(Boost COMPONENTS serialization filesystem system REQUIRED)
+find_package(Boost COMPONENTS serialization filesystem system program_options REQUIRED)
 find_package(ODE REQUIRED)
 find_package(OpenGL)
 find_package(TBB)
@@ -36,5 +36,8 @@ target_link_libraries(internal-visu ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUF
 
 add_executable(multi-instance src/test/MultiInstance.cpp ${all_include} ${all_sources} ${drawstuff_src} )
 target_link_libraries(multi-instance ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_LIBRARY} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})
+
+add_executable(acrobot-env src/test/AcrobotEnv.cpp ${all_include} ${all_sources} ${drawstuff_src} )
+target_link_libraries(acrobot-env ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_LIBRARY} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})
 
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

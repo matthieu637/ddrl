@@ -8,6 +8,7 @@
 ///
 ///
 
+#include "bib/Assert.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>

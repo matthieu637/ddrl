@@ -12,10 +12,6 @@ class AAgent : public ProgOptions, public CommonAE
 public:
     virtual const std::vector<float>& run(float reward, const std::vector<float>&, bool, bool) = 0;
 
-    virtual void unique_invoke(boost::property_tree::ptree*) {
-
-    }
-
     virtual void start_episode(const std::vector<float>&) {
 
     }

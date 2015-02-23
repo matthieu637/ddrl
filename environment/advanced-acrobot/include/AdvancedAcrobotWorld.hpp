@@ -1,5 +1,6 @@
 #ifndef ADVANCEDACROBOTWORLD_HPP
 #define ADVANCEDACROBOTWORLD_HPP
+#include "bib/Assert.hpp"
 #include <vector>
 #include <ode/ode.h>
 #include "ODEObject.hpp"
@@ -21,18 +22,16 @@ enum bone_joint {HINGE, SLIDER};
 class AdvancedAcrobotWorld
 {
 public:
-    AdvancedAcrobotWorld(const std::vector<bone_joint>& types={HINGE,HINGE}, const std::vector<bool>& actuators={false,true,true});
+    AdvancedAcrobotWorld(const std::vector<bone_joint>& types= {HINGE,HINGE}, const std::vector<bool>& actuators= {false,false,true});
     virtual ~AdvancedAcrobotWorld();
 
     void resetPositions();
-    
+
     virtual void step(const std::vector<float>& motors);
     const std::vector<float>& state() const;
-    bool end();
-    bool prematureEnd();
     unsigned int activated_motors();
     float perf() const;
-    
+
 protected:
     void createWorld(const std::vector<bone_joint>&);
     std::vector<float>* current_joint_forces() const;
@@ -42,10 +41,10 @@ public:
 protected:
     std::vector<bone_joint> types;
     std::vector<bool> actuators;
-    
+
     std::vector<ODEObject*> bones;
     std::vector<dJointID> joints;
-    
+
     std::vector<float> internal_state;
 
     dGeomID ground;
