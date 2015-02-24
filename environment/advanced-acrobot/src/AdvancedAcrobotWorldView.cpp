@@ -68,7 +68,8 @@ void threadloop(const std::string& goodpath) {
     }
 }
 
-AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(const std::string& path) : AdvancedAcrobotWorld(), requestEnd(false), speedUp(false), ignoreMotor(false)
+AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(const std::string& path, const std::vector<bone_joint>& types, const std::vector<bool>& actuators) :
+    AdvancedAcrobotWorld(types, actuators), requestEnd(false), speedUp(false), ignoreMotor(false)
 {
     std::string goodpath = path;
 

@@ -103,9 +103,9 @@ private:
         actuators = bib::to_array<bool>(properties->get<std::string>("environment.actuators"));
 
         if(visible)
-            instance = new AdvancedAcrobotWorldView("data/textures");
+            instance = new AdvancedAcrobotWorldView("data/textures", *bones, *actuators);
         else
-            instance = new AdvancedAcrobotWorld();
+            instance = new AdvancedAcrobotWorld(*bones, *actuators);
     }
 
     void _apply(const std::vector<float>& actuators) {

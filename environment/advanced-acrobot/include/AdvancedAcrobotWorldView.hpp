@@ -9,7 +9,7 @@
 class AdvancedAcrobotWorldView : public AdvancedAcrobotWorld
 {
 public:
-    AdvancedAcrobotWorldView(const std::string&);
+    AdvancedAcrobotWorldView(const std::string&, const std::vector<bone_joint>& types= {HINGE,HINGE}, const std::vector<bool>& actuators= {false,false,true});
     ~AdvancedAcrobotWorldView();
     void step(const std::vector<float>& motors);
 
