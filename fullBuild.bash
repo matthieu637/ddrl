@@ -1,6 +1,11 @@
 #!/bin/bash
 
+LIB=$(dirname "${BASH_SOURCE[0]}")
+cd $LIB
+
 . scripts/cpu.bash
+#check cmake if installed
+. scripts/check_program.bash
 
 function hr(){
 	echo "---------------------------------------------------------------------------------"
@@ -75,21 +80,14 @@ function buildDir(){
 	done
 }
 
-#check cmake if installed
-which cmake >& /dev/null
-if [ $? -ne 0 ]; then
-	echo "ERROR : Please install 'cmake' to build this project."
-	exit 1
-else
-	echo "INFO : cmake well founded. Look what following to know if you need other software."
-	echo "QUESTION : if a subdirectory already contains a build, should I remove it ? (y/n) [y]:"
+echo "INFO : cmake well founded. Look what following to know if you need other software."
+echo "QUESTION : if a subdirectory already contains a build, should I remove it ? (y/n) [y]:"
 
-	force_remove="a"
-	while [[ $force_remove != "" && $force_remove != "y" &&  $force_remove != "n"  ]] ; do
-		read force_remove
-	done
-	hr
-fi
+force_remove="a"
+while [[ $force_remove != "" && $force_remove != "y" &&  $force_remove != "n"  ]] ; do
+	read force_remove
+done
+hr
 
 if [[ $force_remove == "n" ]] ; then
 	export FORCE_REMOVE=0
