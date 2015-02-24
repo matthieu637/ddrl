@@ -4,12 +4,12 @@
 #include "arch/Example.hpp"
 #include "AdvancedAcrobotEnv.hpp"
 
-#include "DiscretAction.hpp"
+#include "DiscretActionAg.hpp"
 
 int main(int argc, char **argv)
 {
     
-    arch::Simulator<AdvancedAcrobotEnv, DiscretAction > s;
+    arch::Simulator<AdvancedAcrobotEnv<>, DiscretActionAg > s;
 //     arch::Simulator<AdvancedAcrobotEnv, arch::ExampleAgent > s;
     s.init(argc, argv);
 
