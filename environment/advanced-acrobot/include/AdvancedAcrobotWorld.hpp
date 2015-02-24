@@ -13,8 +13,8 @@
 #define GRAVITY -9.81
 #define BONE_DENSITY 1
 #define BONE_MASS 1
-#define MAX_TORQUE_HINGE 10
-#define MAX_TORQUE_SLIDER 60
+#define MAX_TORQUE_HINGE 6
+#define MAX_TORQUE_SLIDER 40
 #define WORLD_STEP 0.01
 
 enum bone_joint {HINGE, SLIDER};
