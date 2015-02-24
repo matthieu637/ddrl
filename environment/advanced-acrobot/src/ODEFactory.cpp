@@ -1,14 +1,12 @@
 #include "ODEFactory.hpp"
 #include "bib/Logger.hpp"
 
-ODEFactory::ODEFactory()
-{
+ODEFactory::ODEFactory() {
 //     dInitODE2(dInitFlagManualThreadCleanup);
     dInitODE2(0);
 }
 
-ODEWorld ODEFactory::createWorld()
-{
+ODEWorld ODEFactory::createWorld() {
 
     Mutex::scoped_lock lock(mutex);//acquire
 //     LOG_DEBUG("call for create");
@@ -27,8 +25,7 @@ ODEWorld ODEFactory::createWorld()
     return world;
 }
 
-void ODEFactory::destroyWorld(const ODEWorld& world)
-{
+void ODEFactory::destroyWorld(const ODEWorld& world) {
 
     Mutex::scoped_lock lock(mutex);
 //     LOG_DEBUG("call for destory");
@@ -41,18 +38,15 @@ void ODEFactory::destroyWorld(const ODEWorld& world)
     lock.release();
 }
 
-Mutex& ODEFactory::wannaStep()
-{
+Mutex& ODEFactory::wannaStep() {
     return mutex;
 }
 
-ODEFactory::~ODEFactory()
-{
+ODEFactory::~ODEFactory() {
     dCloseODE();
 }
 
-ODEObject* ODEFactory::createBox(const ODEWorld& world, float x, float y, float z, float lx, float ly, float lz, float density, float mass, bool linkBody)
-{
+ODEObject* ODEFactory::createBox(const ODEWorld& world, float x, float y, float z, float lx, float ly, float lz, float density, float mass, bool linkBody) {
     dGeomID boxgeom = dCreateBox(world.space_id, lx, ly, lz);
 
     dMass m;
@@ -60,23 +54,22 @@ ODEObject* ODEFactory::createBox(const ODEWorld& world, float x, float y, float 
     dMassAdjust(&m, mass);
 
     dBodyID box_id;
-    if(linkBody) {
+    if (linkBody) {
         box_id = dBodyCreate(world.world_id);
-        dBodySetPosition (box_id,x,y,z);
+        dBodySetPosition (box_id, x, y, z);
 
         dBodySetMass(box_id, &m);
 
         dGeomSetBody(boxgeom, box_id);
     } else {
-        box_id=nullptr;
+        box_id = nullptr;
     }
 
     ODEObject* box = new ODEBox(box_id, m, boxgeom, x, y, z, density, mass, lx, ly, lz);
     return box;
 }
 
-ODEObject* ODEFactory::createSphere(const ODEWorld& world, float x, float y, float z, float radius, float density, float mass, bool linkBody)
-{
+ODEObject* ODEFactory::createSphere(const ODEWorld& world, float x, float y, float z, float radius, float density, float mass, bool linkBody) {
     dGeomID sphgeom = dCreateSphere(world.space_id, radius);
 
     dMass m;
@@ -84,7 +77,7 @@ ODEObject* ODEFactory::createSphere(const ODEWorld& world, float x, float y, flo
     dMassAdjust(&m, mass);
 
     dBodyID sphere_id;
-    if(linkBody) {
+    if (linkBody) {
         sphere_id = dBodyCreate(world.world_id);
         dBodySetPosition(sphere_id, x, y, z);
 
@@ -92,7 +85,7 @@ ODEObject* ODEFactory::createSphere(const ODEWorld& world, float x, float y, flo
 
         dGeomSetBody(sphgeom, sphere_id);
     } else {
-        sphere_id=nullptr;
+        sphere_id = nullptr;
     }
 
     ODEObject* sphere = new ODESphere(sphere_id, m, sphgeom, x, y, z, density, mass, radius);
@@ -100,8 +93,7 @@ ODEObject* ODEFactory::createSphere(const ODEWorld& world, float x, float y, flo
 }
 
 
-dGeomID ODEFactory::createGround(const ODEWorld& world)
-{
-    return dCreatePlane(world.space_id, 0,0,1,0);
+dGeomID ODEFactory::createGround(const ODEWorld& world) {
+    return dCreatePlane(world.space_id, 0, 0, 1, 0);
 }
 

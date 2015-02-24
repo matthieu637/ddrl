@@ -2,9 +2,8 @@
 #define ODEOBJECT_H
 #include <ode/ode.h>
 
-class ODEObject
-{
-public:
+class ODEObject {
+  public:
     ODEObject(dBodyID bid, dMass m, dGeomID geom, float x, float y, float z, float density, float massv);
     dBodyID getID();
     float getX();
@@ -22,36 +21,34 @@ public:
     float distSinceX();
     float distSinceY();
     float distSinceZ();
-    
-protected :
+
+  protected :
     dBodyID bid;
     dMass mass;
     dGeomID geom;
     float x, y, z, density, massv;
 };
 
-class ODEBox : public ODEObject
-{
-public:
+class ODEBox : public ODEObject {
+  public:
     ODEBox(dBodyID bid, dMass m, dGeomID geom, float x, float y, float z, float density, float mass, float lx, float ly, float lz);
     float getLX();
     float getLY();
     float getLZ();
-    
-protected :
+
+  protected :
     float lx, ly, lz;
 
 };
 
-class ODESphere : public ODEObject
-{
-public:
+class ODESphere : public ODEObject {
+  public:
     ODESphere(dBodyID bid, dMass m, dGeomID geom, float x, float y, float z, float density, float massv, float radius);
     float getRadius();
-    
-protected :
-  float radius;
-  
+
+  protected :
+    float radius;
+
 };
 
 #endif // ODEOBJECT_H

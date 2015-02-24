@@ -17,7 +17,7 @@
 #include <list>
 #include <map>
 #include "Singleton.hpp"
-  
+
 #define LOG(stream) \
    bib::Logger::getInstance()->isBufferEnable() ? bib::Logger::getInstance()->registerBuffer() << stream : std::cout << stream << std::endl
 
@@ -47,130 +47,127 @@
 
 namespace bib {
 
-class Logger : public Singleton<Logger> {
-    friend class Singleton<Logger>;
+    class Logger : public Singleton<Logger> {
+        friend class Singleton<Logger>;
 
-public:
-    enum LogLevel { DEBUGGING, INFO, WARNING, ERROR };
-    
-    std::ofstream& getFile(const std::string& s){
-      if(open_files.find(s) == open_files.end()){
-	std::ofstream* ofs = new std::ofstream;
-	ofs->open(s, std::ofstream::out);
-	open_files.insert(std::pair<std::string, std::ofstream*>(s, ofs));
-      }
-	
-      return *open_files.find(s)->second;
-    }
+      public:
+        enum LogLevel { DEBUGGING, INFO, WARNING, ERROR };
 
-    std::stringstream& registerBuffer() {
-        std::stringstream* n = new std::stringstream;
+        std::ofstream& getFile(const std::string& s) {
+            if (open_files.find(s) == open_files.end()) {
+                std::ofstream* ofs = new std::ofstream;
+                ofs->open(s, std::ofstream::out);
+                open_files.insert(std::pair<std::string, std::ofstream*>(s, ofs));
+            }
 
-        if(!ignored_buffer_enable)
-            buff.push_back(n);
-        else
-            ignored_buffer.push_back(n);
-
-        return *n;
-    }
-
-    void flushBuffer() {
-        for(std::list<std::stringstream*>::iterator it = buff.begin(); it != buff.end(); ++it) {
-            std::cout << (*it)->str() << " " ;
-            delete *it;
+            return *open_files.find(s)->second;
         }
-        std::cout << std::endl;
-        buff.clear();
 
-        clearIgnoredBuffer();
-    }
+        std::stringstream& registerBuffer() {
+            std::stringstream* n = new std::stringstream;
 
-    void clearIgnoredBuffer() {
-        for(std::list<std::stringstream*>::iterator it = ignored_buffer.begin(); it != ignored_buffer.end(); ++it)
-            delete *it;
-        ignored_buffer.clear();
-    }
+            if (!ignored_buffer_enable)
+                buff.push_back(n);
+            else
+                ignored_buffer.push_back(n);
 
-    void enableBuffer() {
-        enable_buffer = true;
-    }
+            return *n;
+        }
 
-    bool isEnabled(LogLevel l) {
-        return level <= l;
-    }
+        void flushBuffer() {
+            for (std::list<std::stringstream*>::iterator it = buff.begin(); it != buff.end(); ++it) {
+                std::cout << (*it)->str() << " " ;
+                delete *it;
+            }
+            std::cout << std::endl;
+            buff.clear();
 
-    bool isBufferEnable() {
-        return enable_buffer;
-    }
+            clearIgnoredBuffer();
+        }
 
-    void setLevel(LogLevel l) {
-        level = l;
-    }
+        void clearIgnoredBuffer() {
+            for (std::list<std::stringstream*>::iterator it = ignored_buffer.begin(); it != ignored_buffer.end(); ++it)
+                delete *it;
+            ignored_buffer.clear();
+        }
 
-    void setIgnoredBuffer(bool val) {
-        ignored_buffer_enable = val;
-    }
+        void enableBuffer() {
+            enable_buffer = true;
+        }
 
-    template <class T>
-    static inline void PRINT_ELEMENTS (const T& coll, const char* optcstr="")
-    {
-        typename T::const_iterator pos;
+        bool isEnabled(LogLevel l) {
+            return level <= l;
+        }
 
-        LOG_DEBUGS(optcstr);
-        for (pos=coll.begin(); pos!=coll.end(); ++pos)
-            LOG_DEBUGC(*pos << ",\t");
+        bool isBufferEnable() {
+            return enable_buffer;
+        }
 
-        LOG_DEBUGE();
-    }
-    
-    template <class T>
-    static inline void PRINT_ELEMENTS_FT (const T& coll, const char* optcstr="", int width=4, int precision=2)
-    {
-        typename T::const_iterator pos;
+        void setLevel(LogLevel l) {
+            level = l;
+        }
 
-        LOG_DEBUGS(optcstr);
-        for (pos=coll.begin(); pos!=coll.end(); ++pos)
-            LOG_DEBUGC(std::left << std::setw(width) << std::setfill(' ') << std::setprecision(precision) << *pos);
+        void setIgnoredBuffer(bool val) {
+            ignored_buffer_enable = val;
+        }
 
-        LOG_DEBUGE();
-    }
+        template <class T>
+        static inline void PRINT_ELEMENTS (const T& coll, const char* optcstr = "") {
+            typename T::const_iterator pos;
 
-    template <class T>
-    static inline void PRINT_ELEMENTS (const T& coll, int length, const char* optcstr="")
-    {
-        LOG_DEBUGS(optcstr);
-        for (int i=0; i<length; i++)
-            LOG_DEBUGC(coll[i] << ", ");
+            LOG_DEBUGS(optcstr);
+            for (pos = coll.begin(); pos != coll.end(); ++pos)
+                LOG_DEBUGC(*pos << ",\t");
 
-        LOG_DEBUGE();
-    }
+            LOG_DEBUGE();
+        }
 
-    ~Logger() {
-        clearIgnoredBuffer();
-        for(std::list<std::stringstream*>::iterator it = buff.begin(); it != buff.end(); ++it)
-            delete *it;
-        buff.clear();
-	
-	for(auto it = open_files.begin(); it != open_files.end(); ++it){
-	    it->second->close();
-	    delete it->second;
-	}
-    }
+        template <class T>
+        static inline void PRINT_ELEMENTS_FT (const T& coll, const char* optcstr = "", int width = 4, int precision = 2) {
+            typename T::const_iterator pos;
 
-protected:
-    Logger():level(DEBUGGING) {}
+            LOG_DEBUGS(optcstr);
+            for (pos = coll.begin(); pos != coll.end(); ++pos)
+                LOG_DEBUGC(std::left << std::setw(width) << std::setfill(' ') << std::setprecision(precision) << *pos);
+
+            LOG_DEBUGE();
+        }
+
+        template <class T>
+        static inline void PRINT_ELEMENTS (const T& coll, int length, const char* optcstr = "") {
+            LOG_DEBUGS(optcstr);
+            for (int i = 0; i < length; i++)
+                LOG_DEBUGC(coll[i] << ", ");
+
+            LOG_DEBUGE();
+        }
+
+        ~Logger() {
+            clearIgnoredBuffer();
+            for (std::list<std::stringstream*>::iterator it = buff.begin(); it != buff.end(); ++it)
+                delete *it;
+            buff.clear();
+
+            for (auto it = open_files.begin(); it != open_files.end(); ++it) {
+                it->second->close();
+                delete it->second;
+            }
+        }
+
+      protected:
+        Logger(): level(DEBUGGING) {}
 
 
-private :
-    LogLevel level;
+      private :
+        LogLevel level;
 
-    bool enable_buffer = false;
-    bool ignored_buffer_enable = false;
-    std::list<std::stringstream*> buff;
-    std::list<std::stringstream*> ignored_buffer;
-    unsigned int buffer_index = 0;
-    std::map<std::string, std::ofstream*> open_files;
-};
+        bool enable_buffer = false;
+        bool ignored_buffer_enable = false;
+        std::list<std::stringstream*> buff;
+        std::list<std::stringstream*> ignored_buffer;
+        unsigned int buffer_index = 0;
+        std::map<std::string, std::ofstream*> open_files;
+    };
 
 }
 

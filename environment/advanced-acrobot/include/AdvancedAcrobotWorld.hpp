@@ -19,10 +19,9 @@
 
 enum bone_joint {HINGE, SLIDER};
 
-class AdvancedAcrobotWorld
-{
-public:
-    AdvancedAcrobotWorld(const std::vector<bone_joint>& types= {HINGE,HINGE}, const std::vector<bool>& actuators= {false,false,true});
+class AdvancedAcrobotWorld {
+  public:
+    AdvancedAcrobotWorld(const std::vector<bone_joint>& types = {HINGE, HINGE}, const std::vector<bool>& actuators = {false, false, true});
     virtual ~AdvancedAcrobotWorld();
 
     void resetPositions();
@@ -32,13 +31,13 @@ public:
     unsigned int activated_motors();
     float perf() const;
 
-protected:
+  protected:
     void createWorld(const std::vector<bone_joint>&);
     std::vector<float>* current_joint_forces() const;
 
-public:
+  public:
     ODEWorld odeworld;
-protected:
+  protected:
     std::vector<bone_joint> types;
     std::vector<bool> actuators;
 
@@ -49,7 +48,7 @@ protected:
 
     dGeomID ground;
 
-private:
+  private:
     bool goalBeenReached;
     bool goalFailed;
     unsigned int _activated_motors;

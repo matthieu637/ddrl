@@ -4,8 +4,7 @@
 #include "arch/Example.hpp"
 #include "AdvancedAcrobotEnv.hpp"
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     arch::Simulator<AdvancedAcrobotEnv<>, arch::ExampleAgent> s;
     s.init(argc, argv);
 

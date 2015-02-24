@@ -11,10 +11,9 @@
 
 typedef boost::shared_ptr<std::vector<float>> EnvState;
 
-class DiscretActionAg : public arch::AAgent<>
-{
-public:
-    DiscretActionAg(unsigned int _nb_motors, unsigned int _nb_sensors) :nb_motors(_nb_motors), nb_sensors(_nb_sensors) {
+class DiscretActionAg : public arch::AAgent<> {
+  public:
+    DiscretActionAg(unsigned int _nb_motors, unsigned int _nb_sensors) : nb_motors(_nb_motors), nb_sensors(_nb_sensors) {
 
     }
 
@@ -30,12 +29,12 @@ public:
     const std::vector<float>& run(float reward, const std::vector<float>& sensors, bool learning, bool goal_reached) {
         EnvState s(new std::vector<float>(sensors));
         sml::DAction* ac;
-        if(learning)
+        if (learning)
             ac = algo->learn(s, reward, goal_reached);
         else ac = algo->decision(s, false);
 
         vector<float>* outputs = sml::ActionFactory::computeOutputs(ac, 0, *actions);
-        if(!learning)
+        if (!learning)
             delete ac;
         return *outputs;
     }
@@ -67,7 +66,7 @@ public:
         algo->startEpisode(s, *ainit);
     }
 
-private:
+  private:
     int nb_motors;
     int nb_sensors;
 

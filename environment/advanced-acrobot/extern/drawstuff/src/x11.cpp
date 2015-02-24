@@ -49,43 +49,39 @@
 //***************************************************************************
 // error handling for unix
 
-static void printMessage (const char *msg1, const char *msg2, va_list ap)
-{
+static void printMessage (const char *msg1, const char *msg2, va_list ap) {
     fflush (stderr);
     fflush (stdout);
-    fprintf (stderr,"\n%s: ",msg1);
-    vfprintf (stderr,msg2,ap);
-    fprintf (stderr,"\n");
+    fprintf (stderr, "\n%s: ", msg1);
+    vfprintf (stderr, msg2, ap);
+    fprintf (stderr, "\n");
     fflush (stderr);
 }
 
 
-extern "C" void dsError (const char *msg, ...)
-{
+extern "C" void dsError (const char *msg, ...) {
     va_list ap;
-    va_start (ap,msg);
-    printMessage ("Error",msg,ap);
+    va_start (ap, msg);
+    printMessage ("Error", msg, ap);
     va_end (ap);
     exit (1);
 }
 
 
-extern "C" void dsDebug (const char *msg, ...)
-{
+extern "C" void dsDebug (const char *msg, ...) {
     va_list ap;
-    va_start (ap,msg);
-    printMessage ("INTERNAL ERROR",msg,ap);
+    va_start (ap, msg);
+    printMessage ("INTERNAL ERROR", msg, ap);
     va_end (ap);
-    // *((char *)0) = 0;	 ... commit SEGVicide ?
+    // *((char *)0) = 0;   ... commit SEGVicide ?
     abort();
 }
 
 
-extern "C" void dsPrint (const char *msg, ...)
-{
+extern "C" void dsPrint (const char *msg, ...) {
     va_list ap;
-    va_start (ap,msg);
-    vprintf (msg,ap);
+    va_start (ap, msg);
+    vprintf (msg, ap);
     va_end (ap);
 }
 
@@ -93,45 +89,44 @@ extern "C" void dsPrint (const char *msg, ...)
 // openGL window
 
 // X11 display info
-static Display *display=0;
-static int screen=0;
-static XVisualInfo *visual=0;		// best visual for openGL
-static Colormap colormap=0;		// window's colormap
+static Display *display = 0;
+static int screen = 0;
+static XVisualInfo *visual = 0; // best visual for openGL
+static Colormap colormap = 0; // window's colormap
 static Atom wm_protocols_atom = 0;
 static Atom wm_delete_window_atom = 0;
 
 // window and openGL
-static Window win=0;			// X11 window, 0 if not initialized
-static int width=0,height=0;		// window size
-static GLXContext glx_context=0;	// openGL rendering context
-static int last_key_pressed=0;		// last key pressed in the window
-static int run=1;			// 1 if simulation running
-static int pausemode=0;			// 1 if in `pause' mode
-static int singlestep=0;		// 1 if single step key pressed
-static int writeframes=0;		// 1 if frame files to be written
+static Window win = 0;    // X11 window, 0 if not initialized
+static int width = 0, height = 0; // window size
+static GLXContext glx_context = 0; // openGL rendering context
+static int last_key_pressed = 0;  // last key pressed in the window
+static int run = 1;   // 1 if simulation running
+static int pausemode = 0;   // 1 if in `pause' mode
+static int singlestep = 0;  // 1 if single step key pressed
+static int writeframes = 0; // 1 if frame files to be written
 
 
-void createMainWindow (int _width, int _height)
-{
+void createMainWindow (int _width, int _height) {
     // create X11 display connection
     display = XOpenDisplay (NULL);
     if (!display) dsError ("can not open X11 display");
     screen = DefaultScreen(display);
 
     // get GL visual
-    static int attribListDblBuf[] = {GLX_RGBA, GLX_DOUBLEBUFFER, GLX_DEPTH_SIZE,16,
-                                     GLX_RED_SIZE,4, GLX_GREEN_SIZE,4, GLX_BLUE_SIZE,4, None
+    static int attribListDblBuf[] = {GLX_RGBA, GLX_DOUBLEBUFFER, GLX_DEPTH_SIZE, 16,
+                                     GLX_RED_SIZE, 4, GLX_GREEN_SIZE, 4, GLX_BLUE_SIZE, 4, None
                                     };
-    static int attribList[] = {GLX_RGBA, GLX_DEPTH_SIZE,16,
-                               GLX_RED_SIZE,4, GLX_GREEN_SIZE,4, GLX_BLUE_SIZE,4, None
+    static int attribList[] = {GLX_RGBA, GLX_DEPTH_SIZE, 16,
+                               GLX_RED_SIZE, 4, GLX_GREEN_SIZE, 4, GLX_BLUE_SIZE, 4, None
                               };
-    visual = glXChooseVisual (display,screen,attribListDblBuf);
-    if (!visual) visual = glXChooseVisual (display,screen,attribList);
+    visual = glXChooseVisual (display, screen, attribListDblBuf);
+    if (!visual) visual = glXChooseVisual (display, screen, attribList);
     if (!visual) dsError ("no good X11 visual found for OpenGL");
 
     // create colormap
-    colormap = XCreateColormap (display,RootWindow(display,screen),
-                                visual->visual,AllocNone);
+    colormap = XCreateColormap (display, RootWindow(display, screen),
+                                visual->visual, AllocNone);
 
     // initialize variables
     win = 0;
@@ -140,21 +135,21 @@ void createMainWindow (int _width, int _height)
     glx_context = 0;
     last_key_pressed = 0;
 
-    if (width < 1 || height < 1) dsDebug (0,"bad window width or height");
+    if (width < 1 || height < 1) dsDebug (0, "bad window width or height");
 
     // create the window
     XSetWindowAttributes attributes;
-    attributes.background_pixel = BlackPixel(display,screen);
+    attributes.background_pixel = BlackPixel(display, screen);
     attributes.colormap = colormap;
     attributes.event_mask = ButtonPressMask | ButtonReleaseMask |
                             KeyPressMask | KeyReleaseMask | ButtonMotionMask | PointerMotionHintMask |
                             StructureNotifyMask;
-    win = XCreateWindow (display,RootWindow(display,screen),50,50,width,height,
-                         0,visual->depth, InputOutput,visual->visual,
-                         CWBackPixel | CWColormap | CWEventMask,&attributes);
+    win = XCreateWindow (display, RootWindow(display, screen), 50, 50, width, height,
+                         0, visual->depth, InputOutput, visual->visual,
+                         CWBackPixel | CWColormap | CWEventMask, &attributes);
 
     // associate a GLX context with the window
-    glx_context = glXCreateContext (display,visual,0,GL_TRUE);
+    glx_context = glXCreateContext (display, visual, 0, GL_TRUE);
     if (!glx_context) dsError ("can't make an OpenGL context");
 
     // set the window title
@@ -163,33 +158,32 @@ void createMainWindow (int _width, int _height)
     window_name.encoding = XA_STRING;
     window_name.format = 8;
     window_name.nitems = strlen((char *) window_name.value);
-    XSetWMName (display,win,&window_name);
+    XSetWMName (display, win, &window_name);
 
     // participate in the window manager 'delete yourself' protocol
-    wm_protocols_atom = XInternAtom (display,"WM_PROTOCOLS",False);
-    wm_delete_window_atom = XInternAtom (display,"WM_DELETE_WINDOW",False);
-    if (XSetWMProtocols (display,win,&wm_delete_window_atom,1)==0)
+    wm_protocols_atom = XInternAtom (display, "WM_PROTOCOLS", False);
+    wm_delete_window_atom = XInternAtom (display, "WM_DELETE_WINDOW", False);
+    if (XSetWMProtocols (display, win, &wm_delete_window_atom, 1) == 0)
         dsError ("XSetWMProtocols() call failed");
 
     // pop up the window
-    XMapWindow (display,win);
-    XSync (display,win);
+    XMapWindow (display, win);
+    XSync (display, win);
 }
 
 void HACKinitX11(int w, int h, dsFunctions *fn) {
     XInitThreads();
     createMainWindow (w, h);
-    glXMakeCurrent (display,win,glx_context);
+    glXMakeCurrent (display, win, glx_context);
 
     dsStartGraphics (w, h, fn);
 }
 
 
-static void destroyMainWindow()
-{
-    glXDestroyContext (display,glx_context);
-    XDestroyWindow (display,win);
-    XSync (display,0);
+static void destroyMainWindow() {
+    glXDestroyContext (display, glx_context);
+    XDestroyWindow (display, win);
+    XSync (display, 0);
     XCloseDisplay(display);
     display = 0;
     win = 0;
@@ -197,10 +191,9 @@ static void destroyMainWindow()
 }
 
 
-static void handleEvent (XEvent &event, dsFunctions *fn)
-{
-    static int mx=0,my=0; 	// mouse position
-    static int mode = 0;		// mouse button bits
+static void handleEvent (XEvent &event, dsFunctions *fn) {
+    static int mx = 0, my = 0; // mouse position
+    static int mode = 0;    // mouse button bits
 
     switch (event.type) {
 
@@ -224,10 +217,10 @@ static void handleEvent (XEvent &event, dsFunctions *fn)
 
     case MotionNotify: {
         if (event.xmotion.is_hint) {
-            Window root,child;
+            Window root, child;
             unsigned int mask;
-            XQueryPointer (display,win,&root,&child,&event.xbutton.x_root,
-                           &event.xbutton.y_root,&event.xbutton.x,&event.xbutton.y,
+            XQueryPointer (display, win, &root, &child, &event.xbutton.x_root,
+                           &event.xbutton.y_root, &event.xbutton.x, &event.xbutton.y,
                            &mask);
         }
         dsMotion (mode, event.xmotion.x - mx, event.xmotion.y - my);
@@ -238,11 +231,10 @@ static void handleEvent (XEvent &event, dsFunctions *fn)
 
     case KeyPress: {
         KeySym key;
-        XLookupString (&event.xkey,NULL,0,&key,0);
+        XLookupString (&event.xkey, NULL, 0, &key, 0);
         if ((event.xkey.state & ControlMask) == 0) {
             if (key >= ' ' && key <= 126 && fn->command) fn->command (key);
-        }
-        else if (event.xkey.state & ControlMask) {
+        } else if (event.xkey.state & ControlMask) {
             switch (key) {
             case 't':
             case 'T':
@@ -267,10 +259,10 @@ static void handleEvent (XEvent &event, dsFunctions *fn)
                 break;
             case 'v':
             case 'V': {
-                float xyz[3],hpr[3];
-                dsGetViewpoint (xyz,hpr);
+                float xyz[3], hpr[3];
+                dsGetViewpoint (xyz, hpr);
                 printf ("Viewpoint = (%.4f,%.4f,%.4f,%.4f,%.4f,%.4f)\n",
-                        xyz[0],xyz[1],xyz[2],hpr[0],hpr[1],hpr[2]);
+                        xyz[0], xyz[1], xyz[2], hpr[0], hpr[1], hpr[2]);
                 break;
             }
             case 'w':
@@ -280,7 +272,7 @@ static void handleEvent (XEvent &event, dsFunctions *fn)
                 break;
             }
         }
-        last_key_pressed = key;		// a kludgy place to put this...
+        last_key_pressed = key;   // a kludgy place to put this...
     }
     return;
 
@@ -307,14 +299,13 @@ static void handleEvent (XEvent &event, dsFunctions *fn)
 
 
 // return the index of the highest bit
-static int getHighBitIndex (unsigned int x)
-{
+static int getHighBitIndex (unsigned int x) {
     int i = 0;
     while (x) {
         i++;
         x >>= 1;
     }
-    return i-1;
+    return i - 1;
 }
 
 
@@ -322,70 +313,65 @@ static int getHighBitIndex (unsigned int x)
 #define SHIFTL(x,i) (((i) >= 0) ? ((x) << (i)) : ((x) >> (-i)))
 
 
-static void captureFrame (int num)
-{
-    fprintf (stderr,"capturing frame %04d\n",num);
+static void captureFrame (int num) {
+    fprintf (stderr, "capturing frame %04d\n", num);
 
     char s[100];
-    sprintf (s,"frame/frame%04d.ppm",num);
-    FILE *f = fopen (s,"wb");
-    if (!f) dsError ("can't open \"%s\" for writing",s);
-    fprintf (f,"P6\n%d %d\n255\n",width,height);
-    XImage *image = XGetImage (display,win,0,0,width,height,~0,ZPixmap);
+    sprintf (s, "frame/frame%04d.ppm", num);
+    FILE *f = fopen (s, "wb");
+    if (!f) dsError ("can't open \"%s\" for writing", s);
+    fprintf (f, "P6\n%d %d\n255\n", width, height);
+    XImage *image = XGetImage (display, win, 0, 0, width, height, ~0, ZPixmap);
 
     int rshift = 7 - getHighBitIndex (image->red_mask);
     int gshift = 7 - getHighBitIndex (image->green_mask);
     int bshift = 7 - getHighBitIndex (image->blue_mask);
 
-    for (int y=0; y<height; y++) {
-        for (int x=0; x<width; x++) {
-            unsigned long pixel = XGetPixel (image,x,y);
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            unsigned long pixel = XGetPixel (image, x, y);
             unsigned char b[3];
-            b[0] = SHIFTL(pixel & image->red_mask,rshift);
-            b[1] = SHIFTL(pixel & image->green_mask,gshift);
-            b[2] = SHIFTL(pixel & image->blue_mask,bshift);
-            fwrite (b,3,1,f);
+            b[0] = SHIFTL(pixel & image->red_mask, rshift);
+            b[1] = SHIFTL(pixel & image->green_mask, gshift);
+            b[2] = SHIFTL(pixel & image->blue_mask, bshift);
+            fwrite (b, 3, 1, f);
         }
     }
     fclose (f);
     XDestroyImage (image);
 }
 
-void processDrawFrame(int *frame, dsFunctions *fn)
-{
-    dsDrawFrame (width,height,fn,pausemode && !singlestep);
+void processDrawFrame(int *frame, dsFunctions *fn) {
+    dsDrawFrame (width, height, fn, pausemode && !singlestep);
     singlestep = 0;
 
     glFlush();
-    glXSwapBuffers (display,win);
-    XSync (display,0);
+    glXSwapBuffers (display, win);
+    XSync (display, 0);
 
     // capture frames if necessary
-    if (pausemode==0 && writeframes) {
+    if (pausemode == 0 && writeframes) {
         captureFrame (*frame);
         (*frame)++;
     }
 }
 
-void microsleep(int usecs)
-{
+void microsleep(int usecs) {
 #ifdef HAVE_UNISTD_H
     usleep(usecs);
 #endif
 }
 
 void dsPlatformSimLoop (int window_width, int window_height, dsFunctions *fn,
-                        int initial_pause)
-{
+                        int initial_pause) {
     pausemode = initial_pause;
     createMainWindow (window_width, window_height);
-    glXMakeCurrent (display,win,glx_context);
+    glXMakeCurrent (display, win, glx_context);
 
-    dsStartGraphics (window_width,window_height,fn);
+    dsStartGraphics (window_width, window_height, fn);
 
-    static bool firsttime=true;
-    if (firsttime)
-    {
+    static bool firsttime = true;
+    if (firsttime) {
         fprintf
         (
             stderr,
@@ -403,7 +389,7 @@ void dsPlatformSimLoop (int window_width, int window_height, dsFunctions *fn,
             "   Left button - pan and tilt.\n"
             "   Right button - forward and sideways.\n"
             "   Left + Right button (or middle button) - sideways and up.\n"
-            "\n",DS_VERSION >> 8,DS_VERSION & 0xff
+            "\n", DS_VERSION >> 8, DS_VERSION & 0xff
         );
         firsttime = false;
     }
@@ -422,19 +408,17 @@ void dsPlatformSimLoop (int window_width, int window_height, dsFunctions *fn,
         // read in and process all pending events for the main window
         XEvent event;
         while (run && XPending (display)) {
-            XNextEvent (display,&event);
-            handleEvent (event,fn);
+            XNextEvent (display, &event);
+            handleEvent (event, fn);
         }
 
 #if HAVE_GETTIMEOFDAY
         gettimeofday(&tv, 0);
         double curr = tv.tv_sec + (double) tv.tv_usec / 1000000.0 ;
-        if (curr-prev >= 1.0/60.0)
-        {
+        if (curr - prev >= 1.0 / 60.0) {
             prev = curr;
             processDrawFrame(&frame, fn);
-        }
-        else
+        } else
             microsleep(1000);
 #else
         processDrawFrame(&frame, fn);
@@ -448,25 +432,23 @@ void dsPlatformSimLoop (int window_width, int window_height, dsFunctions *fn,
 }
 
 
-extern "C" void dsStop()
-{
+extern "C" void dsStop() {
     run = 0;
 }
 
 
-extern "C" double dsElapsedTime()
-{
+extern "C" double dsElapsedTime() {
 #if HAVE_GETTIMEOFDAY
-    static double prev=0.0;
+    static double prev = 0.0;
     timeval tv ;
 
     gettimeofday(&tv, 0);
     double curr = tv.tv_sec + (double) tv.tv_usec / 1000000.0 ;
     if (!prev)
-        prev=curr;
-    double retval = curr-prev;
-    prev=curr;
-    if (retval>1.0) retval=1.0;
+        prev = curr;
+    double retval = curr - prev;
+    prev = curr;
+    if (retval > 1.0) retval = 1.0;
 //     if (retval<dEpsilon) retval=dEpsilon;
     return retval;
 #else
@@ -479,8 +461,8 @@ void HACKdraw(dsFunctions *fn) {
 
     XEvent event;
     while (XPending (display)) {
-        XNextEvent (display,&event);
-        handleEvent (event,fn);
+        XNextEvent (display, &event);
+        handleEvent (event, fn);
     }
 
     processDrawFrame(&frame, fn);

@@ -6,30 +6,29 @@
 
 namespace arch {
 
-template <typename ProgOptions = AgentProgOptions>
-class AAgent : public ProgOptions, public CommonAE
-{
-public:
+    template <typename ProgOptions = AgentProgOptions>
+    class AAgent : public ProgOptions, public CommonAE {
+      public:
 //     virtual AAgent(unsigned int, unsigned int)=0;
-  
-    virtual const std::vector<float>& run(float reward, const std::vector<float>&, bool, bool) = 0;
 
-    virtual void start_episode(const std::vector<float>&) {
+        virtual const std::vector<float>& run(float reward, const std::vector<float>&, bool, bool) = 0;
 
-    }
-
-    std::ostream& display(std::ostream& out, bool display, bool dump) {
-        if(display) {
+        virtual void start_episode(const std::vector<float>&) {
 
         }
 
-        if(dump) {
+        std::ostream& display(std::ostream& out, bool display, bool dump) {
+            if (display) {
 
+            }
+
+            if (dump) {
+
+            }
+
+            return out;
         }
-
-        return out;
-    }
-};
+    };
 
 }
 

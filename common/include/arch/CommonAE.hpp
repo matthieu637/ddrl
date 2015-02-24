@@ -4,31 +4,30 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 
-class CommonAE
-{
-public :
+class CommonAE {
+  public :
     std::ostream& display(std::ostream& out, bool display, bool dump) {
-        if(display) {
+        if (display) {
             _display(out);
         }
 
-        if(dump) {
+        if (dump) {
             _dump(out);
         }
 
         return out;
     }
-    
-    virtual void unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*){
-      
+
+    virtual void unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) {
+
     }
-protected:
-    virtual void _display(std::ostream&){
-	
+  protected:
+    virtual void _display(std::ostream&) {
+
     }
-    
-    virtual void _dump(std::ostream&){
-	
+
+    virtual void _dump(std::ostream&) {
+
     }
 };
 

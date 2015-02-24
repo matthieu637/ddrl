@@ -6,17 +6,17 @@
 
 namespace bib {
 
-class Seed : public Singleton<Seed> {
-    friend class Singleton<Seed>;
+    class Seed : public Singleton<Seed> {
+        friend class Singleton<Seed>;
 
-protected:
-    Seed() {
-        time_t t = time(0) + ::getpid();
-        std::cout<<"seed: " << t << std::endl;
-        srand(t);
-    }
+      protected:
+        Seed() {
+            time_t t = time(0) + ::getpid();
+            std::cout << "seed: " << t << std::endl;
+            srand(t);
+        }
 
-};
+    };
 
 }
 

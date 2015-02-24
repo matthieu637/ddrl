@@ -7,52 +7,51 @@
 
 namespace arch {
 
-class ExampleEnv : public arch::AEnvironment<> {
-public:
+    class ExampleEnv : public arch::AEnvironment<> {
+      public:
 
-    ExampleEnv() : internal_state(6) {
-        for(unsigned int i=0; i < internal_state.size(); i++)
-            internal_state[i] = bib::Utils::randin(-1, 1);
-    }
+        ExampleEnv() : internal_state(6) {
+            for (unsigned int i = 0; i < internal_state.size(); i++)
+                internal_state[i] = bib::Utils::randin(-1, 1);
+        }
 
-    const std::vector<float>& perceptions() const
-    {
-        return internal_state;
-    }
+        const std::vector<float>& perceptions() const {
+            return internal_state;
+        }
 
-    unsigned int number_of_actuators() const {
-        return 3;
-    }
+        unsigned int number_of_actuators() const {
+            return 3;
+        }
 
-    unsigned int number_of_sensors() const {
-        return internal_state.size();
-    }
+        unsigned int number_of_sensors() const {
+            return internal_state.size();
+        }
 
-    float performance() {
-        return 0;
-    }
+        float performance() {
+            return 0;
+        }
 
-    void _apply(const std::vector<float>&) {
+        void _apply(const std::vector<float>&) {
 
-    }
+        }
 
-    std::vector<float> internal_state;
-};
+        std::vector<float> internal_state;
+    };
 
 
-class ExampleAgent : public arch::AAgent<> {
-public:
-    ExampleAgent(unsigned int nb_motors, unsigned int): actuator(nb_motors) {
-    }
+    class ExampleAgent : public arch::AAgent<> {
+      public:
+        ExampleAgent(unsigned int nb_motors, unsigned int): actuator(nb_motors) {
+        }
 
-    const std::vector<float>& run(float, const std::vector<float>&, bool, bool) {
-        for(unsigned int i=0; i < actuator.size(); i++)
-            actuator[i] = bib::Utils::randin(-1, 1);
-        return actuator;
-    }
+        const std::vector<float>& run(float, const std::vector<float>&, bool, bool) {
+            for (unsigned int i = 0; i < actuator.size(); i++)
+                actuator[i] = bib::Utils::randin(-1, 1);
+            return actuator;
+        }
 
-    std::vector<float> actuator;
-};
+        std::vector<float> actuator;
+    };
 
 }
 

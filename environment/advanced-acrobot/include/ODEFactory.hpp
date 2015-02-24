@@ -12,20 +12,18 @@
 typedef std::shared_ptr<ODEObject> pODEObject;
 typedef tbb::queuing_mutex Mutex;
 
-struct ODEWorld
-{
+struct ODEWorld {
     dWorldID world_id;
     dSpaceID space_id;
     dJointGroupID contactgroup;
 };
 
-class ODEFactory : public bib::Singleton<ODEFactory>
-{
+class ODEFactory : public bib::Singleton<ODEFactory> {
     friend class bib::Singleton<ODEFactory>;
 
-public:
-    ODEObject* createBox(const ODEWorld& world, float x, float y, float z, float lx, float ly, float lz, float density, float mass, bool linkBody=true);
-    ODEObject* createSphere(const ODEWorld& world, float x, float y, float z, float radius, float density, float mass, bool linkBody=true);
+  public:
+    ODEObject* createBox(const ODEWorld& world, float x, float y, float z, float lx, float ly, float lz, float density, float mass, bool linkBody = true);
+    ODEObject* createSphere(const ODEWorld& world, float x, float y, float z, float radius, float density, float mass, bool linkBody = true);
 
     ODEWorld createWorld();
     void destroyWorld(const ODEWorld&);
@@ -34,11 +32,11 @@ public:
 
     dGeomID createGround(const ODEWorld& world);
 
-protected:
+  protected:
     ODEFactory();
     ~ODEFactory();
 
-protected:
+  protected:
 #ifdef NO_PARALLEL
     //only to display them in single thread impl
     std::list<dGeomID> createdGeom;

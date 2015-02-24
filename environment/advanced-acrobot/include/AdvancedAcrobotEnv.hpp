@@ -9,7 +9,7 @@
 std::istream& operator>>(std::istream& istream, bone_joint& v);
 
 class AdvancedAcrobotProgOptions {
-public:
+  public:
     static boost::program_options::options_description program_options() {
         boost::program_options::options_description desc("Allowed environment options");
         desc.add_options()
@@ -19,26 +19,24 @@ public:
 };
 
 class ProblemDefinition {
-protected:
+  protected:
     virtual float performance(AdvancedAcrobotWorld*) = 0;
     virtual bool still_running(AdvancedAcrobotWorld*) {
         return true;
     }
 };
 
-class KeepHigh : ProblemDefinition
-{
-protected:
+class KeepHigh : ProblemDefinition {
+  protected:
     float performance(AdvancedAcrobotWorld* instance) {
         return instance->perf();
     }
 };
 
-class ReachLimitPoorInformed : ProblemDefinition
-{
-protected:
+class ReachLimitPoorInformed : ProblemDefinition {
+  protected:
     float performance(AdvancedAcrobotWorld* instance) {
-        if(instance->perf() > 0.95)
+        if (instance->perf() > 0.95)
             return 1.;
         else return 0.f;
     }
@@ -48,25 +46,23 @@ protected:
     }
 };
 
-class ReachLimitWellInformed : ProblemDefinition
-{
-protected:
+class ReachLimitWellInformed : ProblemDefinition {
+  protected:
     float performance(AdvancedAcrobotWorld* instance) {
-        if(instance->perf() > 0.95)
+        if (instance->perf() > 0.95)
             return 1.;
-        else return instance->perf()*0.01;
+        else return instance->perf() * 0.01;
     }
-    
+
     bool still_running(AdvancedAcrobotWorld* instance) {
         return instance->perf() <= 0.95;
     }
 };
 
 
-template<typename ProblemToResolve=ReachLimitWellInformed>
-class AdvancedAcrobotEnv : public arch::AEnvironment<AdvancedAcrobotProgOptions>, private ProblemToResolve
-{
-public:
+template<typename ProblemToResolve = ReachLimitWellInformed>
+class AdvancedAcrobotEnv : public arch::AEnvironment<AdvancedAcrobotProgOptions>, private ProblemToResolve {
+  public:
     AdvancedAcrobotEnv() {
         ODEFactory::getInstance();
     }
@@ -77,8 +73,7 @@ public:
         ODEFactory::endInstance();
     }
 
-    const std::vector<float>& perceptions() const
-    {
+    const std::vector<float>& perceptions() const {
         return instance->state();
     }
 
@@ -95,14 +90,14 @@ public:
     }
 
 
-private:
+  private:
     void _unique_invoke(boost::property_tree::ptree* properties, boost::program_options::variables_map* vm) {
-        if(vm->count("view"))
+        if (vm->count("view"))
             visible = true;
         bones = bib::to_array<bone_joint>(properties->get<std::string>("environment.bones"));
         actuators = bib::to_array<bool>(properties->get<std::string>("environment.actuators"));
 
-        if(visible)
+        if (visible)
             instance = new AdvancedAcrobotWorldView("data/textures", *bones, *actuators);
         else
             instance = new AdvancedAcrobotWorld(*bones, *actuators);
@@ -120,7 +115,7 @@ private:
         return ProblemToResolve::still_running(instance);
     }
 
-private:
+  private:
     bool visible = false;
     std::vector<bone_joint>* bones;
     std::vector<bool>* actuators;
