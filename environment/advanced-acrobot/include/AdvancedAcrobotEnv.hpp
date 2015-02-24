@@ -18,7 +18,53 @@ public:
     }
 };
 
-class AdvancedAcrobotEnv : public arch::AEnvironment<AdvancedAcrobotProgOptions>
+class ProblemDefinition {
+protected:
+    virtual float performance(AdvancedAcrobotWorld*) = 0;
+    virtual bool still_running(AdvancedAcrobotWorld*) {
+        return true;
+    }
+};
+
+class KeepHigh : ProblemDefinition
+{
+protected:
+    float performance(AdvancedAcrobotWorld* instance) {
+        return instance->perf();
+    }
+};
+
+class ReachLimitPoorInformed : ProblemDefinition
+{
+protected:
+    float performance(AdvancedAcrobotWorld* instance) {
+        if(instance->perf() > 0.95)
+            return 1.;
+        else return 0.f;
+    }
+
+    bool still_running(AdvancedAcrobotWorld* instance) {
+        return instance->perf() <= 0.95;
+    }
+};
+
+class ReachLimitWellInformed : ProblemDefinition
+{
+protected:
+    float performance(AdvancedAcrobotWorld* instance) {
+        if(instance->perf() > 0.95)
+            return 1.;
+        else return instance->perf()*0.01;
+    }
+    
+    bool still_running(AdvancedAcrobotWorld* instance) {
+        return instance->perf() <= 0.95;
+    }
+};
+
+
+template<typename ProblemToResolve=ReachLimitWellInformed>
+class AdvancedAcrobotEnv : public arch::AEnvironment<AdvancedAcrobotProgOptions>, private ProblemToResolve
 {
 public:
     AdvancedAcrobotEnv() {
@@ -37,13 +83,13 @@ public:
     }
 
     float performance() {
-        return instance->perf();
+        return ProblemToResolve::performance(instance);
     }
 
     unsigned int number_of_actuators() const {
         return instance->activated_motors();
     }
-    
+
     unsigned int number_of_sensors() const {
         return instance->state().size();
     }
@@ -68,6 +114,10 @@ private:
 
     void _next_instance() {
         instance->resetPositions();
+    }
+
+    bool _running() {
+        return ProblemToResolve::still_running(instance);
     }
 
 private:
