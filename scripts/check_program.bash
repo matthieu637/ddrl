@@ -14,4 +14,5 @@ checker make
 checker c++
 checker ode-config
 checker astyle
+checker cppcheck
 

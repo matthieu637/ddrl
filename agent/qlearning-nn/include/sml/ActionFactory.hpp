@@ -40,8 +40,8 @@ namespace sml {
 
         friend class bib::Singleton<ActionFactory>;
 
-// protected:
-//     ActionFactory():actions() {}
+      protected:
+        ActionFactory(): actions(), numberAction(-1) {}
 
       public:
         const list_tlaction& getActions() const;

@@ -86,7 +86,7 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint>& types) {
 }
 
 void nearCallback (void *data, dGeomID o1, dGeomID o2) {
-    int i, n;
+    int n;
     nearCallbackData* d = (nearCallbackData*) data;
     AdvancedAcrobotWorld* inst = d->inst;
 
@@ -99,7 +99,7 @@ void nearCallback (void *data, dGeomID o1, dGeomID o2) {
     dContact contact[N];
     n = dCollide (o1, o2, N, &contact[0].geom, sizeof(dContact));
     if (n > 0) {
-        for (i = 0; i < n; i++) {
+        for (int i = 0; i < n; i++) {
             contact[i].surface.mode = dContactSlip1 | dContactSlip2 |
                                       dContactSoftERP | dContactSoftCFM | dContactApprox1 ;
             contact[i].surface.mu = dInfinity;

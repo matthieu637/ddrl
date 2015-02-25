@@ -26,7 +26,7 @@ namespace sml {
         values = new int[templ->actionNumber()];
 
         list<int>::const_iterator it = templ->sizesActions()->begin();
-        it++; //always ignore first multiplier
+        ++it; //always ignore first multiplier
         for ( int i = 0 ; i < templ->actionNumber(); i++ ) {
             int multiplier = 1;
 
@@ -42,7 +42,7 @@ namespace sml {
 //  LOG_DEBUG(values[i] << " " << value << " " << this->get("motor"));
 
                 for ( int j = 0; j < ( templ->actionNumber() - 1 ) - ( i + 1 ); j++ ) //refill
-                    it--;
+                    --it;
         }
     }
 
@@ -93,7 +93,7 @@ namespace sml {
     void DAction::computehash() {
         unsigned int hash = 0;
         list<int>::const_iterator it = templ->sizesActions()->begin();
-        it++; //always ignore first multiplier
+        ++it; //always ignore first multiplier
 
         for ( int i = 0 ; i < templ->actionNumber(); i++ ) {
             int multiplier = 1;
@@ -104,7 +104,7 @@ namespace sml {
             hash += values[i] * multiplier;
 
             for ( int j = 0; j < ( templ->actionNumber() - 1 ) - ( i + 1 ); j++ ) //refill
-                it--;
+                --it;
         }
 
         hashmem = hash;

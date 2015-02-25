@@ -56,37 +56,44 @@ namespace sml {
 
         TemporalLinearAction ac;
 
-        int i = 1;
-        while (getline(myfile, line)) {
-            stringstream sstream(line);
-            string value;
+        try {
 
-            TemporalLinearMotor tlm;
+            int i = 1;
+            while (getline(myfile, line)) {
+                stringstream sstream(line);
+                string value;
 
-            if (getline(sstream, value, ' '))
-                tlm.a = stof(value);
-            else throw malformedfile_ex;
+                TemporalLinearMotor tlm;
 
-            if (getline(sstream, value, ' '))
-                tlm.b = stof(value);
-            else throw malformedfile_ex;
+                if (getline(sstream, value, ' '))
+                    tlm.a = stof(value);
+                else throw malformedfile_ex;
 
-            if (getline(sstream, value, ' '))
-                ac.temporal_extension = stoi(value);
-            else throw malformedfile_ex;
+                if (getline(sstream, value, ' '))
+                    tlm.b = stof(value);
+                else throw malformedfile_ex;
 
-            ac.motors.push_back(tlm);
+                if (getline(sstream, value, ' '))
+                    ac.temporal_extension = stoi(value);
+                else throw malformedfile_ex;
 
-            if ( i % numberMotor == 0  && i != 1) {
-                actions.push_back(ac);
-                if (actions.size() >= numberAction)
-                    break;
+                ac.motors.push_back(tlm);
 
-                ac.motors.clear();
-                ac.temporal_extension = -1;
+                if ( i % numberMotor == 0  && i != 1) {
+                    actions.push_back(ac);
+                    if (actions.size() >= numberAction)
+                        break;
+
+                    ac.motors.clear();
+                    ac.temporal_extension = -1;
+                }
+
+                i++;
             }
 
-            i++;
+        } catch (const std::exception& e) {
+            LOG_ERROR(e.what());
+            exit(1);
         }
 
         myfile.close();

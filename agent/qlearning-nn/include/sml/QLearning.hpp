@@ -58,12 +58,12 @@ namespace sml {
 
 
       public:
-        QLearning(const ActionTemplate* atmp, RLParam param, unsigned int size_input_state
+        QLearning(const ActionTemplate* atmp, RLParam param, unsigned int _size_input_state
 #ifdef ACTION_TIME
                   , std::vector<int> _actions_time
 #endif
                  ) :
-            Policy<State>(param), atmpl(atmp), Qa(atmp), neural_networks(atmp->sizeNeeded()), size_input_state(size_input_state), history_order(nullptr)
+            Policy<State>(param), atmpl(atmp), Qa(atmp), neural_networks(atmp->sizeNeeded()), size_input_state(_size_input_state), history_order(nullptr), internal_step(0), reward_sum(0)
 #ifdef ACTION_TIME
             , actions_time(_actions_time)
 #endif
@@ -97,7 +97,8 @@ namespace sml {
         }
 
         QLearning(const QLearning& clone) :
-            Policy<State>(clone.param), atmpl(clone.atmpl), Qa(clone.Qa), neural_networks(clone.atmpl->sizeNeeded()), size_input_state(clone.size_input_state), history_order(nullptr)
+            Policy<State>(clone.param), atmpl(clone.atmpl), Qa(clone.Qa), neural_networks(clone.atmpl->sizeNeeded()), size_input_state(clone.size_input_state), history_order(nullptr),
+            internal_step(clone.internal_step), reward_sum(clone.internal_step)
 #ifdef ACTION_TIME
             , actions_time(clone.actions_time)
 #endif
@@ -146,7 +147,6 @@ namespace sml {
             return Qa.argmax();
         }
 
-//     long internal_step = 0;
         LearnReturn _learn(const State& state, double r, bool goal) {
             assert(this->lastAction != nullptr);
             DAction* a = this->lastAction;

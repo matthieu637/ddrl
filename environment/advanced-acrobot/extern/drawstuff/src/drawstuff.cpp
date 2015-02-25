@@ -128,10 +128,10 @@ class Image {
     Image (char *filename);
     // load from PPM file
     ~Image();
-    int width() {
+    int width() const {
         return image_width;
     }
-    int height() {
+    int height() const {
         return image_height;
     }
     byte *data() {
@@ -143,9 +143,9 @@ class Image {
 // skip over whitespace and comments in a stream.
 
 static void skipWhiteSpace (char *filename, FILE *f) {
-    int c, d;
+    int d;
     for (;;) {
-        c = fgetc(f);
+        int c = fgetc(f);
         if (c == EOF) dsError ("unexpected end of file in \"%s\"", filename);
 
         // skip comments
@@ -169,9 +169,9 @@ static void skipWhiteSpace (char *filename, FILE *f) {
 // because 0 is a bad value for all PPM numbers anyway).
 
 static int readNumber (char *filename, FILE *f) {
-    int c, n = 0;
+    int n = 0;
     for (;;) {
-        c = fgetc(f);
+        int c = fgetc(f);
         if (c == EOF) dsError ("unexpected end of file in \"%s\"", filename);
         if (c >= '0' && c <= '9') n = n * 10 + (c - '0');
         else {
@@ -476,10 +476,9 @@ static void drawBox (const float sides[3]) {
 // triangles rather than triangle strips.
 
 static void drawPatch (float p1[3], float p2[3], float p3[3], int level) {
-    int i;
     if (level > 0) {
         float q1[3], q2[3], q3[3];   // sub-vertices
-        for (i = 0; i < 3; i++) {
+        for (int i = 0; i < 3; i++) {
             q1[i] = 0.5f * (p1[i] + p2[i]);
             q2[i] = 0.5f * (p2[i] + p3[i]);
             q3[i] = 0.5f * (p3[i] + p1[i]);
@@ -487,7 +486,7 @@ static void drawPatch (float p1[3], float p2[3], float p3[3], int level) {
         float length1 = (float)(1.0 / sqrt(q1[0] * q1[0] + q1[1] * q1[1] + q1[2] * q1[2]));
         float length2 = (float)(1.0 / sqrt(q2[0] * q2[0] + q2[1] * q2[1] + q2[2] * q2[2]));
         float length3 = (float)(1.0 / sqrt(q3[0] * q3[0] + q3[1] * q3[1] + q3[2] * q3[2]));
-        for (i = 0; i < 3; i++) {
+        for (int i = 0; i < 3; i++) {
             q1[i] *= length1;
             q2[i] *= length2;
             q3[i] *= length3;
@@ -530,21 +529,21 @@ static void drawSphere() {
         { -ICZ, -ICX, 0}
     };
 
-    static int index[20][3] = {
-        {0, 4, 1},    {0, 9, 4},
-        {9, 5, 4},    {4, 5, 8},
-        {4, 8, 1},    {8, 10, 1},
-        {8, 3, 10},   {5, 3, 8},
-        {5, 2, 3},    {2, 7, 3},
-        {7, 10, 3},   {7, 6, 10},
-        {7, 11, 6},   {11, 0, 6},
-        {0, 1, 6},    {6, 1, 10},
-        {9, 0, 11},   {9, 11, 2},
-        {9, 2, 5},    {7, 2, 11},
-    };
-
     static GLuint listnum = 0;
     if (listnum == 0) {
+        static int index[20][3] = {
+            {0, 4, 1},    {0, 9, 4},
+            {9, 5, 4},    {4, 5, 8},
+            {4, 8, 1},    {8, 10, 1},
+            {8, 3, 10},   {5, 3, 8},
+            {5, 2, 3},    {2, 7, 3},
+            {7, 10, 3},   {7, 6, 10},
+            {7, 11, 6},   {11, 0, 6},
+            {0, 1, 6},    {6, 1, 10},
+            {9, 0, 11},   {9, 11, 2},
+            {9, 2, 5},    {7, 2, 11},
+        };
+
         listnum = glGenLists (1);
         glNewList (listnum, GL_COMPILE);
         glBegin (GL_TRIANGLES);
@@ -562,9 +561,9 @@ static void drawSphere() {
 static void drawSphereShadow (float px, float py, float pz, float radius) {
     // calculate shadow constants based on light vector
     static int init = 0;
-    static float len2, len1, scale;
+    static float len1, scale;
     if (!init) {
-        len2 = LIGHTX * LIGHTX + LIGHTY * LIGHTY;
+        static int len2 = LIGHTX * LIGHTX + LIGHTY * LIGHTY;
         len1 = 1.0f / (float)sqrt(len2);
         scale = (float) sqrt(len2 + 1);
         init = 1;
