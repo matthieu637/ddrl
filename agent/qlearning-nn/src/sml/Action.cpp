@@ -1,5 +1,4 @@
 #include "sml/Action.hpp"
-#include <assert.h>
 #include <bib/Logger.hpp>
 
 namespace sml {

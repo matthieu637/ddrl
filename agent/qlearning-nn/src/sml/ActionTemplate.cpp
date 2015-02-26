@@ -1,6 +1,5 @@
 #include "sml/ActionTemplate.hpp"
 
-#include <assert.h>
 #include <bib/Logger.hpp>
 
 namespace sml {
