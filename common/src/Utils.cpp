@@ -1,6 +1,6 @@
 #include "bib/Utils.hpp"
 #include <sys/time.h>
-// #include <stdlib.h>
+#include "bib/Seed.hpp"
 #include <random>
 #include <algorithm>
 
@@ -8,7 +8,7 @@ namespace bib {
 
 float Utils::rand01() {
   //     LOG_DEBUG("rand");
-  return (float)rand() / (float)RAND_MAX;
+  return (float)RAND() / (float)RAND_MAX;
 }
 bool Utils::rand01(float limit) {
   if (limit > 0.L) {
@@ -19,7 +19,7 @@ bool Utils::rand01(float limit) {
 
 float Utils::randin(float a, float b) {
   ASSERT(b > a, "");
-  float random = ((float)rand()) / (float)RAND_MAX;
+  float random = ((float)RAND()) / (float)RAND_MAX;
   float diff = b - a;
   float r = random * diff;
   return a + r;

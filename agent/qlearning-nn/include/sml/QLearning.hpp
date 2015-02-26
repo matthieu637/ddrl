@@ -156,7 +156,7 @@ class QLearning : public Policy<State> {
 
   DAction *decision(const State &state, bool greedy) {
     if (greedy && bib::Utils::rand01(this->param.epsilon)) {
-      return new DAction(atmpl, {rand() % (int)atmpl->sizeNeeded()});
+      return new DAction(atmpl, {RAND() % (int)atmpl->sizeNeeded()});
     }
 
     computeQa(state);
@@ -176,7 +176,7 @@ class QLearning : public Policy<State> {
     DAction *ap = this->Qa.argmax();
     if (bib::Utils::rand01(this->param.epsilon)) {
       delete ap;
-      ap = new DAction(this->atmpl, rand() % this->atmpl->sizeNeeded());
+      ap = new DAction(this->atmpl, RAND() % this->atmpl->sizeNeeded());
       gotGreedy = true;
     }
 #ifdef SARSA

@@ -8,7 +8,7 @@
 #include <boost/thread/shared_mutex.hpp>
 #include "Singleton.hpp"
 
-#define RAND() : Seed::getInstace()->rand();
+#define RAND() bib::Seed::getInstance()->rand()
 
 namespace bib {
 

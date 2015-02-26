@@ -27,7 +27,6 @@ QTable::QTable(const ActionTemplate *atmp) : atmpl(atmp) {
   shouldDeleteStmpl = true;
   stmpl = new StateTemplate({""}, {1});  // for file saving
   map = new hashmap(atmpl->sizeNeeded());
-  //     LOG_DEBUG("call here");
 
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++) map->at(j) = 0.L;
 }
@@ -46,7 +45,7 @@ DAction *QTable::argmax(const DState &name) const {
   unsigned int hashState = name.hash();
   unsigned int beginRange = hashState * atmpl->sizeNeeded();
 
-  unsigned int imax = rand_r(bib::Seed::getInstance()->getSeed()) % atmpl->sizeNeeded();
+  unsigned int imax = RAND() % atmpl->sizeNeeded();
   //      LOG_DEBUG(imax << " " << hashState << " " << atmpl->sizeNeeded() << "
   //      " << beginRange << " " << name << " " << map->size());
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
@@ -55,7 +54,7 @@ DAction *QTable::argmax(const DState &name) const {
   return new DAction(atmpl, imax);
 }
 DAction *QTable::argmax() const {
-  unsigned int imax = rand_r(bib::Seed::getInstance()->getSeed()) % atmpl->sizeNeeded();
+  unsigned int imax = RAND() % atmpl->sizeNeeded();
   // unsigned int imax = 0;
   //     LOG_DEBUG(imax << " " << hashState << " " << atmpl->sizeNeeded() << " "
   //     << name["angle"] << " " << name["distance"] );
@@ -65,7 +64,7 @@ DAction *QTable::argmax() const {
   return new DAction(atmpl, imax);
 }
 float QTable::max() const {
-  unsigned int imax = rand_r(bib::Seed::getInstance()->getSeed()) % atmpl->sizeNeeded();
+  unsigned int imax = RAND() % atmpl->sizeNeeded();
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
     if (map->at(imax) < map->at(j)) imax = j;
 
@@ -73,7 +72,7 @@ float QTable::max() const {
 }
 DAction *QTable::argmax(const std::vector<int> *action_time,
                         float gamma) const {
-  unsigned int imax = rand_r(bib::Seed::getInstance()->getSeed()) % atmpl->sizeNeeded();
+  unsigned int imax = RAND() % atmpl->sizeNeeded();
   float _max = map->at(imax) * powf(gamma, action_time->at(imax));
 
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++) {
@@ -87,14 +86,14 @@ DAction *QTable::argmax(const std::vector<int> *action_time,
 }
 
 DAction *QTable::argmin() const {
-  unsigned int imin = rand_r(bib::Seed::getInstance()->getSeed()) % atmpl->sizeNeeded();
+  unsigned int imin = RAND() % atmpl->sizeNeeded();
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
     if (map->at(imin) > map->at(j)) imin = j;
 
   return new DAction(atmpl, imin);
 }
 float QTable::min() const {
-  unsigned int imin = rand_r(bib::Seed::getInstance()->getSeed()) % atmpl->sizeNeeded();
+  unsigned int imin = RAND() % atmpl->sizeNeeded();
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
     if (map->at(imin) > map->at(j)) imin = j;
 
