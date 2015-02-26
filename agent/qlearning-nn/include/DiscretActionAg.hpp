@@ -1,9 +1,10 @@
 #ifndef DISCRETACTION_H
 #define DISCRETACTION_H
 
+#include <vector>
+
 #include "arch/AAgent.hpp"
 #include "sml/QLearning.hpp"
-#include <vector>
 #include "sml/ActionFactory.hpp"
 
 #define NUMBER_OF_DISCRET_ACTION

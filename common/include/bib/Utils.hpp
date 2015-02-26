@@ -7,8 +7,8 @@
 ///
 ///
 
-#include "bib/Logger.hpp"
 #include <vector>
+#include "bib/Logger.hpp"
 
 using std::vector;
 

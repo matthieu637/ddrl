@@ -1,11 +1,10 @@
 #define NO_PARALLEL
-#include "ODEFactory.hpp"
 
+#include "ODEFactory.hpp"
 #include "AdvancedAcrobotWorld.hpp"
-#include <bib/Utils.hpp>
-#include <drawstuff.h>
+#include "bib/Utils.hpp"
 #include "Draw.hpp"
-#include <AdvancedAcrobotWorldView.hpp>
+#include "AdvancedAcrobotWorldView.hpp"
 
 void way2() {
   AdvancedAcrobotWorldView simu("data/textures");

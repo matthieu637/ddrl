@@ -1,11 +1,11 @@
 #ifndef ACTIONFACTORY_H
 #define ACTIONFACTORY_H
 
-#include "bib/Singleton.hpp"
 #include <string>
 #include <vector>
-#include <boost/serialization/nvp.hpp>
-#include <boost/serialization/vector.hpp>
+#include "boost/serialization/nvp.hpp"
+#include "boost/serialization/vector.hpp"
+#include "bib/Singleton.hpp"
 #include "Action.hpp"
 
 namespace sml {

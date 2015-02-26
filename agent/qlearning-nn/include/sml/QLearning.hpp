@@ -1,19 +1,17 @@
 #ifndef SARSANN_H
 #define SARSANN_H
 
-#include <sml/Policy.hpp>
-#include "bib/Utils.hpp"
-#include "bib/Seed.hpp"
-#include <sml/Q.hpp>
 #include <set>
 #include <vector>
-
-#include <tbb/parallel_for.h>
-#include <tbb/blocked_range.h>
-
+#include "tbb/parallel_for.h"
+#include "tbb/blocked_range.h"
+#include "boost/graph/graph_concepts.hpp"
 #include "fann.h"
 #include "fann_train.h"
-#include <boost/graph/graph_concepts.hpp>
+#include "sml/Policy.hpp"
+#include "bib/Utils.hpp"
+#include "bib/Seed.hpp"
+#include "sml/Q.hpp"
 
 using std::pair;
 

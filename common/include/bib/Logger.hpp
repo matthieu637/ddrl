@@ -8,7 +8,6 @@
 ///
 ///
 
-#include "bib/Assert.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -16,6 +15,8 @@
 #include <iomanip>
 #include <list>
 #include <map>
+
+#include "bib/Assert.hpp"
 #include "Singleton.hpp"
 
 #define LOG(stream)                                            \

@@ -1,8 +1,11 @@
 #include "bib/Utils.hpp"
+
 #include <sys/time.h>
-#include "bib/Seed.hpp"
 #include <random>
 #include <algorithm>
+
+#include "bib/Seed.hpp"
+
 
 namespace bib {
 

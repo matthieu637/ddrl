@@ -1,8 +1,9 @@
 #ifndef DRAW_HPP
 #define DRAW_HPP
 
+#include "ode/ode.h"
+
 #include "drawstuff.h"
-#include <ode/ode.h>
 
 #ifdef dDOUBLE
 #define dsDrawBox dsDrawBoxD

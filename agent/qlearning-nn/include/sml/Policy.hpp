@@ -1,13 +1,14 @@
 #ifndef POLICY_HPP
 #define POLICY_HPP
 
+#include <string>
+#include "boost/filesystem.hpp"
+#include "boost/interprocess/sync/scoped_lock.hpp"
+#include "boost/interprocess/sync/named_mutex.hpp"
+#include "bib/XMLEngine.hpp"
 #include "bib/Logger.hpp"
 #include "Action.hpp"
-#include <boost/filesystem.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
-#include <bib/XMLEngine.hpp>
-#include <string>
+
 
 using std::string;
 using namespace boost::interprocess;
