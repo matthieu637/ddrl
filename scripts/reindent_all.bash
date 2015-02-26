@@ -6,5 +6,8 @@ cd $LIB
 . locate.bash
 goto_root
 
-find . | egrep "(cpp|hpp)$" | grep -v build | xargs astyle -L -A14 -N -H -c -p --indent=spaces=4
-find . | grep ".orig$" |xargs rm
+find . | egrep "(cpp|hpp)$" | grep -v build | xargs  astyle -A14 --indent=spaces=2 
+
+if [ `find . | grep ".orig$" | wc -l` -ne 0 ] ; then
+	find . | grep ".orig$" |xargs rm
+fi

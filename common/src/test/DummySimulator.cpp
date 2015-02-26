@@ -4,10 +4,10 @@
 #include "arch/Example.hpp"
 
 int main(int argc, char **argv) {
-    arch::Simulator<arch::ExampleEnv, arch::ExampleAgent> s;
-    s.init(argc, argv);
+  arch::Simulator<arch::ExampleEnv, arch::ExampleAgent> s;
+  s.init(argc, argv);
 
-    s.run();
+  s.run();
 
-    LOG_DEBUG("works !");
+  LOG_DEBUG("works !");
 }

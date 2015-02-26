@@ -6,4 +6,4 @@
 #define DEFAULT_DUMP_LEARNING_FILE "learning.data"
 #define DEFAULT_DUMP_TESTING_FILE "testing.data"
 
-#endif // DEFAULTPARAM_H
+#endif  // DEFAULTPARAM_H

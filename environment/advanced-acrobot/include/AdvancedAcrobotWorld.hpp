@@ -17,45 +17,49 @@
 #define MAX_TORQUE_SLIDER 40
 #define WORLD_STEP 0.01
 
-enum bone_joint {HINGE, SLIDER};
+enum bone_joint { HINGE, SLIDER };
 
 class AdvancedAcrobotWorld {
-  public:
-    AdvancedAcrobotWorld(const std::vector<bone_joint>& types = {HINGE, HINGE}, const std::vector<bool>& actuators = {false, false, true});
-    virtual ~AdvancedAcrobotWorld();
+ public:
+  AdvancedAcrobotWorld(const std::vector<bone_joint> &types = {HINGE, HINGE},
+                       const std::vector<bool> &actuators = {false, false,
+                                                             true
+                                                            });
+  virtual ~AdvancedAcrobotWorld();
 
-    void resetPositions();
+  void resetPositions();
 
-    virtual void step(const std::vector<float>& motors);
-    const std::vector<float>& state() const;
-    unsigned int activated_motors();
-    float perf() const;
+  virtual void step(const std::vector<float> &motors);
+  const std::vector<float> &state() const;
+  unsigned int activated_motors();
+  float perf() const;
 
-  protected:
-    void createWorld(const std::vector<bone_joint>&);
-    std::vector<float>* current_joint_forces() const;
+ protected:
+  void createWorld(const std::vector<bone_joint> &);
+  std::vector<float> *current_joint_forces() const;
 
-  public:
-    ODEWorld odeworld;
-  protected:
-    std::vector<bone_joint> types;
-    std::vector<bool> actuators;
+ public:
+  ODEWorld odeworld;
 
-    std::vector<ODEObject*> bones;
-    std::vector<dJointID> joints;
+ protected:
+  std::vector<bone_joint> types;
+  std::vector<bool> actuators;
 
-    std::vector<float> internal_state;
+  std::vector<ODEObject *> bones;
+  std::vector<dJointID> joints;
 
-    dGeomID ground;
+  std::vector<float> internal_state;
 
-  private:
-    bool goalBeenReached;
-    bool goalFailed;
-    unsigned int _activated_motors;
+  dGeomID ground;
+
+ private:
+  bool goalBeenReached;
+  bool goalFailed;
+  unsigned int _activated_motors;
 };
 
 struct nearCallbackData {
-    AdvancedAcrobotWorld* inst;
+  AdvancedAcrobotWorld *inst;
 };
 
-#endif // ADVANCEDACROBOTWORLD_HPP
+#endif  // ADVANCEDACROBOTWORLD_HPP

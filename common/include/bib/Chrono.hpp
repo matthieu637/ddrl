@@ -7,16 +7,14 @@ using namespace std::chrono;
 
 namespace bib {
 
-    class Chrono {
-      public:
-        void start();
-        double finish();
-        void reset();
-      private:
+class Chrono {
+ public:
+  void start();
+  double finish();
+  void reset();
 
-        high_resolution_clock::time_point begin;
-    };
-
+ private:
+  high_resolution_clock::time_point begin;
+};
 }
-
-#endif // CHRONO_H
+#endif  // CHRONO_H

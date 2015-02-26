@@ -14,14 +14,13 @@
 
 #include "ODEFactory.hpp"
 
-
 class Draw {
-  public:
-    static std::list<dGeomID>* geoms;
+ public:
+  static std::list<dGeomID> *geoms;
 
-    static void drawGeom (dGeomID g, const dReal *pos, const dReal *R);
+  static void drawGeom(dGeomID g, const dReal *pos, const dReal *R);
 
-    static void drawLoop (int);
+  static void drawLoop(int);
 };
 
 #endif

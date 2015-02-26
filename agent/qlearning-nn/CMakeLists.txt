@@ -12,7 +12,7 @@ endif(NOT CMAKE_BUILD_TYPE)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
 #Boost library
-find_package(Boost COMPONENTS serialization filesystem system program_options REQUIRED)
+find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
 find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(TBB)

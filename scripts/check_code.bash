@@ -8,9 +8,17 @@ cd $LIB
 
 rm_build
 
-goto_root
+function check_code_cppcheck(){
+	goto_root
+	all_sources=`ls -d */src */*/src */include */*/include`
+	cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem $all_sources
+}
 
-all_sources=`ls -d */src */*/src */include */*/include`
+function check_code_cpplint(){
+	goto_root
+	all_files=`find . -type f -name '*cpp' -o -name '*.hpp' | grep -v extern`
+	echo $all_files | xargs cpplint --filter=-legal/copyright --extensions=hpp,cpp --linelength=120
+}
 
-cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem $all_sources
-
+check_code_cppcheck
+check_code_cpplint

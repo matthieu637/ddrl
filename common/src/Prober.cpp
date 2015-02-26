@@ -4,21 +4,20 @@
 
 namespace bib {
 
-    void Prober::probe(float m) {
-        if (prob_init) {
-            min_probe = std::min(min_probe, m);
-            max_probe = std::max(max_probe, m);
-        } else {
-            min_probe = m;
-            max_probe = m;
-            prob_init = true;
-        }
+void Prober::probe(float m) {
+  if (prob_init) {
+    min_probe = std::min(min_probe, m);
+    max_probe = std::max(max_probe, m);
+  } else {
+    min_probe = m;
+    max_probe = m;
+    prob_init = true;
+  }
 
-        prob_step ++;
+  prob_step++;
 
-        if (prob_step % 100 == 0) {
-            LOG_DEBUG("min : " << min_probe << " max : " << max_probe);
-        }
-    }
-
+  if (prob_step % 100 == 0) {
+    LOG_DEBUG("min : " << min_probe << " max : " << max_probe);
+  }
+}
 }
