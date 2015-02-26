@@ -1,8 +1,10 @@
 #ifndef ADVANCEDACROBOTWORLD_HPP
 #define ADVANCEDACROBOTWORLD_HPP
-#include "bib/Assert.hpp"
+
 #include <vector>
-#include <ode/ode.h>
+#include "ode/ode.h"
+
+#include "bib/Assert.hpp"
 #include "ODEObject.hpp"
 #include "ODEFactory.hpp"
 

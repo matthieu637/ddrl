@@ -1,10 +1,11 @@
 #ifndef ADVANCEDACROBOTWORLDVIEW_HPP
 #define ADVANCEDACROBOTWORLDVIEW_HPP
 
-#include <AdvancedAcrobotWorld.hpp>
 #include <string>
-#include <tbb/tbb.h>
+#include "tbb/tbb.h"
+
 #include "drawstuff.h"
+#include "AdvancedAcrobotWorld.hpp"
 
 class AdvancedAcrobotWorldView : public AdvancedAcrobotWorld {
  public:

@@ -1,13 +1,15 @@
 #ifndef ODEFACTORY_H
 #define ODEFACTORY_H
 
+#include <list>
+#include <memory>
+#include "ode/ode.h"
+#include "tbb/queuing_mutex.h"
+
 #include "bib/Singleton.hpp"
 #include "bib/Logger.hpp"
 #include "ODEObject.hpp"
-#include <ode/ode.h>
-#include <list>
-#include <memory>
-#include <tbb/queuing_mutex.h>
+
 
 typedef std::shared_ptr<ODEObject> pODEObject;
 typedef tbb::queuing_mutex Mutex;
