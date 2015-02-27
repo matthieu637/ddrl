@@ -1,6 +1,8 @@
 #include "bib/Chrono.hpp"
 
 using std::chrono::high_resolution_clock;
+using std::chrono::duration;
+using std::chrono::duration_cast;
 
 namespace bib {
 
