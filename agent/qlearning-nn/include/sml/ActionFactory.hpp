@@ -69,5 +69,5 @@ class ActionFactory : public bib::Singleton<ActionFactory> {
   list_tlaction actions;
   int numberAction;
 };
-}
+} // namespace sml
 #endif  // ACTIONFACTORY_H

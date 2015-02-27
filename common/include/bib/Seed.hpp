@@ -51,6 +51,6 @@ class Seed : public Singleton<Seed> {
 
 };
 
-}
+} // namespace bib
 
 #endif

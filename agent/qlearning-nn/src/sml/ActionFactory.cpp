@@ -169,4 +169,4 @@ std::vector<float> *ActionFactory::computeOutputs(
 
   return outputs;
 }
-}
+} // namespace sml

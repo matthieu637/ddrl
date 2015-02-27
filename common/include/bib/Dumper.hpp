@@ -31,6 +31,6 @@ class Dumper {
   Displayable* ptr;
   std::tuple<Args...> params;
 };
-}
+} // namespace bib
 
 #endif  // DUMPER_H

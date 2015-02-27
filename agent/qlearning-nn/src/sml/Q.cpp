@@ -167,4 +167,4 @@ void QTable::print(bool perState) const {
   std::cout << "####################################################"
             << std::endl;
 }
-}
+} // namespace sml

@@ -111,5 +111,5 @@ class DAction {
 std::ostream &operator<<(std::ostream &stream, const sml::DAction &ac);
 
 typedef DAction DState;
-}
+} // namespace sml
 #endif

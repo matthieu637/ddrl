@@ -14,5 +14,5 @@ std::vector<T> *to_array(const std::string &s) {
     result->push_back(boost::lexical_cast<T>(item));
   return result;
 }
-}
+} // namespace bib
 #endif  // INIPARSER_H

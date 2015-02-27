@@ -202,6 +202,6 @@ class Simulator {
   bool well_init = false;
 #endif
 };
-}
+} // namespace arch
 
 #endif

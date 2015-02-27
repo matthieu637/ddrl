@@ -105,6 +105,6 @@ class Policy {
 };
 
 typedef Policy<DState> DPolicy;
-}
+} // namespace sml
 
 #endif  // MCARTASK_H

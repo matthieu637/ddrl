@@ -42,6 +42,6 @@ class Singleton {
 
 template <class T>
 T *Singleton<T>::_singleton = new T;
-}
+} // namespace bib
 
 #endif

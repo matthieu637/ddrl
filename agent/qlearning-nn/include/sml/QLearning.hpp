@@ -433,6 +433,6 @@ class QLearning : public Policy<State> {
   std::vector<int> actions_time;
 #endif
 };
-}
+} // namespace sml
 
 #endif  // SARSANN_H

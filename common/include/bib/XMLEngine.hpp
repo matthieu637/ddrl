@@ -59,6 +59,6 @@ class XMLEngine {
     return object;
   }
 };
-}
+} // namespace bib
 
 #endif  // XMLENGINE_HPP

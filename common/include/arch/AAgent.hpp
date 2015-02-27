@@ -25,6 +25,6 @@ class AAgent : public ProgOptions, public CommonAE {
     return out;
   }
 };
-}
+} // namespace arch
 
 #endif  // AAGENT_H

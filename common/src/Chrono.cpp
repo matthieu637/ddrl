@@ -17,4 +17,4 @@ double Chrono::finish() {
 void Chrono::reset() {
   start();
 }
-}
+} // namespace bib

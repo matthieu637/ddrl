@@ -186,6 +186,6 @@ class Logger : public Singleton<Logger> {
   unsigned int buffer_index = 0;
   std::map<std::string, std::ofstream *> open_files;
 };
-}
+} // namespace bib
 
 #endif

@@ -80,5 +80,5 @@ class ActionTemplate {
 };
 
 typedef ActionTemplate StateTemplate;
-}
+} // namespace sml
 #endif  // ACTIONTEMPLATE_HPP

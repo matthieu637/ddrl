@@ -105,5 +105,5 @@ class QTable {
   const StateTemplate *stmpl;
   const ActionTemplate *atmpl;
 };
-}
+} // namespace sml
 #endif
