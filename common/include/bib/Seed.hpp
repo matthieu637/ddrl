@@ -4,6 +4,7 @@
 #include <iostream>
 #include <thread>
 #include <map>
+#include <utility>
 #include "boost/thread/locks.hpp"
 #include "boost/thread/shared_mutex.hpp"
 

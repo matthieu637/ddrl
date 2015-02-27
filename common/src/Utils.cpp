@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <random>
 #include <algorithm>
+#include <functional>
 
 #include "bib/Seed.hpp"
 

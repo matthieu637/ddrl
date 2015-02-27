@@ -2,6 +2,8 @@
 #define ADVANCEDACROBOTWORLDVIEW_HPP
 
 #include <string>
+#include <list>
+#include <vector>
 #include "tbb/tbb.h"
 
 #include "drawstuff.h"

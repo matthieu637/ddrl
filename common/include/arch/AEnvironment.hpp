@@ -1,6 +1,8 @@
 #ifndef AENVIRONMENT_H
 #define AENVIRONMENT_H
 
+#include <vector>
+
 #include "arch/Dummy.hpp"
 #include "arch/CommonAE.hpp"
 

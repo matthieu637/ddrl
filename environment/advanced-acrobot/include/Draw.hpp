@@ -1,6 +1,7 @@
 #ifndef DRAW_HPP
 #define DRAW_HPP
 
+#include <list>
 #include "ode/ode.h"
 
 #include "drawstuff.h"

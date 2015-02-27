@@ -2,6 +2,8 @@
 #define INIPARSER_H
 
 #include <iostream>
+#include <string>
+#include <vector>
 
 namespace bib {
 

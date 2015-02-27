@@ -1,6 +1,8 @@
 #ifndef AAGENT_H
 #define AAGENT_H
 
+#include <vector>
+
 #include "arch/Dummy.hpp"
 #include "arch/CommonAE.hpp"
 

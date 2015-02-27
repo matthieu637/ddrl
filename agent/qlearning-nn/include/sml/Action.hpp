@@ -9,8 +9,10 @@
 ///
 
 #include <string>
+#include <list>
 #include "boost/serialization/nvp.hpp"
 #include "boost/serialization/split_member.hpp"
+
 #include "sml/ActionTemplate.hpp"
 
 using std::string;

@@ -8,6 +8,8 @@
 ///
 
 #include <vector>
+#include <algorithm>
+
 #include "bib/Logger.hpp"
 
 using std::vector;

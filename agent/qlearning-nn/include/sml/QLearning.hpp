@@ -3,11 +3,16 @@
 
 #include <set>
 #include <vector>
+#include <utility>
+#include <deque>
+#include <string>
+#include <list>
 #include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
 #include "boost/graph/graph_concepts.hpp"
 #include "fann.h"
 #include "fann_train.h"
+
 #include "sml/Policy.hpp"
 #include "bib/Utils.hpp"
 #include "bib/Seed.hpp"

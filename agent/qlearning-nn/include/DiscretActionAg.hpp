@@ -2,6 +2,7 @@
 #define DISCRETACTION_H
 
 #include <vector>
+#include <string>
 
 #include "arch/AAgent.hpp"
 #include "sml/QLearning.hpp"

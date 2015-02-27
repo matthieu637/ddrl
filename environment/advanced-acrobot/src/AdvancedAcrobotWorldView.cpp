@@ -1,6 +1,9 @@
-
 #include "AdvancedAcrobotWorldView.hpp"
-#include <boost/filesystem.hpp>
+
+#include <string>
+#include <vector>
+#include "boost/filesystem.hpp"
+
 #include "Draw.hpp"
 #include "bib/Logger.hpp"
 

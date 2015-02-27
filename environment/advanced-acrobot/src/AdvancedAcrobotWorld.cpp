@@ -1,7 +1,11 @@
-#include <functional>
-#include "ode/ode.h"
-#include "bib/Utils.hpp"
 #include "AdvancedAcrobotWorld.hpp"
+
+#include <functional>
+#include <vector>
+#include <algorithm>
+#include "ode/ode.h"
+
+#include "bib/Utils.hpp"
 #include "ODEFactory.hpp"
 
 

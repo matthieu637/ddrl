@@ -14,7 +14,7 @@ goto_root
 	injection=`echo $injection | sed -e 's/\//\\\%/g' | sed -e 's/%/\//g'`
 
 	sed -si "${line},${line}s/}/} $injection/" $file
-	#echo "${file} changed! ($line)"
+	echo "${file} changed! ($line)"
 done
 
 ./scripts/reindent_all.bash

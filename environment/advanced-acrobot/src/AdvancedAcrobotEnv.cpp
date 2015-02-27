@@ -1,6 +1,7 @@
 #include "AdvancedAcrobotEnv.hpp"
 
-#include <boost/algorithm/string/case_conv.hpp>
+#include <string>
+#include "boost/algorithm/string/case_conv.hpp"
 
 std::istream& operator>>(std::istream& istream, bone_joint& v) {
   std::string s;

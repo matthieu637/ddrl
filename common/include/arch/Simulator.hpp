@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <list>
 #include <type_traits>
 #include "boost/property_tree/ptree.hpp"
 #include "boost/property_tree/ini_parser.hpp"

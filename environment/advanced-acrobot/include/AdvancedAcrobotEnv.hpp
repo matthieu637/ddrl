@@ -1,10 +1,13 @@
 #ifndef ADVANCEDACROBOTENV_H
 #define ADVANCEDACROBOTENV_H
 
+#include <string>
+#include <vector>
+
+#include "bib/IniParser.hpp"
 #include "arch/AEnvironment.hpp"
 #include "AdvancedAcrobotWorld.hpp"
 #include "AdvancedAcrobotWorldView.hpp"
-#include "bib/IniParser.hpp"
 
 std::istream &operator>>(std::istream &istream, bone_joint &v);
 

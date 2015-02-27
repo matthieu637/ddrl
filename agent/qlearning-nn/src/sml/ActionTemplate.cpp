@@ -1,6 +1,9 @@
 #include "sml/ActionTemplate.hpp"
 
-#include <bib/Logger.hpp>
+#include <string>
+#include <list>
+
+#include "bib/Logger.hpp"
 
 namespace sml {
 

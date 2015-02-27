@@ -1,7 +1,9 @@
 #include "sml/Q.hpp"
 
 #include <fstream>
+#include <vector>
 #include "boost/serialization/vector.hpp"
+
 #include "bib/Utils.hpp"
 #include "bib/XMLEngine.hpp"
 #include "bib/Seed.hpp"

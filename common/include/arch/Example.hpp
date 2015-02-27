@@ -1,6 +1,8 @@
 #ifndef EXAMPLE_H
 #define EXAMPLE_H
 
+#include <vector>
+
 #include "arch/AAgent.hpp"
 #include "arch/AEnvironment.hpp"
 #include "bib/Utils.hpp"

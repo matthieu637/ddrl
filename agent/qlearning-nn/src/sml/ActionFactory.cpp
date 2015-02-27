@@ -3,9 +3,12 @@
 #include <iostream>
 #include <fstream>
 #include <exception>
+#include <string>
+#include <vector>
 #include "boost/serialization/vector.hpp"
 #include "boost/serialization/utility.hpp"
 #include "boost/filesystem.hpp"
+
 #include "bib/Utils.hpp"
 #include "bib/XMLEngine.hpp"
 

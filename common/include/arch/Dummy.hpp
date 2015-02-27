@@ -1,7 +1,8 @@
 #ifndef DUMMY_H
 #define DUMMY_H
 
-#include <boost/program_options.hpp>
+#include <string>
+#include "boost/program_options.hpp"
 
 namespace arch {
 

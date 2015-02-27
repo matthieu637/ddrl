@@ -15,6 +15,7 @@
 #include <iomanip>
 #include <list>
 #include <map>
+#include <utility>
 
 #include "bib/Assert.hpp"
 #include "Singleton.hpp"

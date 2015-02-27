@@ -1,5 +1,8 @@
 #include "Draw.hpp"
 
+#include <string>
+#include <list>
+
 std::list<dGeomID> *Draw::geoms = nullptr;
 
 void Draw::drawGeom(dGeomID g, const dReal *pos, const dReal *R) {

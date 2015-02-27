@@ -1,9 +1,9 @@
 #define NO_PARALLEL
 
+#include <vector>
+
 #include "ODEFactory.hpp"
-#include "AdvancedAcrobotWorld.hpp"
 #include "bib/Utils.hpp"
-#include "Draw.hpp"
 #include "AdvancedAcrobotWorldView.hpp"
 
 void way2() {
