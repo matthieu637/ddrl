@@ -21,6 +21,7 @@ class DiscretActionAg : public arch::AAgent<> {
     algo = nullptr;
     act_templ = nullptr;
   }
+
   ~DiscretActionAg() {
     delete ainit;
     delete actions;
@@ -63,8 +64,7 @@ class DiscretActionAg : public arch::AAgent<> {
 
     sml::ActionFactory::getInstance()->injectArgs(number_discret_action);
     sml::ActionFactory::getInstance()->randomFixedAction(nb_motors, 1, 1);
-    actions =
-      new sml::list_tlaction(sml::ActionFactory::getInstance()->getActions());
+    actions = new sml::list_tlaction(sml::ActionFactory::getInstance()->getActions());
 
     act_templ = new sml::ActionTemplate({"effectors"}, {number_discret_action});
     ainit = new sml::DAction(act_templ, {0});

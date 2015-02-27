@@ -33,7 +33,7 @@ class QTable {
   ///
   // /\brief Constructeur pour créer le tableau "Action"
   // /\param atmp : le modèle d'action
-  QTable(const ActionTemplate *atmp);
+  explicit QTable(const ActionTemplate *atmp);
 
   ~QTable();
 
@@ -99,8 +99,6 @@ class QTable {
  private:
   bool shouldDeleteStmpl;
   hashmap *map = nullptr;
-  // TODO: could be slightly improve argmax performance by using multiset and
-  // hashmap together
 
   const StateTemplate *stmpl;
   const ActionTemplate *atmpl;

@@ -13,6 +13,8 @@ else()
     PATHS
       ${FANN_DIR}/include
       /usr/include
+      /usr/include/fann
+      /usr/local/include/fann
       /usr/local/include
       /opt/local/include
       /sw/include

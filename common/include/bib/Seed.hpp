@@ -25,9 +25,11 @@ class Seed : public Singleton<Seed> {
     std::thread::id my_id = std::this_thread::get_id();
 //         tbb::tbb_thread::id my_id_tbb = tbb::this_tbb_thread::get_id();
 
-    if(seeds.find(my_id) != seeds.end()) {
+    if (seeds.find(my_id) != seeds.end()) {
       return &(seeds[my_id]);
-    } else return createSeed(my_id);
+    } else {
+      return createSeed(my_id);
+    }
   }
 
   int rand() {
@@ -44,12 +46,11 @@ class Seed : public Singleton<Seed> {
     LOG_DEBUG("new seed " << element.second << " " << my_id);
     return &(it->second);
   }
-//     TODO:auto clear map?
+// TODO(Matthieu) :auto clear map?
 
  private:
   std::map< std::thread::id, unsigned int> seeds;
   boost::shared_mutex _write_mutex;
-
 };
 
 }  // namespace bib

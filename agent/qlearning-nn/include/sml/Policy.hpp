@@ -32,7 +32,7 @@ struct LearnReturn {
 template <class State>
 class Policy {
  public:
-  Policy(RLParam param) : param(param) {}
+  explicit Policy(RLParam _param) : param(_param) {}
   virtual ~Policy() {}
 
   virtual DAction *decision(const State &st, bool greedy) = 0;

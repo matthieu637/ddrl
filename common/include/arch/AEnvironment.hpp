@@ -21,7 +21,7 @@ class AEnvironment : public ProgOptions, public CommonAE {
   virtual float performance() = 0;
 
   virtual ~AEnvironment() {  // pure?
-  };
+  }
 
   void unique_invoke(boost::property_tree::ptree *properties,
                      boost::program_options::variables_map *vm) {
@@ -55,6 +55,7 @@ class AEnvironment : public ProgOptions, public CommonAE {
   bool hasInstance() const {
     return current_instance < instance_per_episode;
   }
+
  protected:
   virtual void _unique_invoke(boost::property_tree::ptree *,
                               boost::program_options::variables_map *) {}

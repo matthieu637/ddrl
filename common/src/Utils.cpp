@@ -21,7 +21,7 @@ bool Utils::rand01(float limit) {
 }
 
 float Utils::randin(float a, float b) {
-  ASSERT(b > a, "");
+  ASSERT(b > a, "first argument " << a << " sould be smaller than second :" << b);
   float random = rand01();
   float diff = b - a;
   float r = random * diff;

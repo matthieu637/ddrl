@@ -41,6 +41,7 @@ class ActionFactory : public bib::Singleton<ActionFactory> {
 
  protected:
   ActionFactory() : actions(), numberAction(-1) {}
+
  public:
   const list_tlaction &getActions() const;
   int getActionsNumber() const;

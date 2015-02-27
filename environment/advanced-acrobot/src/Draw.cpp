@@ -21,9 +21,8 @@ void Draw::drawGeom(dGeomID g, const dReal *pos, const dReal *R) {
     dReal radius, length;
     dGeomCapsuleGetParams(g, &radius, &length);
     dsDrawCapsule(pos, R, length, radius);
-  }
-  //----> Convex Object
-  else if (type == dCylinderClass) {
+  } else if (type == dCylinderClass) {
+    //----> Convex Object
     dReal radius, length;
     dGeomCylinderGetParams(g, &radius, &length);
     dsDrawCylinder(pos, R, length, radius);

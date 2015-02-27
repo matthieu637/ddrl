@@ -20,7 +20,7 @@
     }                                                                         \
   } while (0)
 #else
-#define ASSERT(condition, stream) ;
+#define ASSERT(condition, stream)
 #endif
 
 #endif

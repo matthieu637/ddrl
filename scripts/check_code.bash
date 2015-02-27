@@ -17,7 +17,13 @@ function check_code_cppcheck(){
 function check_code_cpplint(){
 	goto_root
 	all_files=`find . -type f -name '*cpp' -o -name '*.hpp' | grep -v extern`
-	echo $all_files | xargs cpplint --filter=-legal/copyright --extensions=hpp,cpp --linelength=120
+	echo $all_files | xargs cpplint --filter=-legal/copyright,-build/c++11 --extensions=hpp,cpp --linelength=120 |& grep -v 'Include the directory when naming' |& grep -v 'All parameters should be named' |& grep -v 'Archive &ar' |& grep -v 'Is this a non-const reference.*ostream'
+
+	#EXCEPTIONS RULES : coryright, enable c++11, linelength 120
+	#include "dir/fann.h" hasn't been done like this by the fann library
+	#Archive* instead of Archive& : hasn't been done like this by the boost library
+	#ostream* instead of ostream& : ugly
+	#All parameters should be named : conflit with gcc warning unused parameters
 }
 
 check_code_cppcheck

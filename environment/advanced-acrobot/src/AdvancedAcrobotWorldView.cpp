@@ -7,7 +7,7 @@
 #include "Draw.hpp"
 #include "bib/Logger.hpp"
 
-static AdvancedAcrobotWorldView *inst = nullptr;
+static AdvancedAcrobotWorldView* inst = nullptr;
 
 void parseCommand(int cmd) {
   static float xyz[3] = {0., -3., 1};
@@ -49,7 +49,7 @@ void parseCommand(int cmd) {
   }
 }
 
-void threadloop(const std::string &goodpath) {
+void threadloop(const std::string& goodpath) {
   ASSERT(inst != nullptr, "not instantiated " << goodpath);
   inst->fn.version = DS_VERSION;
   inst->fn.start = 0;
@@ -73,8 +73,8 @@ void threadloop(const std::string &goodpath) {
 }
 
 AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
-  const std::string &path, const std::vector<bone_joint> &types,
-  const std::vector<bool> &actuators)
+  const std::string& path, const std::vector<bone_joint>& types,
+  const std::vector<bool>& actuators)
   : AdvancedAcrobotWorld(types, actuators),
     requestEnd(false),
     speedUp(false),
@@ -86,8 +86,9 @@ AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
     if (!boost::filesystem::exists(goodpath)) {
       LOG_DEBUG(goodpath << " doesnt exists");
       goodpath = std::string("../") + goodpath;
-    } else
+    } else {
       break;
+    }
 
   if (n >= 5) {
     LOG_ERROR("cannot found " << path);
@@ -95,7 +96,7 @@ AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
   }
   inst = this;
 
-  for (ODEObject *b : bones) geoms.push_back(b->getGeom());
+  for (ODEObject * b : bones) geoms.push_back(b->getGeom());
 
   eventThread = new tbb::tbb_thread(threadloop, goodpath);
 }
@@ -113,7 +114,7 @@ AdvancedAcrobotWorldView::~AdvancedAcrobotWorldView() {
   HACKclose();
 }
 
-void AdvancedAcrobotWorldView::step(const std::vector<float> &motors) {
+void AdvancedAcrobotWorldView::step(const std::vector<float>& motors) {
   std::vector<float> modified_motors(motors.size(), 0);
   if (!inst->ignoreMotor) {
     for (unsigned int i = 0; i < motors.size(); i++)

@@ -22,7 +22,7 @@ using std::pair;
 
 namespace sml {
 
-typedef struct fann *NN;
+typedef struct fann* NN;
 
 template <class State>
 class QLearning : public Policy<State> {
@@ -57,7 +57,7 @@ class QLearning : public Policy<State> {
   };
 
  public:
-  QLearning(const ActionTemplate *atmp, RLParam param,
+  QLearning(const ActionTemplate* atmp, RLParam param,
             unsigned int _size_input_state
 #ifdef ACTION_TIME
             ,
@@ -77,19 +77,18 @@ class QLearning : public Policy<State> {
       actions_time(_actions_time)
 #endif
   {
-
     for (unsigned int i = 0; i < atmp->sizeNeeded(); i++) {
       neural_networks[i] =
         fann_create_standard(3, size_input_state, param.hidden_unit, 1);
 
-      if (param.activation == "tanh")
+      if (param.activation == "tanh") {
         fann_set_activation_function_hidden(neural_networks[i],
                                             FANN_SIGMOID_SYMMETRIC);
-      else if (param.activation == "sigmoid")
+      } else if (param.activation == "sigmoid") {
         fann_set_activation_function_hidden(neural_networks[i], FANN_SIGMOID);
-      else if (param.activation == "linear")
+      } else if (param.activation == "linear") {
         fann_set_activation_function_hidden(neural_networks[i], FANN_LINEAR);
-      else {
+      } else {
         LOG_ERROR(
           "activation function for hidden layer of the neural network "
           "unknown : "
@@ -111,7 +110,7 @@ class QLearning : public Policy<State> {
     }
   }
 
-  QLearning(const QLearning &clone)
+  QLearning(const QLearning& clone)
     : Policy<State>(clone.param),
       atmpl(clone.atmpl),
       Qa(clone.Qa),
@@ -125,7 +124,6 @@ class QLearning : public Policy<State> {
       actions_time(clone.actions_time)
 #endif
   {
-
     for (unsigned int i = 0; i < clone.atmpl->sizeNeeded(); i++)
       neural_networks[i] = fann_copy(clone.neural_networks[i]);
   }
@@ -142,7 +140,7 @@ class QLearning : public Policy<State> {
     if (history_order != nullptr) delete history_order;
   }
 
-  void startEpisode(const State &s, const DAction &a) {
+  void startEpisode(const State& s, const DAction& a) {
     if (lastAction != nullptr) delete lastAction;
     lastAction = new DAction(a);
     lastState = s;
@@ -157,7 +155,7 @@ class QLearning : public Policy<State> {
     //         good initilization
   }
 
-  DAction *decision(const State &state, bool greedy) {
+  DAction* decision(const State& state, bool greedy) {
     if (greedy && bib::Utils::rand01(this->param.epsilon)) {
       return new DAction(atmpl, {RAND() % static_cast<int>(atmpl->sizeNeeded())});
     }
@@ -166,9 +164,9 @@ class QLearning : public Policy<State> {
     return Qa.argmax();
   }
 
-  LearnReturn _learn(const State &state, double r, bool goal) {
+  LearnReturn _learn(const State& state, double r, bool goal) {
     assert(this->lastAction != nullptr);
-    DAction *a = this->lastAction;
+    DAction* a = this->lastAction;
 
     float delta = r;
 
@@ -176,7 +174,7 @@ class QLearning : public Policy<State> {
     computeQa(state);
 
     bool gotGreedy = false;
-    DAction *ap = this->Qa.argmax();
+    DAction* ap = this->Qa.argmax();
     if (bib::Utils::rand01(this->param.epsilon)) {
       delete ap;
       ap = new DAction(this->atmpl, RAND() % this->atmpl->sizeNeeded());
@@ -192,7 +190,7 @@ class QLearning : public Policy<State> {
 #endif
     }
 #else
-    DAction *ba = this->Qa.argmax();
+    DAction* ba = this->Qa.argmax();
 
     if (!goal) {
 #ifdef ACTION_TIME
@@ -205,14 +203,17 @@ class QLearning : public Policy<State> {
     delete ba;
 #endif
 
-    fann_type inputs[size_input_state];
-    fann_type out[1];
+    if (internal_step > 0) {
+      fann_type* inputs = new fann_type[size_input_state];
+      fann_type out[1];
 
-    for (unsigned int i = 0; i < size_input_state; i++)
-      inputs[i] = lastState->at(i);
-    out[0] = delta;
+      for (unsigned int i = 0; i < size_input_state; i++)
+        inputs[i] = lastState->at(i);
+      out[0] = delta;
 
-    if (internal_step > 0) fann_train(neural_networks[a->hash()], inputs, out);
+      fann_train(neural_networks[a->hash()], inputs, out);
+      delete[] inputs;
+    }
 
     if (internal_step > this->param.memory_size)
       this->addTraces(lastState, *a, state, r, goal);
@@ -227,13 +228,13 @@ class QLearning : public Policy<State> {
     return {ap, gotGreedy};
   }
 
-  Policy<State> *copyPolicy() {
+  Policy<State>* copyPolicy() {
     return new QLearning(*this);
   }
 
-  void save(boost::archive::xml_oarchive *) {}
+  void save(boost::archive::xml_oarchive*) {}
 
-  void load(boost::archive::xml_iarchive *) {}
+  void load(boost::archive::xml_iarchive*) {}
 
   float mse() {
 #ifndef NDEBUG
@@ -248,13 +249,13 @@ class QLearning : public Policy<State> {
 #endif
   }
 
-  void write(const string &chemin) {
+  void write(const string& chemin) {
     for (unsigned int i = 0; i < atmpl->sizeNeeded(); i++) {
       fann_save(neural_networks[i], (chemin + "." + std::to_string(i)).c_str());
     }
   }
 
-  void read(const string &chemin) {
+  void read(const string& chemin) {
     for (unsigned int i = 0; i < atmpl->sizeNeeded(); i++) {
       neural_networks[i] =
         fann_create_from_file((chemin + "." + std::to_string(i)).c_str());
@@ -269,7 +270,7 @@ class QLearning : public Policy<State> {
 #ifndef NDEBUG
     float sum = 0.f;
     for (int i = 0; i < atmpl->sizeNeeded(); i++) {
-      struct fann_connection *connections = (struct fann_connection *)malloc(
+      struct fann_connection* connections = (struct fann_connection*)malloc(
                                               sizeof(struct fann_connection) *
                                               fann_get_total_connections(neural_networks[i]));
 
@@ -289,28 +290,29 @@ class QLearning : public Policy<State> {
 
  protected:
   struct ParallelComputeQa {
-    sml::QTable &Qa;
-    std::vector<sml::NN> &neural_networks;
-    fann_type *inputs;
-    ParallelComputeQa(sml::QTable &_Qa, std::vector<sml::NN> &_neural_networks,
-                      fann_type *_inputs)
+    sml::QTable* Qa;
+    const std::vector<sml::NN>& neural_networks;
+    fann_type* inputs;
+    ParallelComputeQa(sml::QTable* _Qa, const std::vector<sml::NN>& _neural_networks,
+                      fann_type* _inputs)
       : Qa(_Qa), neural_networks(_neural_networks), inputs(_inputs) {}
-    void operator()(const tbb::blocked_range<int> &r) const {
+    void operator()(const tbb::blocked_range<int>& r) const {
       for (int i = r.begin(); i != r.end(); i++) {
-        fann_type *out = fann_run(neural_networks[i], inputs);
-        Qa.operator()(0, i) = out[0];
+        fann_type* out = fann_run(neural_networks[i], inputs);
+        Qa->operator()(0, i) = out[0];
       }
     }
   };
 
-  void computeQa(const State &state) {
-    fann_type inputs[size_input_state];
+  void computeQa(const State& state) {
+    fann_type* inputs = new fann_type[size_input_state];
 
     for (unsigned int i = 0; i < size_input_state; i++)
       inputs[i] = state->at(i);
 
-    ParallelComputeQa para(Qa, neural_networks, inputs);
+    ParallelComputeQa para(&Qa, neural_networks, inputs);
     tbb::parallel_for(tbb::blocked_range<int>(0, atmpl->sizeNeeded()), para);
+    delete[] inputs;
 
     //         for(int i=0; i<atmpl->sizeNeeded(); i++) {
     //             out = fann_run(neural_networks[i], inputs);
@@ -323,8 +325,9 @@ class QLearning : public Policy<State> {
       if (history_order->size() > 0) {
         history_of_history p(history_order, {reward_sum, 0});
         hoh_list.push_back(p);
-      } else
+      } else {
         delete history_order;
+      }
 
       std::random_shuffle(hoh_list.begin(), hoh_list.end());
       replayTraces();
@@ -357,7 +360,7 @@ class QLearning : public Policy<State> {
     history_order = new std::list<history_type>;
   }
 
-  void addTraces(const State &state, const DAction &a, const State &next_st,
+  void addTraces(const State& state, const DAction& a, const State& next_st,
                  float next_r, bool end) {
     history_type new_play = history_type(new replay_history);
     new_play->st = state;
@@ -392,11 +395,11 @@ class QLearning : public Policy<State> {
              it != bit->first->crend(); ++it) {
           const history_type play = *it;
           computeQa(play->next_st);
-          DAction *ba = Qa.argmax();
+          DAction* ba = Qa.argmax();
 #ifdef ACTION_TIME
 
           float delta = play->next_r;
-          ;
+
           if (!play->end)
             delta += powf(this->param.gamma, actions_time[play->at->hash()]) *
                      this->Qa(*ba);
@@ -406,7 +409,7 @@ class QLearning : public Policy<State> {
 #endif
           delete ba;
 
-          fann_type inputs[size_input_state];
+          fann_type* inputs = new fann_type[size_input_state];
           fann_type out[1];
 
           for (unsigned int i = 0; i < size_input_state; i++)
@@ -414,22 +417,23 @@ class QLearning : public Policy<State> {
           out[0] = delta;
 
           fann_train(neural_networks[play->at->hash()], inputs, out);
+          delete[] inputs;
         }
       }
   }
 
  protected:
-  const ActionTemplate *atmpl;
+  const ActionTemplate* atmpl;
   QTable Qa;
   vector<NN> neural_networks;
   unsigned int size_input_state;
 
-  std::list<history_type> *history_order;
+  std::list<history_type>* history_order;
 
   typedef std::pair<std::list<history_type> *, info_replay> history_of_history;
   std::deque<history_of_history> hoh_list;
 
-  DAction *lastAction = nullptr;
+  DAction* lastAction = nullptr;
   State lastState;
   int internal_step;
   float reward_sum;

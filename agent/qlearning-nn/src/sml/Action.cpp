@@ -42,11 +42,12 @@ DAction::DAction(const ActionTemplate* temp, int value) {
     values[i] = static_cast<int>(value / multiplier);
     value -= values[i] * multiplier;
 
-    if (temp->sizeNeeded() == 3)
+    if (temp->sizeNeeded() == 3) {
       //  LOG_DEBUG(values[i] << " " << value << " " << this->get("motor"));
 
       for (int j = 0; j < (templ->actionNumber() - 1) - (i + 1); j++)  // refill
         --it;
+    }
   }
 }
 

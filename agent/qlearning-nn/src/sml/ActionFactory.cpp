@@ -44,7 +44,6 @@ void ActionFactory::injectArgs(int _numberAction) {
 
 void ActionFactory::injectArgs(const std::string& key, int numberMotor,
                                unsigned int numberAction) {
-
   if (!boost::filesystem::exists(key)) {
     std::cout << "Can't find the action file! (" << key << ")" << std::endl;
     exit(1);
@@ -91,7 +90,6 @@ void ActionFactory::injectArgs(const std::string& key, int numberMotor,
 
       i++;
     }
-
   } catch (const std::exception& e) {
     LOG_ERROR(e.what());
     exit(1);
