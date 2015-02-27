@@ -2,8 +2,8 @@
 #define XMLENGINE_HPP
 
 ///
-///\file XMLEngine.hpp
-///\brief Permet d'enregistrer et de lire des objets serializable
+// /\file XMLEngine.hpp
+// /\brief Permet d'enregistrer et de lire des objets serializable
 ///
 
 #include <fstream>
@@ -26,9 +26,9 @@ namespace bib {
 class XMLEngine {
  public:
   ///
-  ///\brief Sauvegarder une instance d'objet dans un fichier XML
+  // /\brief Sauvegarder une instance d'objet dans un fichier XML
   ///
-  ///\param object : objet en question
+  // /\param object : objet en question
   ///       name : nom de l'entrée XML ( le nom de la classe est en générale une
   ///       bonne idée )
   ///    file_name : chemin vers le fichier à écrire
@@ -43,9 +43,9 @@ class XMLEngine {
     xml << make_nvp(name, object);
     outputFile.close();
   }
-  //////\brief Créer une instance d'objet à partir d'un fichier XML//////\param
-  ///name : nom de l'entrée XML ( le nom de la classe est en générale une///
-  ///bonne idée )///    file_name : chemin vers le fichier XML à lire///
+  // ////\brief Créer une instance d'objet à partir d'un fichier XML//////\param
+  // /name : nom de l'entrée XML ( le nom de la classe est en générale une///
+  // /bonne idée )///    file_name : chemin vers le fichier XML à lire///
   template <class T>
   static T *load(const char *name, const string &file_name) {
     LOG_INFO("Lecture du fichier XML " << file_name);
@@ -59,6 +59,6 @@ class XMLEngine {
     return object;
   }
 };
-} // namespace bib
+}  // namespace bib
 
 #endif  // XMLENGINE_HPP

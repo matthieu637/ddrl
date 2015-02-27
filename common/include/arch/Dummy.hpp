@@ -33,6 +33,6 @@ class EnvProgOptions {
     return desc;
   }
 };
-} // namespace arch
+}  // namespace arch
 
 #endif  // DUMMY_H

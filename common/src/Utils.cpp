@@ -78,4 +78,4 @@ float Utils::euclidien_dist3D(float x1, float x2, float y1, float y2, float z1,
                               float z2) {
   return sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2) + pow(z1 - z2, 2));
 }
-} // namespace bib
+}  // namespace bib

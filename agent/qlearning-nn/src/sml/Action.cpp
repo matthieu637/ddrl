@@ -131,4 +131,4 @@ std::ostream& operator<<(std::ostream& stream, const sml::DAction& ac) {
   ac.print(stream);
   return stream;
 }
-} // namespace sml
+}  // namespace sml

@@ -2,8 +2,8 @@
 #define UTILS_HPP
 
 ///
-///\file Utils.hpp
-///\brief les méthodes utiles
+// /\file Utils.hpp
+// /\brief les méthodes utiles
 ///
 ///
 
@@ -19,20 +19,20 @@ namespace bib {
 class Utils {
  public:
   ///
-  ///\brief Retourner 0 ou 1
+  // /\brief Retourner 0 ou 1
   static float rand01();
 
   static bool rand01(float);
 
   static float randin(float a, float b);
   ///
-  ///\brief Retourner la valeur absolue de "x"
-  ///\param x : une valeur
+  // /\brief Retourner la valeur absolue de "x"
+  // /\param x : une valeur
   static double abs(double x);
 
   ///
-  ///\brief transformer la valeur x qui appartient [a,b] à [c,d]
-  ///\param x :une valeur
+  // /\brief transformer la valeur x qui appartient [a,b] à [c,d]
+  // /\param x :une valeur
   ///   a,b : intervalle [a,b]
   ///   c,d: intervalle [c,d]
   static double transform(double x, double a, double b, double c, double d);
@@ -82,6 +82,6 @@ class Utils {
   static float euclidien_dist3D(float x1, float x2, float y1, float y2,
                                 float z1, float z2);
 };
-} // namespace bib
+}  // namespace bib
 
 #endif  // UTILS_HPP

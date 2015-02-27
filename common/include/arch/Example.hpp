@@ -43,6 +43,6 @@ class ExampleAgent : public arch::AAgent<> {
 
   std::vector<float> actuator;
 };
-} // namespace arch
+}  // namespace arch
 
 #endif  // EXAMPLE_H

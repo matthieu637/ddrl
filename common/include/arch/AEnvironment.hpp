@@ -20,7 +20,7 @@ class AEnvironment : public ProgOptions, public CommonAE {
 
   virtual float performance() = 0;
 
-  virtual ~AEnvironment() { // pure?
+  virtual ~AEnvironment() {  // pure?
   };
 
   void unique_invoke(boost::property_tree::ptree *properties,
@@ -74,6 +74,6 @@ class AEnvironment : public ProgOptions, public CommonAE {
   unsigned int max_step_per_instance;
   unsigned int instance_per_episode;
 };
-} // namespace arch
+}  // namespace arch
 
 #endif  // AENVIRONMENT_H

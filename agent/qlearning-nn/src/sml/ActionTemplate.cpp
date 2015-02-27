@@ -105,4 +105,4 @@ unsigned int ActionTemplate::sizeNeeded() const {
     r *= (*it);
   return r;
 }
-} // namespace sml
+}  // namespace sml

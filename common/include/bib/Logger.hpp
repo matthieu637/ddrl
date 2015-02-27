@@ -2,9 +2,9 @@
 #define LOGGER_HPP
 
 ///
-///\file Logger.hpp
-///\brief Singleton de Logger afin d'écrire des logs
-///\example Dans LoggerTest.hpp
+// /\file Logger.hpp
+// /\brief Singleton de Logger afin d'écrire des logs
+// /\example Dans LoggerTest.hpp
 ///
 ///
 
@@ -187,6 +187,6 @@ class Logger : public Singleton<Logger> {
   unsigned int buffer_index = 0;
   std::map<std::string, std::ofstream *> open_files;
 };
-} // namespace bib
+}  // namespace bib
 
 #endif

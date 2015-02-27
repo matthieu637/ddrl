@@ -20,4 +20,4 @@ void Prober::probe(float m) {
     LOG_DEBUG("min : " << min_probe << " max : " << max_probe);
   }
 }
-} // namespace bib
+}  // namespace bib

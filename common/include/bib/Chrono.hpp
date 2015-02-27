@@ -16,5 +16,5 @@ class Chrono {
  private:
   high_resolution_clock::time_point begin;
 };
-} // namespace bib
+}  // namespace bib
 #endif  // CHRONO_H

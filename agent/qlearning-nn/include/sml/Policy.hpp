@@ -51,8 +51,8 @@ class Policy {
   }
 
   ///
-  ///\brief Sauvegarder les données de l'algorithme
-  ///\param chemin : l'adresse où on sauvegarde
+  // /\brief Sauvegarder les données de l'algorithme
+  // /\param chemin : l'adresse où on sauvegarde
   virtual void write(const string &chemin) {
     //         named_mutex mutex( open_or_create, chemin.c_str());
 
@@ -68,8 +68,8 @@ class Policy {
   }
 
   ///
-  ///\brief Charger les données de l'algorithme
-  ///\param chemin : l'adresse où on charge
+  // /\brief Charger les données de l'algorithme
+  // /\param chemin : l'adresse où on charge
   virtual void read(const string &chemin) {
     if (!boost::filesystem::exists(chemin)) {
       LOG_DEBUG(chemin << " n'existe pas.");
@@ -88,13 +88,13 @@ class Policy {
 
  protected:
   ///
-  ///\brief Sauvegarder ce que l'algorithme a appris
-  ///\param xml : le fichier XML
+  // /\brief Sauvegarder ce que l'algorithme a appris
+  // /\param xml : le fichier XML
   virtual void save(boost::archive::xml_oarchive *xml) = 0;
 
   ///
-  ///\brief Charger ce que l'algorithme a appris
-  ///\param xml : le fichier XML
+  // /\brief Charger ce que l'algorithme a appris
+  // /\param xml : le fichier XML
   virtual void load(boost::archive::xml_iarchive *xml) = 0;
 
  protected:
@@ -102,6 +102,6 @@ class Policy {
 };
 
 typedef Policy<DState> DPolicy;
-} // namespace sml
+}  // namespace sml
 
 #endif  // MCARTASK_H
