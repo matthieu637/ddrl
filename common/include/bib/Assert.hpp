@@ -3,12 +3,12 @@
 
 #include <iostream>
 
-#ifdef _ASSERT_H
-#warning do not use assert, please use our own assert method in order to speed up simulation
-#endif
+// #ifdef _ASSERT_H
+// #warning do not use assert, please use our own assert method in order to speed up simulation
+// #endif
 
 // avoid the inclusion of assert.h
-#define _ASSERT_H
+// #define _ASSERT_H
 
 #ifndef NDEBUG
 #define ASSERT(condition, stream)                                             \

@@ -63,7 +63,7 @@ class DiscretActionAg : public arch::AAgent<> {
     int number_discret_action = pt->get<int>("agent.discret_action");
 
     sml::ActionFactory::getInstance()->injectArgs(number_discret_action);
-    sml::ActionFactory::getInstance()->randomFixedAction(nb_motors, 1, 1);
+    sml::ActionFactory::getInstance()->randomFixedAction(nb_motors, 1, 2);
     actions = new sml::list_tlaction(sml::ActionFactory::getInstance()->getActions());
 
     act_templ = new sml::ActionTemplate({"effectors"}, {number_discret_action});

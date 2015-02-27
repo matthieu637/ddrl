@@ -26,19 +26,20 @@ void Draw::drawGeom(dGeomID g, const dReal *pos, const dReal *R) {
     dReal radius, length;
     dGeomCylinderGetParams(g, &radius, &length);
     dsDrawCylinder(pos, R, length, radius);
-  } else if (type == dGeomTransformClass) {
-    dGeomID g2 = dGeomTransformGetGeom(g);
-    const dReal *pos2 = dGeomGetPosition(g2);
-    const dReal *R2 = dGeomGetRotation(g2);
-    dVector3 actual_pos;
-    dMatrix3 actual_R;
-    dMultiply0_331(actual_pos, R, pos2);
-    actual_pos[0] += pos[0];
-    actual_pos[1] += pos[1];
-    actual_pos[2] += pos[2];
-    dMultiply0_333(actual_R, R, R2);
-    drawGeom(g2, actual_pos, actual_R);
   }
+//   else if (type == dGeomTransformClass) {
+//     dGeomID g2 = dGeomTransformGetGeom(g);
+//     const dReal *pos2 = dGeomGetPosition(g2);
+//     const dReal *R2 = dGeomGetRotation(g2);
+//     dVector3 actual_pos;
+//     dMatrix3 actual_R;
+//     dMultiply0_331(actual_pos, R, pos2);
+//     actual_pos[0] += pos[0];
+//     actual_pos[1] += pos[1];
+//     actual_pos[2] += pos[2];
+//     dMultiply0_333(actual_R, R, R2);
+//     drawGeom(g2, actual_pos, actual_R);
+//   }
   if (false) {
     dBodyID body = dGeomGetBody(g);
     if (body) {
