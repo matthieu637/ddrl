@@ -3,15 +3,12 @@
 
 #include <string>
 #include "boost/filesystem.hpp"
-#include "boost/interprocess/sync/scoped_lock.hpp"
-#include "boost/interprocess/sync/named_mutex.hpp"
 #include "bib/XMLEngine.hpp"
 #include "bib/Logger.hpp"
 #include "Action.hpp"
 
 
 using std::string;
-using namespace boost::interprocess;
 
 namespace sml {
 

@@ -3,7 +3,7 @@
 
 #include <chrono>
 
-using namespace std::chrono;
+using std::chrono::high_resolution_clock;
 
 namespace bib {
 

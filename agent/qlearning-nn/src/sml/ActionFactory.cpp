@@ -14,24 +14,24 @@
 
 namespace sml {
 
-const list_tlaction &ActionFactory::getActions() const {
+const list_tlaction& ActionFactory::getActions() const {
   return actions;
 }
 int ActionFactory::getActionsNumber() const {
   return numberAction;
 }
 class malformedfile : public std::exception {
-  virtual const char *what() const throw() {
+  virtual const char* what() const throw() {
     return "The action file is malformed !";
   }
 } malformedfile_ex;
 
-void ActionFactory::write(const list_tlaction &ac, const std::string &file) {
+void ActionFactory::write(const list_tlaction& ac, const std::string& file) {
   bib::XMLEngine::save<list_tlaction>(ac, "actions", file);
 }
 
-void ActionFactory::read(const std::string &file) {
-  list_tlaction *ptr = bib::XMLEngine::load<list_tlaction>("actions", file);
+void ActionFactory::read(const std::string& file) {
+  list_tlaction* ptr = bib::XMLEngine::load<list_tlaction>("actions", file);
   actions.clear();
   for (auto it = ptr->cbegin(); it != ptr->cend(); ++it) actions.push_back(*it);
   delete ptr;
@@ -42,9 +42,8 @@ void ActionFactory::injectArgs(int _numberAction) {
   numberAction = _numberAction;
 }
 
-void ActionFactory::injectArgs(const std::string &key, int numberMotor,
+void ActionFactory::injectArgs(const std::string& key, int numberMotor,
                                unsigned int numberAction) {
-  using namespace std;
 
   if (!boost::filesystem::exists(key)) {
     std::cout << "Can't find the action file! (" << key << ")" << std::endl;
@@ -59,23 +58,23 @@ void ActionFactory::injectArgs(const std::string &key, int numberMotor,
 
   try {
     int i = 1;
-    while (getline(myfile, line)) {
-      stringstream sstream(line);
-      string value;
+    while (std::getline(myfile, line)) {
+      std::stringstream sstream(line);
+      std::string value;
 
       TemporalLinearMotor tlm;
 
-      if (getline(sstream, value, ' '))
+      if (std::getline(sstream, value, ' '))
         tlm.a = stof(value);
       else
         throw malformedfile_ex;
 
-      if (getline(sstream, value, ' '))
+      if (std::getline(sstream, value, ' '))
         tlm.b = stof(value);
       else
         throw malformedfile_ex;
 
-      if (getline(sstream, value, ' '))
+      if (std::getline(sstream, value, ' '))
         ac.temporal_extension = stoi(value);
       else
         throw malformedfile_ex;
@@ -93,7 +92,7 @@ void ActionFactory::injectArgs(const std::string &key, int numberMotor,
       i++;
     }
 
-  } catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     LOG_ERROR(e.what());
     exit(1);
   }
@@ -158,13 +157,13 @@ void ActionFactory::randomFixedAction(int numberMotor, int timestepMin,
   randomFixedAction(numberMotor, numberAction, timestepMin, timestepMax);
 }
 
-std::vector<float> *ActionFactory::computeOutputs(
-  const DAction *ac, int timestep, const sml::list_tlaction &actions) {
+std::vector<float>* ActionFactory::computeOutputs(
+  const DAction* ac, int timestep, const sml::list_tlaction& actions) {
   int ac_id = ac->get(0);
-  const TemporalLinearAction &action = actions.at(ac_id);
+  const TemporalLinearAction& action = actions.at(ac_id);
 
   int nb_motors = action.motors.size();
-  std::vector<float> *outputs = new std::vector<float>(nb_motors, 0.5);
+  std::vector<float>* outputs = new std::vector<float>(nb_motors, 0.5);
 
   for (int motor = 0; motor < nb_motors; motor++)
     outputs->operator[](motor) =
