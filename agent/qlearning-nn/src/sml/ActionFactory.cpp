@@ -118,7 +118,7 @@ void ActionFactory::randomLinearAction(int numberMotor, int timestepMin,
       float y2 = bib::Utils::rand01();
 
       TemporalLinearMotor tlm;
-      tlm.a = float((y2 - y1) / ac.temporal_extension);
+      tlm.a = static_cast<float>((y2 - y1) / ac.temporal_extension);
       tlm.b = y2;
       ac.motors.push_back(tlm);
     }

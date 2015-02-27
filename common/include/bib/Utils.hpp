@@ -62,14 +62,14 @@ class Utils {
       else if (p < min)
         min = p;
     }
-    mean = (float)(mean / (float)_list.size());
+    mean = (mean / static_cast<float>(_list.size()));
 
     float variance = 0.f;
     for (auto it = _list.cbegin(); it != _list.cend(); ++it) {
       float p = *it;
       variance += p * p;
     }
-    variance = (float)(variance / (float)_list.size());
+    variance = (variance / static_cast<float>(_list.size()));
     variance = variance - mean * mean;
 
     return {variance, mean, max, min};

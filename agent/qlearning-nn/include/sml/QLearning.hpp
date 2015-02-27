@@ -159,7 +159,7 @@ class QLearning : public Policy<State> {
 
   DAction *decision(const State &state, bool greedy) {
     if (greedy && bib::Utils::rand01(this->param.epsilon)) {
-      return new DAction(atmpl, {RAND() % (int)atmpl->sizeNeeded()});
+      return new DAction(atmpl, {RAND() % static_cast<int>(atmpl->sizeNeeded())});
     }
 
     computeQa(state);

@@ -11,8 +11,7 @@
 namespace bib {
 
 float Utils::rand01() {
-  //     LOG_DEBUG("rand");
-  return (float)RAND() / (float)RAND_MAX;
+  return static_cast<float>(RAND()) / static_cast<float>(RAND_MAX);
 }
 bool Utils::rand01(float limit) {
   if (limit > 0.L) {
@@ -23,7 +22,7 @@ bool Utils::rand01(float limit) {
 
 float Utils::randin(float a, float b) {
   ASSERT(b > a, "");
-  float random = ((float)RAND()) / (float)RAND_MAX;
+  float random = rand01();
   float diff = b - a;
   float r = random * diff;
   return a + r;
@@ -58,8 +57,8 @@ time_t Utils::srand_mili(bool zero) {
   }
 }
 
-float *Utils::genNrand(int N, float max) {
-  float *tab = new float[N];
+float* Utils::genNrand(int N, float max) {
+  float* tab = new float[N];
   tab[0] = 0.;
   for (int i = 1; i < N; i++) tab[i] = rand01() * max;
 

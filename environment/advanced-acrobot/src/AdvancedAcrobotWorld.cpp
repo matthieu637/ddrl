@@ -98,7 +98,7 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint> &types) {
 
 void nearCallback(void *data, dGeomID o1, dGeomID o2) {
   int n;
-  nearCallbackData *d = (nearCallbackData *)data;
+  nearCallbackData *d = reinterpret_cast<nearCallbackData *>(data);
   AdvancedAcrobotWorld *inst = d->inst;
 
   // exit without doing anything if the two bodies are connected by a joint

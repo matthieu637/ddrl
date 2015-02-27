@@ -8,7 +8,7 @@
 namespace sml {
 
 DAction::DAction(const ActionTemplate* temp, const std::list<int>& vals) {
-  assert((int)vals.size() == temp->actionNumber());
+  assert(static_cast<int>(vals.size()) == temp->actionNumber());
 
   this->templ = temp;
 
@@ -39,7 +39,7 @@ DAction::DAction(const ActionTemplate* temp, int value) {
     //  LOG_DEBUG(multiplier << " " << value << " " << (int) ( value /
     //  multiplier ));
 
-    values[i] = (int)(value / multiplier);
+    values[i] = static_cast<int>(value / multiplier);
     value -= values[i] * multiplier;
 
     if (temp->sizeNeeded() == 3)
