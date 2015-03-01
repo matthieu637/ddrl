@@ -36,3 +36,8 @@ target_link_libraries(advanced-acrobot ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_
 #file(COPY data/minimal_config.ini DESTINATION . ) 
 #file(RENAME ${CMAKE_CURRENT_BINARY_DIR}/minimal_config.ini ${CMAKE_CURRENT_BINARY_DIR}/config.ini)
 
+file(COPY ../../environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+
+execute_process(COMMAND bash ../../../../scripts/merge_ini.bash ../../../../common/data/minimal_config.ini data/acrobot.ini config.ini)
+execute_process(COMMAND bash ../../../../scripts/merge_ini.bash config.ini data/qlearning.ini config.ini)

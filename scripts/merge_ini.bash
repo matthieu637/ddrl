@@ -11,10 +11,12 @@ destination=$3
 
 if [ ! -e $base ] ; then
 	echo "$base doesn't exist !"
+	exit 1
 fi
 
 if [ ! -e $injector ] ; then
 	echo "$injector doesn't exist !"
+	exit 1
 fi
 
 tmp=`mktemp`

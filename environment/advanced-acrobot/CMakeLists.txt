@@ -44,6 +44,8 @@ target_link_libraries(acrobot-env ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_
 
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
+execute_process(COMMAND bash ../../../../scripts/merge_ini.bash ../../../../common/data/minimal_config.ini data/acrobot.ini config.ini)
+
 #BUILD THE LIBRARY
 set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
 
