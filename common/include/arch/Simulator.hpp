@@ -94,10 +94,15 @@ class Simulator {
         all_rewards.push_back(reward);
       }
 
-      perceptions = env->perceptions();
-      float reward = env->performance();
-      agent->run(reward, perceptions, learning, true);
-      all_rewards.push_back(reward);
+      // if the environment is in a final state
+      //        i.e it didn't reach the number of step but finished well
+      // then we call the algorithm a last time to give him this information
+      if (env->final_state()) {
+        perceptions = env->perceptions();
+        float reward = env->performance();
+        agent->run(reward, perceptions, learning, true);
+        all_rewards.push_back(reward);
+      }
 
       env->next_instance();
     }
