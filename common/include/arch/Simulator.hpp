@@ -30,13 +30,16 @@ class Simulator {
   //     a base of AAgent.");
 
  public:
-  Simulator() {}
+  Simulator() : max_episode(0), test_episode_per_episode(0), test_episode_at_end(0),
+    dump_log_each(0), display_log_each(0), save_agent_each(0), properties(nullptr),
+    command_args(nullptr), time_spend(), env(nullptr), agent(nullptr) {}
+  
   ~Simulator() {
     delete properties;
     delete command_args;
   }
 
-  void init(int argc, char **argv) {
+  void init(int argc, char** argv) {
     string config_file = DEFAULT_CONFIG_FILE;
     readCommandArgs(argc, argv, &config_file);
     readConfig(config_file);
@@ -87,7 +90,7 @@ class Simulator {
       while (env->running()) {
         perceptions = env->perceptions();
         float reward = env->performance();
-        const std::vector<float> &actuators =
+        const std::vector<float>& actuators =
           agent->run(reward, perceptions, learning, false);
         env->apply(actuators);
         all_rewards.push_back(reward);
@@ -110,8 +113,8 @@ class Simulator {
     save_agent(agent, episode);
   }
 
-  void dump_and_display(unsigned int episode, const std::list<float> &all_rewards, Environment *env,
-                        Agent *ag, bool learning) {
+  void dump_and_display(unsigned int episode, const std::list<float>& all_rewards, Environment* env,
+                        Agent* ag, bool learning) {
     bool display = episode % display_log_each == 0;
     bool dump = episode % dump_log_each == 0;
 
@@ -135,7 +138,7 @@ class Simulator {
     }
   }
 
-  void save_agent(Agent *agent, unsigned int episode) {
+  void save_agent(Agent* agent, unsigned int episode) {
     if (episode % save_agent_each == 0 && episode != 0) {
       std::string filename(DEFAULT_AGENT_SAVE_FILE);
       std::string filename2 = std::to_string(episode);
@@ -144,7 +147,7 @@ class Simulator {
     }
   }
 
-  void readCommandArgs(int argc, char **argv, string *s) {
+  void readCommandArgs(int argc, char** argv, string* s) {
     namespace po = boost::program_options;
 
     po::options_description desc("Allowed Simulator options");
@@ -196,13 +199,13 @@ class Simulator {
   unsigned int display_log_each;
   unsigned int save_agent_each;
 
-  boost::property_tree::ptree *properties;
-  boost::program_options::variables_map *command_args;
+  boost::property_tree::ptree* properties;
+  boost::program_options::variables_map* command_args;
 
   bib::Chrono time_spend;
 
-  Environment *env;
-  Agent *agent;
+  Environment* env;
+  Agent* agent;
 
 #ifndef NDEBUG
   bool well_init = false;

@@ -36,7 +36,7 @@ class ODEFactory : public bib::Singleton<ODEFactory> {
 
   Mutex &wannaStep();
 
-  dGeomID createGround(const ODEWorld &world);
+  static dGeomID createGround(const ODEWorld &world);
 
  protected:
   ODEFactory();

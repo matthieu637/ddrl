@@ -108,7 +108,7 @@ void ActionFactory::randomLinearAction(int numberMotor, int timestepMin,
   assert(numberAction > 0);
   //     LOG_DEBUG("redefining actions");
 
-  while (actions.size() < numberAction) {
+  do {
     TemporalLinearAction ac;
     ac.temporal_extension = bib::Utils::randin(timestepMin, timestepMax);
     for (int motor = 0; motor < numberMotor; motor++) {
@@ -123,7 +123,7 @@ void ActionFactory::randomLinearAction(int numberMotor, int timestepMin,
 
     actions.push_back(ac);
     ac.motors.clear();
-  }
+  } while (actions.size() < numberAction);
 }
 
 void ActionFactory::randomFixedAction(int numberMotor,
@@ -131,7 +131,7 @@ void ActionFactory::randomFixedAction(int numberMotor,
                                       int timestepMin, int timestepMax) {
   actions.clear();
 
-  while (actions.size() < numberAction) {
+  do {
     TemporalLinearAction ac;
     for (int motor = 0; motor < numberMotor; motor++) {
       TemporalLinearMotor tlm;
@@ -142,7 +142,7 @@ void ActionFactory::randomFixedAction(int numberMotor,
     ac.temporal_extension = bib::Utils::randin(timestepMin, timestepMax);
     actions.push_back(ac);
     ac.motors.clear();
-  }
+  } while (actions.size() < numberAction);
 }
 
 void ActionFactory::randomLinearAction(int numberMotor, int timestepMin,

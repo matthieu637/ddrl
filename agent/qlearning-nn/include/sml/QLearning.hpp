@@ -10,8 +10,7 @@
 #include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
 #include "boost/graph/graph_concepts.hpp"
-#include "fann.h"
-#include "fann_train.h"
+#include "doublefann.h"
 
 #include "sml/Policy.hpp"
 #include "bib/Utils.hpp"
@@ -117,6 +116,8 @@ class QLearning : public Policy<State> {
       neural_networks(clone.atmpl->sizeNeeded()),
       size_input_state(clone.size_input_state),
       history_order(nullptr),
+      hoh_list(),
+      lastState(),
       internal_step(clone.internal_step),
       reward_sum(clone.internal_step)
 #ifdef ACTION_TIME
@@ -145,6 +146,7 @@ class QLearning : public Policy<State> {
     lastAction = new DAction(a);
     lastState = s;
 
+    history_order = new std::list<history_type>;
     resetTraces();
 
     // start an new episod
@@ -236,18 +238,17 @@ class QLearning : public Policy<State> {
 
   void load(boost::archive::xml_iarchive*) {}
 
-  float mse() {
 #ifndef NDEBUG
+  float mse() {
     float s = 0.;
     for (int i = 0; i < atmpl->sizeNeeded(); i++) {
       s += fann_get_MSE(neural_networks[i]);
       fann_reset_MSE(neural_networks[i]);
     }
     return s / atmpl->sizeNeeded();
-#else
-    return 0;
-#endif
   }
+#endif
+
 
   void write(const string& chemin) {
     for (unsigned int i = 0; i < atmpl->sizeNeeded(); i++) {
@@ -262,12 +263,12 @@ class QLearning : public Policy<State> {
     }
   }
 
-  int history_size() {
+  int history_size() const {
     return history_order->size();
   }
 
-  float weight_sum() {
 #ifndef NDEBUG
+  float weight_sum() {
     float sum = 0.f;
     for (int i = 0; i < atmpl->sizeNeeded(); i++) {
       struct fann_connection* connections = (struct fann_connection*)malloc(
@@ -283,10 +284,9 @@ class QLearning : public Policy<State> {
     }
 
     return sum / atmpl->sizeNeeded();
-#else
-    return 0;
-#endif
   }
+#endif
+
 
  protected:
   struct ParallelComputeQa {
@@ -321,43 +321,34 @@ class QLearning : public Policy<State> {
   }
 
   void resetTraces() {
-    if (history_order != nullptr) {
-      if (history_order->size() > 0) {
-        history_of_history p(history_order, {reward_sum, 0});
-        hoh_list.push_back(p);
-      } else {
-        delete history_order;
-      }
+    history_of_history p(history_order, {reward_sum, 0});
+    hoh_list.push_back(p);
 
-      std::random_shuffle(hoh_list.begin(), hoh_list.end());
-      replayTraces();
-      if (hoh_list.size() > this->param.repeat_replay) {
-        float min = reward_sum;
-        auto it = hoh_list.begin();
-        decltype(it) min_it;
-        for (; it != hoh_list.end();) {
-          if (it->second.replay_time >
-              (this->param.repeat_replay + 2) * 3) {  // too many replayed
-            delete it->first;
-            it = hoh_list.erase(it);
-            continue;
-          }
-
-          it->second.replay_time++;
-          if (it->second.sum_reward <= min) {
-            min = it->second.sum_reward;
-            min_it = it;
-          }
-          ++it;
+    std::random_shuffle(hoh_list.begin(), hoh_list.end());
+    replayTraces();
+    if (hoh_list.size() > this->param.repeat_replay) {
+      float min = reward_sum;
+      auto it = hoh_list.begin();
+      decltype(it) min_it;
+      for (; it != hoh_list.end();) {
+        if (it->second.replay_time >
+            (this->param.repeat_replay + 2) * 3) {  // too many replayed
+          delete it->first;
+          it = hoh_list.erase(it);
+          continue;
         }
 
-        delete min_it->first;
-        hoh_list.erase(min_it);
+        it->second.replay_time++;
+        if (it->second.sum_reward <= min) {
+          min = it->second.sum_reward;
+          min_it = it;
+        }
+        ++it;
       }
-      //      hoh_list.pop_back();
-    }
 
-    history_order = new std::list<history_type>;
+      delete min_it->first;
+      hoh_list.erase(min_it);
+    }
   }
 
   void addTraces(const State& state, const DAction& a, const State& next_st,
@@ -370,19 +361,6 @@ class QLearning : public Policy<State> {
     new_play->meeted = 1;
     new_play->end = end;
 
-    //         auto ret = history.insert(new_play);
-    //         if(!ret.second && new_play->next_r != (*ret.first)->next_r ) //
-    //         j'ai déjà un élement dans l'historique
-    //         {
-    //             new_play->next_r =( (*ret.first)->next_r *
-    //             (*ret.first)->meeted + next_r) / ( (*ret.first)->meeted + 1)
-    //             ;
-    //             new_play->meeted = (*ret.first)->meeted + 1;
-    //
-    //             history.erase(ret.first);
-    //             history.insert(new_play);
-    //         }
-    //         if(ret.second)
     history_order->push_back(new_play);
   }
 

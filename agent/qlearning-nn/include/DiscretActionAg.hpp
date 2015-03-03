@@ -20,6 +20,7 @@ class DiscretActionAg : public arch::AAgent<> {
     actions = nullptr;
     algo = nullptr;
     act_templ = nullptr;
+    rlparam = nullptr;
   }
 
   ~DiscretActionAg() {
@@ -27,6 +28,7 @@ class DiscretActionAg : public arch::AAgent<> {
     delete actions;
     delete algo;
     delete act_templ;
+    delete rlparam;
 
     sml::ActionFactory::endInstance();
   }
@@ -47,15 +49,16 @@ class DiscretActionAg : public arch::AAgent<> {
   }
 
   void unique_invoke(boost::property_tree::ptree *pt, boost::program_options::variables_map * vm) {
-    rlparam.epsilon             = pt->get<float>("agent.epsilon");
-    rlparam.gamma               = pt->get<float>("agent.gamma");
+    rlparam = new sml::RLParam;
+    rlparam->epsilon             = pt->get<float>("agent.epsilon");
+    rlparam->gamma               = pt->get<float>("agent.gamma");
 
-    rlparam.alpha               = pt->get<float>("agent.alpha");
-    rlparam.hidden_unit         = pt->get<int>("agent.hidden_unit");
-    rlparam.activation          = pt->get<std::string>("agent.activation_function_hidden");
-    rlparam.activation_stepness = pt->get<float>("agent.activation_steepness_hidden");
+    rlparam->alpha               = pt->get<float>("agent.alpha");
+    rlparam->hidden_unit         = pt->get<int>("agent.hidden_unit");
+    rlparam->activation          = pt->get<std::string>("agent.activation_function_hidden");
+    rlparam->activation_stepness = pt->get<float>("agent.activation_steepness_hidden");
 
-    rlparam.activation_stepness = pt->get<int>("agent.replay");
+    rlparam->repeat_replay = pt->get<int>("agent.replay");
 
     int number_discret_action   = pt->get<int>("agent.discret_action");
 
@@ -65,7 +68,7 @@ class DiscretActionAg : public arch::AAgent<> {
 
     act_templ = new sml::ActionTemplate({"effectors"}, {number_discret_action});
     ainit = new sml::DAction(act_templ, {0});
-    algo = new sml::QLearning<EnvState>(act_templ, rlparam, nb_sensors);
+    algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
 
     if (vm->count("load"))
       algo->read((*vm)["load"].as<std::string>());
@@ -88,7 +91,7 @@ class DiscretActionAg : public arch::AAgent<> {
   sml::ActionTemplate *act_templ;
   sml::list_tlaction *actions;
   sml::DAction *ainit;
-  sml::RLParam rlparam;
+  sml::RLParam *rlparam;
 };
 
 #endif  // DISCRETACTION_H

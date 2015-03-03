@@ -86,13 +86,6 @@ DAction *QTable::argmax(const std::vector<int> *action_time,
   return new DAction(atmpl, imax);
 }
 
-DAction *QTable::argmin() const {
-  unsigned int imin = RAND() % atmpl->sizeNeeded();
-  for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
-    if (map->at(imin) > map->at(j)) imin = j;
-
-  return new DAction(atmpl, imin);
-}
 float QTable::min() const {
   unsigned int imin = RAND() % atmpl->sizeNeeded();
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
@@ -132,10 +125,6 @@ double &QTable::operator()(unsigned int s, unsigned int a) {
 
   //     LOG_DEBUG("set at " << beginRange + a);
   return (*map)[beginRange + a];
-}
-
-hashmap *QTable::getWholeCouple() {
-  return map;
 }
 
 void QTable::save(boost::archive::xml_oarchive *xml) {

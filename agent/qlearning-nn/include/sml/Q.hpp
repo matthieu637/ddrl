@@ -55,7 +55,6 @@ class QTable {
 
   DAction *boltzmann(float temperature) const;
 
-  DAction *argmin() const;
   float min() const;
 
   ///
@@ -89,10 +88,6 @@ class QTable {
   // /\brief Charger ce que l'algorithme a appris
   // /\param xml : le fichier XML
   void load(boost::archive::xml_iarchive *xml);
-
-  ///
-  // /\brief Renvoyer toutes les actions
-  hashmap *getWholeCouple();
 
   void print(bool perState = true) const;
 

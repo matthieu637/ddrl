@@ -10,8 +10,9 @@ rm_build
 
 function check_code_cppcheck(){
 	goto_root
-	all_sources=`ls -d */src */*/src */include */*/include`
-	cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem $all_sources
+	all_sources=`ls -d */src */*/src`
+	all_includes=`ls -d */include */*/include | xargs -I% echo -n "-I% "`
+	cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem --std=c++11 $all_includes $all_sources
 }
 
 function check_code_cpplint(){

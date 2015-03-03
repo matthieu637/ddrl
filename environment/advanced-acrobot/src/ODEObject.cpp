@@ -12,23 +12,23 @@ ODEObject::ODEObject(dBodyID bid, dMass m, dGeomID geom, float x, float y,
     density(density),
     massv(massv) {}
 
-dBodyID ODEObject::getID() {
+dBodyID ODEObject::getID() const {
   return bid;
 }
 
-dGeomID &ODEObject::getGeom() {
+dGeomID &ODEObject::getGeom() const {
   return geom;
 }
 
-dMass &ODEObject::getMass() {
+dMass &ODEObject::getMass() const {
   return mass;
 }
 
-float ODEObject::getDensity() {
+float ODEObject::getDensity() const {
   return density;
 }
 
-float ODEObject::getMassValue() {
+float ODEObject::getMassValue() const {
   return massv;
 }
 
@@ -36,15 +36,15 @@ void ODEObject::setID(const dBodyID _id) {
   bid = _id;
 }
 
-float ODEObject::getX() {
+float ODEObject::getX() const {
   return x;
 }
 
-float ODEObject::getY() {
+float ODEObject::getY() const {
   return y;
 }
 
-float ODEObject::getZ() {
+float ODEObject::getZ() const {
   return z;
 }
 
@@ -84,15 +84,15 @@ ODEBox::ODEBox(dBodyID bid, dMass m, dGeomID geom, float x, float y, float z,
                float density, float mass, float lx, float ly, float lz)
   : ODEObject(bid, m, geom, x, y, z, density, mass), lx(lx), ly(ly), lz(lz) {}
 
-float ODEBox::getLX() {
+float ODEBox::getLX() const {
   return lx;
 }
 
-float ODEBox::getLY() {
+float ODEBox::getLY() const {
   return ly;
 }
 
-float ODEBox::getLZ() {
+float ODEBox::getLZ() const {
   return lz;
 }
 
@@ -100,6 +100,6 @@ ODESphere::ODESphere(dBodyID bid, dMass m, dGeomID geom, float x, float y,
                      float z, float density, float massv, float radius)
   : ODEObject(bid, m, geom, x, y, z, density, massv), radius(radius) {}
 
-float ODESphere::getRadius() {
+float ODESphere::getRadius() const {
   return radius;
 }

@@ -33,12 +33,11 @@ class AdvancedAcrobotWorld {
 
   virtual void step(const std::vector<float> &motors);
   const std::vector<float> &state() const;
-  unsigned int activated_motors();
+  unsigned int activated_motors() const;
   float perf() const;
 
  protected:
   void createWorld(const std::vector<bone_joint> &);
-  std::vector<float> *current_joint_forces() const;
 
  public:
   ODEWorld odeworld;

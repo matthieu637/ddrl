@@ -112,11 +112,11 @@ class Logger : public Singleton<Logger> {
     enable_buffer = true;
   }
 
-  bool isEnabled(LogLevel l) {
+  bool isEnabled(LogLevel l) const {
     return level <= l;
   }
 
-  bool isBufferEnable() {
+  bool isBufferEnable() const {
     return enable_buffer;
   }
 

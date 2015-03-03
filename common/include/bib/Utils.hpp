@@ -25,10 +25,6 @@ class Utils {
   static bool rand01(float);
 
   static float randin(float a, float b);
-  ///
-  // /\brief Retourner la valeur absolue de "x"
-  // /\param x : une valeur
-  static double abs(double x);
 
   ///
   // /\brief transformer la valeur x qui appartient [a,b] à [c,d]
@@ -36,8 +32,6 @@ class Utils {
   ///   a,b : intervalle [a,b]
   ///   c,d: intervalle [c,d]
   static double transform(double x, double a, double b, double c, double d);
-
-  static time_t srand_mili(bool zero = false);
 
   static float *genNrand(int N, float max);
 

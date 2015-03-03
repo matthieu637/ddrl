@@ -9,48 +9,48 @@
 #include "AdvancedAcrobotWorld.hpp"
 #include "AdvancedAcrobotWorldView.hpp"
 
-std::istream &operator>>(std::istream &istream, bone_joint &v);
+std::istream& operator>>(std::istream& istream, bone_joint& v);
 
 class ProblemDefinition {
  public:
   virtual ~ProblemDefinition() {}
 
  public:
-  virtual float performance(AdvancedAcrobotWorld *) const = 0;
-  virtual bool still_running(AdvancedAcrobotWorld *) const {
+  virtual float performance(AdvancedAcrobotWorld*) const = 0;
+  virtual bool still_running(AdvancedAcrobotWorld*) const {
     return true;
   }
 };
 
 class KeepHigh : public ProblemDefinition {
  public:
-  float performance(AdvancedAcrobotWorld *instance) const {
+  float performance(AdvancedAcrobotWorld* instance) const {
     return instance->perf();
   }
 };
 
 class ReachLimitPoorInformed : public ProblemDefinition {
  public:
-  float performance(AdvancedAcrobotWorld *instance) const {
+  float performance(AdvancedAcrobotWorld* instance) const {
     if (instance->perf() > 0.95)
       return 1.;
     else
       return 0.f;
   }
-  bool still_running(AdvancedAcrobotWorld *instance) const {
+  bool still_running(AdvancedAcrobotWorld* instance) const {
     return instance->perf() <= 0.95;
   }
 };
 
 class ReachLimitWellInformed : public ProblemDefinition {
  public:
-  float performance(AdvancedAcrobotWorld *instance) const {
+  float performance(AdvancedAcrobotWorld* instance) const {
     if (instance->perf() > 0.95)
       return 1.;
     else
       return instance->perf() * 0.01;
   }
-  bool still_running(AdvancedAcrobotWorld *instance) const {
+  bool still_running(AdvancedAcrobotWorld* instance) const {
     return instance->perf() <= 0.95;
   }
 };
@@ -61,16 +61,21 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
  public:
   AdvancedAcrobotEnv() {
     ODEFactory::getInstance();
+    bones = nullptr;
+    actuators = nullptr;
+    instance = nullptr;
+    problem = nullptr;
   }
 
   ~AdvancedAcrobotEnv() {
     delete bones;
     delete actuators;
     delete problem;
+    delete instance;
     ODEFactory::endInstance();
   }
 
-  const std::vector<float> &perceptions() const {
+  const std::vector<float>& perceptions() const {
     return instance->state();
   }
   float performance() const {
@@ -88,7 +93,7 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
   }
 
  private:
-  void _unique_invoke(boost::property_tree::ptree *properties, boost::program_options::variables_map *vm) {
+  void _unique_invoke(boost::property_tree::ptree* properties, boost::program_options::variables_map* vm) {
     visible     = vm->count("view");
     bones       = bib::to_array<bone_joint>(properties->get<std::string>("environment.bones"));
     actuators   = bib::to_array<bool>(properties->get<std::string>("environment.actuators"));
@@ -100,7 +105,7 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
       instance = new AdvancedAcrobotWorld(*bones, *actuators);
   }
 
-  void _apply(const std::vector<float> &actuators) {
+  void _apply(const std::vector<float>& actuators) {
     instance->step(actuators);
   }
 
@@ -110,9 +115,9 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
 
  private:
   bool visible = false;
-  std::vector<bone_joint> *bones;
-  std::vector<bool> *actuators;
-  AdvancedAcrobotWorld *instance;
+  std::vector<bone_joint>* bones;
+  std::vector<bool>* actuators;
+  AdvancedAcrobotWorld* instance;
   ProblemDefinition* problem;
 
   std::vector<float> internal_state;

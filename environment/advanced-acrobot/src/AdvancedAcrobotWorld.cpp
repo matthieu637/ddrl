@@ -181,27 +181,8 @@ const std::vector<float> &AdvancedAcrobotWorld::state() const {
   return internal_state;
 }
 
-unsigned int AdvancedAcrobotWorld::activated_motors() {
+unsigned int AdvancedAcrobotWorld::activated_motors() const {
   return _activated_motors;
-}
-
-std::vector<float> *AdvancedAcrobotWorld::current_joint_forces() const {
-  std::vector<float> *forces = new std::vector<float>;
-
-  //     internal_state.push_back(dJointGetHingeAngle(joints[0]));
-  //     internal_state.push_back(dJointGetHingeAngleRate(joints[0]));
-  //
-  //     for(unsigned int i =0; i<types.size(); i++)
-  //         if(types[i] == HINGE) {
-  //             internal_state.push_back(dJointGetHingeAngle(joints[i+1]));
-  //             internal_state.push_back(dJointGetHingeAngleRate(joints[i+1]));
-  //         }
-  //         else {
-  //             internal_state.push_back(dJointGetSliderPosition(joints[i]));
-  //             internal_state.push_back(dJointGetSliderPositionRate(joints[i]));
-  //         }
-
-  return forces;
 }
 
 void AdvancedAcrobotWorld::resetPositions() {
