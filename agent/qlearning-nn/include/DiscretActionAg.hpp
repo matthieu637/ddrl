@@ -76,6 +76,10 @@ class DiscretActionAg : public arch::AAgent<> {
     algo->startEpisode(s, *ainit);
   }
 
+  void save(const std::string& path) {
+    algo->write(path);
+  }
+
  private:
   int nb_motors;
   int nb_sensors;

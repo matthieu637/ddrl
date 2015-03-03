@@ -2,6 +2,7 @@
 #define AAGENT_H
 
 #include <vector>
+#include <string>
 
 #include "arch/Dummy.hpp"
 #include "arch/CommonAE.hpp"
@@ -17,6 +18,9 @@ class AAgent : public ProgOptions, public CommonAE {
                                         bool, bool) = 0;
 
   virtual void start_episode(const std::vector<float>&) {}
+
+  virtual void save(const std::string&) {}
+
   std::ostream& display(std::ostream& out, bool display, bool dump) {
     if (display) {
     }

@@ -108,6 +108,7 @@ class Simulator {
     }
 
     dump_and_display(episode, all_rewards, env, agent, learning);
+    save_agent(agent, episode);
   }
 
   void dump_and_display(unsigned int episode,
@@ -139,6 +140,15 @@ class Simulator {
           episode << " " << reward_stats.mean << " " << reward_stats.var
           << " " << reward_stats.max << " " << reward_stats.min
           << env_dump << agent_dump);
+    }
+  }
+
+  void save_agent(Agent *agent, unsigned int episode) {
+    if (episode % save_agent_each == 0 && episode != 0) {
+      std::string filename(DEFAULT_AGENT_SAVE_FILE);
+      std::string filename2 = std::to_string(episode);
+      std::string path = filename + filename2;
+      agent->save(path);
     }
   }
 
@@ -175,13 +185,12 @@ class Simulator {
     properties = new boost::property_tree::ptree;
     boost::property_tree::ini_parser::read_ini(config_file, *properties);
     max_episode = properties->get<unsigned int>("simulation.max_episode");
-    test_episode_per_episode =
-      properties->get<unsigned int>("simulation.test_episode_per_episode");
-    test_episode_at_end =
-      properties->get<unsigned int>("simulation.test_episode_at_end");
+    test_episode_per_episode = properties->get<unsigned int>("simulation.test_episode_per_episode");
+    test_episode_at_end = properties->get<unsigned int>("simulation.test_episode_at_end");
+
     dump_log_each = properties->get<unsigned int>("simulation.dump_log_each");
-    display_log_each =
-      properties->get<unsigned int>("simulation.display_log_each");
+    display_log_each = properties->get<unsigned int>("simulation.display_log_each");
+    save_agent_each = properties->get<unsigned int>("simulation.save_agent_each");
 
 #ifndef NDEBUG
     well_init = true;
@@ -195,6 +204,7 @@ class Simulator {
 
   unsigned int dump_log_each;
   unsigned int display_log_each;
+  unsigned int save_agent_each;
 
   boost::property_tree::ptree *properties;
   boost::program_options::variables_map *command_args;
