@@ -11,16 +11,6 @@
 
 std::istream &operator>>(std::istream &istream, bone_joint &v);
 
-class AdvancedAcrobotProgOptions {
- public:
-  static boost::program_options::options_description program_options() {
-    boost::program_options::options_description desc(
-      "Allowed environment options");
-    desc.add_options()("view", "display the environment [default : false]");
-    return desc;
-  }
-};
-
 class ProblemDefinition {
  protected:
   virtual float performance(AdvancedAcrobotWorld *) const = 0;
@@ -63,9 +53,7 @@ class ReachLimitWellInformed : ProblemDefinition {
 };
 
 template <typename ProblemToResolve = ReachLimitWellInformed>
-class AdvancedAcrobotEnv
-  : public arch::AEnvironment<AdvancedAcrobotProgOptions>,
-    private ProblemToResolve {
+class AdvancedAcrobotEnv : public arch::AEnvironment<>, private ProblemToResolve {
  public:
   AdvancedAcrobotEnv() {
     ODEFactory::getInstance();
@@ -93,18 +81,16 @@ class AdvancedAcrobotEnv
   unsigned int number_of_sensors() const {
     return instance->state().size();
   }
+
  private:
-  void _unique_invoke(boost::property_tree::ptree *properties,
-                      boost::program_options::variables_map *vm) {
-    if (vm->count("view")) visible = true;
-    bones = bib::to_array<bone_joint>(
-              properties->get<std::string>("environment.bones"));
-    actuators = bib::to_array<bool>(
-                  properties->get<std::string>("environment.actuators"));
+  void _unique_invoke(boost::property_tree::ptree *properties, boost::program_options::variables_map *vm) {
+    if (vm->count("view"))
+      visible = true;
+    bones = bib::to_array<bone_joint>(properties->get<std::string>("environment.bones"));
+    actuators = bib::to_array<bool>(properties->get<std::string>("environment.actuators"));
 
     if (visible)
-      instance =
-        new AdvancedAcrobotWorldView("data/textures", *bones, *actuators);
+      instance = new AdvancedAcrobotWorldView("data/textures", *bones, *actuators);
     else
       instance = new AdvancedAcrobotWorld(*bones, *actuators);
   }

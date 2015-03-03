@@ -56,9 +56,8 @@ class Simulator {
       //  learning
       run_episode(true, episode);
 
-      for (unsigned int test_episode = 0;
-           test_episode < test_episode_per_episode; test_episode++) {
-        //      testing during learning
+      for (unsigned int test_episode = 0; test_episode < test_episode_per_episode; test_episode++) {
+        //  testing during learning
         run_episode(false, episode);
       }
     }
@@ -111,8 +110,7 @@ class Simulator {
     save_agent(agent, episode);
   }
 
-  void dump_and_display(unsigned int episode,
-                        const std::list<float> &all_rewards, Environment *env,
+  void dump_and_display(unsigned int episode, const std::list<float> &all_rewards, Environment *env,
                         Agent *ag, bool learning) {
     bool display = episode % display_log_each == 0;
     bool dump = episode % dump_log_each == 0;
@@ -125,21 +123,15 @@ class Simulator {
       if (display)
         LOG_INFO((learning ? "L " : "T ")
                  << std::left << std::setw(7) << std::setfill(' ') << episode
-                 << std::left << std::setw(8) << std::setfill(' ')
-                 << std::setprecision(4) << reward_stats.mean << std::left
-                 << std::setw(8) << std::setfill(' ') << std::setprecision(4)
-                 << reward_stats.var << std::left << std::setw(8)
-                 << std::setfill(' ') << std::setprecision(4)
-                 << reward_stats.max << std::left << std::setw(8)
-                 << std::setfill(' ') << std::setprecision(4)
-                 << reward_stats.min);
+                 << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.mean
+                 << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.var
+                 << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.max
+                 << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.min);
 
       if (dump)
-        LOG_FILE(
-          learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE,
-          episode << " " << reward_stats.mean << " " << reward_stats.var
-          << " " << reward_stats.max << " " << reward_stats.min
-          << env_dump << agent_dump);
+        LOG_FILE(learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE,
+                 episode << " " << reward_stats.mean << " " << reward_stats.var << " " <<
+                 reward_stats.max << " " << reward_stats.min << env_dump << agent_dump);
     }
   }
 
@@ -158,15 +150,12 @@ class Simulator {
     po::options_description desc("Allowed Simulator options");
     desc.add(Environment::program_options());
     desc.add(Agent::program_options());
-    desc.add_options()("config", po::value<string>(),
-                       "set the config file to load [default : config.ini]")(
-                         "help", "produce help message");
+    desc.add_options()
+    ("config", po::value<string>(), "set the config file to load [default : config.ini]")
+    ("help", "produce help message");
 
     command_args = new po::variables_map;
-    po::parsed_options parsed = po::command_line_parser(argc, argv)
-                                .options(desc)
-                                .allow_unregistered()
-                                .run();
+    po::parsed_options parsed = po::command_line_parser(argc, argv).options(desc).allow_unregistered().run();
     po::store(parsed, *command_args);
     po::notify(*command_args);
 
@@ -184,13 +173,14 @@ class Simulator {
   void readConfig(string config_file = DEFAULT_CONFIG_FILE) {
     properties = new boost::property_tree::ptree;
     boost::property_tree::ini_parser::read_ini(config_file, *properties);
-    max_episode = properties->get<unsigned int>("simulation.max_episode");
-    test_episode_per_episode = properties->get<unsigned int>("simulation.test_episode_per_episode");
-    test_episode_at_end = properties->get<unsigned int>("simulation.test_episode_at_end");
 
-    dump_log_each = properties->get<unsigned int>("simulation.dump_log_each");
-    display_log_each = properties->get<unsigned int>("simulation.display_log_each");
-    save_agent_each = properties->get<unsigned int>("simulation.save_agent_each");
+    max_episode                 = properties->get<unsigned int>("simulation.max_episode");
+    test_episode_per_episode    = properties->get<unsigned int>("simulation.test_episode_per_episode");
+    test_episode_at_end         = properties->get<unsigned int>("simulation.test_episode_at_end");
+
+    dump_log_each               = properties->get<unsigned int>("simulation.dump_log_each");
+    display_log_each            = properties->get<unsigned int>("simulation.display_log_each");
+    save_agent_each             = properties->get<unsigned int>("simulation.save_agent_each");
 
 #ifndef NDEBUG
     well_init = true;
