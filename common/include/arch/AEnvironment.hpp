@@ -18,7 +18,7 @@ class AEnvironment : public ProgOptions, public CommonAE {
 
   virtual unsigned int number_of_sensors() const = 0;
 
-  virtual float performance() = 0;
+  virtual float performance() const = 0;
 
   virtual ~AEnvironment() {  // pure?
   }
@@ -50,8 +50,13 @@ class AEnvironment : public ProgOptions, public CommonAE {
   }
 
   bool running() const {
-    return current_step < max_step_per_instance && _running();
+    return current_step < max_step_per_instance && ! final_state();
   }
+  
+  virtual bool final_state() const {
+    return false;
+  }
+  
   bool hasInstance() const {
     return current_instance < instance_per_episode;
   }
@@ -64,9 +69,6 @@ class AEnvironment : public ProgOptions, public CommonAE {
 
   virtual void _next_instance() {}
 
-  virtual bool _running() const {
-    return true;
-  }
   virtual void _apply(const std::vector<float> &) = 0;
 
   unsigned int current_step = 0;

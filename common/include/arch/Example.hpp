@@ -24,7 +24,7 @@ class ExampleEnv : public arch::AEnvironment<> {
   unsigned int number_of_sensors() const {
     return internal_state.size();
   }
-  float performance() {
+  float performance() const {
     return 0;
   }
   void _apply(const std::vector<float>&) {}
