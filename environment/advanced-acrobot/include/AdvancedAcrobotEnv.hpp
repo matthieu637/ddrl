@@ -12,22 +12,25 @@
 std::istream &operator>>(std::istream &istream, bone_joint &v);
 
 class ProblemDefinition {
- protected:
+ public:
+  virtual ~ProblemDefinition() {}
+
+ public:
   virtual float performance(AdvancedAcrobotWorld *) const = 0;
   virtual bool still_running(AdvancedAcrobotWorld *) const {
     return true;
   }
 };
 
-class KeepHigh : ProblemDefinition {
- protected:
+class KeepHigh : public ProblemDefinition {
+ public:
   float performance(AdvancedAcrobotWorld *instance) const {
     return instance->perf();
   }
 };
 
-class ReachLimitPoorInformed : ProblemDefinition {
- protected:
+class ReachLimitPoorInformed : public ProblemDefinition {
+ public:
   float performance(AdvancedAcrobotWorld *instance) const {
     if (instance->perf() > 0.95)
       return 1.;
@@ -39,8 +42,8 @@ class ReachLimitPoorInformed : ProblemDefinition {
   }
 };
 
-class ReachLimitWellInformed : ProblemDefinition {
- protected:
+class ReachLimitWellInformed : public ProblemDefinition {
+ public:
   float performance(AdvancedAcrobotWorld *instance) const {
     if (instance->perf() > 0.95)
       return 1.;
@@ -52,8 +55,9 @@ class ReachLimitWellInformed : ProblemDefinition {
   }
 };
 
-template <typename ProblemToResolve = ReachLimitWellInformed>
-class AdvancedAcrobotEnv : public arch::AEnvironment<>, private ProblemToResolve {
+ProblemDefinition* str2prob(const std::string& s);
+
+class AdvancedAcrobotEnv : public arch::AEnvironment<> {
  public:
   AdvancedAcrobotEnv() {
     ODEFactory::getInstance();
@@ -62,6 +66,7 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<>, private ProblemToResolve
   ~AdvancedAcrobotEnv() {
     delete bones;
     delete actuators;
+    delete problem;
     ODEFactory::endInstance();
   }
 
@@ -69,10 +74,10 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<>, private ProblemToResolve
     return instance->state();
   }
   float performance() const {
-    return ProblemToResolve::performance(instance);
+    return problem->performance(instance);
   }
   bool final_state() const {
-    return !ProblemToResolve::still_running(instance);
+    return !problem->still_running(instance);
   }
 
   unsigned int number_of_actuators() const {
@@ -84,10 +89,10 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<>, private ProblemToResolve
 
  private:
   void _unique_invoke(boost::property_tree::ptree *properties, boost::program_options::variables_map *vm) {
-    if (vm->count("view"))
-      visible = true;
-    bones = bib::to_array<bone_joint>(properties->get<std::string>("environment.bones"));
-    actuators = bib::to_array<bool>(properties->get<std::string>("environment.actuators"));
+    visible     = vm->count("view");
+    bones       = bib::to_array<bone_joint>(properties->get<std::string>("environment.bones"));
+    actuators   = bib::to_array<bool>(properties->get<std::string>("environment.actuators"));
+    problem     = str2prob(properties->get<std::string>("environment.problem"));
 
     if (visible)
       instance = new AdvancedAcrobotWorldView("data/textures", *bones, *actuators);
@@ -108,6 +113,7 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<>, private ProblemToResolve
   std::vector<bone_joint> *bones;
   std::vector<bool> *actuators;
   AdvancedAcrobotWorld *instance;
+  ProblemDefinition* problem;
 
   std::vector<float> internal_state;
 };
