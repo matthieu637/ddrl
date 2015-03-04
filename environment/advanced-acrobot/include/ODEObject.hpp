@@ -10,8 +10,8 @@ class ODEObject {
   float getX() const;
   float getY() const;
   float getZ() const;
-  dGeomID& getGeom() const;
-  dMass& getMass() const;
+  dGeomID& getGeom();
+  dMass& getMass();
   float getDensity() const;
   float getMassValue() const;
   void setID(const dBodyID getID);

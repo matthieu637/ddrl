@@ -16,11 +16,11 @@ dBodyID ODEObject::getID() const {
   return bid;
 }
 
-dGeomID &ODEObject::getGeom() const {
+dGeomID &ODEObject::getGeom() {
   return geom;
 }
 
-dMass &ODEObject::getMass() const {
+dMass &ODEObject::getMass() {
   return mass;
 }
 
