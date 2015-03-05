@@ -64,7 +64,7 @@ DAction *QTable::argmax() const {
 
   return new DAction(atmpl, imax);
 }
-float QTable::max() const {
+double QTable::max() const {
   unsigned int imax = RAND() % atmpl->sizeNeeded();
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
     if (map->at(imax) < map->at(j)) imax = j;
@@ -72,12 +72,12 @@ float QTable::max() const {
   return map->at(imax);
 }
 DAction *QTable::argmax(const std::vector<int> *action_time,
-                        float gamma) const {
+                        double gamma) const {
   unsigned int imax = RAND() % atmpl->sizeNeeded();
-  float _max = map->at(imax) * powf(gamma, action_time->at(imax));
+  double _max = map->at(imax) * powf(gamma, action_time->at(imax));
 
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++) {
-    float nmax = map->at(j) * powf(gamma, action_time->at(j));
+    double nmax = map->at(j) * powf(gamma, action_time->at(j));
     if (_max < nmax) {
       imax = j;
       _max = nmax;
@@ -86,7 +86,7 @@ DAction *QTable::argmax(const std::vector<int> *action_time,
   return new DAction(atmpl, imax);
 }
 
-float QTable::min() const {
+double QTable::min() const {
   unsigned int imin = RAND() % atmpl->sizeNeeded();
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
     if (map->at(imin) > map->at(j)) imin = j;
@@ -138,7 +138,7 @@ void QTable::load(boost::archive::xml_iarchive *xml) {
 }
 
 void QTable::print(bool perState) const {
-  //     std::cout.set(ios::fixed, ios::floatfield);
+  //     std::cout.set(ios::fixed, ios::doublefield);
   std::cout.precision(2);
 
   if (perState) {

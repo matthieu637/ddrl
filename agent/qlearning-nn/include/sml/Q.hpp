@@ -50,12 +50,12 @@ class QTable {
   ///
   // /\brief Retourner l'actions maximale dans le tableau
   DAction *argmax() const;
-  float max() const;
-  DAction *argmax(const std::vector<int> *action_time, float gamma) const;
+  double max() const;
+  DAction *argmax(const std::vector<int> *action_time, double gamma) const;
 
-  DAction *boltzmann(float temperature) const;
+  DAction *boltzmann(double temperature) const;
 
-  float min() const;
+  double min() const;
 
   ///
   // /\brief Renvoyer la valeur de (s,a) dans le tableau Q

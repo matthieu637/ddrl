@@ -32,7 +32,7 @@ set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -O2 -g -DNDEBU
 
 
 add_executable(advanced-acrobot src/test/AdvancedAcrobotDiscret.cpp ${all_include} ${all_sources} ${all_sources_sml})
-target_link_libraries(advanced-acrobot ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${FANN_LIBRARIES} ${TBB_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(advanced-acrobot ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES})
 #file(COPY data/minimal_config.ini DESTINATION . ) 
 #file(RENAME ${CMAKE_CURRENT_BINARY_DIR}/minimal_config.ini ${CMAKE_CURRENT_BINARY_DIR}/config.ini)
 

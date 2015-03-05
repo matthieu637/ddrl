@@ -29,13 +29,13 @@ class QLearning : public Policy<State> {
     State st;
     std::unique_ptr<DAction> at;
     State next_st;
-    float next_r;
+    double next_r;
     bool end;
     int meeted;
   } replay_history;
 
   typedef struct _info_rep_list {
-    float sum_reward;
+    double sum_reward;
     unsigned int replay_time;
   } info_replay;
 
@@ -170,7 +170,7 @@ class QLearning : public Policy<State> {
     assert(this->lastAction != nullptr);
     DAction* a = this->lastAction;
 
-    float delta = r;
+    double delta = r;
 
     // For all a in A(s')
     computeQa(state);
@@ -185,8 +185,7 @@ class QLearning : public Policy<State> {
 #ifdef SARSA
     if (!goal) {
 #ifdef ACTION_TIME
-      delta = delta +
-              powf(this->param.gamma, actions_time[a->hash()]) * this->Qa(*ap);
+      delta = delta + pow(this->param.gamma, actions_time[a->hash()]) * this->Qa(*ap);
 #else
       delta = delta + this->param.gamma * this->Qa(*ap);
 #endif
@@ -240,7 +239,7 @@ class QLearning : public Policy<State> {
 
 #ifndef NDEBUG
   float mse() {
-    float s = 0.;
+    float s = 0.f;
     for (int i = 0; i < atmpl->sizeNeeded(); i++) {
       s += fann_get_MSE(neural_networks[i]);
       fann_reset_MSE(neural_networks[i]);
@@ -313,11 +312,6 @@ class QLearning : public Policy<State> {
     ParallelComputeQa para(&Qa, neural_networks, inputs);
     tbb::parallel_for(tbb::blocked_range<int>(0, atmpl->sizeNeeded()), para);
     delete[] inputs;
-
-    //         for(int i=0; i<atmpl->sizeNeeded(); i++) {
-    //             out = fann_run(neural_networks[i], inputs);
-    //             Qa.operator()(0, i) = out[0];
-    //         }
   }
 
   void resetTraces() {
@@ -327,7 +321,7 @@ class QLearning : public Policy<State> {
     std::random_shuffle(hoh_list.begin(), hoh_list.end());
     replayTraces();
     if (hoh_list.size() > this->param.repeat_replay) {
-      float min = reward_sum;
+      double min = reward_sum;
       auto it = hoh_list.begin();
       decltype(it) min_it;
       for (; it != hoh_list.end();) {
@@ -352,7 +346,7 @@ class QLearning : public Policy<State> {
   }
 
   void addTraces(const State& state, const DAction& a, const State& next_st,
-                 float next_r, bool end) {
+                 double next_r, bool end) {
     history_type new_play = history_type(new replay_history);
     new_play->st = state;
     new_play->at = std::unique_ptr<DAction>(new DAction(a));
@@ -375,14 +369,13 @@ class QLearning : public Policy<State> {
           computeQa(play->next_st);
           DAction* ba = Qa.argmax();
 #ifdef ACTION_TIME
-
-          float delta = play->next_r;
+          double delta = play->next_r;
 
           if (!play->end)
             delta += powf(this->param.gamma, actions_time[play->at->hash()]) *
                      this->Qa(*ba);
 #else
-          float delta = play->next_r;
+          double delta = play->next_r;
           if (!play->end) delta += this->param.gamma * this->Qa(*ba);
 #endif
           delete ba;
@@ -414,7 +407,7 @@ class QLearning : public Policy<State> {
   DAction* lastAction = nullptr;
   State lastState;
   int internal_step;
-  float reward_sum;
+  double reward_sum;
 
 #ifdef ACTION_TIME
   std::vector<int> actions_time;

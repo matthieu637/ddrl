@@ -33,7 +33,7 @@ class Simulator {
   Simulator() : max_episode(0), test_episode_per_episode(0), test_episode_at_end(0),
     dump_log_each(0), display_log_each(0), save_agent_each(0), properties(nullptr),
     command_args(nullptr), time_spend(), env(nullptr), agent(nullptr) {}
-  
+
   ~Simulator() {
     delete properties;
     delete command_args;
