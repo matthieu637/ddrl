@@ -33,22 +33,22 @@ class DiscretActionAg : public arch::AAgent<> {
     sml::ActionFactory::endInstance();
   }
 
-  const std::vector<float> &run(float reward, const std::vector<float> &sensors,
+  const std::vector<float>& run(float reward, const std::vector<float>& sensors,
                                 bool learning, bool goal_reached) {
     EnvState s(new std::vector<float>(sensors));
-    sml::DAction *ac;
+    sml::DAction* ac;
     if (learning)
       ac = algo->learn(s, reward, goal_reached);
     else
       ac = algo->decision(s, false);
 
-    vector<float> *outputs =
+    vector<float>* outputs =
       sml::ActionFactory::computeOutputs(ac, 0, *actions);
     if (!learning) delete ac;
     return *outputs;
   }
 
-  void unique_invoke(boost::property_tree::ptree *pt, boost::program_options::variables_map * vm) {
+  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* vm) {
     rlparam = new sml::RLParam;
     rlparam->epsilon             = pt->get<float>("agent.epsilon");
     rlparam->gamma               = pt->get<float>("agent.gamma");
@@ -66,15 +66,12 @@ class DiscretActionAg : public arch::AAgent<> {
     sml::ActionFactory::getInstance()->randomFixedAction(nb_motors, 1, 2);
     actions = new sml::list_tlaction(sml::ActionFactory::getInstance()->getActions());
 
-    act_templ = new sml::ActionTemplate({"effectors"}, {number_discret_action});
+    act_templ = new sml::ActionTemplate( {"effectors"}, {number_discret_action});
     ainit = new sml::DAction(act_templ, {0});
     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
-
-    if (vm->count("load"))
-      algo->read((*vm)["load"].as<std::string>());
   }
 
-  void start_episode(const std::vector<float> &sensors) {
+  void start_episode(const std::vector<float>& sensors) {
     EnvState s(new std::vector<float>(sensors));
     algo->startEpisode(s, *ainit);
   }
@@ -83,15 +80,19 @@ class DiscretActionAg : public arch::AAgent<> {
     algo->write(path);
   }
 
+  void load(const std::string& path) {
+    algo->read(path);
+  }
+
  private:
   int nb_motors;
   int nb_sensors;
 
-  sml::QLearning<EnvState> *algo;
-  sml::ActionTemplate *act_templ;
-  sml::list_tlaction *actions;
-  sml::DAction *ainit;
-  sml::RLParam *rlparam;
+  sml::QLearning<EnvState>* algo;
+  sml::ActionTemplate* act_templ;
+  sml::list_tlaction* actions;
+  sml::DAction* ainit;
+  sml::RLParam* rlparam;
 };
 
 #endif  // DISCRETACTION_H

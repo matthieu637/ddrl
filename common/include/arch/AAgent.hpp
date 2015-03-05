@@ -60,16 +60,31 @@ class AAgent : public ProgOptions, public CommonAE {
   virtual void save(const std::string&) {}
 
   /**
-   * @brief Called only at the creation of the agent.
-   * You have to overload this method if you want to get parameters from ini file or from command line.
-   *
-   * @param inifile
-   * @param command_args
-   * @return void
-   */
-  virtual void unique_invoke(boost::property_tree::ptree* , boost::program_options::variables_map*) {}
+  * @brief To load your previous agent saved to a file.
+  * @param filepath the file to load
+  *
+  * @return void
+  */
+  virtual void load(const std::string&) {}
+
+
+  void unique_invoke(boost::property_tree::ptree* inifile, boost::program_options::variables_map* command_args) {
+    _unique_invoke(inifile, command_args);
+    if (command_args->count("load"))
+      load((*command_args)["load"].as<std::string>());
+  }
 
  protected:
+
+  /**
+  * @brief Called only at the creation of the agent.
+  * You have to overload this method if you want to get parameters from ini file or from command line.
+  *
+  * @param inifile
+  * @param command_args
+  * @return void
+  */
+  virtual void _unique_invoke(boost::property_tree::ptree* , boost::program_options::variables_map*) {}
 
   /**
    * @brief if you want to display specific statistics of your agent
