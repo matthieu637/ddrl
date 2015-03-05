@@ -12,7 +12,7 @@ template <typename ProgOptions = EnvProgOptions>
 class AEnvironment : public ProgOptions, public CommonAE {
  public:
   virtual void unique_destroy() {}
-  virtual const std::vector<float> &perceptions() const = 0;
+  virtual const std::vector<float>& perceptions() const = 0;
 
   virtual unsigned int number_of_actuators() const = 0;
 
@@ -23,12 +23,9 @@ class AEnvironment : public ProgOptions, public CommonAE {
   virtual ~AEnvironment() {  // pure?
   }
 
-  void unique_invoke(boost::property_tree::ptree *properties,
-                     boost::program_options::variables_map *vm) {
-    instance_per_episode =
-      properties->get<unsigned int>("environment.instance_per_episode");
-    max_step_per_instance =
-      properties->get<unsigned int>("environment.max_step_per_instance");
+  void unique_invoke(boost::property_tree::ptree* properties, boost::program_options::variables_map* vm) {
+    instance_per_episode    = properties->get<unsigned int>("environment.instance_per_episode");
+    max_step_per_instance   = properties->get<unsigned int>("environment.max_step_per_instance");
     _unique_invoke(properties, vm);
   }
 
@@ -44,7 +41,7 @@ class AEnvironment : public ProgOptions, public CommonAE {
     _next_instance();
   }
 
-  void apply(const std::vector<float> &actuators) {
+  void apply(const std::vector<float>& actuators) {
     current_step++;
     _apply(actuators);
   }
@@ -62,14 +59,13 @@ class AEnvironment : public ProgOptions, public CommonAE {
   }
 
  protected:
-  virtual void _unique_invoke(boost::property_tree::ptree *,
-                              boost::program_options::variables_map *) {}
+  virtual void _unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) {}
 
   virtual void _reset_episode() {}
 
   virtual void _next_instance() {}
 
-  virtual void _apply(const std::vector<float> &) = 0;
+  virtual void _apply(const std::vector<float>&) = 0;
 
   unsigned int current_step = 0;
   unsigned int current_instance = 0;
