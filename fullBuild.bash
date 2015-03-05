@@ -31,8 +31,13 @@ function cmakeBuild(){
 
 	mkdir build/$1
 	cd build/$1
+	
+	if [[ "${CMAKE_ARGS[@]}" == '' ]] ; then
+		cmake ../.. -DCMAKE_BUILD_TYPE=$2 >& $tmplog
+	else
+		cmake ../.. -DCMAKE_BUILD_TYPE=$2 -G "${CMAKE_ARGS[@]}" >& $tmplog
+	fi
 
-	cmake ../.. -DCMAKE_BUILD_TYPE=$2 >& $tmplog
 	stopOnError $? $tmplog
 	echo '' > $tmplog
 
@@ -79,6 +84,26 @@ function buildDir(){
 		hr
 	done
 }
+
+export CMAKE_ARGS=''
+
+for ARG in $*
+do
+	case $ARG in
+		"--help" | "-h")
+			echo "usage : $0 [options]"
+			echo "options : codeblocks | CB"
+			exit 0
+			;;
+		"codeblocks" | "CB")
+			echo "Will generate Codeblocks projects"
+			export CMAKE_ARGS='CodeBlocks - Unix Makefiles'
+			;;
+	esac
+
+done
+
+
 
 echo "INFO : cmake well founded. Look what following to know if you need other software."
 echo "QUESTION : if a subdirectory already contains a build, should I remove it ? (y/n) [y]:"
