@@ -121,10 +121,10 @@ class Simulator {
 
     if (dump || display) {
       bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
-      bib::Dumper<Environment, bool, bool> env_dump(env, display, dump);
-      bib::Dumper<Agent, bool, bool> agent_dump(ag, display, dump);
 
-      if (display)
+      if (display) {
+        bib::Dumper<Environment, bool, bool> env_dump(env, true, false);
+        bib::Dumper<Agent, bool, bool> agent_dump(ag, true, false);
         LOG_INFO((learning ? "L " : "T ")
                  << std::left << std::setw(7) << std::setfill(' ') << episode
                  << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.mean
@@ -132,11 +132,15 @@ class Simulator {
                  << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.max
                  << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.min
                  << " " << env_dump << " " << agent_dump);
+      }
 
-      if (dump)
+      if (dump) {
+        bib::Dumper<Environment, bool, bool> env_dump(env, false, true);
+        bib::Dumper<Agent, bool, bool> agent_dump(ag, false, true);
         LOG_FILE(learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE,
                  episode << " " << reward_stats.mean << " " << reward_stats.var << " " <<
                  reward_stats.max << " " << reward_stats.min << env_dump << agent_dump);
+      }
     }
   }
 
