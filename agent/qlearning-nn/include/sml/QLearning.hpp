@@ -230,7 +230,7 @@ class QLearning : public Policy<State> {
 #ifndef NDEBUG
   float mse() {
     float s = 0.f;
-    for (int i = 0; i < atmpl->sizeNeeded(); i++) {
+    for (unsigned int i = 0; i < atmpl->sizeNeeded(); i++) {
       s += fann_get_MSE(neural_networks[i]);
       fann_reset_MSE(neural_networks[i]);
     }
@@ -303,16 +303,16 @@ class QLearning : public Policy<State> {
 #ifndef NDEBUG
   float weight_sum() {
     double sum = 0.f;
-    for (int i = 0; i < atmpl->sizeNeeded(); i++) {
+    for (unsigned int i = 0; i < atmpl->sizeNeeded(); i++) {
       struct fann_connection* connections = (struct fann_connection*) calloc(
                                               fann_get_total_connections(neural_networks[i]), sizeof(struct fann_connection));
 
-      for (int j = 0; j < fann_get_total_connections(neural_networks[i]); j++)
+      for (unsigned int j = 0; j < fann_get_total_connections(neural_networks[i]); j++)
         connections[j].weight = 0;
 
       fann_get_connection_array(neural_networks[i], connections);
 
-      for (int j = 0; j < fann_get_total_connections(neural_networks[i]); j++)
+      for (unsigned int j = 0; j < fann_get_total_connections(neural_networks[i]); j++)
         sum += std::fabs(connections[j].weight);
 
       free(connections);

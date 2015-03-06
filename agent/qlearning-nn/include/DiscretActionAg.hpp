@@ -34,7 +34,7 @@ class DiscretActionAg : public arch::AAgent<> {
   }
 
   const std::vector<float>& run(float reward, const std::vector<float>& sensors,
-                                bool learning, bool goal_reached) {
+                                bool learning, bool goal_reached) override {
     EnvState s(new std::vector<float>(sensors));
     sml::DAction* ac;
     if (learning)
@@ -52,7 +52,7 @@ class DiscretActionAg : public arch::AAgent<> {
     return *outputs;
   }
 
-  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) {
+  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
     rlparam = new sml::RLParam;
     rlparam->epsilon             = pt->get<float>("agent.epsilon");
     rlparam->gamma               = pt->get<float>("agent.gamma");
@@ -75,23 +75,30 @@ class DiscretActionAg : public arch::AAgent<> {
     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
   }
 
-  void start_episode(const std::vector<float>& sensors) {
+  void start_episode(const std::vector<float>& sensors) override {
     EnvState s(new std::vector<float>(sensors));
     algo->startEpisode(s, *ainit);
     weighted_reward = 0;
     pow_gamma = 1.d;
   }
 
-  void end_episode() {
+  void end_episode() override {
     algo->resetTraces(weighted_reward);
   }
 
-  void save(const std::string& path) {
+  void save(const std::string& path) override {
     algo->write(path);
   }
 
-  void load(const std::string& path) {
+  void load(const std::string& path) override {
     algo->read(path);
+  }
+
+ protected:
+  void _display(std::ostream& stdout) const override {
+#ifndef NDEBUG
+    stdout << " TTT " << algo->history_size() << " " << algo->weight_sum() << " " << algo->mse();
+#endif
   }
 
  private:

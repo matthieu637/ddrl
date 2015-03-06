@@ -130,7 +130,8 @@ class Simulator {
                  << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.mean
                  << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.var
                  << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.max
-                 << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.min);
+                 << std::left << std::setw(8) << std::setfill(' ') << std::setprecision(4) << reward_stats.min
+                 << " " << env_dump << " " << agent_dump);
 
       if (dump)
         LOG_FILE(learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE,

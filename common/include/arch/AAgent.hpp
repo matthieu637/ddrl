@@ -74,7 +74,7 @@ class AAgent : public ProgOptions, public CommonAE {
   virtual void load(const std::string&) {}
 
 
-  void unique_invoke(boost::property_tree::ptree* inifile, boost::program_options::variables_map* command_args) {
+  void unique_invoke(boost::property_tree::ptree* inifile, boost::program_options::variables_map* command_args) override {
     _unique_invoke(inifile, command_args);
     if (command_args->count("load"))
       load((*command_args)["load"].as<std::string>());
@@ -97,14 +97,14 @@ class AAgent : public ProgOptions, public CommonAE {
    * @param stdout use the operator <<
    * @return void
    */
-  virtual void _display(std::ostream&) {}
+  virtual void _display(std::ostream&) const override {}
 
   /**
    * @brief if you want to dump to file specific statistics of your agent
    * @param filestream use the operator <<
    * @return void
    */
-  virtual void _dump(std::ostream&) {}
+  virtual void _dump(std::ostream&) const override {}
 };
 }  // namespace arch
 
