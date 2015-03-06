@@ -69,8 +69,7 @@ class QLearning : public Policy<State> {
       neural_networks(atmp->sizeNeeded()),
       size_input_state(_size_input_state),
       history_order(nullptr),
-      internal_step(0),
-      reward_sum(0)
+      internal_step(0)
 #ifdef ACTION_TIME
     ,
       actions_time(_actions_time)
@@ -81,8 +80,7 @@ class QLearning : public Policy<State> {
         fann_create_standard(3, size_input_state, param.hidden_unit, 1);
 
       if (param.activation == "tanh") {
-        fann_set_activation_function_hidden(neural_networks[i],
-                                            FANN_SIGMOID_SYMMETRIC);
+        fann_set_activation_function_hidden(neural_networks[i], FANN_SIGMOID_SYMMETRIC);
       } else if (param.activation == "sigmoid") {
         fann_set_activation_function_hidden(neural_networks[i], FANN_SIGMOID);
       } else if (param.activation == "linear") {
@@ -94,12 +92,9 @@ class QLearning : public Policy<State> {
           << param.activation_stepness);
         exit(1);
       }
-      fann_set_activation_steepness_hidden(neural_networks[i],
-                                           param.activation_stepness);
+      fann_set_activation_steepness_hidden(neural_networks[i], param.activation_stepness);
 
-      fann_set_activation_function_output(
-        neural_networks[i],
-        FANN_LINEAR);  // Linear cause Q(s,a) isn't normalized
+      fann_set_activation_function_output(neural_networks[i], FANN_LINEAR);  // Linear cause Q(s,a) isn't normalized
       fann_set_learning_momentum(neural_networks[i], 0.);
       fann_set_train_error_function(neural_networks[i], FANN_ERRORFUNC_LINEAR);
       fann_set_training_algorithm(neural_networks[i], FANN_TRAIN_INCREMENTAL);
@@ -118,8 +113,7 @@ class QLearning : public Policy<State> {
       history_order(nullptr),
       hoh_list(),
       lastState(),
-      internal_step(clone.internal_step),
-      reward_sum(clone.internal_step)
+      internal_step(clone.internal_step)
 #ifdef ACTION_TIME
     ,
       actions_time(clone.actions_time)
@@ -147,14 +141,11 @@ class QLearning : public Policy<State> {
     lastState = s;
 
     history_order = new std::list<history_type>;
-    resetTraces();
 
     // start an new episod
     computeQa(s);
     internal_step = 0;
-    reward_sum = 0;
-    //         addTraces(s, a); // don't put the first trace, it may be not a
-    //         good initilization
+    // addTraces(s, a); // don't put the first trace, it may be not a good initilization
   }
 
   DAction* decision(const State& state, bool greedy) {
@@ -219,7 +210,6 @@ class QLearning : public Policy<State> {
     if (internal_step > this->param.memory_size)
       this->addTraces(lastState, *a, state, r, goal);
     internal_step++;
-    reward_sum += r;
 
     // take action a, observe reward, and next state
     delete this->lastAction;
@@ -263,16 +253,62 @@ class QLearning : public Policy<State> {
   }
 
   int history_size() const {
-    return history_order->size();
+    if (history_order != nullptr)
+      return history_order->size();
+    else return -1;
+  }
+
+  void resetTraces(double reward_sum) {
+    if (history_order->size() > 0) {
+      history_of_history p(history_order, {reward_sum, 0});
+      hoh_list.push_back(p);
+    } else {
+      delete history_order;
+      history_order = nullptr;
+    }
+
+    std::random_shuffle(hoh_list.begin(), hoh_list.end());
+    replayTraces();
+    if (hoh_list.size() > this->param.repeat_replay) {
+      double min = reward_sum;
+      auto it = hoh_list.begin();
+      decltype(it) min_it;
+      bool doNotDelete = false;
+      for (; it != hoh_list.end() ;) {
+        if (it->second.replay_time > (this->param.repeat_replay + 2) * 3) {  // too many replayed
+          if (it->first == history_order)
+            history_order = nullptr;
+          delete it->first;
+          it = hoh_list.erase(it);
+          doNotDelete = true;
+          break;
+        }
+
+        it->second.replay_time++;
+        if (it->second.sum_reward <= min) {
+          min = it->second.sum_reward;
+          min_it = it;
+        }
+        ++it;
+      }
+      if (!doNotDelete) {
+        if (min_it->first == history_order)
+          history_order = nullptr;
+        delete min_it->first;
+        hoh_list.erase(min_it);
+      }
+    }
   }
 
 #ifndef NDEBUG
   float weight_sum() {
-    float sum = 0.f;
+    double sum = 0.f;
     for (int i = 0; i < atmpl->sizeNeeded(); i++) {
-      struct fann_connection* connections = (struct fann_connection*)malloc(
-                                              sizeof(struct fann_connection) *
-                                              fann_get_total_connections(neural_networks[i]));
+      struct fann_connection* connections = (struct fann_connection*) calloc(
+                                              fann_get_total_connections(neural_networks[i]), sizeof(struct fann_connection));
+
+      for (int j = 0; j < fann_get_total_connections(neural_networks[i]); j++)
+        connections[j].weight = 0;
 
       fann_get_connection_array(neural_networks[i], connections);
 
@@ -281,6 +317,7 @@ class QLearning : public Policy<State> {
 
       free(connections);
     }
+
 
     return sum / atmpl->sizeNeeded();
   }
@@ -312,37 +349,6 @@ class QLearning : public Policy<State> {
     ParallelComputeQa para(&Qa, neural_networks, inputs);
     tbb::parallel_for(tbb::blocked_range<int>(0, atmpl->sizeNeeded()), para);
     delete[] inputs;
-  }
-
-  void resetTraces() {
-    history_of_history p(history_order, {reward_sum, 0});
-    hoh_list.push_back(p);
-
-    std::random_shuffle(hoh_list.begin(), hoh_list.end());
-    replayTraces();
-    if (hoh_list.size() > this->param.repeat_replay) {
-      double min = reward_sum;
-      auto it = hoh_list.begin();
-      decltype(it) min_it;
-      for (; it != hoh_list.end();) {
-        if (it->second.replay_time >
-            (this->param.repeat_replay + 2) * 3) {  // too many replayed
-          delete it->first;
-          it = hoh_list.erase(it);
-          continue;
-        }
-
-        it->second.replay_time++;
-        if (it->second.sum_reward <= min) {
-          min = it->second.sum_reward;
-          min_it = it;
-        }
-        ++it;
-      }
-
-      delete min_it->first;
-      hoh_list.erase(min_it);
-    }
   }
 
   void addTraces(const State& state, const DAction& a, const State& next_st,
@@ -407,7 +413,6 @@ class QLearning : public Policy<State> {
   DAction* lastAction = nullptr;
   State lastState;
   int internal_step;
-  double reward_sum;
 
 #ifdef ACTION_TIME
   std::vector<int> actions_time;

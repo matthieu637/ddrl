@@ -107,6 +107,7 @@ class Simulator {
       }
 
       env->next_instance();
+      agent->end_episode();
     }
 
     dump_and_display(episode, all_rewards, env, agent, learning);

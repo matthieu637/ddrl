@@ -51,6 +51,12 @@ class AAgent : public ProgOptions, public CommonAE {
   virtual void start_episode(const std::vector<float>&) {}
 
   /**
+   * @brief This method is called after each end of an instance
+   * @return void
+   */
+  virtual void end_episode() {}
+
+  /**
    * @brief To save your agent to a file.
    * Becareful to save every data if you intend to load your agent from this file later.
    * @param filepath where to save the agent

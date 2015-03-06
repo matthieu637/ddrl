@@ -42,13 +42,17 @@ class DiscretActionAg : public arch::AAgent<> {
     else
       ac = algo->decision(s, false);
 
-    vector<float>* outputs =
-      sml::ActionFactory::computeOutputs(ac, 0, *actions);
-    if (!learning) delete ac;
+    vector<float>* outputs = sml::ActionFactory::computeOutputs(ac, 0, *actions);
+    if (!learning)
+      delete ac;
+
+    weighted_reward += reward * pow_gamma;
+    pow_gamma *= rlparam->gamma;
+
     return *outputs;
   }
 
-  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* vm) {
+  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) {
     rlparam = new sml::RLParam;
     rlparam->epsilon             = pt->get<float>("agent.epsilon");
     rlparam->gamma               = pt->get<float>("agent.gamma");
@@ -74,6 +78,12 @@ class DiscretActionAg : public arch::AAgent<> {
   void start_episode(const std::vector<float>& sensors) {
     EnvState s(new std::vector<float>(sensors));
     algo->startEpisode(s, *ainit);
+    weighted_reward = 0;
+    pow_gamma = 1.d;
+  }
+
+  void end_episode() {
+    algo->resetTraces(weighted_reward);
   }
 
   void save(const std::string& path) {
@@ -87,6 +97,8 @@ class DiscretActionAg : public arch::AAgent<> {
  private:
   int nb_motors;
   int nb_sensors;
+  double weighted_reward;
+  double pow_gamma;
 
   sml::QLearning<EnvState>* algo;
   sml::ActionTemplate* act_templ;

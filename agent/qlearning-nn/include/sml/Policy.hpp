@@ -44,6 +44,8 @@ class Policy {
     return _learn(s, reward, goal).ac;
   }
 
+  virtual void resetTraces(double) = 0;
+
   virtual Policy<State> *copyPolicy() = 0;
 
   RLParam &getParams() {
