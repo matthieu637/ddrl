@@ -65,8 +65,7 @@ ODEObject *ODEFactory::createBox(const ODEWorld &world, float x, float y,
     box_id = nullptr;
   }
 
-  ODEObject *box =
-    new ODEBox(box_id, m, boxgeom, x, y, z, density, mass, lx, ly, lz);
+  ODEObject *box = new ODEBox(box_id, m, boxgeom, x, y, z, density, mass, lx, ly, lz);
   return box;
 }
 

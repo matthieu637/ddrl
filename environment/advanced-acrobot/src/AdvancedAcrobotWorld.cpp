@@ -54,7 +54,7 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint> &types) {
 
   float bone_length = BONE_LENGTH;
   float bone_larger = BONE_LARGER;
-  float starting_z = STARTING_Z + bone_length * types.size();
+  float starting_z = STARTING_Z + bone_length * actuators.size() - bone_length / 2.f;
 
   ground = ODEFactory::getInstance()->createGround(odeworld);
 
@@ -135,22 +135,17 @@ void AdvancedAcrobotWorld::step(const vector<float> &motors) {
 
   unsigned int begin_index = 0;
   if (actuators[0])
-    dJointAddHingeTorque(
-      joints[0], bib::Utils::transform(motors[begin_index++], -1, 1,
-                                       -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE));
+    dJointAddHingeTorque(joints[0],
+                         bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE));
 
   for (unsigned int i = 1; i < actuators.size(); i++)
     if (actuators[i]) {
       if (types[i - 1] == HINGE)
-        dJointAddHingeTorque(
-          joints[i],
-          bib::Utils::transform(motors[begin_index++], -1, 1,
-                                -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE));
+        dJointAddHingeTorque(joints[i],
+                             bib::Utils::transform(motors[begin_index++], -1, 1,-MAX_TORQUE_HINGE, MAX_TORQUE_HINGE));
       else
-        dJointAddSliderForce(
-          joints[i],
-          bib::Utils::transform(motors[begin_index++], -1, 1,
-                                -MAX_TORQUE_SLIDER, MAX_TORQUE_SLIDER));
+        dJointAddSliderForce(joints[i],
+                             bib::Utils::transform(motors[begin_index++], -1, 1,-MAX_TORQUE_SLIDER, MAX_TORQUE_SLIDER));
     }
 
   ASSERT(begin_index == motors.size(),
@@ -186,7 +181,7 @@ unsigned int AdvancedAcrobotWorld::activated_motors() const {
 }
 
 void AdvancedAcrobotWorld::resetPositions() {
-  float starting_z = STARTING_Z + BONE_LENGTH * types.size();
+  float starting_z = STARTING_Z + BONE_LENGTH * actuators.size() - BONE_LENGTH / 2.f;
 
   if (actuators[0]) dJointAddHingeTorque(joints[0], 0);
 
@@ -218,10 +213,11 @@ void AdvancedAcrobotWorld::resetPositions() {
 }
 
 float AdvancedAcrobotWorld::perf() const {
-  float normalize = 2 * BONE_LENGTH * types.size();
+  float normalize = 2.f * BONE_LENGTH * actuators.size();
 
   dVector3 result;
-  dBodyGetRelPointPos(bones.back()->getID(), 0, 0, 0, result);
+  dBodyGetRelPointPos(bones.back()->getID(), 0, 0, - BONE_LENGTH / 2.f, result);
 
+//   LOG_DEBUG( result[2] << " " << (result[2] - STARTING_Z) <<" " <<normalize<< " " << (result[2] - STARTING_Z) / normalize );
   return (result[2] - STARTING_Z) / normalize;
 }

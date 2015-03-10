@@ -15,7 +15,7 @@
 #define GRAVITY -9.81
 #define BONE_DENSITY 1
 #define BONE_MASS 1
-#define MAX_TORQUE_HINGE 6
+#define MAX_TORQUE_HINGE 1.5
 #define MAX_TORQUE_SLIDER 40
 #define WORLD_STEP 0.01
 
@@ -24,9 +24,7 @@ enum bone_joint { HINGE, SLIDER };
 class AdvancedAcrobotWorld {
  public:
   AdvancedAcrobotWorld(const std::vector<bone_joint> &types = {HINGE, HINGE},
-                       const std::vector<bool> &actuators = {false, false,
-                                                             true
-                                                            });
+                       const std::vector<bool> &actuators = {false, false, true});
   virtual ~AdvancedAcrobotWorld();
 
   void resetPositions();

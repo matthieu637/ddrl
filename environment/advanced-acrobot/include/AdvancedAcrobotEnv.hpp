@@ -32,26 +32,26 @@ class KeepHigh : public ProblemDefinition {
 class ReachLimitPoorInformed : public ProblemDefinition {
  public:
   float performance(AdvancedAcrobotWorld* instance) const {
-    if (instance->perf() > 0.95)
+    if (instance->perf() > 0.99f)
       return 1.;
     else
       return 0.f;
   }
   bool still_running(AdvancedAcrobotWorld* instance) const {
-    return instance->perf() <= 0.95;
+    return instance->perf() <= 0.99f;
   }
 };
 
 class ReachLimitWellInformed : public ProblemDefinition {
  public:
   float performance(AdvancedAcrobotWorld* instance) const {
-    if (instance->perf() > 0.95)
+    if (instance->perf() > 0.99f)
       return 1.;
     else
       return instance->perf() * 0.01;
   }
   bool still_running(AdvancedAcrobotWorld* instance) const {
-    return instance->perf() <= 0.95;
+    return instance->perf() <= 0.99f;
   }
 };
 
@@ -78,11 +78,17 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
   const std::vector<float>& perceptions() const {
     return instance->state();
   }
+
   float performance() const {
     return problem->performance(instance);
   }
+
   bool final_state() const {
-    return !problem->still_running(instance);
+    if (!visible)
+      return !problem->still_running(instance);
+    if (!problem->still_running(instance))
+      LOG_INFO("goal reached but continue simulation [--view]");
+    return false;
   }
 
   unsigned int number_of_actuators() const {
