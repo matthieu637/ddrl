@@ -49,6 +49,8 @@ class ActionFactory : public bib::Singleton<ActionFactory> {
                   unsigned int numberAction);
   void injectArgs(int numberAction);
 
+  void gridAction(unsigned int numberMotor, unsigned int actionPerMotor);
+
   void randomLinearAction(int numberMotor, int timestepMin, int timestepMax,
                           unsigned int _numberAction);
 
@@ -68,7 +70,7 @@ class ActionFactory : public bib::Singleton<ActionFactory> {
 
  private:
   list_tlaction actions;
-  int numberAction;
+  unsigned int numberAction;
 };
 }  // namespace sml
 #endif  // ACTIONFACTORY_H

@@ -33,7 +33,8 @@ void ActionFactory::write(const list_tlaction& ac, const std::string& file) {
 void ActionFactory::read(const std::string& file) {
   list_tlaction* ptr = bib::XMLEngine::load<list_tlaction>("actions", file);
   actions.clear();
-  for (auto it = ptr->cbegin(); it != ptr->cend(); ++it) actions.push_back(*it);
+  for (auto it = ptr->cbegin(); it != ptr->cend(); ++it)
+    actions.push_back(*it);
   delete ptr;
   numberAction = actions.size();
 }
@@ -98,6 +99,50 @@ void ActionFactory::injectArgs(const std::string& key, int numberMotor,
   myfile.close();
 
   injectArgs(actions.size());
+}
+
+void ActionFactory::gridAction(unsigned int numberMotor, unsigned int actionPerMotor) {
+  ASSERT(actionPerMotor >= 3, "invalid number of action per motor : {-1 0 1}");
+  ASSERT(numberMotor <= 2, "not implemented for more than 2 motors");
+
+#ifndef NDEBUG
+  if(actionPerMotor % 2 == 0)
+    LOG_INFO("Number of action per motor is a pair number so there is no neutral action");
+#endif
+
+  actions.clear();
+
+  std::vector<TemporalLinearMotor> tlm(actionPerMotor);
+  float factor = 2.f / ((float) actionPerMotor - 1.f);
+
+  for (unsigned int i = 0; i < actionPerMotor; i++) {
+    tlm[i].a = 0.f;
+    tlm[i].b = (factor * ((float)i)) - 1.f;
+  }
+
+  numberAction = (int) pow(actionPerMotor, numberMotor);
+  std::vector<TemporalLinearAction> ac(numberAction);
+
+  for (unsigned int i = 0; i < numberAction; i++) {
+    ac[i].temporal_extension = 1;
+    ac[i].motors.push_back(tlm[i % actionPerMotor]);
+  }
+
+  for (unsigned int m = 1; m < numberMotor; m++) {
+    for (unsigned int i = 0; i < numberAction; i++) {
+      ac[i].motors.push_back(tlm[ ((i / actionPerMotor) + i) % actionPerMotor]);
+    }
+  }
+
+  for (auto it = ac.cbegin(); it != ac.cend(); ++it) {
+//       LOG_DEBUG(std::left << std::setw(5) << std::fixed << std::setprecision(1) <<
+//       it->motors[0].b << std::left << std::setw(5) << std::fixed << std::setprecision(1) << it->motors[1].b <<
+//       std::left << std::setw(5) << std::fixed << std::setprecision(1) << it->motors[2].b);
+
+    actions.push_back(*it);
+  }
+
+  numberAction = actions.size();
 }
 
 void ActionFactory::randomLinearAction(int numberMotor, int timestepMin,

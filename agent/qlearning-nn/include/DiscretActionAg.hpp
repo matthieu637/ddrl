@@ -64,13 +64,12 @@ class DiscretActionAg : public arch::AAgent<> {
 
     rlparam->repeat_replay = pt->get<int>("agent.replay");
 
-    int number_discret_action   = pt->get<int>("agent.discret_action");
+    int action_per_motor   = pt->get<int>("agent.action_per_motor");
 
-    sml::ActionFactory::getInstance()->injectArgs(number_discret_action);
-    sml::ActionFactory::getInstance()->randomFixedAction(nb_motors, 1, 2);
+    sml::ActionFactory::getInstance()->gridAction(nb_motors, action_per_motor);
     actions = new sml::list_tlaction(sml::ActionFactory::getInstance()->getActions());
 
-    act_templ = new sml::ActionTemplate( {"effectors"}, {number_discret_action});
+    act_templ = new sml::ActionTemplate( {"effectors"}, {sml::ActionFactory::getInstance()->getActionsNumber()});
     ainit = new sml::DAction(act_templ, {0});
     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
   }

@@ -187,7 +187,7 @@ class QLearning : public Policy<State> {
     if (!goal) {
 #ifdef ACTION_TIME
       delta = delta +
-              powf(this->param.gamma, actions_time[a->hash()]) * this->Qa(*ba);
+              pow(this->param.gamma, actions_time[a->hash()]) * this->Qa(*ba);
 #else
       delta = delta + this->param.gamma * this->Qa(*ba);
 #endif
@@ -378,8 +378,7 @@ class QLearning : public Policy<State> {
           double delta = play->next_r;
 
           if (!play->end)
-            delta += powf(this->param.gamma, actions_time[play->at->hash()]) *
-                     this->Qa(*ba);
+            delta += pow(this->param.gamma, actions_time[play->at->hash()]) * this->Qa(*ba);
 #else
           double delta = play->next_r;
           if (!play->end) delta += this->param.gamma * this->Qa(*ba);
