@@ -6,6 +6,7 @@ cd $LIB
 . scripts/cpu.bash
 #check cmake if installed
 . scripts/check_program.bash
+check_all
 
 function hr(){
 	echo "---------------------------------------------------------------------------------"
@@ -17,7 +18,7 @@ function stopOnError(){
 	log=$2
 	if [ $error -ne 0 ] ; then
 		cat $log
-        	exit
+        	exit 1
         fi  
 }
 

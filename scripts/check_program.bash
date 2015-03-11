@@ -5,15 +5,21 @@ function checker(){
 	which $program >& /dev/null
 	if [ $? -ne 0 ]; then
 	        echo "ERROR : Please install '$program' to run this project."
-		exit
+		exit 1
 	fi
 }
 
-checker cmake
-checker make
-checker c++
-checker ode-config
-checker astyle
-checker cppcheck
-checker cpplint
+function check_all(){
+	checker wget
+	checker tar
+	checker unzip
+	checker python
+	checker cmake
+	checker make
+	checker c++
+	checker ode-config
+	checker astyle
+	checker cppcheck
+	checker cpplint
+}
 
