@@ -12,7 +12,14 @@ function check_code_cppcheck(){
 	goto_root
 	all_sources=`ls -d */src */*/src`
 	all_includes=`ls -d */include */*/include | xargs -I% echo -n "-I% "`
-	cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem --std=c++11 $all_includes $all_sources
+	tmp=`mktemp`
+	cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem --std=c++11 $all_includes $all_sources >& $tmp
+	cat $tmp | grep -v 'Checking' | grep -v 'files checked' | grep -v "Cppcheck cannot find all"
+	error=`cat $tmp | grep -v 'Checking' | grep -v 'files checked' | grep -v "Cppcheck cannot find all" | grep -v 'is never used' | wc -l`
+	rm $tmp
+	if [ $error -ne 0 ] ; then
+		exit 1
+	fi
 }
 
 function check_code_cpplint(){
