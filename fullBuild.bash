@@ -85,39 +85,52 @@ function buildDir(){
 	done
 }
 
+function echo_usage(){
+	echo "usage : $0 [options...] "
+	echo "Following options are possible : "
+	echo "codeblocks | CB : generates Codeblocks projects"
+	echo "--force : always remove old build without asking"
+	echo "--help | -h : displays this message"
+}
+
 export CMAKE_ARGS=''
+export FORCE_REMOVE=''
 
 for ARG in $*
 do
 	case $ARG in
 		"--help" | "-h")
-			echo "usage : $0 [options]"
-			echo "options : codeblocks | CB"
+			echo_usage
 			exit 0
 			;;
 		"codeblocks" | "CB")
 			echo "Will generate Codeblocks projects"
 			export CMAKE_ARGS='CodeBlocks - Unix Makefiles'
 			;;
+		"--force")
+			export FORCE_REMOVE='1'
+			;;
 	esac
-
 done
 
 
 
 echo "INFO : cmake well founded. Look what following to know if you need other software."
-echo "QUESTION : if a subdirectory already contains a build, should I remove it ? (y/n) [y]:"
 
-force_remove="a"
-while [[ $force_remove != "" && $force_remove != "y" &&  $force_remove != "n"  ]] ; do
-	read force_remove
-done
-hr
+if [[ "$FORCE_REMOVE" == '' ]] ; then
+	echo "QUESTION : if a subdirectory already contains a build, should I remove it ? (y/n) [y]:"
 
-if [[ $force_remove == "n" ]] ; then
-	export FORCE_REMOVE=0
-else
-	export FORCE_REMOVE=1
+	force_remove="a"
+	while [[ $force_remove != "" && $force_remove != "y" &&  $force_remove != "n"  ]] ; do
+		read force_remove
+	done
+	hr
+
+	if [[ $force_remove == "n" ]] ; then
+		export FORCE_REMOVE=0
+	else
+		export FORCE_REMOVE=1
+	fi
 fi
 
 buildDir common
