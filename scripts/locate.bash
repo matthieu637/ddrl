@@ -13,11 +13,14 @@ function root_path(){
 			path="$path/.."
 		done
 		echo "$path/"
-	else
+	elif [ -e $PROJECT_NAME ] ; then
 		#go down
 		echo $PROJECT_NAME
+	else
+		#scripts dir
+		cd "$(dirname "${BASH_SOURCE[0]}")"
+		pwd | sed "s/scripts//"
 	fi
-
 }
 
 function goto_root(){
