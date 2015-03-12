@@ -9,12 +9,16 @@ cd $LIB
 
 rm_build
 
-function check_code_cppcheck(){
+function cppcheck_run(){
 	goto_root
 	all_sources=`ls -d */src */*/src`
 	all_includes=`ls -d */include */*/include | xargs -I% echo -n "-I% "`
+	cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem --std=c++11 $all_includes $all_sources $@
+}
+
+function check_code_cppcheck(){
 	tmp=`mktemp`
-	cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem --std=c++11 $all_includes $all_sources >& $tmp
+	cppcheck_run >& $tmp
 	cat $tmp | grep -v 'Checking' | grep -v 'files checked' | grep -v "Cppcheck cannot find all"
 	error=`cat $tmp | grep -v 'Checking' | grep -v 'files checked' | grep -v "Cppcheck cannot find all" | grep -v 'is never used' | wc -l`
 	rm $tmp
@@ -55,9 +59,14 @@ function check_code_astyle(){
 	fi
 }
 
-echo "################### CPPCHECK ###################"
-check_code_cppcheck
-echo "################### CPPLINT ###################"
-check_code_cpplint
-echo "################### ASTYLE ###################"
-check_code_astyle
+if [ $# -eq 0 ] ; then
+	echo "################### CPPCHECK ###################"
+	check_code_cppcheck
+	echo "################### CPPLINT ###################"
+	check_code_cpplint
+	echo "################### ASTYLE ###################"
+	check_code_astyle
+else
+	cppcheck_run --xml --xml-version=2
+fi
+
