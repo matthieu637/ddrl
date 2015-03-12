@@ -9,21 +9,24 @@ if(NOT CMAKE_BUILD_TYPE)
       FORCE)
 endif(NOT CMAKE_BUILD_TYPE)
 
-#Boost library
-find_package(Boost COMPONENTS serialization program_options thread system REQUIRED)
-
-include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS})
-
-file ( GLOB_RECURSE all_include include/*.hpp )
-file ( GLOB all_sources src/*.cpp )
-
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++11 -Wno-switch") #-fPIC 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -g")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -ffast-math -DNDEBUG")
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -O2 -g -DNDEBUG")
 
-set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
+#Boost library
+find_package(Boost COMPONENTS serialization program_options thread system REQUIRED)
+find_package(GTest REQUIRED)
 
+include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${GTEST_INCLUDE_DIRS})
+
+file ( GLOB_RECURSE all_include include/*.hpp )
+file ( GLOB all_sources src/*.cpp )
+
+#-------------------
+# Library Build
+#-------------------
+set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
 
 set(LIBRARY_NAME "common-drl")
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -31,12 +34,24 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   set(LIBRARY_NAME "${LIBRARY_NAME}-rd")
 endif()
-  
 
 add_library(${LIBRARY_NAME} SHARED ${all_sources})
 target_link_libraries(${LIBRARY_NAME} ${Boost_LIBRARIES})
 
+#-------------------
+# Personnals Test
+#-------------------
 add_executable(dummy-simulator src/test/DummySimulator.cpp ${all_include} ${all_sources})
 target_link_libraries(dummy-simulator ${Boost_LIBRARIES})
 file(COPY data/minimal_config.ini DESTINATION . ) 
 file(RENAME ${CMAKE_CURRENT_BINARY_DIR}/minimal_config.ini ${CMAKE_CURRENT_BINARY_DIR}/config.ini)
+
+#-------------------
+# Unit Test
+#-------------------
+enable_testing()
+
+file ( GLOB all_test_sources src/test/*Utest.cpp )
+add_executable(unit-test ${all_test_sources} ${all_sources})
+target_link_libraries(unit-test ${GTEST_BOTH_LIBRARIES} ${Boost_LIBRARIES})
+add_test(AllTests unit-test)

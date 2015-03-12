@@ -13,6 +13,7 @@ sudo apt-get install astyle
 sudo apt-get install cppcheck
 sudo apt-get install libtbb-dev
 sudo apt-get install libglew-dev
+sudo apt-get install libgtest-dev
 
 #cpplint
 wget https://google-styleguide.googlecode.com/svn/trunk/cpplint/cpplint.py
