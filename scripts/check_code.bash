@@ -31,7 +31,7 @@ function check_code_cppcheck(){
 function cpplint_run(){
 	goto_root
 	all_files=`find . -type f -name '*cpp' -o -name '*.hpp' | grep -v extern`
-	echo $all_files | xargs cpplint --filter=-legal/copyright,-build/c++11 --extensions=hpp,cpp --linelength=120 |& grep -v 'Include the directory when naming' |& grep -v 'All parameters should be named' |& grep -v 'Archive &ar' |& grep -v 'Is this a non-const ref    erence.*ostream'
+	echo $all_files | xargs cpplint --filter=-legal/copyright,-build/c++11 --extensions=hpp,cpp --linelength=120 |& grep -v 'Include the directory when naming' |& grep -v 'All parameters should be named' |& grep -v 'Archive &ar' |& grep -v 'Is this a non-const reference.*ostream'
 }
 
 function check_code_cpplint(){
