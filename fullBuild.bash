@@ -51,39 +51,40 @@ function cmakeBuild(){
 
 #found all the CMakeLists.txt and create 3 targets to build (release, debug, release with debug info)
 function buildDir(){
-	dir=$1
-	if [ ! -e $dir ] ; then
-		echo "Please cd into the root directory of DRL"
-		exit
-	fi
-	
-	here=`pwd`
-	find $dir -name 'CMakeLists.txt' -printf '%h\n' | while read subdir ; do
-		cd $here/$subdir
-		
-		if [ -e build ]; then
-			if [ $FORCE_REMOVE -eq 0 ]; then
-				echo "INFO : $subdir already contains a build directory. Passing..."
-				continue
-			else
-				echo "INFO : $subdir already contains a build directory. Removing it..."
-				rm -rf build/
-			fi
-		fi
+        dir=$1
+        if [ ! -e $dir ] ; then
+                echo "Please cd into the root directory of DRL"
+                exit
+        fi
 
-		if [[ -e lib && $FORCE_REMOVE -eq 1 ]]; then
-			rm -rf lib/
-		fi
-		
-		#building
-		mkdir build
-		cmakeBuild release Release
-		cmakeBuild debug Debug
-		cmakeBuild relwithdeb RelWithDebInfo
+        here=`pwd`
+        dirs=`find $dir -name 'CMakeLists.txt' -printf '%h\n'`
+        for subdir in "$dirs" ; do
+                cd $here/$subdir
 
-		echo "INFO : $subdir well builed. Congratz."
-		hr
-	done
+                if [ -e build ]; then
+                        if [ $FORCE_REMOVE -eq 0 ]; then
+                                echo "INFO : $subdir already contains a build directory. Passing..."
+                                continue
+                        else
+                                echo "INFO : $subdir already contains a build directory. Removing it..."
+                                rm -rf build/
+                        fi
+                fi
+
+                if [[ -e lib && $FORCE_REMOVE -eq 1 ]]; then
+                        rm -rf lib/
+                fi
+
+                #building
+                mkdir build
+                cmakeBuild release Release
+                cmakeBuild debug Debug
+                cmakeBuild relwithdeb RelWithDebInfo
+
+                echo "INFO : $subdir well builed. Congratz."
+                hr
+        done 
 }
 
 function merge_report(){
