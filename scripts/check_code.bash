@@ -28,11 +28,15 @@ function check_code_cppcheck(){
 	fi
 }
 
-function check_code_cpplint(){
+function cpplint_run(){
 	goto_root
 	all_files=`find . -type f -name '*cpp' -o -name '*.hpp' | grep -v extern`
+	echo $all_files | xargs cpplint --filter=-legal/copyright,-build/c++11 --extensions=hpp,cpp --linelength=120 |& grep -v 'Include the directory when naming' |& grep -v 'All parameters should be named' |& grep -v 'Archive &ar' |& grep -v 'Is this a non-const ref    erence.*ostream'
+}
+
+function check_code_cpplint(){
 	tmp=`mktemp`
-	echo $all_files | xargs cpplint --filter=-legal/copyright,-build/c++11 --extensions=hpp,cpp --linelength=120 |& grep -v 'Include the directory when naming' |& grep -v 'All parameters should be named' |& grep -v 'Archive &ar' |& grep -v 'Is this a non-const reference.*ostream' | grep -v 'Done processing' | grep -v 'Total errors' >& $tmp
+	cpplint_run | grep -v 'Done processing' | grep -v 'Total errors' >& $tmp
 	error=`cat $tmp | wc -l`
 	cat $tmp
 	rm $tmp
@@ -66,7 +70,9 @@ if [ $# -eq 0 ] ; then
 	check_code_cpplint
 	echo "################### ASTYLE ###################"
 	check_code_astyle
-else
+elif [[ "$1" == 'cppcheck_report' ]] ; then
 	cppcheck_run --xml --xml-version=2
+elif [[ "$1" == 'cpplint_report' ]] ; then
+	cpplint_run
 fi
 
