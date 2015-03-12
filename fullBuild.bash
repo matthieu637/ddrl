@@ -45,7 +45,7 @@ function cmakeBuild(){
 	make -j $(nbcpu) >& $tmplog
 	stopOnError $? $tmplog
 
-	rm $tmplog
+	mv $tmplog build.log
 	cd ../..
 }
 
@@ -86,6 +86,10 @@ function buildDir(){
 	done
 }
 
+function merge_report(){
+	find . -name 'build.log' -type f | xargs cat > build_report.log
+}
+
 function echo_usage(){
 	echo "usage : $0 [options...] "
 	echo "Following options are possible : "
@@ -96,6 +100,7 @@ function echo_usage(){
 
 export CMAKE_ARGS=''
 export FORCE_REMOVE=''
+REPORT=0
 
 for ARG in $*
 do
@@ -110,6 +115,9 @@ do
 			;;
 		"--force")
 			export FORCE_REMOVE='1'
+			;;
+		"--report")
+			REPORT=1
 			;;
 	esac
 done
@@ -137,3 +145,8 @@ fi
 buildDir common
 buildDir environment
 buildDir agent
+
+if [ $REPORT -eq 1 ] ; then
+	merge_report
+fi
+
