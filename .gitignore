@@ -16,3 +16,5 @@
 */*/*/*/*/.directory
 build
 extern
+cppcheck-result.xml
+doc/
