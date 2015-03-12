@@ -10,7 +10,7 @@
 
 
 AdvancedAcrobotWorld::AdvancedAcrobotWorld(
-  const std::vector<bone_joint> &_types, const std::vector<bool> &_actuators)
+  const std::vector<bone_joint>& _types, const std::vector<bool>& _actuators)
   : odeworld(ODEFactory::getInstance()->createWorld()),
     types(_types),
     actuators(_actuators) {
@@ -38,7 +38,7 @@ AdvancedAcrobotWorld::AdvancedAcrobotWorld(
 }
 
 AdvancedAcrobotWorld::~AdvancedAcrobotWorld() {
-  for (ODEObject *o : bones) {
+  for (ODEObject * o : bones) {
     dGeomDestroy(o->getGeom());
     dBodyDestroy(o->getID());
     delete o;
@@ -49,7 +49,7 @@ AdvancedAcrobotWorld::~AdvancedAcrobotWorld() {
   ODEFactory::getInstance()->destroyWorld(odeworld);
 }
 
-void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint> &types) {
+void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint>& types) {
   ASSERT(types.size() > 0, "number of types :" << types.size());
 
   float bone_length = BONE_LENGTH;
@@ -59,7 +59,7 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint> &types) {
   ground = ODEFactory::getInstance()->createGround(odeworld);
 
   //  Create the first fixed bone with it's joint
-  ODEObject *first_bone = ODEFactory::getInstance()->createBox(
+  ODEObject* first_bone = ODEFactory::getInstance()->createBox(
                             odeworld, 0., 0, starting_z, bone_larger, bone_larger, bone_length,
                             BONE_DENSITY, BONE_MASS, true);
   bones.push_back(first_bone);
@@ -73,7 +73,7 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint> &types) {
   //  Create the other bone relative to the first one
   for (bone_joint type : types) {
     float my_starting_z = starting_z - bone_length * bones.size();
-    ODEObject *next = ODEFactory::getInstance()->createBox(
+    ODEObject* next = ODEFactory::getInstance()->createBox(
                         odeworld, 0., 0, my_starting_z, bone_larger, bone_larger, bone_length,
                         BONE_DENSITY, BONE_MASS, true);
 
@@ -96,10 +96,10 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint> &types) {
   }
 }
 
-void nearCallback(void *data, dGeomID o1, dGeomID o2) {
+void nearCallback(void* data, dGeomID o1, dGeomID o2) {
   int n;
-  nearCallbackData *d = reinterpret_cast<nearCallbackData *>(data);
-  AdvancedAcrobotWorld *inst = d->inst;
+  nearCallbackData* d = reinterpret_cast<nearCallbackData*>(data);
+  AdvancedAcrobotWorld* inst = d->inst;
 
   // exit without doing anything if the two bodies are connected by a joint
   dBodyID b1 = dGeomGetBody(o1);
@@ -128,29 +128,30 @@ void nearCallback(void *data, dGeomID o1, dGeomID o2) {
   }
 }
 
-void AdvancedAcrobotWorld::step(const vector<float> &motors) {
+void AdvancedAcrobotWorld::step(const vector<float>& motors) {
   nearCallbackData d = {this};
 
   dSpaceCollide(odeworld.space_id, &d, &nearCallback);
 
   unsigned int begin_index = 0;
-  if (actuators[0])
-    dJointAddHingeTorque(joints[0],
-                         bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE));
+  double force = 0.f;
+  if (actuators[0]) {
+    force = bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE);
+    dJointAddHingeTorque(joints[0], force);
+  }
 
   for (unsigned int i = 1; i < actuators.size(); i++)
     if (actuators[i]) {
       if (types[i - 1] == HINGE)
-        dJointAddHingeTorque(joints[i],
-                             bib::Utils::transform(motors[begin_index++], -1, 1,-MAX_TORQUE_HINGE, MAX_TORQUE_HINGE));
+        force = bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE);
       else
-        dJointAddSliderForce(joints[i],
-                             bib::Utils::transform(motors[begin_index++], -1, 1,-MAX_TORQUE_SLIDER, MAX_TORQUE_SLIDER));
+        force = bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_SLIDER, MAX_TORQUE_SLIDER);
+
+      dJointAddHingeTorque(joints[i], force);
     }
 
   ASSERT(begin_index == motors.size(),
-         "wrong number of motors " << begin_index << " " << motors.size() << " "
-         << actuators.size());
+         "wrong number of motors " << begin_index << " " << motors.size() << " " << actuators.size());
 
   Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
   dWorldStep(odeworld.world_id, WORLD_STEP);
@@ -172,7 +173,7 @@ void AdvancedAcrobotWorld::step(const vector<float> &motors) {
     }
 }
 
-const std::vector<float> &AdvancedAcrobotWorld::state() const {
+const std::vector<float>& AdvancedAcrobotWorld::state() const {
   return internal_state;
 }
 
@@ -197,7 +198,7 @@ void AdvancedAcrobotWorld::resetPositions() {
   dRFromEulerAngles(R, 0, 0, 0);
 
   unsigned int i = 0;
-  for (ODEObject *o : bones) {
+  for (ODEObject * o : bones) {
     dBodySetRotation(o->getID(), R);
     dBodySetForce(o->getID(), 0, 0, 0);
     dBodySetLinearVel(o->getID(), 0, 0, 0);
@@ -218,6 +219,7 @@ float AdvancedAcrobotWorld::perf() const {
   dVector3 result;
   dBodyGetRelPointPos(bones.back()->getID(), 0, 0, - BONE_LENGTH / 2.f, result);
 
-//   LOG_DEBUG( result[2] << " " << (result[2] - STARTING_Z) <<" " <<normalize<< " " << (result[2] - STARTING_Z) / normalize );
+//   LOG_DEBUG( result[2] << " " << (result[2] - STARTING_Z) <<" "
+//   <<normalize<< " " << (result[2] - STARTING_Z) / normalize );
   return (result[2] - STARTING_Z) / normalize;
 }

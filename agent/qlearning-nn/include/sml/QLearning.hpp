@@ -255,17 +255,18 @@ class QLearning : public Policy<State> {
   int history_size() const {
     if (history_order != nullptr)
       return history_order->size();
-    else return -1;
+    else
+      return -1;
   }
 
   void resetTraces(double reward_sum) {
-    if (history_order->size() > 0) {
-      history_of_history p(history_order, {reward_sum, 0});
-      hoh_list.push_back(p);
-    } else {
-      delete history_order;
-      history_order = nullptr;
-    }
+//     if (history_order->size() > 0) {
+    history_of_history p(history_order, {reward_sum, 0});
+    hoh_list.push_back(p);
+//     } else {
+//       delete history_order;
+//       history_order = nullptr;
+//     }
 
     std::random_shuffle(hoh_list.begin(), hoh_list.end());
     replayTraces();
@@ -304,15 +305,16 @@ class QLearning : public Policy<State> {
   float weight_sum() {
     double sum = 0.f;
     for (unsigned int i = 0; i < atmpl->sizeNeeded(); i++) {
-      struct fann_connection* connections = (struct fann_connection*) calloc(
-                                              fann_get_total_connections(neural_networks[i]), sizeof(struct fann_connection));
+      typedef struct fann_connection sfn;
+      unsigned int number_connection = fann_get_total_connections(neural_networks[i]);
+      sfn* connections = reinterpret_cast<sfn*>(calloc(number_connection, sizeof(sfn)));
 
-      for (unsigned int j = 0; j < fann_get_total_connections(neural_networks[i]); j++)
+      for (unsigned int j = 0; j < number_connection; j++)
         connections[j].weight = 0;
 
       fann_get_connection_array(neural_networks[i], connections);
 
-      for (unsigned int j = 0; j < fann_get_total_connections(neural_networks[i]); j++)
+      for (unsigned int j = 0; j < number_connection; j++)
         sum += std::fabs(connections[j].weight);
 
       free(connections);
@@ -420,3 +422,4 @@ class QLearning : public Policy<State> {
 }  // namespace sml
 
 #endif  // SARSANN_H
+

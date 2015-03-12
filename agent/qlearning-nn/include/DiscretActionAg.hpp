@@ -15,7 +15,7 @@ typedef boost::shared_ptr<std::vector<float>> EnvState;
 class DiscretActionAg : public arch::AAgent<> {
  public:
   DiscretActionAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : nb_motors(_nb_motors), nb_sensors(_nb_sensors) {
+    : nb_motors(_nb_motors), nb_sensors(_nb_sensors), weighted_reward(0.f), pow_gamma(1.f) {
     ainit = nullptr;
     actions = nullptr;
     algo = nullptr;

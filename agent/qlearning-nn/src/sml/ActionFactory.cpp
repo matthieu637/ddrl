@@ -106,21 +106,21 @@ void ActionFactory::gridAction(unsigned int numberMotor, unsigned int actionPerM
   ASSERT(numberMotor <= 2, "not implemented for more than 2 motors");
 
 #ifndef NDEBUG
-  if(actionPerMotor % 2 == 0)
+  if (actionPerMotor % 2 == 0)
     LOG_INFO("Number of action per motor is a pair number so there is no neutral action");
 #endif
 
   actions.clear();
 
   std::vector<TemporalLinearMotor> tlm(actionPerMotor);
-  float factor = 2.f / ((float) actionPerMotor - 1.f);
+  float factor = 2.f / (static_cast<float>(actionPerMotor) - 1.f);
 
   for (unsigned int i = 0; i < actionPerMotor; i++) {
     tlm[i].a = 0.f;
-    tlm[i].b = (factor * ((float)i)) - 1.f;
+    tlm[i].b = (factor * (static_cast<float>(i))) - 1.f;
   }
 
-  numberAction = (int) pow(actionPerMotor, numberMotor);
+  numberAction = static_cast<unsigned int>(pow(actionPerMotor, numberMotor));
   std::vector<TemporalLinearAction> ac(numberAction);
 
   for (unsigned int i = 0; i < numberAction; i++) {
