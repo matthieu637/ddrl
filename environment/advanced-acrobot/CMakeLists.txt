@@ -45,3 +45,7 @@ target_link_libraries(acrobot-env ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 execute_process(COMMAND bash ../../../../scripts/merge_ini.bash ../../../../common/data/minimal_config.ini data/acrobot.ini config.ini)
+
+
+set(all_test_source ${all_sources} ${drawstuff_src})
+enable_utest(all_test_source ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_LIBRARY} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})

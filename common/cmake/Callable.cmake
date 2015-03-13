@@ -13,11 +13,12 @@ endfunction()
 #-------------------
 # Unit Test macro
 #-------------------
-function(enable_utest)
+function(enable_utest needed_sources)
   enable_testing()
+  find_package(GTest REQUIRED)
 
   file ( GLOB all_test_sources src/test/*Utest.cpp )
-  add_executable(unit-test ${all_test_sources} ${all_sources})
+  add_executable(unit-test ${all_test_sources} ${${needed_sources}})
   target_link_libraries(unit-test ${GTEST_BOTH_LIBRARIES} ${ARGN})
   add_test(AllTests unit-test)
 endfunction()

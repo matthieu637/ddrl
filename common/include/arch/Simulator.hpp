@@ -74,8 +74,7 @@ class Simulator {
     env->unique_destroy();
     delete env;
 
-    LOG_FILE(DEFAULT_END_FILE,
-             "" << (float)(time_spend.finish() / 60.f));  // in minutes
+    LOG_FILE(DEFAULT_END_FILE, "" << (float)(time_spend.finish() / 60.f));  // in minutes
   }
 
  private:

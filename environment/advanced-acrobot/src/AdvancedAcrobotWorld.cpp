@@ -221,5 +221,5 @@ float AdvancedAcrobotWorld::perf() const {
 
 //   LOG_DEBUG( result[2] << " " << (result[2] - STARTING_Z) <<" "
 //   <<normalize<< " " << (result[2] - STARTING_Z) / normalize );
-  return (result[2] - STARTING_Z) / normalize;
+  return bib::Utils::transform(result[2] - STARTING_Z, 0.f, normalize, 0.f, 1.f);
 }

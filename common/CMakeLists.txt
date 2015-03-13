@@ -30,4 +30,4 @@ target_link_libraries(dummy-simulator ${Boost_LIBRARIES})
 file(COPY data/minimal_config.ini DESTINATION . ) 
 file(RENAME ${CMAKE_CURRENT_BINARY_DIR}/minimal_config.ini ${CMAKE_CURRENT_BINARY_DIR}/config.ini)
 
-enable_utest(${Boost_LIBRARIES})
+enable_utest(all_sources ${Boost_LIBRARIES})
