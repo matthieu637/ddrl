@@ -14,6 +14,7 @@ sudo apt-get install cppcheck
 sudo apt-get install libtbb-dev
 sudo apt-get install libglew-dev
 sudo apt-get install libgtest-dev
+sudo apt-get install unzip
 
 #cpplint
 wget https://google-styleguide.googlecode.com/svn/trunk/cpplint/cpplint.py

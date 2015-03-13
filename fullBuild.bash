@@ -6,7 +6,6 @@ cd $LIB
 . scripts/cpu.bash
 #check cmake if installed
 . scripts/check_program.bash
-. scripts/locate.bash
 check_all
 
 function hr(){
@@ -53,7 +52,6 @@ function cmakeBuild(){
 
 #found all the CMakeLists.txt and create 3 targets to build (release, debug, release with debug info)
 function buildDir(){
-	goto_root
         dir=$1
         if [ ! -e $dir ] ; then
                 echo "Please cd into the root directory of DRL"
@@ -87,6 +85,7 @@ function buildDir(){
                 echo "INFO : $subdir well builed. Congratz."
                 hr
         done
+	cd $here
 }
 
 function merge_report(){
