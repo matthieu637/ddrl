@@ -6,7 +6,7 @@ cd $LIB
 . locate.bash
 goto_root
 
-sudo apt-get install python cmake libode-dev astyle cppcheck libtbb-dev libglew-dev libgtest-dev unzip libboost-all-dev
+sudo apt-get install python cmake libode-dev astyle cppcheck libtbb-dev libglew-dev libgtest-dev unzip libboost-all-dev doxygen
 
 #cpplint
 wget https://google-styleguide.googlecode.com/svn/trunk/cpplint/cpplint.py
