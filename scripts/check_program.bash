@@ -16,7 +16,7 @@ function check_all(){
 	checker python
 	checker cmake
 	checker make
-	checker c++
+	checker g++
 	checker ode-config
 	checker astyle
 	checker cppcheck

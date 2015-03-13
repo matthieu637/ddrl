@@ -6,15 +6,7 @@ cd $LIB
 . locate.bash
 goto_root
 
-sudo apt-get install python
-sudo apt-get install cmake
-sudo apt-get install libode-dev
-sudo apt-get install astyle
-sudo apt-get install cppcheck
-sudo apt-get install libtbb-dev
-sudo apt-get install libglew-dev
-sudo apt-get install libgtest-dev
-sudo apt-get install unzip
+sudo apt-get install python cmake libode-dev astyle cppcheck libtbb-dev libglew-dev libgtest-dev unzip libboost-all-dev
 
 #cpplint
 wget https://google-styleguide.googlecode.com/svn/trunk/cpplint/cpplint.py
@@ -30,3 +22,12 @@ cd FANN-2.2.0-Source
 cmake .
 make
 sudo make install
+
+#gtest lib
+cd /usr/src/gtest
+sudo cmake .
+sudo make
+sudo mv libg* /usr/local/lib/
+
+echo "check your gcc version isn't too old ( <= 4.6 )"
+
