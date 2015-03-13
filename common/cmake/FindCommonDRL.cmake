@@ -1,12 +1,8 @@
-
-set(COMMON_DRL_INCLUDE_DIRS ../../common/include)
+include(${CMAKE_SOURCE_DIR}/../../common/cmake/Callable.cmake)
+set(COMMON_DRL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/../../common/include)
 
 set(COMMON_DRL_NAME "common-drl")
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(COMMON_DRL_NAME "${COMMON_DRL_NAME}-d")
-elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  set(COMMON_DRL_NAME "${COMMON_DRL_NAME}-rd")
-endif()
+rename_buildtype(COMMON_DRL_NAME)
 
 find_library( COMMON_DRL_LIBRARY
   NAMES ${COMMON_DRL_NAME}

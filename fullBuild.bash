@@ -6,6 +6,7 @@ cd $LIB
 . scripts/cpu.bash
 #check cmake if installed
 . scripts/check_program.bash
+. scripts/locate.bash
 check_all
 
 function hr(){
@@ -40,6 +41,7 @@ function cmakeBuild(){
 	fi
 
 	stopOnError $? $tmplog
+	cp $tmplog cmake.log
 	echo '' > $tmplog
 
 	make -j $(nbcpu) >& $tmplog
@@ -51,15 +53,15 @@ function cmakeBuild(){
 
 #found all the CMakeLists.txt and create 3 targets to build (release, debug, release with debug info)
 function buildDir(){
+	goto_root
         dir=$1
         if [ ! -e $dir ] ; then
                 echo "Please cd into the root directory of DRL"
-                exit
+                exit 1
         fi
 
         here=`pwd`
-        dirs=`find $dir -name 'CMakeLists.txt' -printf '%h\n'`
-        for subdir in "$dirs" ; do
+        for subdir in $(find $dir -name 'CMakeLists.txt' -printf '%h\n') ; do
                 cd $here/$subdir
 
                 if [ -e build ]; then
@@ -84,7 +86,7 @@ function buildDir(){
 
                 echo "INFO : $subdir well builed. Congratz."
                 hr
-        done 
+        done
 }
 
 function merge_report(){

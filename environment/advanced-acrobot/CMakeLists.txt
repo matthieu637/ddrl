@@ -3,11 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 #Nom du projet
 project(advanced-acrobot CXX C)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../../common/cmake/")
-
-IF(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
-   SET(CMAKE_BUILD_TYPE DEBUG)
-ENDIF(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+include(${CMAKE_SOURCE_DIR}/../../common/cmake/Config.cmake)
 
 find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
 find_package(ODE REQUIRED)
@@ -26,13 +22,17 @@ file ( GLOB all_sources src/*.cpp )
 
 message(STATUS "ODE flags : " ${ODE_CFLAGS})
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++11 -Wno-switch") #-fPIC 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -g")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -ffast-math -DNDEBUG")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -O2 -g -DNDEBUG")
+#-------------------
+# Library Build
+#-------------------
+set(LIBRARY_NAME "advanced-acrobot")
+rename_buildtype(LIBRARY_NAME)
+add_library(${LIBRARY_NAME} SHARED ${all_include} ${all_sources} ${drawstuff_src})
+target_link_libraries(${LIBRARY_NAME} ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_LIBRARY} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})
 
-
-#BUILD TEST PROGRAM
+#-------------------
+# Personnals Test
+#-------------------
 add_executable(internal-visu src/test/InternalView.cpp ${all_include} ${all_sources} ${drawstuff_src})
 target_link_libraries(internal-visu ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_LIBRARY} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})
 
@@ -45,16 +45,3 @@ target_link_libraries(acrobot-env ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 execute_process(COMMAND bash ../../../../scripts/merge_ini.bash ../../../../common/data/minimal_config.ini data/acrobot.ini config.ini)
-
-#BUILD THE LIBRARY
-set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
-
-set(LIBRARY_NAME "advanced-acrobot")
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(LIBRARY_NAME "${LIBRARY_NAME}-d")
-elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  set(LIBRARY_NAME "${LIBRARY_NAME}-rd")
-endif()
-
-add_library(${LIBRARY_NAME} SHARED ${all_include} ${all_sources} ${drawstuff_src})
-target_link_libraries(${LIBRARY_NAME} ${ODE_LIBRARY} ${Boost_LIBRARIES} ${DRAWSTUFF_LIBRARY} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})

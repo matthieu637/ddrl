@@ -3,16 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 #Project name
 project(common-lib CXX)
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING
-      "Choose the type of build, options are: Debug Release RelWithDebInfo."
-      FORCE)
-endif(NOT CMAKE_BUILD_TYPE)
-
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++11 -Wno-switch") #-fPIC 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG -g")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -ffast-math -DNDEBUG")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -O2 -g -DNDEBUG")
+include(${CMAKE_SOURCE_DIR}/cmake/Config.cmake)
 
 #Boost library
 find_package(Boost COMPONENTS serialization program_options thread system REQUIRED)
@@ -26,15 +17,8 @@ file ( GLOB all_sources src/*.cpp )
 #-------------------
 # Library Build
 #-------------------
-set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
-
 set(LIBRARY_NAME "common-drl")
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(LIBRARY_NAME "${LIBRARY_NAME}-d")
-elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  set(LIBRARY_NAME "${LIBRARY_NAME}-rd")
-endif()
-
+rename_buildtype(LIBRARY_NAME)
 add_library(${LIBRARY_NAME} SHARED ${all_sources})
 target_link_libraries(${LIBRARY_NAME} ${Boost_LIBRARIES})
 
@@ -46,12 +30,4 @@ target_link_libraries(dummy-simulator ${Boost_LIBRARIES})
 file(COPY data/minimal_config.ini DESTINATION . ) 
 file(RENAME ${CMAKE_CURRENT_BINARY_DIR}/minimal_config.ini ${CMAKE_CURRENT_BINARY_DIR}/config.ini)
 
-#-------------------
-# Unit Test
-#-------------------
-enable_testing()
-
-file ( GLOB all_test_sources src/test/*Utest.cpp )
-add_executable(unit-test ${all_test_sources} ${all_sources})
-target_link_libraries(unit-test ${GTEST_BOTH_LIBRARIES} ${Boost_LIBRARIES})
-add_test(AllTests unit-test)
+enable_utest(${Boost_LIBRARIES})
