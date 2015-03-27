@@ -17,7 +17,7 @@
 TEST(AdvancedAcrobotEnv, Realisable)
 {
     boost::property_tree::ptree properties;
-    boost::property_tree::ini_parser::read_ini("utest.ini", properties);
+    boost::property_tree::ini_parser::read_ini("data/acrobot.utest.ini", properties);
     
     boost::program_options::variables_map command_args;
   
