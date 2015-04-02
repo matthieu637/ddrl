@@ -129,9 +129,10 @@ void nearCallback(void* data, dGeomID o1, dGeomID o2) {
 }
 
 void AdvancedAcrobotWorld::step(const vector<float>& motors) {
-  nearCallbackData d = {this};
-
-  dSpaceCollide(odeworld.space_id, &d, &nearCallback);
+  // No collision in this world
+  
+  // nearCallbackData d = {this};
+  // dSpaceCollide(odeworld.space_id, &d, &nearCallback);
 
   unsigned int begin_index = 0;
   double force = 0.f;
