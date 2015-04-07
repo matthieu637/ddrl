@@ -21,7 +21,7 @@ file ( GLOB all_sources src/*.cpp )
 file ( GLOB all_sources_sml src/sml/*.cpp )
 
 
-add_executable(advanced-acrobot src/test/AdvancedAcrobotDiscret.cpp ${all_include} ${all_sources} ${all_sources_sml})
+add_executable(advanced-acrobot src/test/AdvancedAcrobotDiscret.cpp ${all_include} ${all_sources_sml})
 target_link_libraries(advanced-acrobot ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES})
 
 add_executable(adacrobot-cn src/test/AdvancedAcrobotContinuous.cpp ${all_include} ${all_sources} ${all_sources_sml})
