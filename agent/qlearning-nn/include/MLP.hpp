@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <functional>
+#include <bib/Logger.hpp>
 
 #include "doublefann.h"
 #include "opt++/NLF.h"
@@ -14,6 +15,8 @@
 #include "opt++/LinearInequality.h"
 #include "opt++/CompoundConstraint.h"
 #include "opt++/OptNIPS.h"
+#include "opt++/OptBCNewton.h"
+#include "opt++/OptBaNewton.h"
 //     OptNewton(&nlp): Newton method for unconstrained problems
 //     OptBCNewton(&nlp): Newton method for bound-constrained problems
 //     OptBaNewton(&nlp): Newton method for bound-constrained problems
@@ -50,6 +53,8 @@ public:
         fann_set_training_algorithm(neural_net, FANN_TRAIN_INCREMENTAL);
         fann_set_train_stop_function(neural_net, FANN_STOPFUNC_MSE);
         fann_set_learning_rate(neural_net, alpha);
+        fann_set_activation_steepness_hidden(neural_net, 0.5);
+        fann_set_activation_steepness_output(neural_net, 1.);
     }
 
     ~MLP() {
@@ -83,7 +88,7 @@ public:
 
         fann_type* out = fann_run(neural_net, inputs);
         delete inputs;
-        return out[1];
+        return out[0];
     }
 
     std::vector<float>* optimized(const std::vector<float>& inputs) {
@@ -102,29 +107,34 @@ public:
 
         passdata d = {neural_net, inputs};
         NLF2 nips(ndim, hs65, init_hs65, constraints, &d);
+        nips.setIsExpensive(true);
 
-        OptNIPS objfcn(&nips);
-
-// The "0" in the second argument says to create a new file.  A "1"
-// would signify appending to an existing file.
-
-        objfcn.setOutputFile("/dev/null", 1);
-        objfcn.setFcnTol(1.0e-06);
-        objfcn.setMaxIter(20);
-        objfcn.setMeritFcn(ArgaezTapia);
+//         OptNIPS objfcn(&nips); //for general constraints
+        OptBaNewton objfcn(&nips);
+        
+//         OptBCNewton objfcn(&nips); //-nan
+         
+//         objfcn.setOutputFile("/dev/null", 1);
+        objfcn.setFcnTol(1.0e-07);
+        objfcn.setMaxIter(25);
+//         objfcn.setConTol(1e-09);
+//         objfcn.setTRSize(1.0e4);
+//         objfcn.setMeritFcn(ArgaezTapia);  // for nips
 
         objfcn.optimize();
-
-        //objfcn.printStatus("Solution from nips");
-        //objfcn.cleanup();
         
         for(uint i=0;i<a->size();i++)
-          a->at(i) = objfcn.getXPrev()(i+1);
-
+          a->at(i) = nips.getXc()(i+1);
+        
+        objfcn.cleanup();
+        
         return a;
     }
 
-
+    NN getNeuralNet(){
+       return neural_net;
+    }
+    
 private:
     NN neural_net;
     unsigned int size_input_state;

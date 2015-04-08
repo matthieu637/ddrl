@@ -66,7 +66,7 @@ public:
 //     act_templ = new sml::ActionTemplate( {"effectors"}, {sml::ActionFactory::getInstance()->getActionsNumber()});
 //     ainit = new sml::DAction(act_templ, {0});
 //     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
-        hidden_unit=10;
+        hidden_unit=50;
         nn = new MLP(nb_sensors + nb_motors, hidden_unit, nb_sensors, alpha);
     }
 

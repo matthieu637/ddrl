@@ -19,8 +19,26 @@
       std::abort();                                                           \
     }                                                                         \
   } while (0)
+#define _ASSERT_EQ(val1, val2)                                                 \
+  do {                                                                        \
+    if (val1 != val2) {                                                       \
+      std::cout << "#ASSERT FAILED :" << __FILE__ << "." << __LINE__ << " : " \
+                << val1 << " " << val2 << std::endl;                          \
+      std::abort();                                                           \
+    }                                                                         \
+  } while (0)
+#define _ASSERT_EQS(val1, val2, stream)                                        \
+  do {                                                                        \
+    if (val1 != val2) {                                                       \
+      std::cout << "#ASSERT FAILED :" << __FILE__ << "." << __LINE__ << " : " \
+                << val1 << " " << val2 << " " << stream << std::endl;         \
+      std::abort();                                                           \
+    }                                                                         \
+  } while (0)
 #else
 #define ASSERT(condition, stream)
+#define _ASSERT_EQ(val1, val2)
+#define _ASSERT_EQS(val1, val2, stream)
 #endif
 
 #endif

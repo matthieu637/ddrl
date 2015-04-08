@@ -32,3 +32,9 @@ file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 execute_process(COMMAND bash ../../../../scripts/merge_ini.bash ../../../../common/data/minimal_config.ini data/acrobot.ini config.ini)
 execute_process(COMMAND bash ../../../../scripts/merge_ini.bash config.ini data/qlearning.ini config.ini)
+
+#-------------------
+# Unit Test
+#-------------------
+set(all_test_source ${all_sources} ${all_sources_sml})
+enable_utest(all_test_source ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES})

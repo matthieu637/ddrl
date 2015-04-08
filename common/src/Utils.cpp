@@ -28,6 +28,10 @@ float Utils::randin(float a, float b) {
   return a + r;
 }
 
+bool Utils::randBool(){
+  return Utils::rand01() < 0.5;
+}
+
 // a < x < b => c < X < d
 double Utils::transform(double x, double a, double b, double c, double d) {
   if (x < a)
