@@ -21,5 +21,6 @@ function check_all(){
 	checker astyle
 	checker cppcheck
 	checker cpplint
+	checker valgrind
 }
 
