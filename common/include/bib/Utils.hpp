@@ -27,7 +27,7 @@ class Utils {
   static float randin(float a, float b);
 
   static bool randBool();
-  
+
   ///
   // /\brief transformer la valeur x qui appartient [a,b] à [c,d]
   // /\param x :une valeur

@@ -28,7 +28,7 @@ float Utils::randin(float a, float b) {
   return a + r;
 }
 
-bool Utils::randBool(){
+bool Utils::randBool() {
   return Utils::rand01() < 0.5;
 }
 

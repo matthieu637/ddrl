@@ -62,7 +62,7 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint>& types) {
   ODEObject* first_bone = ODEFactory::getInstance()->createBox(
                             odeworld, 0., 0, starting_z, bone_larger, bone_larger, bone_length,
                             BONE_DENSITY, true);
-  
+
   bones.push_back(first_bone);
 
   dJointID first_hinge = dJointCreateHinge(odeworld.world_id, nullptr);
@@ -131,7 +131,7 @@ void nearCallback(void* data, dGeomID o1, dGeomID o2) {
 
 void AdvancedAcrobotWorld::step(const vector<float>& motors) {
   // No collision in this world
-  
+
   // nearCallbackData d = {this};
   // dSpaceCollide(odeworld.space_id, &d, &nearCallback);
 

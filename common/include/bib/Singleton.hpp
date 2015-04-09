@@ -16,32 +16,30 @@
 ///
 ///
 
-namespace bib
-{
+namespace bib {
 
 template <class T>
-class Singleton
-{
-public:
-    ///
-    // /\brief Méthode statique et public pour récupérer l'instance du singleton
-    ///
-    static T* getInstance() {
-        ASSERT(_singleton != nullptr, "singleton never created");
-        return _singleton.get();
-    }
+class Singleton {
+ public:
+  ///
+  // /\brief Méthode statique et public pour récupérer l'instance du singleton
+  ///
+  static T* getInstance() {
+    ASSERT(_singleton != nullptr, "singleton never created");
+    return _singleton.get();
+  }
 
-    ///
-    // /\brief Constructeur privée/protected pour empécher l'instanciation
-    /// n'importe où
-    ///
-protected:
-    Singleton() {}
-public:
-    virtual ~Singleton() {}
+  ///
+  // /\brief Constructeur privée/protected pour empécher l'instanciation
+  /// n'importe où
+  ///
+ protected:
+  Singleton() {}
+ public:
+  virtual ~Singleton() {}
 
-private:
-    static std::shared_ptr<T> _singleton;
+ private:
+  static std::shared_ptr<T> _singleton;
 };
 
 template <class T>
