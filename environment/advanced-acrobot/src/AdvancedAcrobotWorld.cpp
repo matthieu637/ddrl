@@ -61,7 +61,8 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint>& types) {
   //  Create the first fixed bone with it's joint
   ODEObject* first_bone = ODEFactory::getInstance()->createBox(
                             odeworld, 0., 0, starting_z, bone_larger, bone_larger, bone_length,
-                            BONE_DENSITY, BONE_MASS, true);
+                            BONE_DENSITY, true);
+  
   bones.push_back(first_bone);
 
   dJointID first_hinge = dJointCreateHinge(odeworld.world_id, nullptr);
@@ -75,7 +76,7 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint>& types) {
     float my_starting_z = starting_z - bone_length * bones.size();
     ODEObject* next = ODEFactory::getInstance()->createBox(
                         odeworld, 0., 0, my_starting_z, bone_larger, bone_larger, bone_length,
-                        BONE_DENSITY, BONE_MASS, true);
+                        BONE_DENSITY, true);
 
     if (type == HINGE) {
       dJointID next_hinge = dJointCreateHinge(odeworld.world_id, nullptr);

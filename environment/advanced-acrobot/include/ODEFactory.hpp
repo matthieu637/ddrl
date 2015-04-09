@@ -25,10 +25,10 @@ class ODEFactory : public bib::Singleton<ODEFactory> {
 
  public:
   ODEObject *createBox(const ODEWorld &world, float x, float y, float z,
-                       float lx, float ly, float lz, float density, float mass,
+                       float lx, float ly, float lz, float density,
                        bool linkBody = true);
   ODEObject *createSphere(const ODEWorld &world, float x, float y, float z,
-                          float radius, float density, float mass,
+                          float radius, float density,
                           bool linkBody = true);
 
   ODEWorld createWorld();

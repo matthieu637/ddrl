@@ -46,12 +46,11 @@ ODEFactory::~ODEFactory() {
 
 ODEObject *ODEFactory::createBox(const ODEWorld &world, float x, float y,
                                  float z, float lx, float ly, float lz,
-                                 float density, float mass, bool linkBody) {
+                                 float density, bool linkBody) {
   dGeomID boxgeom = dCreateBox(world.space_id, lx, ly, lz);
 
   dMass m;
   dMassSetBox(&m, density, lx, ly, lz);
-  dMassAdjust(&m, mass);
 
   dBodyID box_id;
   if (linkBody) {
@@ -65,18 +64,17 @@ ODEObject *ODEFactory::createBox(const ODEWorld &world, float x, float y,
     box_id = nullptr;
   }
 
-  ODEObject *box = new ODEBox(box_id, m, boxgeom, x, y, z, density, mass, lx, ly, lz);
+  ODEObject *box = new ODEBox(box_id, m, boxgeom, x, y, z, density, m.mass, lx, ly, lz);
   return box;
 }
 
 ODEObject *ODEFactory::createSphere(const ODEWorld &world, float x, float y,
                                     float z, float radius, float density,
-                                    float mass, bool linkBody) {
+                                    bool linkBody) {
   dGeomID sphgeom = dCreateSphere(world.space_id, radius);
 
   dMass m;
   dMassSetSphere(&m, density, radius);
-  dMassAdjust(&m, mass);
 
   dBodyID sphere_id;
   if (linkBody) {
@@ -91,7 +89,7 @@ ODEObject *ODEFactory::createSphere(const ODEWorld &world, float x, float y,
   }
 
   ODEObject *sphere =
-    new ODESphere(sphere_id, m, sphgeom, x, y, z, density, mass, radius);
+    new ODESphere(sphere_id, m, sphgeom, x, y, z, density, m.mass, radius);
   return sphere;
 }
 

@@ -13,8 +13,7 @@
 #define STARTING_Z 0.5
 
 #define GRAVITY -9.81
-#define BONE_DENSITY 1
-#define BONE_MASS 1
+#define BONE_DENSITY 1062 //Average human body density
 #define MAX_TORQUE_HINGE 1.5
 #define MAX_TORQUE_SLIDER 40
 #define WORLD_STEP 0.01
