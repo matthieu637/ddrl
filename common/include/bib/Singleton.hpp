@@ -1,6 +1,9 @@
 #ifndef SINGLETON_HPP
 #define SINGLETON_HPP
 
+#include <list>
+#include <memory>
+
 #include "Assert.hpp"
 
 ///
@@ -13,35 +16,36 @@
 ///
 ///
 
-namespace bib {
+namespace bib
+{
 
 template <class T>
-class Singleton {
- public:
-  ///
-  // /\brief Méthode statique et public pour récupérer l'instance du singleton
-  ///
-  static T *getInstance() {
-    ASSERT(_singleton != nullptr, "singleton never created");
-    return _singleton;
-  }
-  static void endInstance() {
-    delete _singleton;
-  }
-  ///
-  // /\brief Constructeur privée/protected pour empécher l'instanciation
-  /// n'importe où
-  ///
- protected:
-  Singleton() {}
-  virtual ~Singleton() {}
+class Singleton
+{
+public:
+    ///
+    // /\brief Méthode statique et public pour récupérer l'instance du singleton
+    ///
+    static T* getInstance() {
+        ASSERT(_singleton != nullptr, "singleton never created");
+        return _singleton.get();
+    }
 
- private:
-  static T *_singleton;
+    ///
+    // /\brief Constructeur privée/protected pour empécher l'instanciation
+    /// n'importe où
+    ///
+protected:
+    Singleton() {}
+public:
+    virtual ~Singleton() {}
+
+private:
+    static std::shared_ptr<T> _singleton;
 };
 
 template <class T>
-T *Singleton<T>::_singleton = new T;
+std::shared_ptr<T> Singleton<T>::_singleton = std::shared_ptr<T>(new T);
 }  // namespace bib
 
 #endif

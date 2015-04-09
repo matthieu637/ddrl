@@ -21,7 +21,6 @@ void way2() {
 
 int main(int, char **) {
   way2();
-  ODEFactory::endInstance();
 
   return 0;
 }

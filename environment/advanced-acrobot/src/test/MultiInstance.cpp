@@ -29,7 +29,5 @@ int main(int, char **) {
   delete simu2;
   delete simu1;
 
-  ODEFactory::endInstance();
-
   return 0;
 }

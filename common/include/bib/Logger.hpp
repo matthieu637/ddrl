@@ -65,6 +65,7 @@ namespace bib {
 
 class Logger : public Singleton<Logger> {
   friend class Singleton<Logger>;
+  friend class SingletonFactory;
 
  public:
   enum LogLevel { DEBUGGING, INFO, WARNING, ERROR };

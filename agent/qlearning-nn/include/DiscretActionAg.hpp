@@ -29,8 +29,6 @@ class DiscretActionAg : public arch::AAgent<> {
     delete algo;
     delete act_templ;
     delete rlparam;
-
-    sml::ActionFactory::endInstance();
   }
 
   const std::vector<float>& run(float reward, const std::vector<float>& sensors,

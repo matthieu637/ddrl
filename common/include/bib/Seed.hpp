@@ -9,6 +9,7 @@
 #include "boost/thread/shared_mutex.hpp"
 
 #include "Singleton.hpp"
+#include "Logger.hpp"
 
 #define RAND() bib::Seed::getInstance()->rand()
 
@@ -16,6 +17,7 @@ namespace bib {
 
 class Seed : public Singleton<Seed> {
   friend class Singleton<Seed>;
+  friend class SingletonFactory;
 
  protected:
   Seed() {}

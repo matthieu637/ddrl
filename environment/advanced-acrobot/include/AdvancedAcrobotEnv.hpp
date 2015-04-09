@@ -72,7 +72,6 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
     delete actuators;
     delete problem;
     delete instance;
-    ODEFactory::endInstance();
   }
 
   const std::vector<float>& perceptions() const {

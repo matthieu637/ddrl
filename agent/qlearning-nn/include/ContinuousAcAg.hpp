@@ -67,6 +67,9 @@ public:
 //     ainit = new sml::DAction(act_templ, {0});
 //     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
         hidden_unit=50;
+        gamma = 0.97;
+        alpha = 0.01;
+        epsilon = 0.15;
         nn = new MLP(nb_sensors + nb_motors, hidden_unit, nb_sensors, alpha);
     }
 

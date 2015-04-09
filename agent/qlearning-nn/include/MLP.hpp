@@ -74,7 +74,7 @@ public:
             inputs[j] = motors[j - m];
 
         fann_train(neural_net, inputs, out);
-        delete inputs;
+        delete[] inputs;
     }
     
     double computeOut(const std::vector<float>& sensors, const std::vector<float>& motors){
@@ -87,7 +87,7 @@ public:
             inputs[j] = motors[j - m];
 
         fann_type* out = fann_run(neural_net, inputs);
-        delete inputs;
+        delete[] inputs;
         return out[0];
     }
 
@@ -103,10 +103,10 @@ public:
         }
 
         Constraint c1 = new BoundConstraint(ndim, lower, upper);
-        CompoundConstraint* constraints = new CompoundConstraint(c1);
+        CompoundConstraint constraints(c1);
 
         passdata d = {neural_net, inputs};
-        NLF2 nips(ndim, hs65, init_hs65, constraints, &d);
+        NLF2 nips(ndim, hs65, init_hs65, &constraints, &d);
         nips.setIsExpensive(true);
 
 //         OptNIPS objfcn(&nips); //for general constraints

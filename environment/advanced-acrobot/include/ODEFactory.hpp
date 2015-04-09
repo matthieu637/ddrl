@@ -40,6 +40,7 @@ class ODEFactory : public bib::Singleton<ODEFactory> {
 
  protected:
   ODEFactory();
+ public:
   ~ODEFactory();
 
  protected:
