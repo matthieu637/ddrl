@@ -137,6 +137,14 @@ class MLP {
 
     return a;
   }
+  
+  void save(const std::string& path) const {
+      fann_save(neural_net, path.c_str());
+  }
+  
+  void load(const std::string& path){
+      neural_net = fann_create_from_file(path.c_str());
+  }
 
   NN getNeuralNet() {
     return neural_net;

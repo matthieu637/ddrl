@@ -399,3 +399,36 @@ TEST(MLP, OptimizeAndOr) {
     delete ac;
   }
 }
+
+
+TEST(MLP, OptimizeMultiDim) {
+  MLP nn(3, 20, 0, 0.5f);
+
+  // Learn
+  for (uint n = 0; n < 10000 ; n++) {
+    double x1 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x2 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x3 = bib::Utils::randBool() ? 1.f : -1.f;
+
+    double out = AND(OR(x1, x2), x3);
+
+    std::vector<float> sens(0);
+    std::vector<float> ac(3);
+    ac[0] = x1;
+    ac[1] = x2;
+    ac[2] = x3;
+
+    nn.learn(sens, ac, out);
+  }
+
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    std::vector<float> sens(0);
+    std::vector<float>* ac = nn.optimized(sens);
+    double his_sol = nn.computeOut(sens, *ac);
+    double my_sol = 1.;
+
+    EXPECT_GE(his_sol, my_sol - 0.01);
+    delete ac;
+  }
+}

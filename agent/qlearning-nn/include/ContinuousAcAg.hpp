@@ -45,7 +45,7 @@ class ContinuousAcAg : public arch::AAgent<> {
     return *next_action;
   }
 
-  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
+  void _unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) override {
 //         epsilon             = pt->get<float>("agent.epsilon");
 //         gamma               = pt->get<float>("agent.gamma");
 //         alpha               = pt->get<float>("agent.alpha");
@@ -84,16 +84,16 @@ class ContinuousAcAg : public arch::AAgent<> {
 
   }
 
-  void save(const std::string& path) override {
+  void save(const std::string&) override {
 
   }
 
-  void load(const std::string& path) override {
+  void load(const std::string&) override {
 
   }
 
  protected:
-  void _display(std::ostream& stdout) const override {
+  void _display(std::ostream&) const override {
 
   }
 

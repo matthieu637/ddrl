@@ -66,7 +66,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
     return *next_action;
   }
 
-  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
+  void _unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) override {
 //         epsilon             = pt->get<float>("agent.epsilon");
 //         gamma               = pt->get<float>("agent.gamma");
 //         alpha               = pt->get<float>("agent.alpha");
@@ -84,7 +84,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
 // //     act_templ = new sml::ActionTemplate( {"effectors"}, {sml::ActionFactory::getInstance()->getActionsNumber()});
 // //     ainit = new sml::DAction(act_templ, {0});
 // //     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
-    hidden_unit=60;
+    hidden_unit=15;
     gamma = 0.99;
     alpha = 0.01;
     epsilon = 0.15;
@@ -110,21 +110,21 @@ class ContinuousAcTAg : public arch::AAgent<> {
   }
 
   void save(const std::string& path) override {
-
+      nn->save(path);
   }
 
   void load(const std::string& path) override {
-
+      nn->load(path);
   }
 
  protected:
-  void _display(std::ostream& stdout) const override {
+  void _display(std::ostream& ) const override {
 
   }
 
  private:
-  int nb_motors;
-  int nb_sensors;
+  uint nb_motors;
+  uint nb_sensors;
   uint time_for_ac;
   
   double weighted_reward;
