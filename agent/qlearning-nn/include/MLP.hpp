@@ -104,9 +104,9 @@ class MLP {
     uint ndim = size_motors;
     ColumnVector lower(ndim), upper(ndim);
 
-    for (uint i = 0; i < ndim; i++) {
-      lower << -1.0f ;
-      upper <<  1.0f ;
+    for (uint i = 1; i <= ndim; i++) {
+      lower(i) = -1.0f ;
+      upper(i) = 1.0f ;
     }
 
     Constraint c1 = new BoundConstraint(ndim, lower, upper);

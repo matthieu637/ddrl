@@ -1,5 +1,5 @@
-#ifndef CONTINUOUSACAG_HPP
-#define CONTINUOUSACAG_HPP
+#ifndef CONTINUOUSACTAG_HPP
+#define CONTINUOUSACTAG_HPP
 
 #include <vector>
 #include <string>
@@ -9,19 +9,40 @@
 #include "bib/Utils.hpp"
 #include "MLP.hpp"
 
-class ContinuousAcAg : public arch::AAgent<> {
+class ContinuousAcTAg : public arch::AAgent<> {
  public:
-  ContinuousAcAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : nb_motors(_nb_motors), nb_sensors(_nb_sensors) {
+  ContinuousAcTAg(unsigned int _nb_motors, unsigned int _nb_sensors)
+    : nb_motors(_nb_motors), nb_sensors(_nb_sensors), time_for_ac(1), returned_ac(nb_motors) {
 
   }
 
-  ~ContinuousAcAg() {
+  ~ContinuousAcTAg() {
     delete nn;
   }
-
-  const std::vector<float>& run(float reward, const std::vector<float>& sensors,
+  
+    const std::vector<float>& run(float reward, const std::vector<float>& sensors,
                                 bool learning, bool goal_reached) override {
+    
+    weighted_reward += reward * pow_gamma;
+    pow_gamma *= gamma;
+    
+    time_for_ac--;
+    if(time_for_ac == 0){
+      const std::vector<float>& next_action = _run(weighted_reward, sensors, learning, goal_reached);
+      time_for_ac = bib::Utils::transform(next_action[nb_motors], -1.,1., 1, 20);
+      
+      for (uint i = 0; i < nb_motors; i++)
+        returned_ac[i] = next_action[i];
+      
+      weighted_reward = 0;
+      pow_gamma = 1.f;
+    }
+    
+    return returned_ac;
+  }
+
+  const std::vector<float>& _run(float reward, const std::vector<float>& sensors,
+                                bool learning, bool goal_reached) {
     vector<float>* next_action = nn->optimized(sensors);
 
     if (last_action.get() != nullptr && learning) {  // Update Q
@@ -63,11 +84,11 @@ class ContinuousAcAg : public arch::AAgent<> {
 // //     act_templ = new sml::ActionTemplate( {"effectors"}, {sml::ActionFactory::getInstance()->getActionsNumber()});
 // //     ainit = new sml::DAction(act_templ, {0});
 // //     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
-    hidden_unit=50;
-    gamma = 0.97;
+    hidden_unit=60;
+    gamma = 0.99;
     alpha = 0.01;
     epsilon = 0.15;
-    nn = new MLP(nb_sensors + nb_motors, hidden_unit, nb_sensors, alpha);
+    nn = new MLP(nb_sensors + nb_motors + 1, hidden_unit, nb_sensors, alpha);
   }
 
   void start_episode(const std::vector<float>& sensors) override {
@@ -78,6 +99,10 @@ class ContinuousAcAg : public arch::AAgent<> {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
+    
+//     weighted_reward = 0;
+//     pow_gamma = 1.d;
+    time_for_ac = 1;
   }
 
   void end_episode() override {
@@ -100,12 +125,18 @@ class ContinuousAcAg : public arch::AAgent<> {
  private:
   int nb_motors;
   int nb_sensors;
+  uint time_for_ac;
+  
+  double weighted_reward;
+  double pow_gamma;
 
   double epsilon, alpha, gamma;
   uint hidden_unit;
 
   std::shared_ptr<std::vector<float>> last_action;
   std::vector<float> last_state;
+  
+  std::vector<float> returned_ac;
 
   MLP* nn;
 };
