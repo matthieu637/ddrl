@@ -14,7 +14,7 @@
 
 //   s.run();
 
-TEST(AdvancedAcrobotEnv, Realisable) {
+TEST(AdvancedAcrobotEnv, RewardNormalized) {
   boost::property_tree::ptree properties;
   boost::property_tree::ini_parser::read_ini("data/acrobot.utest.ini", properties);
 
@@ -31,3 +31,34 @@ TEST(AdvancedAcrobotEnv, Realisable) {
     EXPECT_LE(env.performance(), 1.f);
   }
 }
+
+// TEST(AdvancedAcrobotEnv, RealisableByRandom) {
+//   boost::property_tree::ptree properties;
+//   boost::property_tree::ini_parser::read_ini("data/acrobot.utest.ini", properties);
+// 
+//   boost::program_options::variables_map command_args;
+// //   boost::program_options::options_description desc;
+// //   desc.add(AdvancedAcrobotEnv::program_options());
+// //   char *argv[] = {"unit-test", "--view", NULL};
+// //   int argc = sizeof(argv) / sizeof(char*) - 1;
+// //   boost::program_options::parsed_options parsed = boost::program_options::command_line_parser(argc, argv).options(desc).allow_unregistered().run();
+// //   boost::program_options::store(parsed, command_args);
+// //   boost::program_options::notify(command_args);
+//     
+//   AdvancedAcrobotEnv env;
+//   env.unique_invoke(&properties, &command_args);
+//   arch::ExampleAgent ag(env.number_of_actuators(), env.number_of_sensors());
+//   
+//   bool succeded = false;
+//   for (uint i = 0; i < 20000000; i++) {
+//     if(i % 10000 == 0)
+//       env.reset_episode();
+//     env.apply(ag.run(0, env.perceptions(), false, false));
+//     if(env.final_state() || env.performance() == 1.f){
+//       succeded = true;
+//       break;
+//     }
+//   }
+//   
+//   EXPECT_EQ(succeded, true);
+// }

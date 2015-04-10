@@ -30,7 +30,7 @@ class AdvancedAcrobotWorldView : public AdvancedAcrobotWorld {
   bool requestEnd;
 
   // specific keyboard behavior
-  bool speedUp;
+  float speed;
   bool ignoreMotor;
 };
 

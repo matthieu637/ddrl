@@ -15,10 +15,16 @@ void parseCommand(int cmd) {
 
   switch (cmd) {
   case 'f':
-    inst->speedUp = true;
+    inst->speed = inst->speed * 2.;
+    if(inst->speed > 16)
+      inst->speed=16;
+    LOG_DEBUG("speed : x " <<inst->speed);
     break;
   case 'd':
-    inst->speedUp = false;
+    inst->speed = inst->speed / 2.;
+    if(inst->speed < 0.5)
+      inst->speed = 0.5;
+    LOG_DEBUG("speed : x " <<inst->speed);
     break;
   case 'a':
     inst->ignoreMotor = !(inst->ignoreMotor);
@@ -68,7 +74,8 @@ void threadloop(const std::string& goodpath) {
 
   while (!inst->requestEnd) {
     HACKdraw(&inst->fn);
-    usleep(10 * 1000);
+    //wait time between frame draw
+    usleep(1 * 1000);
   }
 }
 
@@ -77,7 +84,7 @@ AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
   const std::vector<bool>& actuators)
   : AdvancedAcrobotWorld(types, actuators),
     requestEnd(false),
-    speedUp(false),
+    speed(1),
     ignoreMotor(false) {
   std::string goodpath = path;
 
@@ -137,7 +144,8 @@ void AdvancedAcrobotWorldView::step(const std::vector<float>& motors) {
 
   AdvancedAcrobotWorld::step(modified_motors);
 
-  if (!speedUp) usleep(250 * 1000);
-
-  usleep(20 * 1000);  // needed to don't be faster than the view
+  // approximative human vision smooth
+  // usleep(25 * 1000);
+  
+  usleep((25 / speed)  * 1000);  // needed to don't be faster than the view
 }
