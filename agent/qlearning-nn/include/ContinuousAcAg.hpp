@@ -22,6 +22,10 @@ class ContinuousAcAg : public arch::AAgent<> {
 
   const std::vector<float>& run(float reward, const std::vector<float>& sensors,
                                 bool learning, bool goal_reached) override {
+    if(reward >= 1.f){
+        reward = 100;
+    }
+                                  
     vector<float>* next_action = nn->optimized(sensors);
 
     if (last_action.get() != nullptr && learning) {  // Update Q
@@ -64,7 +68,7 @@ class ContinuousAcAg : public arch::AAgent<> {
 // //     ainit = new sml::DAction(act_templ, {0});
 // //     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
     hidden_unit=50;
-    gamma = 0.97;
+    gamma = 0.999;
     alpha = 0.01;
     epsilon = 0.15;
     nn = new MLP(nb_sensors + nb_motors, hidden_unit, nb_sensors, alpha);

@@ -1,10 +1,6 @@
 #ifndef MLP_H
 #define MLP_H
 
-// OPT++ param
-#define HAVE_NAMESPACES
-#define HAVE_STD
-
 #include <vector>
 #include <functional>
 
@@ -20,11 +16,13 @@
 //     OptBCNewton(&nlp): Newton method for bound-constrained problems
 //     OptBaNewton(&nlp): Newton method for bound-constrained problems
 //     OptNIPS(&nlp): nonlinear interior-point method for generally constrained problems
+#include "UNLF2.hpp"
 #include "bib/Logger.hpp"
 
 using OPTPP::Constraint;
 using OPTPP::CompoundConstraint;
 using OPTPP::NLF2;
+using OPTPP::UNLF2;
 using OPTPP::OptBaNewton;
 using OPTPP::BoundConstraint;
 using OPTPP::NLPFunction;
@@ -98,7 +96,7 @@ class MLP {
     return out[0];
   }
 
-  std::vector<float>* optimized(const std::vector<float>& inputs) {
+  std::vector<float>* optimized(const std::vector<float>& inputs, const std::vector<float>& init_search={}) {
     std::vector<float>* a = new std::vector<float>(size_motors);
 
     uint ndim = size_motors;
@@ -113,15 +111,25 @@ class MLP {
     CompoundConstraint constraints(c1);
 
     passdata d = {neural_net, inputs};
-    NLF2 nips(ndim, hs65, init_hs65, &constraints, &d);
-    nips.setIsExpensive(true);
+    
+    NLF2 *nips = nullptr;
+    if(init_search.size() == 0)
+      nips = new NLF2(ndim, hs65, init_hs65, &constraints, &d);
+    else
+      nips = new UNLF2(ndim, hs65, init_search, &constraints, &d);
+    
+    nips->setIsExpensive(true);
 
 //         OptNIPS objfcn(&nips); //for general constraints
-    OptBaNewton objfcn(&nips);
+    OptBaNewton objfcn(nips);
 
 //         OptBCNewton objfcn(&nips); //-nan
 
-//         objfcn.setOutputFile("/dev/null", 1);
+#ifdef NDEBUG
+    objfcn.setOutputFile("/dev/null", 1);
+#else
+    objfcn.setOutputFile("optpp.log", 0);
+#endif
     objfcn.setFcnTol(1.0e-07);
     objfcn.setMaxIter(25);
 //         objfcn.setConTol(1e-09);
@@ -131,9 +139,11 @@ class MLP {
     objfcn.optimize();
 
     for(uint i=0; i<a->size(); i++)
-      a->at(i) = nips.getXc()(i+1);
+      a->at(i) = nips->getXc()(i+1);
 
     objfcn.cleanup();
+    
+    delete nips;
 
     return a;
   }

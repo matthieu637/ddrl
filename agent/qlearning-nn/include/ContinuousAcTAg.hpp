@@ -22,14 +22,25 @@ class ContinuousAcTAg : public arch::AAgent<> {
   
     const std::vector<float>& run(float reward, const std::vector<float>& sensors,
                                 bool learning, bool goal_reached) override {
+                                  
+//     if(reward >= 1.f){
+// //         reward = 100;
+//       ASSERT(internal_time <= 2000, "");
+//         uint keeped = 2000-internal_time;
+//         reward = 100*log2(keeped+2);
+//     }
+    internal_time ++;
     
     weighted_reward += reward * pow_gamma;
     pow_gamma *= gamma;
     
+    sum_weighted_reward += reward * global_pow_gamma;
+    global_pow_gamma *= gamma;
+    
     time_for_ac--;
     if(time_for_ac == 0){
       const std::vector<float>& next_action = _run(weighted_reward, sensors, learning, goal_reached);
-      time_for_ac = bib::Utils::transform(next_action[nb_motors], -1.,1., 1, 20);
+      time_for_ac = bib::Utils::transform(next_action[nb_motors], -1.,1., min_ac_time, max_ac_time);
       
       for (uint i = 0; i < nb_motors; i++)
         returned_ac[i] = next_action[i];
@@ -43,14 +54,23 @@ class ContinuousAcTAg : public arch::AAgent<> {
 
   const std::vector<float>& _run(float reward, const std::vector<float>& sensors,
                                 bool learning, bool goal_reached) {
-    vector<float>* next_action = nn->optimized(sensors);
+    vector<float>* next_action = nullptr;
+    if(init_old_ac && last_action.get() != nullptr)
+      next_action = nn->optimized(sensors, *last_action);
+    else
+      next_action = nn->optimized(sensors);
 
     if (last_action.get() != nullptr && learning) {  // Update Q
       double nextQ = nn->computeOut(sensors, *next_action);
-      if (!goal_reached)
-        nn->learn(last_state, *last_action, reward + gamma * nextQ);
-      else
+      if (!goal_reached){
+        if(aware_ac_time)
+          nn->learn(last_state, *last_action, reward + pow(gamma, bib::Utils::transform(last_action->at(last_action->size()-1),-1.,1., min_ac_time, max_ac_time) ) * nextQ);
+        else
+          nn->learn(last_state, *last_action, reward + gamma * nextQ);
+      }
+      else{
         nn->learn(last_state, *last_action, reward);
+      }
     }
 
     if (bib::Seed::getInstance()->rand() < alpha) {
@@ -84,25 +104,36 @@ class ContinuousAcTAg : public arch::AAgent<> {
 // //     act_templ = new sml::ActionTemplate( {"effectors"}, {sml::ActionFactory::getInstance()->getActionsNumber()});
 // //     ainit = new sml::DAction(act_templ, {0});
 // //     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
-    hidden_unit=15;
-    gamma = 0.99;
+    hidden_unit=35;
+//     gamma = 0.999; // < 0.99  => gamma ^ 2000 = 0 && gamma != 1 -> better to reach the goal at the very end
+    gamma = 1.0d;
+    //check 0,0099×((1−0.95^1999)÷(1−0.95)) 
+    //r_max_no_goal×((1−gamma^1999)÷(1−gamma)) < r_max_goal * gamma^2000 && gamma^2000 != 0
     alpha = 0.01;
     epsilon = 0.15;
+    
+    min_ac_time = 5;
+    max_ac_time = 15;
+    
+    aware_ac_time = false;
+    init_old_ac = true;
+  
     nn = new MLP(nb_sensors + nb_motors + 1, hidden_unit, nb_sensors, alpha);
   }
 
   void start_episode(const std::vector<float>& sensors) override {
 //     EnvState s(new std::vector<float>(sensors));
 //     algo->startEpisode(s, *ainit);
-//     weighted_reward = 0;
-//     pow_gamma = 1.d;
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
     
-//     weighted_reward = 0;
-//     pow_gamma = 1.d;
+    weighted_reward = 0;
+    pow_gamma = 1.d;
     time_for_ac = 1;
+    sum_weighted_reward = 0;
+    global_pow_gamma = 1.f;
+    internal_time = 0;
   }
 
   void end_episode() override {
@@ -118,8 +149,8 @@ class ContinuousAcTAg : public arch::AAgent<> {
   }
 
  protected:
-  void _display(std::ostream& ) const override {
-
+  void _display(std::ostream& out) const override {
+      out << sum_weighted_reward ;
   }
 
  private:
@@ -129,6 +160,16 @@ class ContinuousAcTAg : public arch::AAgent<> {
   
   double weighted_reward;
   double pow_gamma;
+  double global_pow_gamma;
+  double sum_weighted_reward;
+  
+  uint min_ac_time;
+  uint max_ac_time;
+  
+  uint internal_time;
+  
+  bool aware_ac_time;
+  bool init_old_ac;
 
   double epsilon, alpha, gamma;
   uint hidden_unit;
