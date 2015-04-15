@@ -36,7 +36,7 @@ class ContinuousAcAg : public arch::AAgent<> {
         nn->learn(last_state, *last_action, reward);
     }
 
-    if (bib::Seed::getInstance()->rand() < alpha) {
+    if (bib::Utils::rand01() < alpha) {
       for (uint i = 0; i < next_action->size(); i++)
         next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
     }

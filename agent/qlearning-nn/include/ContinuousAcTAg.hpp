@@ -23,12 +23,12 @@ class ContinuousAcTAg : public arch::AAgent<> {
     const std::vector<float>& run(float reward, const std::vector<float>& sensors,
                                 bool learning, bool goal_reached) override {
                                   
-//     if(reward >= 1.f){
-// //         reward = 100;
+    if(reward >= 1.f){
+        reward = 100;
 //       ASSERT(internal_time <= 2000, "");
-//         uint keeped = 2000-internal_time;
-//         reward = 100*log2(keeped+2);
-//     }
+        uint keeped = 2000-internal_time;
+        reward = 100*log2(keeped+2);
+    }
     internal_time ++;
     
     weighted_reward += reward * pow_gamma;
@@ -73,7 +73,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
       }
     }
 
-    if (bib::Seed::getInstance()->rand() < alpha) {
+    if (bib::Utils::rand01() < alpha) {
       for (uint i = 0; i < next_action->size(); i++)
         next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
     }

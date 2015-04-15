@@ -1,10 +1,11 @@
 #include "gtest/gtest.h"
 #include "bib/Utils.hpp"
+#include <bib/Seed.hpp>
 
 TEST(Utils, random) {
   for (uint i = 0; i < 100; i++) {
     float f = bib::Utils::rand01();
-
+    
     EXPECT_GE(f, 0);
     EXPECT_LE(f, 1);
   }
