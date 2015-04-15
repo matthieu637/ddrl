@@ -25,10 +25,10 @@ public:
         return dis(engine);
     }
 
-    static std::mt19937 random_engine() {
-        return engine;
+    static std::mt19937* random_engine() {
+        return &engine;
     }
-
+private:
     thread_local static std::mt19937 engine;
 };
 

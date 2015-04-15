@@ -28,6 +28,7 @@ using OPTPP::BoundConstraint;
 using OPTPP::NLPFunction;
 using OPTPP::NLPGradient;
 using OPTPP::NLPHessian;
+using OPTPP::OptNIPS;
 
 using NEWMAT::ColumnVector;
 using NEWMAT::Matrix;
@@ -120,10 +121,10 @@ class MLP {
     
     nips->setIsExpensive(true);
 
-//         OptNIPS objfcn(&nips); //for general constraints
-    OptBaNewton objfcn(nips);
+    OptNIPS objfcn(nips); //for general constraints //Nonlinear Interior-Point Method Method with Line Search 
+//     OptBaNewton objfcn(nips); // Bound constrained Newton with barrier Method with Line Search
 
-//         OptBCNewton objfcn(&nips); //-nan
+//         OptBCNewton objfcn(nips); //-nan
 
 #ifdef NDEBUG
     objfcn.setOutputFile("/dev/null", 1);

@@ -60,5 +60,4 @@ TEST(Seed, MultiThreadSafeGenerator)
     b.join();
 
     EXPECT_GT(diffVec(X, Y), 20.);
-//     LOG_DEBUG(diffVec(X, Y));
 }
