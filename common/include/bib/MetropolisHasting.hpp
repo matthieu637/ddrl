@@ -76,7 +76,7 @@ public:
     static Real loglikelihood(const Vector& X, F* ptr){
         Real sum = 0.;
         for(auto it = X.begin();it != X.end(); ++it)
-          sum += log(ptr->eval(*it));
+          sum += log(ptr->density(*it));
             
         return sum / X.size();
     }
@@ -89,22 +89,22 @@ public:
     MCMC(T* _ptr) : ptr(_ptr) {
 
     }
-
-    std::shared_ptr<std::vector<Real>> oneStep(uint dim, Real sigma) {
-        std::vector<Real> xinit(dim, 0.);
-        return oneStep(sigma, xinit);
-    };
-
-    std::shared_ptr<std::vector<Real>> oneStep(Real sigma, std::vector<Real>& init) {
+    
+    std::shared_ptr<std::vector<Real>> oneStep(Real sigma, std::vector<Real>& init, uint step_min=0) {
         Real oldll = log(ptr->eval(init));
-
+        
+        uint step=0;
         while (true) {
             std::shared_ptr<std::vector<Real>> newX(Proba<Real>::multidimentionnalGaussianWReject(init, sigma));
             Real loglike = log(ptr->eval(*newX));
             Real loga = loglike - oldll;
 
             if (log(bib::Utils::rand01()) < loga) {
-                return newX;
+                init = *newX;
+                oldll = loglike;
+                step++;
+                if(step > step_min)
+                  return newX;
             }
         }
     };
