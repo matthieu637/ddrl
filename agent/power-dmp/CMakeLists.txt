@@ -14,9 +14,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../../common/cma
 #Boost library
 find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
 find_package(CommonDRL)
+find_package(Eigen3)
 find_package(AdvancedAcrobot)
 
-include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS})
+include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR})
 
 
 file ( GLOB_RECURSE all_include include/*.hpp )
