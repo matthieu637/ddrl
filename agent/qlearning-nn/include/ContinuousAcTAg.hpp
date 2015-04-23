@@ -25,7 +25,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
                                   
     if(reward >= 1.f){
         reward = 100;
-//       ASSERT(internal_time <= 2000, "");
+        
         uint keeped = 2000-internal_time;
         reward = 100*log2(keeped+2);
     }
@@ -116,7 +116,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
     max_ac_time = 15;
     
     aware_ac_time = false;
-    init_old_ac = true;
+    init_old_ac = false;
   
     nn = new MLP(nb_sensors + nb_motors + 1, hidden_unit, nb_sensors, alpha);
   }
