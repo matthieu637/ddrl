@@ -19,7 +19,6 @@ public:
     static std::vector<Real>* multidimentionnalGaussian(const std::vector<Real>& centers, Real sigma) {
         std::vector<Real>* gauss = new std::vector<Real>(centers.size());
 
-        std::default_random_engine generator;
         for (uint i = 0; i < centers.size(); i++) {
             std::normal_distribution<Real> dist(centers[i], sigma);
             Real number = dist(*bib::Seed::random_engine());
@@ -32,7 +31,6 @@ public:
     static std::vector<Real>* multidimentionnalGaussianWReject(const std::vector<Real>& centers, Real sigma) {
         std::vector<Real>* gauss = new std::vector<Real>(centers.size());
 
-        std::default_random_engine generator;
         for (uint i = 0; i < centers.size(); i++) {
             std::normal_distribution<Real> dist(centers[i], sigma);
             Real number;

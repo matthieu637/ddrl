@@ -42,3 +42,6 @@ cd optpp-2.4/
 ./configure --prefix=/usr/local --includedir=/usr/include/opt++ --enable-static=no --enable-shared=yes
 make
 sudo make install
+
+#dmp-power
+sudo apt-get install libeigen3-dev

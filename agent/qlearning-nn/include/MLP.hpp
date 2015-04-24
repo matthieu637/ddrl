@@ -129,14 +129,14 @@ public:
         ParallelOptimization para(neural_net, inputs, init_search, size_motors, number_parra_eval);
 
         vector<std::thread*> threads(number_parra_eval);
-        for (uint thread = 0; thread  < number_parra_eval; thread++) {
+        for (uint th = 0; th  < number_parra_eval; th++) {
             //careful to give a point of para or it'll be deleted
-            threads[thread] = new std::thread(&ParallelOptimization::operator(), &para, thread);
+            threads[th] = new std::thread(&ParallelOptimization::operator(), &para, th);
         }
 
-        for (uint thread = 0; thread  < number_parra_eval; thread++) {
-            threads[thread]->join();
-            delete threads[thread];
+        for (uint th = 0; th  < number_parra_eval; th++) {
+            threads[th]->join();
+            delete threads[th];
         }
 
         double imin = 0;

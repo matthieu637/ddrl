@@ -19,7 +19,7 @@ function cppcheck_run(){
 function check_code_cppcheck(){
 	tmp=`mktemp`
 	cppcheck_run >& $tmp
-	cat $tmp | grep -v 'Checking' | grep -v 'files checked' | grep -v "Cppcheck cannot find all"
+	cat $tmp | grep -v 'Checking' | grep -v 'files checked' | grep -v "Cppcheck cannot find all" | grep -v Utest.cpp
 	error=`cat $tmp | grep -v 'Checking' | grep -v 'files checked' | grep -v "Cppcheck cannot find all" | grep -v 'is never used' | grep -v 'is not initialized in the constructor' | wc -l`
 	rm $tmp
 	if [ $error -ne 0 ] ; then
