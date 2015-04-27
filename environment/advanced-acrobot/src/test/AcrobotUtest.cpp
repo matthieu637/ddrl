@@ -32,6 +32,20 @@ TEST(AdvancedAcrobotEnv, RewardNormalized) {
   }
 }
 
+TEST(AdvancedAcrobotEnvSimulator, MemoryCheckDummySimulation)
+{
+     int argc = 2;
+     char config[] = "--config";
+     char config_arg[] = "data/acrobot.utest.ini";
+     char* argv[] = { &config[0], &config_arg[0], NULL};
+        
+     arch::Simulator<AdvancedAcrobotEnv, arch::ExampleAgent> s;
+     s.init(argc, argv);
+
+     s.run();
+}
+
+
 // TEST(AdvancedAcrobotEnv, RealisableByRandom) {
 //   boost::property_tree::ptree properties;
 //   boost::property_tree::ini_parser::read_ini("data/acrobot.utest.ini", properties);

@@ -53,7 +53,7 @@ TEST(MetropolisHasting, OneStepConsistency)
     bib::MCMC<UnkownDistribution, float> mcmc(&dist);
 
     float mean_llw = 0;
-    for (uint n = 0; n < 1000; n++) {
+    for (uint n = 0; n < 100; n++) {
         std::vector<float> xinit(2, 0);
         xinit[0] = 0;
         xinit[1] = 0;
@@ -90,7 +90,7 @@ TEST(MetropolisHasting, MultiStepConsistency)
     bib::MCMC<UnkownDistribution, float> mcmc(&dist);
 
     float mean_llw = 0;
-    for (uint n = 0; n < 1000; n++) {
+    for (uint n = 0; n < 100; n++) {
         std::vector<float> xinit(2, 0);
         xinit[0] = 0;
         xinit[1] = 0;
@@ -108,6 +108,8 @@ TEST(MetropolisHasting, MultiStepConsistency)
         outfile.close();
         float lg = bib::Proba<float>::loglikelihood<std::vector< std::shared_ptr<std::vector<float> > >, UnkownDistribution>(*points, &dist);
         mean_llw += lg;
+        
+        delete points;
     }
 
     mean_llw /= 1000.;
@@ -122,7 +124,7 @@ TEST(MetropolisHasting, MultiStepWithInitConsistency)
     bib::MCMC<UnkownDistribution, float> mcmc(&dist);
 
     float mean_llw = 0;
-    for (uint n = 0; n < 1000; n++) {
+    for (uint n = 0; n < 100; n++) {
         std::vector<float> xinit(2, 0);
         xinit[0] = 0;
         xinit[1] = 1;
@@ -140,6 +142,8 @@ TEST(MetropolisHasting, MultiStepWithInitConsistency)
         outfile.close();
         float lg = bib::Proba<float>::loglikelihood<std::vector< std::shared_ptr<std::vector<float> > >, UnkownDistribution>(*points, &dist);
         mean_llw += lg;
+        
+        delete points;
     }
 
     mean_llw /= 1000;
