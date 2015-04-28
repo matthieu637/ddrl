@@ -146,6 +146,6 @@ void AdvancedAcrobotWorldView::step(const std::vector<float>& motors) {
 
   // approximative human vision smooth
   // usleep(25 * 1000);
-  
+
   usleep((25 / speed)  * 1000);  // needed to don't be faster than the view
 }

@@ -61,6 +61,9 @@
 #define LOG_FILE(file, stream) \
   bib::Logger::getInstance()->getFile(file) << stream << std::endl;
 
+#define LOG_FILE_NNL(file, stream) \
+  bib::Logger::getInstance()->getFile(file) << stream;
+
 namespace bib {
 
 class Logger : public Singleton<Logger> {

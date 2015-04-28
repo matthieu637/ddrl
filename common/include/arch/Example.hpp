@@ -40,8 +40,8 @@ class ExampleAgent : public arch::AAgent<> {
       actuator[i] = bib::Utils::randin(-1, 1);
     return actuator;
   }
-  
-  virtual ~ExampleAgent(){
+
+  virtual ~ExampleAgent() {
   }
 
   std::vector<float> actuator;
