@@ -35,6 +35,7 @@ class AdvancedAcrobotWorld {
 
  protected:
   void createWorld(const std::vector<bone_joint> &);
+  void update_state();
 
  public:
   ODEWorld odeworld;

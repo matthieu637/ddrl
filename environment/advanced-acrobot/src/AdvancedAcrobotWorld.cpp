@@ -161,7 +161,11 @@ void AdvancedAcrobotWorld::step(const vector<float>& motors) {
 
   dJointGroupEmpty(odeworld.contactgroup);
 
-  begin_index = 0;
+  update_state();
+}
+
+void AdvancedAcrobotWorld::update_state(){
+  uint begin_index = 0;
   internal_state[begin_index++] = dJointGetHingeAngle(joints[0]);
   internal_state[begin_index++] = dJointGetHingeAngleRate(joints[0]);
   for (unsigned int i = 0; i < types.size(); i++)
@@ -172,7 +176,7 @@ void AdvancedAcrobotWorld::step(const vector<float>& motors) {
       internal_state[begin_index++] = dJointGetSliderPosition(joints[i + 1]);
       internal_state[begin_index++] =
         dJointGetSliderPositionRate(joints[i + 1]);
-    }
+    } 
 }
 
 const std::vector<float>& AdvancedAcrobotWorld::state() const {
@@ -213,6 +217,8 @@ void AdvancedAcrobotWorld::resetPositions() {
   lock.release();
 
   dJointGroupEmpty(odeworld.contactgroup);
+  
+  update_state();
 }
 
 float AdvancedAcrobotWorld::perf() const {
