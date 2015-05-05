@@ -11,8 +11,8 @@ function run_all_test(){
 	goto_root
 	find . -type f -name 'unit-test' | while read atest ; do
 		cd $(dirname $atest)
-		#15 min timeout
-		timeout 900 ./unit-test $@
+		#30 min timeout
+		timeout 1800 ./unit-test $@
 		if [ $? -ne 0 ] ; then
 			exit 1
 		fi
