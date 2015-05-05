@@ -5,6 +5,8 @@ cd $LIB
 
 . locate.bash
 
+set -e
+
 function run_all_test(){
 	goto_root
 	find . -type f -name 'unit-test' | while read atest ; do
