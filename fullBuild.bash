@@ -50,6 +50,26 @@ function cmakeBuild(){
 	cd ../..
 }
 
+#recall cmake & make in a multicore maner
+function cmakeBuildRecall(){
+	directory=$1
+
+	cd build/$directory
+
+	tmplog=`mktemp`
+	cmake ../.. >& $tmplog
+	stopOnError $? $tmplog
+	cp $tmplog cmake.log
+	echo '' > $tmplog
+
+	make -j $(nbcpu) >& $tmplog
+	stopOnError $? $tmplog
+
+	mv $tmplog build.log
+
+	cd ../..
+}
+
 #found all the CMakeLists.txt and create 3 targets to build (release, debug, release with debug info)
 function buildDir(){
         dir=$1
@@ -64,7 +84,10 @@ function buildDir(){
 
                 if [ -e build ]; then
                         if [ $FORCE_REMOVE -eq 0 ]; then
-                                echo "INFO : $subdir already contains a build directory. Passing..."
+                                echo "INFO : $subdir already contains a build directory. Just recall..."
+				cmakeBuildRecall release
+				cmakeBuildRecall debug
+				cmakeBuildRecall relwithdeb
                                 continue
                         else
                                 echo "INFO : $subdir already contains a build directory. Removing it..."
