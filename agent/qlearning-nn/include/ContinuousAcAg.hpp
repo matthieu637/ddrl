@@ -16,16 +16,16 @@ class ContinuousAcAg : public arch::AAgent<> {
 
   }
 
-  ~ContinuousAcAg() {
+  virtual ~ContinuousAcAg() {
     delete nn;
   }
 
   const std::vector<float>& run(float reward, const std::vector<float>& sensors,
                                 bool learning, bool goal_reached) override {
-    if(reward >= 1.f){
-        reward = 100;
+    if(reward >= 1.f) {
+      reward = 100;
     }
-                                  
+
     vector<float>* next_action = nn->optimized(sensors);
 
     if (last_action.get() != nullptr && learning) {  // Update Q

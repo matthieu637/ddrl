@@ -16,13 +16,12 @@
 #include "opt++/OptBaNewton.h"
 #include "opt++/OptDHNIPS.h"
 #include <fann_data.h>
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range.h>
 
-//     OptNewton(&nlp): Newton method for unconstrained problems
-//     OptBCNewton(&nlp): Newton method for bound-constrained problems
-//     OptBaNewton(&nlp): Newton method for bound-constrained problems
-//     OptNIPS(&nlp): nonlinear interior-point method for generally constrained problems
 #include "UNLF2.hpp"
 #include "bib/Logger.hpp"
+#include <bib/Converger.hpp>
 
 using OPTPP::Constraint;
 using OPTPP::CompoundConstraint;
@@ -42,8 +41,8 @@ using NEWMAT::SymmetricMatrix;
 
 typedef struct fann* NN;
 struct passdata {
-    NN neural_net;
-    const std::vector<float>& inputs;
+  NN neural_net;
+  const std::vector<float>& inputs;
 };
 
 void init_hs65_zero(int ndim, ColumnVector& x);
@@ -53,122 +52,159 @@ void hs65(int mode, int ndim, const ColumnVector& x, double& fx,
 
 
 struct ParallelOptimization {
-    ParallelOptimization(const NN _neural_net, const std::vector<float>& _inputs, const std::vector<float>& _init_search,
-                         uint _size_motors, uint number_parra);
-    ~ParallelOptimization();
-//     void operator()(const tbb::blocked_range<uint>& r) const;
-    void operator()(uint);
+  ParallelOptimization(const NN _neural_net, const std::vector<float>& _inputs, const std::vector<float>& _init_search,
+                       uint _size_motors, uint number_parra);
+  ~ParallelOptimization();
+  void operator()(const tbb::blocked_range<uint>& r) const;
+  void free(uint expect_index);
 
-private:
-    const NN neural_net;
-    const std::vector<float>& inputs;
-    const std::vector<float>& init_search;
-    const uint ndim;
-public:
-    std::vector < std::vector<float>* > a;
-    std::vector<double>* cost;
+ private:
+  const NN neural_net;
+  const std::vector<float>& inputs;
+  const std::vector<float>& init_search;
+  const uint ndim;
+ public:
+  std::vector < std::vector<float>* > a;
+  std::vector<double>* cost;
 };
 
-class MLP
-{
-public:
+class MLP {
+ public:
 
-    MLP(unsigned int input, unsigned int hidden, unsigned int sensors, float alpha) : size_input_state(input),
-        size_sensors(sensors), size_motors(size_input_state - sensors) {
-        neural_net = fann_create_standard(3, input, hidden, 1);
+  MLP(unsigned int input, unsigned int hidden, unsigned int sensors, float alpha) : size_input_state(input),
+    size_sensors(sensors), size_motors(size_input_state - sensors) {
+    neural_net = fann_create_standard(3, input, hidden, 1);
 
-        fann_set_activation_function_hidden(neural_net, FANN_SIGMOID_SYMMETRIC);
+    fann_set_activation_function_hidden(neural_net, FANN_SIGMOID_SYMMETRIC);
 
-        fann_set_activation_function_output(neural_net, FANN_LINEAR);  // Linear cause Q(s,a) isn't normalized
-        fann_set_learning_momentum(neural_net, 0.);
-        fann_set_train_error_function(neural_net, FANN_ERRORFUNC_LINEAR);
-        fann_set_training_algorithm(neural_net, FANN_TRAIN_INCREMENTAL);
-        fann_set_train_stop_function(neural_net, FANN_STOPFUNC_MSE);
-        fann_set_learning_rate(neural_net, alpha);
-        fann_set_activation_steepness_hidden(neural_net, 0.5);
-        fann_set_activation_steepness_output(neural_net, 1.);
-    }
+    fann_set_activation_function_output(neural_net, FANN_LINEAR);  // Linear cause Q(s,a) isn't normalized
+    fann_set_learning_momentum(neural_net, 0.);
+    fann_set_train_error_function(neural_net, FANN_ERRORFUNC_LINEAR);
+    fann_set_training_algorithm(neural_net, FANN_TRAIN_INCREMENTAL);
+    fann_set_train_stop_function(neural_net, FANN_STOPFUNC_MSE);
+    fann_set_learning_rate(neural_net, alpha);
+    fann_set_activation_steepness_hidden(neural_net, 0.5);
+    fann_set_activation_steepness_output(neural_net, 1.);
+  }
 
-    ~MLP() {
-        fann_destroy(neural_net);
-    }
+  ~MLP() {
+    fann_destroy(neural_net);
+  }
 
-    void learn(const std::vector<float>& sensors, const std::vector<float>& motors, float toval) {
-        fann_type out[1];
-        out[0] = toval;
+  void learn(const std::vector<float>& sensors, const std::vector<float>& motors, float toval) {
+    fann_type out[1];
+    out[0] = toval;
 
-        uint m = sensors.size();
-        uint n = motors.size();
-        fann_type* inputs = new fann_type[m + n];
-        for (uint j = 0; j < m ; j++)
-            inputs[j] = sensors[j];
-        for (uint j = m; j < m + n; j++)
-            inputs[j] = motors[j - m];
+    uint m = sensors.size();
+    uint n = motors.size();
+    fann_type* inputs = new fann_type[m + n];
+    for (uint j = 0; j < m ; j++)
+      inputs[j] = sensors[j];
+    for (uint j = m; j < m + n; j++)
+      inputs[j] = motors[j - m];
 
-        fann_train(neural_net, inputs, out);
-        delete[] inputs;
-    }
+    fann_train(neural_net, inputs, out);
+    delete[] inputs;
+  }
 
-    double computeOut(const std::vector<float>& sensors, const std::vector<float>& motors) {
-        uint m = sensors.size();
-        uint n = motors.size();
-        fann_type* inputs = new fann_type[m + n];
-        for (uint j = 0; j < m ; j++)
-            inputs[j] = sensors[j];
-        for (uint j = m; j < m + n; j++)
-            inputs[j] = motors[j - m];
+  void learn(struct fann_train_data* data) {
+    learn(neural_net, data);
+  }
 
-        fann_type* out = fann_run(neural_net, inputs);
-        delete[] inputs;
-        return out[0];
-    }
+  static void learn(NN neural_net, struct fann_train_data* data) {
+    fann_set_training_algorithm(neural_net, FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
+    fann_set_train_error_function(neural_net, FANN_ERRORFUNC_TANH);
 
-    std::vector<float>* optimized(const std::vector<float>& inputs, const std::vector<float>& init_search = {}) {
-        uint number_parra_eval = 8;
+    uint max_epoch=30000;
+    uint display_each = 0;
+    float precision = 0.00001;
 
-        ParallelOptimization para(neural_net, inputs, init_search, size_motors, number_parra_eval);
+    auto iter = [&]() {
+      fann_train_epoch(neural_net, data);
+    };
+    auto eval = [&]() {
+      return fann_get_MSE(neural_net);
+    };
 
-        vector<std::thread*> threads(number_parra_eval);
-        for (uint th = 0; th  < number_parra_eval; th++) {
-            //careful to give a point of para or it'll be deleted
-            threads[th] = new std::thread(&ParallelOptimization::operator(), &para, th);
-        }
+    bib::Converger::determinist<>(iter, eval, max_epoch, precision, display_each);
+  }
 
-        for (uint th = 0; th  < number_parra_eval; th++) {
-            threads[th]->join();
-            delete threads[th];
-        }
+  double computeOut(const std::vector<float>& sensors, const std::vector<float>& motors) const {
+    return computeOut(neural_net, sensors, motors);
+  }
 
-        double imin = 0;
-        for (uint i = 1; i < number_parra_eval; i++)
-            if (para.cost->at(imin) > para.cost->at(i))
-                imin = i;
+  static double computeOut(NN neural_net, const std::vector<float>& sensors, const std::vector<float>& motors) {
+    uint m = sensors.size();
+    uint n = motors.size();
+    fann_type* inputs = new fann_type[m + n];
+    for (uint j = 0; j < m ; j++)
+      inputs[j] = sensors[j];
+    for (uint j = m; j < m + n; j++)
+      inputs[j] = motors[j - m];
 
-        std::vector<float>* best_ac = new std::vector<float>(*para.a[imin]);
+    fann_type* out = fann_run(neural_net, inputs);
+    delete[] inputs;
+    return out[0];
+  }
 
-//         for(uint i=0;i < number_parra_eval; i++)
-//           LOG_DEBUG("all solutions : " << para.a[i]->at(0) << " " << para.cost->at(i));
+  /**
+   * @brief Search the input in [-1; 1 ] that maximize the network output
+   * Can be traped in local maxima
+   *
+   * @param inputs part of the input layer known
+   * @param init_search initial solution for the input layer
+   * @param nb_solution kept it empty if you do not care to be traped in local maxima
+   * If you want to try to found a global maxima you can increase this number however there is no garanty
+   *
+   * @return std::vector< float >* your job to delete it
+   */
 
-        return best_ac;
-    }
+  std::vector<float>* optimized(const std::vector<float>& inputs, const std::vector<float>& init_search = {},
+                                uint nb_solution = 12) const {
 
-    void save(const std::string& path) const {
-        fann_save(neural_net, path.c_str());
-    }
+    ParallelOptimization para(neural_net, inputs, init_search, size_motors, nb_solution);
+    tbb::parallel_for(tbb::blocked_range<uint>(0, nb_solution), para);
 
-    void load(const std::string& path) {
-        neural_net = fann_create_from_file(path.c_str());
-    }
+    double imin = 0;
+    for (uint i = 1; i < nb_solution; i++)
+      if (para.cost->at(imin) > para.cost->at(i))
+        imin = i;
 
-    NN getNeuralNet() {
-        return neural_net;
-    }
+//         for(uint i=0;i < nb_solution; i++)
+//           LOG_DEBUG("all solutions : " << para.a[i]->at(0) << " " << para.cost->at(i) << " " << i);
 
-private:
-    NN neural_net;
-    unsigned int size_input_state;
-    unsigned int size_sensors;
-    unsigned int size_motors;
+//         bib::Logger::PRINT_ELEMENTS<>(*best_ac);
+    para.free(imin);
+
+    return para.a[imin];
+  }
+
+  void copy(NN new_nn) {
+    fann_destroy(neural_net);
+    neural_net = fann_copy(new_nn);
+  }
+
+  void save(const std::string& path) const {
+    fann_save(neural_net, path.c_str());
+  }
+
+  void load(const std::string& path) {
+    neural_net = fann_create_from_file(path.c_str());
+  }
+
+  NN getNeuralNet() {
+    return neural_net;
+  }
+
+  double error() {
+    return fann_get_MSE(neural_net);
+  }
+
+ private:
+  NN neural_net;
+  unsigned int size_input_state;
+  unsigned int size_sensors;
+  unsigned int size_motors;
 };
 
 #endif  // MLP_H

@@ -23,7 +23,7 @@ class DiscretActionAg : public arch::AAgent<> {
     rlparam = nullptr;
   }
 
-  ~DiscretActionAg() {
+  virtual ~DiscretActionAg() {
     delete ainit;
     delete actions;
     delete algo;

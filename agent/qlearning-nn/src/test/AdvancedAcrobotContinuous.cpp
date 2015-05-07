@@ -8,6 +8,7 @@
 
 int main(int argc, char **argv) {
 //   arch::Simulator<AdvancedAcrobotEnv, ContinuousAcAg> s;
+//   arch::Simulator<AdvancedAcrobotEnv, ContinuousAcTAg, arch::MotorEpisodeStat> s;
   arch::Simulator<AdvancedAcrobotEnv, ContinuousAcTAg> s;
   s.init(argc, argv);
 
