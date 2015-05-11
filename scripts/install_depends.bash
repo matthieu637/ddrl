@@ -38,7 +38,9 @@ goto_root
 cd scripts/extern
 #wget https://software.sandia.gov/opt++/downloads/optpp-2.4.tar.gz
 tar -xvf optpp-2.4.tar.gz
+wget https://matthieu-zimmer.net/~matthieu/patches/optpp-2.4.patch
 cd optpp-2.4/
+patch -Np1 -i ../optpp-2.4.patch
 ./configure --prefix=/usr/local --includedir=/usr/include/opt++ --enable-static=no --enable-shared=yes
 make
 sudo make install

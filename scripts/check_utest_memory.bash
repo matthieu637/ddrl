@@ -13,6 +13,7 @@ function run_all_test(){
 		cd $(dirname $atest)
 		tmp=`mktemp`
 		#30 min timeout
+		echo "testing $atest"
 		timeout 1800 valgrind --tool=memcheck --leak-check=full --show-reachable=yes --track-origins=yes --leak-resolution=high ./unit-test >& $tmp
 		if [ $? -ne 0 ] ; then
 			cat $tmp
