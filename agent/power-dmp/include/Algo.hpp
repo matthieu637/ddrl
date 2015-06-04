@@ -3,6 +3,7 @@
 
 #include <eigen3/Eigen/Core>
 #include "Kernel.hpp"
+#include "Config.hpp"
 #include <vector>
 #include <stdlib.h>
 #include <math.h>
@@ -19,15 +20,15 @@ class Algo
 {
     public:
 
-struct Param
-{
-    std::vector<Eigen::MatrixXf*> weights;
-    std::vector<Eigen::MatrixXf*> variance;
-    unsigned int episode;
-};
+        struct Param
+        {
+            std::vector<Eigen::MatrixXf*> weights;
+            std::vector<Eigen::MatrixXf*> variance;
+            unsigned int episode;
+        };
         /** Default constructor */
         Algo();
-        Algo(unsigned int _n_kernels);
+        Algo(Config*);
         ~Algo() {
             delete iter;
             delete current_param;
@@ -37,6 +38,7 @@ struct Param
         void addReward(float const _reward );
        void setPointeurIteration(unsigned int* _iter);
        void setPointeurEpisode(unsigned int* _iter);
+       void setPointeurConfig(Config* _config);
         Eigen::VectorXf normalDistribution(unsigned int size);
       void save(const std::string& path);
       void load(const std::string& path);
@@ -56,6 +58,7 @@ struct Param
         std::vector< std::pair<float,Param*>> params_episode;
         std::vector< std::pair<float,Param*>> best_params;
         const float PI = 3.14159265358979f;
+        Config* config;
 };
 
 #endif // ALGO_HPP

@@ -4,16 +4,15 @@ using namespace std;
 using namespace Eigen;
 
 PowerAg::PowerAg(unsigned int nb_motors, unsigned int nb_sensors) : n_sensors(nb_sensors), n_motors(nb_motors) {
-algo = new Algo(n_motors);
-  n_dims = nb_sensors/2;
-  y_max = nb_sensors/2;
-  best_value=-y_max;
-  iter = 0;
-  episode = 0;
-  algo->setPointeurIteration(&iter);
-  algo->setPointeurEpisode(&episode);
-  best_reward = 0;
 
+      n_dims = nb_sensors/2;
+      y_max = nb_sensors/2;
+      best_value=-y_max;
+      iter = 0;
+      episode = 0;
+
+      //algo->setPointeurConfig(&config);
+      best_reward = 0;
   }
 
 const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, bool learning, bool goal_reached) {
@@ -37,8 +36,8 @@ const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, b
         best_value=y;
 
       if(goal_reached){
-            int diff = pas-n_steps_max;
-            rewards[iter] += 0.1f*abs(diff)/n_steps_max;
+            int diff = pas-config.n_steps_max;
+            rewards[iter] += 0.1f*abs(diff)/config.n_steps_max;
       }
       /*if(y>0.99f*y_max)
           rewards[iter] += 0.1f*y/y_max;*/
@@ -57,7 +56,8 @@ const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, b
     pas=0;
     rewards.push_back(0);
     algo->computeNewWeights();
-
+    if(iter%config.n_instances==0)
+        best_reward_episode=0;
   }
 
   void PowerAg::end_episode() {
@@ -69,10 +69,13 @@ const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, b
         best_state = state;
         best_reward=reward;
     }
+    if(reward>best_reward_episode){
+        best_reward_episode=reward;
+    }
 
     algo->addReward(rewards[iter]);
     iter++;
-    episode = iter/n_instances;
+    episode = iter/config.n_instances;
   }
 
    void PowerAg::save(const std::string& path) {
@@ -83,7 +86,7 @@ const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, b
         if(fichier_state)
         {
 
-        for(unsigned int i=0;i<n_steps_max;i++){
+        for(unsigned int i=0;i<config.n_steps_max;i++){
             for(unsigned int state=0;state<n_sensors+n_motors;state++){
                 if(state!=n_sensors+n_motors-1)
                     fichier_state << best_state(i,state) << "\t";

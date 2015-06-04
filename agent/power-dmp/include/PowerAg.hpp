@@ -14,11 +14,12 @@
 #include "bib/XMLEngine.hpp"
 #include <Algo.hpp>
 #include <Kernel.hpp>
+#include <Config.hpp>
 
 class PowerAg : public arch::AAgent<> {
  protected:
   void _display(std::ostream& stdout) const override {
-    stdout << reward ;
+    stdout << best_reward_episode ;
   }
  public:
   PowerAg(unsigned int nb_motors, unsigned int);
@@ -31,14 +32,28 @@ class PowerAg : public arch::AAgent<> {
   void save(const std::string& path) override;
   void load(const std::string& path) override;
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override{
-        n_steps_max = pt->get<int>("environment.max_step_per_instance");
-        n_episodes = pt->get<int>("simulation.max_episode");
-        n_instances = pt->get<int>("environment.instance_per_episode");
-        state = Eigen::MatrixXf::Zero(n_steps_max,n_sensors+n_motors);
-        best_state = Eigen::MatrixXf::Zero(n_steps_max,n_sensors+n_motors);
+        config.n_steps_max = pt->get<int>("environment.max_step_per_instance");
+        config.n_episodes = pt->get<int>("simulation.max_episode");
+        config.n_instances = pt->get<int>("environment.instance_per_episode");
+        config.var_init = pt->get<int>("agent.var_init");
+        config.n_states_per_kernels = pt->get<int>("agent.n_states_per_kernels");
+        //config.n_kernels_per_dim = pt->get<std::vector<unsigned int>>("agent.n_kernels_per_dim");
+        config.n_kernels_per_dim = pt->get<int>("agent.n_kernels_per_dim");
+        config.width_kernel = pt->get<float>("agent.width_kernel");
+        config.d_variance = pt->get<float>("agent.d_variance");
+        config.elite = pt->get<int>("agent.elite");
+        config.elite_variance = pt->get<int>("agent.elite_variance");
+        config.n_motors = n_motors;
+        config.n_sensors = n_sensors;
+        state = Eigen::MatrixXf::Zero(config.n_steps_max,n_sensors+n_motors);
+        best_state = Eigen::MatrixXf::Zero(config.n_steps_max,n_sensors+n_motors);
+        algo = new Algo(&config);
+        algo->setPointeurIteration(&iter);
+        algo->setPointeurEpisode(&episode);
   }
   Eigen::VectorXf normalDistribution(int size);
   const float PI = 3.14159265358979f;
+
   private:
   std::vector<float> actuator;
   std::vector< std::pair<float,int>> s_Return;
@@ -48,15 +63,13 @@ class PowerAg : public arch::AAgent<> {
   float best_value;
   float reward;
   float best_reward;
+  float best_reward_episode;
   float y_max;
+  Config config;
   unsigned int pas;
-  unsigned int n_steps_max;
-  unsigned int n_kernels;
   unsigned int n_motors;
   unsigned int n_sensors;
   unsigned int n_dims;
-  unsigned int n_episodes;
-  unsigned int n_instances;
   Eigen::MatrixXf best_state;
   Eigen::MatrixXf state;
   Algo *algo;

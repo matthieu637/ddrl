@@ -14,11 +14,8 @@ Kernel::Kernel(int nKernelsPerDim, int nDims) : m_widths(nDims), m_nDims(nDims)
         m_nKernelsPerDim[i]=nKernelsPerDim;
         m_nKernels*=m_nKernelsPerDim[i];
     }
-    //m_nKernels = std::pow(m_nKernelsPerDim, m_nDims);
 
     m_centers.resize(m_nDims,m_nKernels);
-    //Eigen::MatrixXf centersLinSpaced(m_nKernelsPerDim,m_nDims);
-    //m_weights.resize(m_nKernels);
     m_weights = Eigen::VectorXf::Zero(m_nKernels);
 /*
     m_widths(0) = PI/(m_nKernelsPerDim+1);
@@ -38,13 +35,13 @@ Kernel::Kernel(int nKernelsPerDim, int nDims) : m_widths(nDims), m_nDims(nDims)
         //if(i==0||i==2){
         if(i==0||i==2){
             //m_widths(i) = 1.0f/(m_nKernelsPerDim[i]-1.f);
-            m_widths(i) = 1.0f/(m_nKernelsPerDim[i]-1);
+            m_widths(i) = 1.0f/(m_nKernelsPerDim[i]-1.f);
         } else if(i==1){
-            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]-1);
+            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]-1.f);
         } else if(i%2==0){
-            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]-1);
+            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]-1.f);
         } else {
-            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]+1);
+            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]+1.f);
         }
         if(i==0||i==2)
             centersSpaced.push_back(VectorXf::LinSpaced(Sequential,m_nKernelsPerDim[i],0.f,1.f).transpose());
@@ -59,16 +56,14 @@ Kernel::Kernel(int nKernelsPerDim, int nDims) : m_widths(nDims), m_nDims(nDims)
     unsigned int r;
     for (unsigned int i = 0; i < m_nKernels; i++){
         r=i;
-        std::cout << "Kernel " << i << " ";
+        //std::cout << "Kernel " << i << " ";
         for(unsigned int dim=0; dim<m_nDims; dim++){
             div_t q = div(r,m_nKernelsPerDim[dim]);
-            std::cout << "dim " << dim << "i " << q.rem << " ";
-            //m_centers(dim, i) =  centersLinSpaced(q.rem, dim);
+            //std::cout << "dim " << dim << "i " << q.rem << " ";
             m_centers(dim, i) =  centersSpaced[dim](q.rem);
             r=q.quot;
         }
-        std::cout << std::endl;
-
+        //std::cout << std::endl;
     }
 
 }
