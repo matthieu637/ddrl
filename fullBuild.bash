@@ -119,6 +119,7 @@ function echo_usage(){
 	echo "usage : $0 [options...] "
 	echo "Following options are possible : "
 	echo "codeblocks | CB : generates Codeblocks projects"
+	echo "eclipse | EC : generates Eclipse projects"
 	echo "--force : always remove old build without asking"
 	echo "--help | -h : displays this message"
 }
@@ -137,6 +138,10 @@ do
 		"codeblocks" | "CB")
 			echo "Will generate Codeblocks projects"
 			export CMAKE_ARGS='CodeBlocks - Unix Makefiles'
+			;;
+		"eclipse" | "EC")
+			echo "Will generate Codeblocks projects"
+			export CMAKE_ARGS='Eclipse CDT4 - Unix Makefiles'
 			;;
 		"--force")
 			export FORCE_REMOVE='1'
