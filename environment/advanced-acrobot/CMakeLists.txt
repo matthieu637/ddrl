@@ -3,7 +3,11 @@ cmake_minimum_required(VERSION 2.8)
 #Nom du projet
 project(advanced-acrobot CXX C)
 
-include(${CMAKE_SOURCE_DIR}/../../common/cmake/Config.cmake)
+if(NOT DEFINED ROOT_DRL_PATH)
+	set(ROOT_DRL_PATH "${CMAKE_SOURCE_DIR}/../..")
+endif()
+
+include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
 
 find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
 find_package(ODE)
@@ -46,7 +50,7 @@ target_link_libraries(acrobot-env ${ODE_LIBRARY} ${Boost_LIBRARIES} ${X11_LIBRAR
 
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
-execute_process(COMMAND bash ../../../../scripts/merge_ini.bash ../../../../common/data/minimal_config.ini data/acrobot.ini config.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/acrobot.ini config.ini)
 
 #-------------------
 # Unit Test

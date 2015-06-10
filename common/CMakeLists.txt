@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 2.8)
 #Project name
 project(common-lib C CXX)
 
+if(NOT DEFINED ROOT_DRL_PATH)
+        set(ROOT_DRL_PATH "${CMAKE_SOURCE_DIR}/..")
+endif()
+
 include(${CMAKE_SOURCE_DIR}/cmake/Config.cmake)
 
 #Boost library

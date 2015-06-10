@@ -3,13 +3,11 @@ cmake_minimum_required(VERSION 2.8)
 #Project name
 project(power-dmp CXX)
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING
-      "Choose the type of build, options are: Debug Release RelWithDebInfo."
-      FORCE)
-endif(NOT CMAKE_BUILD_TYPE)
+if(NOT DEFINED ROOT_DRL_PATH)
+        set(ROOT_DRL_PATH "${CMAKE_SOURCE_DIR}/../..")
+endif()
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../../common/cmake/")
+include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
 
 #Boost library
 find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
@@ -35,5 +33,5 @@ target_link_libraries(advanced-acrobot ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_
 file(COPY ../../environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
-execute_process(COMMAND bash ../../../../scripts/merge_ini.bash ../../../../common/data/minimal_config.ini data/acrobot.ini config.ini)
-execute_process(COMMAND bash ../../../../scripts/merge_ini.bash config.ini data/power-dmp.ini config.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/acrobot.ini config.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash config.ini data/power-dmp.ini config.ini)
