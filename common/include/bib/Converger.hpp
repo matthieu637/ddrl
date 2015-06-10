@@ -86,7 +86,7 @@ class Converger {
       epoch++;
     }
     if (display_each != max_epoch + 1)
-      LOG_DEBUG(epoch << " " << eval());
+      LOG_DEBUG(epoch << " " << minv);
 
     return epoch;
   }

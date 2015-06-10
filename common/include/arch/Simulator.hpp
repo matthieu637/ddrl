@@ -100,7 +100,7 @@ class Simulator {
       while (env->running()) {
         perceptions = env->perceptions();
         float reward = env->performance();
-        const std::vector<float>& actuators = agent->run(reward, perceptions, learning, false);
+        const std::vector<float>& actuators = agent->runf(reward, perceptions, learning, false, false);
         env->apply(actuators);
         stat.dump(episode, perceptions, actuators, reward);
         all_rewards.push_back(reward);
@@ -109,19 +109,18 @@ class Simulator {
       // if the environment is in a final state
       //        i.e it didn't reach the number of step but finished well
       // then we call the algorithm a last time to give him this information
-      if (env->final_state()) {
-        perceptions = env->perceptions();
-        float reward = env->performance();
-        agent->run(reward, perceptions, learning, true);
-        all_rewards.push_back(reward);
-      }
+      perceptions = env->perceptions();
+      float reward = env->performance();
+      agent->runf(reward, perceptions, learning, env->final_state(), true);
+      all_rewards.push_back(reward);
 
       env->next_instance();
       agent->end_episode();
     }
 
     dump_and_display(episode, all_rewards, env, agent, learning);
-    save_agent(agent, episode);
+    if(learning)
+      save_agent(agent, episode);
   }
 
   void dump_and_display(unsigned int episode, const std::list<float>& all_rewards, Environment* env,
