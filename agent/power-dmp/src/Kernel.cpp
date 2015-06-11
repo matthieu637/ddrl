@@ -35,21 +35,21 @@ Kernel::Kernel(int nKernelsPerDim, int nDims) : m_widths(nDims), m_nDims(nDims)
         //if(i==0||i==2){
         if(i==0||i==2){
             //m_widths(i) = 1.0f/(m_nKernelsPerDim[i]-1.f);
-            m_widths(i) = 1.0f/(m_nKernelsPerDim[i]-1.f);
+            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]);
         } else if(i==1){
-            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]-1.f);
+            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]);
         } else if(i%2==0){
-            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]-1.f);
+            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]);
         } else {
-            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]+1.f);
+            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]);
         }
         if(i==0||i==2)
-            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,m_nKernelsPerDim[i],0.f,1.f).transpose());
+            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,m_nKernelsPerDim[i],-0.5f,0.5f).transpose());
         else
-            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,m_nKernelsPerDim[i],-1.f,1.f).transpose());
+            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,m_nKernelsPerDim[i],-0.5f,0.5f).transpose());
     }
 
-    m_widths *= 1.f;
+    m_widths *= 0.55f;
 
     m_widths = m_widths.array().square().inverse();
 
@@ -84,7 +84,7 @@ float Kernel::getValue(const std::vector<float>& sensors, const int& dim){
 
     if(state(0)<0){
         state*=-1.0f;
-        inv=true;
+        //inv=true;
     }
 
 for(unsigned int k=0; k<m_nKernels;k++){

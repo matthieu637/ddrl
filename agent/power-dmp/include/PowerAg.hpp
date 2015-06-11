@@ -15,6 +15,7 @@
 #include <Algo.hpp>
 #include <Kernel.hpp>
 #include <Config.hpp>
+#include "bib/IniParser.hpp"
 
 class PowerAg : public arch::AAgent<> {
  protected:
@@ -35,9 +36,13 @@ class PowerAg : public arch::AAgent<> {
         config.n_steps_max = pt->get<int>("environment.max_step_per_instance");
         config.n_episodes = pt->get<int>("simulation.max_episode");
         config.n_instances = pt->get<int>("environment.instance_per_episode");
-        config.var_init = pt->get<int>("agent.var_init");
+        config.var_init = pt->get<float>("agent.var_init");
         config.n_states_per_kernels = pt->get<int>("agent.n_states_per_kernels");
-        //config.n_kernels_per_dim = pt->get<std::vector<unsigned int>>("agent.n_kernels_per_dim");
+
+
+        //config.n_kernels_per_dim = bib::to_array<unsigned int>(properties->get<std::string>("agent.n_kernels_per_dim"));
+
+
         config.n_kernels_per_dim = pt->get<int>("agent.n_kernels_per_dim");
         config.width_kernel = pt->get<float>("agent.width_kernel");
         config.d_variance = pt->get<float>("agent.d_variance");

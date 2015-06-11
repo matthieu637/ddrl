@@ -45,134 +45,144 @@ void Algo::setPointeurEpisode(unsigned int* _iter){
     episode=_iter;
 }
 void Algo::addReward(float const _reward){
+
     if(*episode>1){
         (*current_param_episode).episode = *iter;
         params_episode.push_back( pair<float,Param*> (_reward,current_param_episode));
         sort(params_episode.begin(), params_episode.end());
     }
+
     if(*episode>1 && ((*iter)+1)%(*config).n_instances==0){
+
         best_params.push_back( pair<float,Param*> (params_episode[params_episode.size()-1].first,params_episode[params_episode.size()-1].second));
-        sort(best_params.begin(), best_params.end());
+
+        for(unsigned int i=0;i<params_episode.size()-1;i++){
+            for(unsigned int j=0;j<(*params_episode[i].second).weights.size();j++){
+                delete (*params_episode[i].second).weights[j];
+            }
+            for(unsigned int j=0;j<(*params_episode[i].second).variance.size();j++){
+                delete (*params_episode[i].second).variance[j];
+            }
+            delete params_episode[i].second;
+        }
+
         params_episode.clear();
-        if(*episode>100)
+
+        sort(best_params.begin(), best_params.end());
+
+
+        if(best_params.size()> (*config).elite_variance ){
+        Param* p = best_params[0].second;
+            for(unsigned int j=0;j<(*p).weights.size();j++){
+                delete (*p).weights[j];
+            }
+            for(unsigned int j=0;j<(*p).variance.size();j++){
+                delete (*p).variance[j];
+            }
+            delete p;
             best_params.erase(best_params.begin());
+        }
+
+
     } else if(*episode==1 && ((*iter)+1)%(*config).n_instances==0){
         (*current_param).episode = *iter;
         best_params.push_back( pair<float,Param*> (_reward,current_param));
     }
-    /*if(*episode>100){
-        //delete best_params[0].second;
-        //delete p;
-        for(int i=0;i<(*best_params[0].second).weights.size();i++)
-            delete (*best_params[0].second).weights[i];
-        for(int i=0;i<(*best_params[0].second).variance.size();i++)
-            delete (*best_params[0].second).variance[i];
 
-    }*/
 }
 void Algo::computeNewWeights(){
 
-    Param *new_param = new Param(*current_param);
+    if(*episode>1){
+        Param *new_param = new Param(*current_param);
 
-    for(unsigned int i_kernel=0;i_kernel<(*config).n_motors;i_kernel++){
+        for(unsigned int i_kernel=0;i_kernel<(*config).n_motors;i_kernel++){
 
-        Eigen::VectorXf param_nom = VectorXf::Zero(n_weights).transpose();
-        Eigen::VectorXf param_dnom = VectorXf::Zero(n_weights).transpose();
-        Eigen::VectorXf temp_W(n_weights);
+            Eigen::VectorXf param_nom = VectorXf::Zero(n_weights).transpose();
+            Eigen::VectorXf param_dnom = VectorXf::Zero(n_weights).transpose();
+            Eigen::VectorXf temp_W(n_weights);
 
-        Eigen::VectorXf temp_explore(n_weights);
+            Eigen::VectorXf temp_explore(n_weights);
 
-        //if(*episode>1&&( ((((*episode/10+i_kernel))%(n_motors))!=0)||*episode%10==0)){
-        //if(*iter>1&&( ((((*iter/10+i_kernel))%(n_motors))!=0)||(*iter%10==0))){
-        //if(*iter>1&&(i_kernel==(n_motors-1)||(*iter%10==0))){
-        if((*episode>1&&(*config).n_motors<3)||(*episode>1&&( ((((*episode/10+i_kernel))%((*config).n_motors))!=0)||*episode%10==0))){
+            //if(*episode>1&&( ((((*episode/10+i_kernel))%(n_motors))!=0)||*episode%10==0)){
+            //if(*iter>1&&( ((((*iter/10+i_kernel))%(n_motors))!=0)||(*iter%10==0))){
+            //if(*iter>1&&(i_kernel==(n_motors-1)||(*iter%10==0))){
+            if((*episode>1&&(*config).n_motors<3)||(*episode>1&&( ((((*episode/10+i_kernel))%((*config).n_motors))!=0)||*episode%10==0))){
+                //const int m = *iter%((*config).n_instances)*4+2;
+                const unsigned int m = (*config).elite;
+                int n_items = (*episode-1<m)?*episode-1:m;
 
-        const int m = *iter%((*config).n_instances)*4+2;
-        //const int m = (*config).elite;
-        int n_items = (*episode-1<m)?*episode-1:m;
+                for(int i=0;i<n_items;i++){
+                    Param* par = best_params[best_params.size()-1-i].second;
+                    float reward_j = best_params[best_params.size()-1-i].first;
+                    /*if(i_kernel==((*config).n_motors-1) && i<11){
+                    cout << (*par).episode << endl;
+                    cout << reward_j << endl;
+                    }*/
+                    temp_W = (*par).variance[i_kernel]->col(0).array().inverse();
+                    temp_explore = (*par).weights[i_kernel]->col(0)-(*current_param).weights[i_kernel]->col(0);
+                    param_nom = param_nom.array() + temp_W.array()*temp_explore.array()*reward_j;
+                    param_dnom = param_dnom.array() + temp_W.array()*reward_j;
+                }
 
-        for(int i=0;i<n_items;i++){
-            Param* par = best_params[best_params.size()-1-i].second;
-            float reward_j = best_params[best_params.size()-1-i].first;
-            /*if(i_kernel==((*config).n_motors-1) && i<11){
-            cout << (*par).episode << endl;
-            cout << reward_j << endl;
-            }*/
-            temp_W = (*par).variance[i_kernel]->col(0).array().inverse();
-            temp_explore = (*par).weights[i_kernel]->col(0)-(*current_param).weights[i_kernel]->col(0);
-            param_nom = param_nom.array() + temp_W.array()*temp_explore.array()*reward_j;
-            param_dnom = param_dnom.array() + temp_W.array()*reward_j;
+                MatrixXf *new_weights = new MatrixXf(n_weights,1);
+                *new_weights = (*current_param).weights[i_kernel]->col(0).array() + param_nom.array()/(param_dnom.array()+0.0000000001f);
+
+                Eigen::VectorXf var_nom = VectorXf::Zero(n_weights).transpose();
+                float var_dnom = 0;
+                n_items = (*episode-1<(*config).elite_variance)?*episode-1:(*config).elite_variance;
+
+                for(int i=0;i<n_items;i++){
+                    float reward_j = best_params[best_params.size()-1-i].first;
+                    Param* par = best_params[best_params.size()-1-i].second;
+                    temp_explore = (*par).weights[i_kernel]->col(0)-(*current_param).weights[i_kernel]->col(0);
+                    var_nom = var_nom.array() + temp_explore.array().square()*reward_j;
+                    var_dnom = var_dnom + reward_j;
+                }
+
+                MatrixXf matr_var=MatrixXf::Zero(n_weights,1);
+                matr_var.col(0) = var_nom.array() / (var_dnom);
+
+                /*
+                int best = s_Return[s_Return.size()-1].second;
+                float mean = param.col(best).mean();
+                float var_iance = ((param.col(best).squaredNorm()/param.col(best).rows())-pow(mean,2))*100/n_motors;
+                VectorXf varVector = VectorXf::Constant(n_motors,var_iance).array().transpose();
+                cout << var_iance << endl;
+                variance.col(iter)=variance.col(iter).cwiseMin(10*varVector);
+                if(var_iance>0.1)
+                variance.col(iter)=variance.col(iter).cwiseMax(1e-20*varVector);
+                else
+                */
+
+                float coef = pow((*config).d_variance,*episode);
+                if(coef*(*config).var_init<1e-16)
+                    coef = 1e-16/(*config).var_init;
+
+                matr_var.col(0)=matr_var.col(0).cwiseMin(coef*10.f*variances[i_kernel].col(0));
+                matr_var.col(0)=matr_var.col(0).cwiseMax(coef*0.1f*variances[i_kernel].col(0));
+
+                MatrixXf *new_variance = new MatrixXf(matr_var);
+
+                if(*episode<3)
+                    *new_variance = variances[i_kernel].col(0);
+
+                (*new_param).variance[i_kernel]=new_variance;
+                Eigen::VectorXf noise = normalDistribution(n_weights);
+                (*new_weights)=(*new_weights).col(0).array() + (*new_variance).col(0).array().sqrt()*noise.array();
+                (*new_param).weights[i_kernel]=new_weights;
+
+            }
+
         }
-
-        MatrixXf *new_weights = new MatrixXf(n_weights,1);
-        *new_weights = (*current_param).weights[i_kernel]->col(0).array() + param_nom.array()/(param_dnom.array()+0.0000000001f);
-
-        Eigen::VectorXf var_nom = VectorXf::Zero(n_weights).transpose();
-        float var_dnom = 0;
-        n_items = (*episode-1<(*config).elite_variance)?*episode-1:(*config).elite_variance;
-
-        for(int i=0;i<n_items;i++){
-            float reward_j = best_params[best_params.size()-1-i].first;
-            Param* par = best_params[best_params.size()-1-i].second;
-            temp_explore = (*par).weights[i_kernel]->col(0)-(*current_param).weights[i_kernel]->col(0);
-            var_nom = var_nom.array() + temp_explore.array().square()*reward_j;
-            var_dnom = var_dnom + reward_j;
-        }
-
-        MatrixXf matr_var=MatrixXf::Zero(n_weights,1);
-        matr_var.col(0) = var_nom.array() / (var_dnom);
-
-        /*
-        int best = s_Return[s_Return.size()-1].second;
-        float mean = param.col(best).mean();
-        float var_iance = ((param.col(best).squaredNorm()/param.col(best).rows())-pow(mean,2))*100/n_motors;
-        VectorXf varVector = VectorXf::Constant(n_motors,var_iance).array().transpose();
-        cout << var_iance << endl;
-        variance.col(iter)=variance.col(iter).cwiseMin(10*varVector);
-        if(var_iance>0.1)
-        variance.col(iter)=variance.col(iter).cwiseMax(1e-20*varVector);
-        else
-        */
-
-        float coef = pow((*config).d_variance,*episode);
-        if(coef<1e-15)
-            coef = 1e-15;
-
-        matr_var.col(0)=matr_var.col(0).cwiseMin(coef*10.f*variances[i_kernel].col(0));
-        matr_var.col(0)=matr_var.col(0).cwiseMax(coef*0.1f*variances[i_kernel].col(0));
-
-        MatrixXf *new_variance = new MatrixXf(matr_var);
-
-        if(*episode<3)
-            *new_variance = variances[i_kernel].col(0);
-
-        (*new_param).variance[i_kernel]=new_variance;
-        Eigen::VectorXf noise = normalDistribution(n_weights);
-        (*new_weights)=(*new_weights).col(0).array() + (*new_variance).col(0).array().sqrt()*noise.array();
-        (*new_param).weights[i_kernel]=new_weights;
-
-        } else {
-            /*Eigen::VectorXf noise = normalDistribution(n_weights);
-            MatrixXf *weights = new MatrixXf(MatrixXf::Zero(n_weights,1));
-            MatrixXf *variance = new MatrixXf(variances[i_kernel].col(*iter));
-            *weights=variances[i_kernel].col(*iter).array().sqrt()*noise.array();
-            (*new_param).weights.push_back(weights);
-            (*new_param).variance.push_back(variance);*/
-        }
-
-    }
-
-    if(*episode>1)
         current_param_episode = new_param;
+        for(unsigned int i_kernel=0;i_kernel<(*config).n_motors;i_kernel++){
+            kernels[i_kernel].setWeights((*current_param_episode).weights[i_kernel]->col(0));
+        }
+    } else {
+        for(unsigned int i_kernel=0;i_kernel<(*config).n_motors;i_kernel++){
+            kernels[i_kernel].setWeights((*current_param).weights[i_kernel]->col(0));
+        }
 
-    for(unsigned int i_kernel=0;i_kernel<(*config).n_motors;i_kernel++){
-        //if(((((*iter/100+i_kernel))%(n_motors))==0)||*iter<2){
-        if(*episode>1)
-        kernels[i_kernel].setWeights((*current_param_episode).weights[i_kernel]->col(0));
-        else
-        kernels[i_kernel].setWeights((*current_param).weights[i_kernel]->col(0));
-        //  cout << "maj " << *iter << " " << i_kernel << endl;
-        //}
     }
 }
 
@@ -180,7 +190,6 @@ Eigen::VectorXf Algo::normalDistribution(unsigned int _size){
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator(seed);
     std::normal_distribution<float> distribution(0.0,1.0);
-    //distribution.reset();
     Eigen::VectorXf retour(_size);
     for(unsigned int i=0;i<_size;i++)
         retour(i) = distribution(generator);

@@ -30,8 +30,17 @@ class Algo
         Algo();
         Algo(Config*);
         ~Algo() {
-            delete iter;
-            delete current_param;
+
+            for(unsigned int i=0;i<best_params.size();i++){
+                for(unsigned int j=0;j<(*best_params[i].second).weights.size();j++){
+                    delete (*best_params[i].second).weights[j];
+                }
+                for(unsigned int j=0;j<(*best_params[i].second).variance.size();j++){
+                    delete (*best_params[i].second).variance[j];
+                }
+                delete best_params[i].second;
+            }
+
         }
         void computeNewWeights();
         std::vector<float> getNextActions(std::vector<float> states);
@@ -46,8 +55,6 @@ class Algo
     private:
         unsigned int n_states_per_kernels;
         unsigned int n_kernels;
-     // vector<Eigen::MatrixXf> param;
-      //Eigen::MatrixXf variance;
         std::vector<Kernel> kernels;
         std::vector<Eigen::MatrixXf> variances;
         unsigned int *iter;
