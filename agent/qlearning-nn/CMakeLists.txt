@@ -3,7 +3,11 @@ cmake_minimum_required(VERSION 2.8)
 #Project name
 project(qlearning-nn CXX)
 
-include(${CMAKE_SOURCE_DIR}/../../common/cmake/Config.cmake)
+if(NOT DEFINED ROOT_DRL_PATH)
+        set(ROOT_DRL_PATH "${CMAKE_SOURCE_DIR}/../..")
+endif()
+
+include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
 
 #Boost library
 find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
@@ -27,11 +31,11 @@ target_link_libraries(advanced-acrobot ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_
 add_executable(adacrobot-cn src/test/AdvancedAcrobotContinuous.cpp ${all_include} ${all_sources} ${all_sources_sml})
 target_link_libraries(adacrobot-cn ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
 
-file(COPY ../../environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
-execute_process(COMMAND bash ../../../../scripts/merge_ini.bash ../../../../common/data/minimal_config.ini data/acrobot.ini config.ini)
-execute_process(COMMAND bash ../../../../scripts/merge_ini.bash config.ini data/qlearning.ini config.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/acrobot.ini config.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash config.ini data/qlearning.ini config.ini)
 
 #-------------------
 # Unit Test

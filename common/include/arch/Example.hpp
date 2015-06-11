@@ -35,7 +35,7 @@ class ExampleEnv : public arch::AEnvironment<> {
 class ExampleAgent : public arch::AAgent<> {
  public:
   ExampleAgent(unsigned int nb_motors, unsigned int) : actuator(nb_motors) {}
-  const std::vector<float>& run(float, const std::vector<float>&, bool, bool) {
+  const std::vector<float>& run(float, const std::vector<float>&, bool, bool) override {
     for (unsigned int i = 0; i < actuator.size(); i++)
       actuator[i] = bib::Utils::randin(-1, 1);
     return actuator;

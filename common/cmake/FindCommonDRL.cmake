@@ -1,5 +1,5 @@
-include(${CMAKE_SOURCE_DIR}/../../common/cmake/Callable.cmake)
-set(COMMON_DRL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/../../common/include)
+include(${ROOT_DRL_PATH}/common/cmake/Callable.cmake)
+set(COMMON_DRL_INCLUDE_DIRS ${ROOT_DRL_PATH}/common/include)
 
 set(COMMON_DRL_NAME "common-drl")
 rename_buildtype(COMMON_DRL_NAME)
@@ -7,7 +7,7 @@ rename_buildtype(COMMON_DRL_NAME)
 find_library( COMMON_DRL_LIBRARY
   NAMES ${COMMON_DRL_NAME}
   PATHS
-  "../../common/lib"
+  "${ROOT_DRL_PATH}/common/lib"
 )
 
 include(FindPackageHandleStandardArgs)

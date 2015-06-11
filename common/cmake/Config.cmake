@@ -20,10 +20,6 @@ set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -O2 -g -DNDEBU
 # Global Config
 #-------------------
 set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../../common/cmake/")
+list(APPEND CMAKE_MODULE_PATH "${ROOT_DRL_PATH}/common/cmake/")
 
-if(EXISTS ${CMAKE_SOURCE_DIR}/cmake)
-  include(${CMAKE_SOURCE_DIR}/cmake/Callable.cmake)
-else()
-  include(${CMAKE_SOURCE_DIR}/../../common/cmake/Callable.cmake)
-endif()
+include(${ROOT_DRL_PATH}/common/cmake/Callable.cmake)

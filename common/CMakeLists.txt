@@ -1,13 +1,18 @@
 cmake_minimum_required(VERSION 2.8)
 
 #Project name
-project(common-lib CXX)
+project(common-lib C CXX)
+
+if(NOT DEFINED ROOT_DRL_PATH)
+        set(ROOT_DRL_PATH "${CMAKE_SOURCE_DIR}/..")
+endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/Config.cmake)
 
 #Boost library
 find_package(Boost COMPONENTS serialization program_options thread system REQUIRED)
 find_package(GTest REQUIRED)
+find_package(Threads REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${GTEST_INCLUDE_DIRS})
 
@@ -30,4 +35,4 @@ target_link_libraries(dummy-simulator ${Boost_LIBRARIES})
 file(COPY data/minimal_config.ini DESTINATION . ) 
 file(RENAME ${CMAKE_CURRENT_BINARY_DIR}/minimal_config.ini ${CMAKE_CURRENT_BINARY_DIR}/config.ini)
 
-enable_utest(all_sources ${Boost_LIBRARIES})
+enable_utest(all_sources ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})

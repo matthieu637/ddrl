@@ -1,5 +1,5 @@
 
-set(ADVANCED_ACROBOT_INCLUDE_DIRS ../../environment/advanced-acrobot/include ../../environment/advanced-acrobot/extern/drawstuff/include)
+set(ADVANCED_ACROBOT_INCLUDE_DIRS ${ROOT_DRL_PATH}/environment/advanced-acrobot/include ${ROOT_DRL_PATH}/environment/advanced-acrobot/extern/drawstuff/include)
 
 set(ADVANCED_ACROBOT_NAME "advanced-acrobot")
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -11,7 +11,7 @@ endif()
 find_library( ADVANCED_ACROBOT_LIBRARY
   NAMES ${ADVANCED_ACROBOT_NAME}
   PATHS
-  "../../environment/advanced-acrobot/lib"
+  "${ROOT_DRL_PATH}/environment/advanced-acrobot/lib"
 )
 
 include(FindPackageHandleStandardArgs)

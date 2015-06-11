@@ -37,11 +37,33 @@ class AAgent : public ProgOptions, public CommonAE {
    * @param reward the reward you got for your last action choose
    * @param perceptions the current perceptions provided by the environment
    * @param learning should the agent learns during the interaction (false to test an agent)
-   * @param finished did the agent reached a global goal during his last action
+   * @param goal_reached did the agent reached a global goal during his last action
    * @return const std::vector< float, std::allocator< void > >&
    */
   virtual const std::vector<float>& run(float reward, const std::vector<float>& perceptions,
-                                        bool learning, bool finished) = 0;
+                                        bool learning, bool goal_reached) 
+  {
+    (void) reward; (void) perceptions; (void) learning; (void) goal_reached;
+    LOG_ERROR("not implemented");
+    return *new std::vector<float>();
+  }
+  
+  /**
+   * @brief This is the main method to define the behavior of your agent
+   *
+   * @param reward the reward you got for your last action choose
+   * @param perceptions the current perceptions provided by the environment
+   * @param learning should the agent learns during the interaction (false to test an agent)
+   * @param goal_reached did the agent reached a global goal during his last action
+   * @param finished is it the last step of this episode
+   * @return const std::vector< float, std::allocator< void > >&
+   */
+  virtual const std::vector<float>& runf(float reward, const std::vector<float>& perceptions,
+                                        bool learning, bool goal_reached, bool finished)
+  {
+    (void) finished;
+    return run(reward, perceptions, learning, goal_reached);
+  }
 
   /**
    * @brief This method is called after each beginning of a new instance of episode
