@@ -54,6 +54,7 @@ void Algo::addReward(float const _reward){
 
     if(*episode>1 && ((*iter)+1)%(*config).n_instances==0){
 
+        current_param = params_episode[params_episode.size()-1].second;
         best_params.push_back( pair<float,Param*> (params_episode[params_episode.size()-1].first,params_episode[params_episode.size()-1].second));
 
         for(unsigned int i=0;i<params_episode.size()-1;i++){
@@ -182,7 +183,6 @@ void Algo::computeNewWeights(){
         for(unsigned int i_kernel=0;i_kernel<(*config).n_motors;i_kernel++){
             kernels[i_kernel].setWeights((*current_param).weights[i_kernel]->col(0));
         }
-
     }
 }
 
@@ -202,7 +202,6 @@ vector<float> Algo::getNextActions(vector<float> sensors){
     for (unsigned int i=0;i<(*config).n_motors;i++){
           vector<float> states;
           //float coef = 1.0f/0.75f;
-          float coef = 1.0f;
           float theta(0);
           float y(0);
           float x(0);
@@ -214,11 +213,11 @@ vector<float> Algo::getNextActions(vector<float> sensors){
           //states.push_back(x/1.f);
           //states.push_back(y/1.f);
           states.push_back(sensors[0]/PI);
-          states.push_back(coef*sensors[1]/27.f);
+          states.push_back(sensors[1]/27.f);
           states.push_back(sensors[2]/PI);
-          states.push_back(coef*(sensors[3])/62.f);
+          states.push_back((sensors[3])/62.f);
           //states.push_back(sensors[0]+sensors[2]);
-          //states.push_back(coef*(sensors[1]+sensors[3])/36.f);
+          //states.push_back((sensors[1]+sensors[3])/36.f);
         } else if(i==1) {
           theta +=sensors[i*2];
           y+= -cos(theta);
@@ -226,20 +225,20 @@ vector<float> Algo::getNextActions(vector<float> sensors){
           //states.push_back(x/2.f);
           //states.push_back(y/2.f);
           //states.push_back(sensors[0]);
-          //states.push_back(coef*sensors[1]/28.f);
+          //states.push_back(sensors[1]/28.f);
           states.push_back((sensors[0]+sensors[2])/PI);
-          states.push_back(coef*(sensors[1]+sensors[3])/45.f);
+          states.push_back((sensors[1]+sensors[3])/45.f);
           states.push_back(sensors[4]/PI);
-          states.push_back(coef*sensors[5]/71.f);
+          states.push_back(sensors[5]/71.f);
           //states.push_back(sensors[2]+sensors[4]);
-          //states.push_back(coef*(sensors[3]+sensors[5])/44.f);
+          //states.push_back((sensors[3]+sensors[5])/44.f);
             /*
           states.push_back(sensors[0]+sensors[2]);
-          states.push_back(coef*(sensors[1]+sensors[3])/36);
+          states.push_back((sensors[1]+sensors[3])/36);
           states.push_back(sensors[4]);
-          states.push_back(coef*sensors[5]/70);
+          states.push_back(sensors[5]/70);
           states.push_back(sensors[6]);
-          states.push_back(coef*sensors[7]/80);
+          states.push_back(sensors[7]/80);
           */
         } else if(i==2) {
           theta +=sensors[i*2];
@@ -250,11 +249,11 @@ vector<float> Algo::getNextActions(vector<float> sensors){
           //states.push_back(sensors[0]+sensors[2]);
           //states.push_back((sensors[1]+sensors[3])/27);
           states.push_back((sensors[0]+sensors[2]+sensors[4])/PI);
-          states.push_back(coef*(sensors[1]+sensors[3]+sensors[5])/44.f);
+          states.push_back((sensors[1]+sensors[3]+sensors[5])/44.f);
           states.push_back(sensors[6]/PI);
-          states.push_back(coef*sensors[7]/95.f);
+          states.push_back(sensors[7]/95.f);
           //states.push_back(sensors[2]+sensors[4]+sensors[6]);
-          //states.push_back(coef*(sensors[3]+sensors[5]+sensors[7])/41.f);
+          //states.push_back((sensors[3]+sensors[5]+sensors[7])/41.f);
         } else if(i==3) {
           theta +=sensors[i*2];
           y+= -cos(theta);
@@ -264,9 +263,9 @@ vector<float> Algo::getNextActions(vector<float> sensors){
           //states.push_back(sensors[0]+sensors[2]);
           //states.push_back((sensors[1]+sensors[3])/27);
           states.push_back((sensors[0]+sensors[2]+sensors[4]+sensors[6])/PI);
-          states.push_back(coef*(sensors[1]+sensors[3]+sensors[5]+sensors[7])/41.f);
+          states.push_back((sensors[1]+sensors[3]+sensors[5]+sensors[7])/41.f);
           states.push_back(sensors[8]/PI);
-          states.push_back(coef*sensors[9]/85.f);
+          states.push_back(sensors[9]/85.f);
         }
         actions.push_back(kernels[i].getValue(states,4));
     }
@@ -275,7 +274,7 @@ return actions;
    void Algo::save(const std::string& path) {
 
         std::cout.setf(std::ios::scientific);
-       ofstream fichier(path, ios::out | ios::trunc);  // ouverture en écriture avec effacement du fichier ouvert
+        ofstream fichier(path, ios::out | ios::trunc);  // ouverture en écriture avec effacement du fichier ouvert
         if(fichier)
         {
             Param *p = best_params[best_params.size()-1].second;
@@ -318,10 +317,6 @@ return actions;
                 float temp;
                 temp = Kernel::GetFloat32(ligne.c_str());
                 //temp = ::atof(ligne.c_str());
-
-                //cout << i << "  " << i/n_motors << "  " << i%n_motors << endl;
-                //cout << i << " " << temp << endl;
-
                 (*weights)(i,0)=temp;
                 //params[i_motor](i_kernel,0)=temp;
                 i++;

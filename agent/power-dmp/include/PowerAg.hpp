@@ -41,11 +41,7 @@ class PowerAg : public arch::AAgent<> {
         config.n_instances = pt->get<int>("environment.instance_per_episode");
         config.var_init = pt->get<float>("agent.var_init");
         config.n_states_per_kernels = pt->get<int>("agent.n_states_per_kernels");
-
-
         //config.n_basis_per_dim = bib::to_array<unsigned int>(properties->get<std::string>("agent.n_basis_per_dim"));
-
-
         config.n_basis_per_dim = pt->get<int>("agent.n_basis_per_dim");
         config.width_kernel = pt->get<float>("agent.width_kernel");
         config.d_variance = pt->get<float>("agent.d_variance");
@@ -53,8 +49,9 @@ class PowerAg : public arch::AAgent<> {
         config.elite_variance = pt->get<int>("agent.elite_variance");
         config.n_motors = n_motors;
         config.n_sensors = n_sensors;
-        state = Eigen::MatrixXf::Zero(config.n_steps_max,n_sensors+n_motors);
-        best_state = Eigen::MatrixXf::Zero(config.n_steps_max,n_sensors+n_motors);
+
+        state = Eigen::MatrixXf::Zero(config.n_steps_max+1,n_sensors+n_motors);
+        best_state = Eigen::MatrixXf::Zero(config.n_steps_max+1,n_sensors+n_motors);
         algo = new Algo(&config);
         algo->setPointeurIteration(&iter);
         algo->setPointeurEpisode(&episode);
