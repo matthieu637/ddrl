@@ -10,7 +10,7 @@ Kernel::Kernel(int _n_basis_per_dim, int _n_dims) : widths(_n_dims), n_dims(_n_d
     //n_basis_per_dim << 2,2,2,2,2,2;
     //n_basis_per_dim << 3,3,3,3,3,3;
     n_basis=1;
-    for(int i=0;i<n_dims;i++){
+    for(int i=0;i<_n_dims;i++){
         n_basis_per_dim[i]=_n_basis_per_dim;
         n_basis*=n_basis_per_dim[i];
     }
@@ -48,7 +48,7 @@ Kernel::Kernel(int _n_basis_per_dim, int _n_dims) : widths(_n_dims), n_dims(_n_d
             centersSpaced.push_back(VectorXf::LinSpaced(Sequential,n_basis_per_dim[i],-0.5f,0.5f).transpose());
     }
 
-    widths *= 0.55f;
+    widths /= 2.3548f;
 
     widths = widths.array().square().inverse();
 

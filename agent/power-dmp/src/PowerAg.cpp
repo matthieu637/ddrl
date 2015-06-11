@@ -4,11 +4,14 @@ using namespace std;
 using namespace Eigen;
 
 PowerAg::PowerAg(unsigned int nb_motors, unsigned int nb_sensors) : n_sensors(nb_sensors), n_motors(nb_motors) {
+
       n_dims = nb_sensors/2;
       y_max = nb_sensors/2;
       best_value=-y_max;
       iter = 0;
       episode = 0;
+
+      //algo->setPointeurConfig(&config);
       best_reward = 0;
   }
 
@@ -31,6 +34,7 @@ const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, b
       }
       if(y>best_value)
         best_value=y;
+
       /*if(goal_reached){
             int diff = pas-config.n_steps_max;
             rewards[iter] += 0.1f*abs(diff)/config.n_steps_max;
@@ -39,18 +43,17 @@ const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, b
       if(y>0.99f*y_max && sensors[1]<0.1){
           rewards[iter] += .1f*y/y_max;
      }
-
       for(unsigned int i=0;i<n_sensors;i++)
         state(pas,i) = sensors[i];
       for(unsigned int j=0;j<n_motors;j++)
         state(pas,n_sensors+j) = actuator[j];
 
       pas++;
-
     return actuator;
   }
 
   void PowerAg::start_episode(const std::vector<float>& sensors) {
+
     pas=0;
     rewards.push_back(0);
     algo->computeNewWeights();
@@ -59,6 +62,7 @@ const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, b
   }
 
   void PowerAg::end_episode() {
+
     rewards[iter]=(best_value+y_max)/(2*y_max)+rewards[iter];
     best_value=-y_max;
     reward =rewards[iter];
