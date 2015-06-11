@@ -2,65 +2,64 @@
 
 using namespace Eigen;
 
-Kernel::Kernel() : m_nKernelsPerDim(4), m_nDims(4){}
-Kernel::Kernel(int nKernelsPerDim, int nDims) : m_widths(nDims), m_nDims(nDims)
+Kernel::Kernel() : n_basis_per_dim(4), n_dims(4){}
+Kernel::Kernel(int _n_basis_per_dim, int _n_dims) : widths(_n_dims), n_dims(_n_dims)
 {
-    m_nKernelsPerDim.resize(nDims);
+    n_basis_per_dim.resize(_n_dims);
 
-    //m_nKernelsPerDim << 2,2,2,2,2,2;
-    //m_nKernelsPerDim << 3,3,3,3,3,3;
-    m_nKernels=1;
-    for(int i=0;i<nDims;i++){
-        m_nKernelsPerDim[i]=nKernelsPerDim;
-        m_nKernels*=m_nKernelsPerDim[i];
+    //n_basis_per_dim << 2,2,2,2,2,2;
+    //n_basis_per_dim << 3,3,3,3,3,3;
+    n_basis=1;
+    for(int i=0;i<_n_dims;i++){
+        n_basis_per_dim[i]=_n_basis_per_dim;
+        n_basis*=n_basis_per_dim[i];
     }
 
-    m_centers.resize(m_nDims,m_nKernels);
-    m_weights = Eigen::VectorXf::Zero(m_nKernels);
+    centers.resize(n_dims,n_basis);
+    weights = Eigen::VectorXf::Zero(n_basis);
 /*
-    m_widths(0) = PI/(m_nKernelsPerDim+1);
-    m_widths(1) = 20*PI/(m_nKernelsPerDim+1);
-    m_widths(2) = 2*PI/(m_nKernelsPerDim+1);
-    m_widths(3) = 40*PI/(m_nKernelsPerDim+1);
-    m_widths *= 0.60f;
-    m_widths = m_widths.array().square().inverse();
-    centersLinSpaced.col(0) = VectorXf::LinSpaced(Sequential,m_nKernelsPerDim,0+m_widths(0),PI-m_widths(0)).transpose();
-    centersLinSpaced.col(1) = VectorXf::LinSpaced(Sequential,m_nKernelsPerDim,-10*PI+m_widths(1),10*PI+m_widths(1)).transpose();
-    centersLinSpaced.col(2) = VectorXf::LinSpaced(Sequential,m_nKernelsPerDim,-PI+m_widths(2),PI-m_widths(2)).transpose();
-    centersLinSpaced.col(3) = VectorXf::LinSpaced(Sequential,m_nKernelsPerDim,-20*PI+m_widths(3),20*PI-m_widths(3)).transpose();
+    widths(0) = PI/(n_basis_per_dim+1);
+    widths(1) = 20*PI/(n_basis_per_dim+1);
+    widths(2) = 2*PI/(n_basis_per_dim+1);
+    widths(3) = 40*PI/(n_basis_per_dim+1);
+    widths *= 0.60f;
+    widths = widths.array().square().inverse();
+    centersLinSpaced.col(0) = VectorXf::LinSpaced(Sequential,n_basis_per_dim,0+widths(0),PI-widths(0)).transpose();
+    centersLinSpaced.col(1) = VectorXf::LinSpaced(Sequential,n_basis_per_dim,-10*PI+widths(1),10*PI+widths(1)).transpose();
+    centersLinSpaced.col(2) = VectorXf::LinSpaced(Sequential,n_basis_per_dim,-PI+widths(2),PI-widths(2)).transpose();
+    centersLinSpaced.col(3) = VectorXf::LinSpaced(Sequential,n_basis_per_dim,-20*PI+widths(3),20*PI-widths(3)).transpose();
 */
 
     std::vector <VectorXf> centersSpaced;
-    for(int i=0;i<nDims;i++){
-        //if(i==0||i==2){
+    for(int i=0;i<_n_dims;i++){
         if(i==0||i==2){
-            //m_widths(i) = 1.0f/(m_nKernelsPerDim[i]-1.f);
-            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]);
+            //widths(i) = 1.0f/(n_basis_per_dim[i]-1.f);
+            widths(i) = 2.0f/(n_basis_per_dim[i]);
         } else if(i==1){
-            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]);
+            widths(i) = 2.0f/(n_basis_per_dim[i]);
         } else if(i%2==0){
-            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]);
+            widths(i) = 2.0f/(n_basis_per_dim[i]);
         } else {
-            m_widths(i) = 2.0f/(m_nKernelsPerDim[i]);
+            widths(i) = 2.0f/(n_basis_per_dim[i]);
         }
         if(i==0||i==2)
-            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,m_nKernelsPerDim[i],-0.5f,0.5f).transpose());
+            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,n_basis_per_dim[i],-0.5f,0.5f).transpose());
         else
-            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,m_nKernelsPerDim[i],-0.5f,0.5f).transpose());
+            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,n_basis_per_dim[i],-0.5f,0.5f).transpose());
     }
 
-    m_widths *= 0.55f;
+    widths /= 2.3548f;
 
-    m_widths = m_widths.array().square().inverse();
+    widths = widths.array().square().inverse();
 
     unsigned int r;
-    for (unsigned int i = 0; i < m_nKernels; i++){
+    for (unsigned int i = 0; i < n_basis; i++){
         r=i;
         //std::cout << "Kernel " << i << " ";
-        for(unsigned int dim=0; dim<m_nDims; dim++){
-            div_t q = div(r,m_nKernelsPerDim[dim]);
+        for(unsigned int dim=0; dim<n_dims; dim++){
+            div_t q = div(r,n_basis_per_dim[dim]);
             //std::cout << "dim " << dim << "i " << q.rem << " ";
-            m_centers(dim, i) =  centersSpaced[dim](q.rem);
+            centers(dim, i) =  centersSpaced[dim](q.rem);
             r=q.quot;
         }
         //std::cout << std::endl;
@@ -70,7 +69,7 @@ Kernel::Kernel(int nKernelsPerDim, int nDims) : m_widths(nDims), m_nDims(nDims)
 
 float Kernel::getValue(const std::vector<float>& sensors, const int& dim){
 
-    VectorXf psi(m_nKernels);
+    VectorXf psi(n_basis);
     VectorXf state(dim);
     bool inv = false;
 
@@ -87,14 +86,14 @@ float Kernel::getValue(const std::vector<float>& sensors, const int& dim){
         //inv=true;
     }
 
-for(unsigned int k=0; k<m_nKernels;k++){
+for(unsigned int k=0; k<n_basis;k++){
 
-    float psi_tmp = (state.array()-m_centers.col(k).array()).square().matrix().dot(m_widths);
+    float psi_tmp = (state.array()-centers.col(k).array()).square().matrix().dot(widths);
     psi(k) = exp(-0.5f*psi_tmp);
 }
 float retour;
 
-retour = (m_weights.array()*psi.array()).sum()/(psi.sum()+0.00000000001f);
+retour = (weights.array()*psi.array()).sum()/(psi.sum()+0.00000000001f);
 
 if(retour>1)
     retour=1;
@@ -106,11 +105,11 @@ else if(retour<-1)
 return retour;
 
 }
-void Kernel::setWeights(const VectorXf weights){
-    m_weights =weights;
+void Kernel::setWeights(const VectorXf _weights){
+    weights =_weights;
 }
 float Kernel::getWeight(const int& index) const{
-    return m_weights[index];
+    return weights[index];
 }
-//unsigned int Kernel::getSize(){return m_nKernels}
+//unsigned int Kernel::getSize(){return n_basis}
 

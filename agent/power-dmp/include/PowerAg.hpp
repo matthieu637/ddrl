@@ -22,6 +22,9 @@ class PowerAg : public arch::AAgent<> {
   void _display(std::ostream& stdout) const override {
     stdout << best_reward_episode ;
   }
+  void _dump(std::ostream& stdout) const override {
+    stdout << best_reward_episode ;
+  }
  public:
   PowerAg(unsigned int nb_motors, unsigned int);
   virtual ~PowerAg() {
@@ -40,10 +43,10 @@ class PowerAg : public arch::AAgent<> {
         config.n_states_per_kernels = pt->get<int>("agent.n_states_per_kernels");
 
 
-        //config.n_kernels_per_dim = bib::to_array<unsigned int>(properties->get<std::string>("agent.n_kernels_per_dim"));
+        //config.n_basis_per_dim = bib::to_array<unsigned int>(properties->get<std::string>("agent.n_basis_per_dim"));
 
 
-        config.n_kernels_per_dim = pt->get<int>("agent.n_kernels_per_dim");
+        config.n_basis_per_dim = pt->get<int>("agent.n_basis_per_dim");
         config.width_kernel = pt->get<float>("agent.width_kernel");
         config.d_variance = pt->get<float>("agent.d_variance");
         config.elite = pt->get<int>("agent.elite");

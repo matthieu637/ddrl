@@ -7,7 +7,7 @@
       unsigned int n_motors;
       unsigned int n_sensors;
       unsigned int n_states_per_kernels;
-      unsigned int n_kernels_per_dim;
+      unsigned int n_basis_per_dim;
       unsigned int elite;
       unsigned int elite_variance;
       float width_kernel;

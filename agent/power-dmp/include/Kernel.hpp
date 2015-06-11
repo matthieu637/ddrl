@@ -13,10 +13,10 @@ class Kernel {
 public :
     Kernel(int n_kernels_per_dims,int n_dims);
     Kernel();
-    void setWeights(const Eigen::VectorXf weights);
-    float getValue(const std::vector<float>& state, const int& dim);
+    void setWeights(const Eigen::VectorXf _weights);
+    float getValue(const std::vector<float>& _state, const int& _dim);
     float getWeight(const int& index) const;
-    unsigned int getSize(){return m_nKernels;};
+    unsigned int getSize(){return n_basis;};
   const float PI = 3.14159265358979f;
 // Convert the 32-bit binary encoding into hexadecimal
 static int Binary2Hex( std::string Binary )
@@ -76,12 +76,12 @@ static std::string GetBinary32( float value )
     return mystring;
 }
 private :
-    Eigen::VectorXi m_nKernelsPerDim;
-    unsigned int m_nDims;
-    unsigned int m_nKernels;
-    Eigen::MatrixXf m_centers;
-    Eigen::VectorXf m_widths;
-    Eigen::VectorXf m_weights;
+    Eigen::VectorXi n_basis_per_dim;
+    unsigned int n_dims;
+    unsigned int n_basis;
+    Eigen::MatrixXf centers;
+    Eigen::VectorXf widths;
+    Eigen::VectorXf weights;
 
 };
 

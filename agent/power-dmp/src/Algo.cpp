@@ -9,7 +9,7 @@ Algo::Algo(Config* _config) : config(_config)
     //unsigned int const n_motors_per_dim = 2;
     //unsigned int const n_states_per_kernels=4;
 
-    n_weights = std::pow((*config).n_kernels_per_dim, (*config).n_states_per_kernels);
+    n_weights = std::pow((*config).n_basis_per_dim, (*config).n_states_per_kernels);
 
     /*n_weights=1;
     for(int i=0;i<nDims;i++){
@@ -29,7 +29,7 @@ Algo::Algo(Config* _config) : config(_config)
     //*weights=variances[i_kernel].col(*iter).array().sqrt()*noise.array();
         (*new_param).weights.push_back(weights);
         (*new_param).variance.push_back(variance);
-        Kernel kernel((*config).n_kernels_per_dim,(*config).n_states_per_kernels);
+        Kernel kernel((*config).n_basis_per_dim,(*config).n_states_per_kernels);
         variances.push_back(variance_init);
         kernels.push_back(kernel);
     }
