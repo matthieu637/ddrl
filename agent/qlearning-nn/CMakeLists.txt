@@ -25,11 +25,11 @@ file ( GLOB all_sources src/*.cpp )
 file ( GLOB all_sources_sml src/sml/*.cpp )
 
 
-add_executable(advanced-acrobot src/test/AdvancedAcrobotDiscret.cpp ${all_include} ${all_sources_sml})
-target_link_libraries(advanced-acrobot ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES})
+add_executable(adacrobot-ql src/test/AdacrobotQLNoreplay.cpp ${all_include} ${all_sources_sml})
+target_link_libraries(adacrobot-ql ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES})
 
-add_executable(adacrobot-cn src/test/AdvancedAcrobotContinuous.cpp ${all_include} ${all_sources} ${all_sources_sml})
-target_link_libraries(adacrobot-cn ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
+add_executable(adacrobot-cqfitted src/test/AdacrobotCQFitted.cpp ${all_include} ${all_sources} ${all_sources_sml})
+target_link_libraries(adacrobot-cqfitted ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
 
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

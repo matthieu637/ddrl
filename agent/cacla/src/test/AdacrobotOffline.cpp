@@ -2,12 +2,11 @@
 #include "arch/Simulator.hpp"
 #include "arch/Example.hpp"
 #include "AdvancedAcrobotEnv.hpp"
-
-#include "DiscretActionAg.hpp"
+#include "OfflineCaclaAg.hpp"
 
 int main(int argc, char **argv) {
-  arch::Simulator<AdvancedAcrobotEnv, DiscretActionAg> s;
-  //     arch::Simulator<AdvancedAcrobotEnv, arch::ExampleAgent > s;
+  arch::Simulator<AdvancedAcrobotEnv, OfflineCaclaAg> s;
+
   s.init(argc, argv);
 
   s.run();

@@ -86,8 +86,12 @@ class MLP {
     fann_set_activation_steepness_hidden(neural_net, 0.5);
     fann_set_activation_steepness_output(neural_net, 1.);
   }
+  
+  MLP(unsigned int input, unsigned int sensors) : size_input_state(input), size_sensors(sensors), size_motors(size_input_state - sensors){
+     
+  }
 
-  ~MLP() {
+  virtual ~MLP() {
     fann_destroy(neural_net);
   }
 
@@ -106,18 +110,28 @@ class MLP {
     fann_train(neural_net, inputs, out);
     delete[] inputs;
   }
+  
+  void learn(const std::vector<float>& inputs, const std::vector<float>& outputs) {
+    fann_type* out = new fann_type[outputs.size()];
+    for(uint j=0;j < outputs.size();j++)
+      out[j] = outputs[j];
 
-  void learn(struct fann_train_data* data) {
-    learn(neural_net, data);
+    fann_type* in = new fann_type[inputs.size()];
+    for (uint j = 0; j < inputs.size() ; j++)
+      in[j] = inputs[j];
+
+    fann_train(neural_net, in, out);
+    delete[] in;
+    delete[] out;
   }
 
-  static void learn(NN neural_net, struct fann_train_data* data) {
+  void learn(struct fann_train_data* data, uint max_epoch=10000, uint display_each = 0, float precision = 0.00001) {
+    learn(neural_net, data, max_epoch, display_each, precision);
+  }
+
+  static void learn(NN neural_net, struct fann_train_data* data, uint max_epoch, uint display_each, float precision) {
     fann_set_training_algorithm(neural_net, FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
     fann_set_train_error_function(neural_net, FANN_ERRORFUNC_TANH);
-
-    uint max_epoch=30000;
-    uint display_each = 0;
-    float precision = 0.00001;
 
     auto iter = [&]() {
       fann_train_epoch(neural_net, data);
@@ -146,6 +160,25 @@ class MLP {
     delete[] inputs;
     return out[0];
   }
+  
+  std::vector<float>* computeOut(const std::vector<float>& in) const {
+    return computeOut(neural_net, in);
+  }
+  
+  static std::vector<float>* computeOut(NN neural_net, const std::vector<float>& in) {
+    uint m = in.size();
+
+    fann_type* inputs = new fann_type[m];
+    for (uint j = 0; j < m ; j++)
+      inputs[j] = in[j];
+
+    fann_type* out = fann_run(neural_net, inputs);
+    std::vector<float>* outputs = new std::vector<float>(fann_get_num_output(neural_net));
+    for(uint j=0;j < outputs->size();j++)
+      outputs->at(j) = out[j];
+    delete[] inputs;
+    return outputs;
+  }
 
   /**
    * @brief Search the input in [-1; 1 ] that maximize the network output
@@ -159,7 +192,7 @@ class MLP {
    * @return std::vector< float >* your job to delete it
    */
 
-  std::vector<float>* optimized(const std::vector<float>& inputs, const std::vector<float>& init_search = {},
+  virtual std::vector<float>* optimized(const std::vector<float>& inputs, const std::vector<float>& init_search = {},
                                 uint nb_solution = 12) const {
 
     ParallelOptimization para(neural_net, inputs, init_search, size_motors, nb_solution);
@@ -200,7 +233,7 @@ class MLP {
     return fann_get_MSE(neural_net);
   }
 
- private:
+ protected:
   NN neural_net;
   unsigned int size_input_state;
   unsigned int size_sensors;

@@ -544,8 +544,6 @@ TEST(MLP, Optimize2LocalMaxima) {
 
   MLP nn(1, 10, 0, 0.1f);
   std::vector<float> sens(0);
-  std::vector<double> gauss(1);
-  gauss[0] = 0;
   std::vector<float> ac(1);
 
   fann_set_training_algorithm(nn.getNeuralNet(), FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
@@ -606,8 +604,6 @@ TEST(MLP, OptimizeTrapInEvilLocalOptimal) {
 
   MLP nn(1, 12, 0, 0.1f);
   std::vector<float> sens(0);
-  std::vector<double> gauss(1);
-  gauss[0] = 0;
   std::vector<float> ac(1);
 
   fann_set_training_algorithm(nn.getNeuralNet(), FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
@@ -658,3 +654,54 @@ TEST(MLP, OptimizeTrapInEvilLocalOptimal) {
   delete acopt;
 }
 
+
+
+TEST(MLP, OptimizePlateau) {
+  //learn sin(-3*x*x*x+2*x*x+x)
+  //local max ~0.6
+  //global max -0.7
+
+  MLP nn(1, 2, 0, 0.1f);
+  std::vector<float> sens(0);
+  std::vector<float> ac(1);
+
+  fann_set_training_algorithm(nn.getNeuralNet(), FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
+  fann_set_train_error_function(nn.getNeuralNet(), FANN_ERRORFUNC_TANH);
+
+  struct fann_train_data* data = fann_create_train(5000, 1, 1);
+
+  // Learn
+  for (uint n = 0; n < 5000 ; n++) {
+    double x1 = n < 2000 ? (bib::Utils::rand01() * 2.) - 1 : bib::Utils::randin(0, 0.5);
+
+    double out = x1 >= 0.2 ? 1. : 0.2;
+    ac[0] = x1;
+
+    data->input[n][0] = x1;
+    data->output[n][0] = out;
+  }
+
+  fann_train_on_data(nn.getNeuralNet(), data, 10000, 0, 0.00001);
+  fann_destroy_train(data);
+
+  //Test learned
+  for (uint n = 0; n < 1000 ; n++) {
+    double x1 = (bib::Utils::rand01() * 2.) - 1;
+
+    double out = x1 >= 0.2 ? 1. : 0.2;
+    ac[0] = x1;
+
+    double myout = nn.computeOut(sens, ac);
+    LOG_FILE("OptimizePlateau.data", x1 << " " << myout << " " << out);
+//     close all; X=load('OptimizePlateau.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');
+  }
+
+  std::vector<float>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION);
+//     LOG_DEBUG(acopt->at(0));
+
+  float precision = 0.01;
+
+  EXPECT_GT(acopt->at(0), 0.2 - precision);
+
+  delete acopt;
+}

@@ -8,8 +8,6 @@
 #include "sml/QLearning.hpp"
 #include "sml/ActionFactory.hpp"
 
-#define NUMBER_OF_DISCRET_ACTION
-
 typedef boost::shared_ptr<std::vector<float>> EnvState;
 
 class DiscretActionAg : public arch::AAgent<> {
