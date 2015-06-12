@@ -68,12 +68,12 @@ void Algo::addReward(float const _reward){
         }
 
         params_episode.clear();
-
         sort(best_params.begin(), best_params.end());
 
-
-        if(best_params.size()> (*config).elite_variance ){
-        Param* p = best_params[0].second;
+        while(best_params.size()> (*config).elite_variance ){
+            Param* p = best_params[0].second;
+            if((*p).episode!=(*current_param).episode)
+                break;
             for(unsigned int j=0;j<(*p).weights.size();j++){
                 delete (*p).weights[j];
             }
@@ -83,8 +83,6 @@ void Algo::addReward(float const _reward){
             delete p;
             best_params.erase(best_params.begin());
         }
-
-
     } else if(*episode==1 && ((*iter)+1)%(*config).n_instances==0){
         (*current_param).episode = *iter;
         best_params.push_back( pair<float,Param*> (_reward,current_param));
@@ -95,7 +93,6 @@ void Algo::computeNewWeights(){
 
     if(*episode>1){
         Param *new_param = new Param(*current_param);
-
         for(unsigned int i_kernel=0;i_kernel<(*config).n_motors;i_kernel++){
 
             Eigen::VectorXf param_nom = VectorXf::Zero(n_weights).transpose();
@@ -108,8 +105,8 @@ void Algo::computeNewWeights(){
             //if(*iter>1&&( ((((*iter/10+i_kernel))%(n_motors))!=0)||(*iter%10==0))){
             //if(*iter>1&&(i_kernel==(n_motors-1)||(*iter%10==0))){
             if((*episode>1&&(*config).n_motors<3)||(*episode>1&&( ((((*episode/10+i_kernel))%((*config).n_motors))!=0)||*episode%10==0))){
-                //const int m = *iter%((*config).n_instances)*4+2;
-                const unsigned int m = (*config).elite;
+                const unsigned int m = *iter%((*config).n_instances)*4+2;
+                //const unsigned int m = (*config).elite;
                 int n_items = (*episode-1<m)?*episode-1:m;
 
                 for(int i=0;i<n_items;i++){
@@ -213,9 +210,11 @@ vector<float> Algo::getNextActions(vector<float> sensors){
           //states.push_back(x/1.f);
           //states.push_back(y/1.f);
           states.push_back(sensors[0]/PI);
-          states.push_back(sensors[1]/27.f);
+          states.push_back(sensors[1]/28.f);
           states.push_back(sensors[2]/PI);
           states.push_back((sensors[3])/62.f);
+          states.push_back(sensors[4]/PI);
+          states.push_back(sensors[5]/71.f);
           //states.push_back(sensors[0]+sensors[2]);
           //states.push_back((sensors[1]+sensors[3])/36.f);
         } else if(i==1) {
@@ -226,8 +225,12 @@ vector<float> Algo::getNextActions(vector<float> sensors){
           //states.push_back(y/2.f);
           //states.push_back(sensors[0]);
           //states.push_back(sensors[1]/28.f);
-          states.push_back((sensors[0]+sensors[2])/PI);
-          states.push_back((sensors[1]+sensors[3])/45.f);
+          //states.push_back((sensors[0]+sensors[2])/PI);
+          //states.push_back((sensors[1]+sensors[3])/45.f);
+          states.push_back(sensors[0]/PI);
+          states.push_back(sensors[1]/28.f);
+          states.push_back(sensors[2]/PI);
+          states.push_back((sensors[3])/62.f);
           states.push_back(sensors[4]/PI);
           states.push_back(sensors[5]/71.f);
           //states.push_back(sensors[2]+sensors[4]);
@@ -267,7 +270,8 @@ vector<float> Algo::getNextActions(vector<float> sensors){
           states.push_back(sensors[8]/PI);
           states.push_back(sensors[9]/85.f);
         }
-        actions.push_back(kernels[i].getValue(states,4));
+        cout << (*config).n_sensors << endl;
+        actions.push_back(kernels[i].getValue(states,(*config).n_sensors));
     }
 return actions;
 }

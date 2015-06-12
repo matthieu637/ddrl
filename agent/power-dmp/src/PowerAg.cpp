@@ -35,14 +35,15 @@ const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, b
       if(y>best_value)
         best_value=y;
 
-      /*if(goal_reached){
+      if(goal_reached){
             int diff = pas-config.n_steps_max;
-            rewards[iter] += 0.1f*abs(diff)/config.n_steps_max;
-      }*/
-
+            rewards[iter] += 1.f*abs(diff)/config.n_steps_max;
+      }
+/*
       if(y>0.99f*y_max && sensors[1]<0.1){
           rewards[iter] += .1f*y/y_max;
      }
+*/
       for(unsigned int i=0;i<n_sensors;i++)
         state(pas,i) = sensors[i];
       for(unsigned int j=0;j<n_motors;j++)

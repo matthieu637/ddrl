@@ -34,21 +34,22 @@ Kernel::Kernel(int _n_basis_per_dim, int _n_dims) : widths(_n_dims), n_dims(_n_d
     for(int i=0;i<_n_dims;i++){
         if(i==0||i==2){
             //widths(i) = 1.0f/(n_basis_per_dim[i]-1.f);
-            widths(i) = 2.0f/(n_basis_per_dim[i]);
+            widths(i) = 2.0f/(n_basis_per_dim[i]+1);
         } else if(i==1){
-            widths(i) = 2.0f/(n_basis_per_dim[i]);
+            widths(i) = 2.0f/(n_basis_per_dim[i]+1);
         } else if(i%2==0){
-            widths(i) = 2.0f/(n_basis_per_dim[i]);
+            widths(i) = 2.0f/(n_basis_per_dim[i]+1);
         } else {
-            widths(i) = 2.0f/(n_basis_per_dim[i]);
+            widths(i) = 2.0f/(n_basis_per_dim[i]+1);
         }
+        float decalage = 0.0f;
         if(i==0||i==2)
-            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,n_basis_per_dim[i],-0.5f,0.5f).transpose());
+            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,n_basis_per_dim[i],-1.f+decalage,1.f-decalage).transpose());
         else
-            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,n_basis_per_dim[i],-0.5f,0.5f).transpose());
+            centersSpaced.push_back(VectorXf::LinSpaced(Sequential,n_basis_per_dim[i],-1.f+decalage,1.f-decalage).transpose());
     }
 
-    widths /= 2.3548f;
+    widths *= 1.0f;
 
     widths = widths.array().square().inverse();
 
@@ -82,7 +83,7 @@ float Kernel::getValue(const std::vector<float>& sensors, const int& dim){
     }
 
     if(state(0)<0){
-        state*=-1.0f;
+        //state*=-1.0f;
         //inv=true;
     }
 
