@@ -22,5 +22,6 @@ function check_all(){
 	checker cppcheck
 	checker cpplint
 	checker valgrind
+	checker xml
 }
 

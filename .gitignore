@@ -26,3 +26,4 @@ cmake_install.cmake
 .cproject
 .project
 eclipse
+gen-data
