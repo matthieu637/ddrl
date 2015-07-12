@@ -54,6 +54,7 @@ echo "	<command value='$CALLED_PATH/$2' />" >> $RULES
 echo "	<args value='' />" >> $RULES
 echo "	<ini_file value='config.ini' />" >> $RULES
 echo "	<end_file value='time_elapsed' />" >> $RULES
+echo "	<default_stat_file value='learning.data' />" >> $RULES
 echo "" >> $RULES
 echo "	<fold name='main'>" >> $RULES
 echo "		<!-- <param name='some_parameter' values='a,b,c' /> --> " >> $RULES
