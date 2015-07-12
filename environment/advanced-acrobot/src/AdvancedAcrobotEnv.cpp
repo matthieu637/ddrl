@@ -23,6 +23,8 @@ ProblemDefinition* str2prob(const std::string& s1) {
     return new ReachLimitPoorInformed;
   else if (s == "REACHLIMITWELLINFORMED")
     return new ReachLimitWellInformed;
+  else if (s == "REACHLIMITPOORINFORMEDMAX")
+    return new ReachLimitPoorInformedMax;
 
   return new KeepHigh;
 }

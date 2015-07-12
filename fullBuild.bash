@@ -105,9 +105,25 @@ function buildDir(){
                 if [ -e build ]; then
                         if [ $FORCE_REMOVE -eq 0 ]; then
                                 echo "INFO : $subdir already contains a build directory. Just recall..."
-				cmakeBuildRecall release
-				cmakeBuildRecall debug
-				cmakeBuildRecall relwithdeb
+				if [ -e build/release ] ; then
+					cmakeBuildRecall release
+				else
+					cmakeBuild release Release
+				fi
+
+				if [ -e build/debug ] ; then
+					cmakeBuildRecall debug
+				else
+					cmakeBuild debug Debug
+				fi
+
+
+				if [ -e build/relwithdeb ] ; then
+					cmakeBuildRecall relwithdeb
+				else
+                			cmakeBuild relwithdeb RelWithDebInfo
+				fi
+
                                 continue
                         else
                                 echo "INFO : $subdir already contains a build directory. Removing it..."

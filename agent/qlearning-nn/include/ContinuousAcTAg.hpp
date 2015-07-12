@@ -17,10 +17,10 @@
 #include <bib/XMLEngine.hpp>
 #include "MLP.hpp"
 
-#define NBSOL_OPT 25
-#define LEARNING_PRECISION 0.00001
+#define NBSOL_OPT 10
+#define LEARNING_PRECISION 0.0001
 #define MIN_Q_ITERATION 10
-#define MAX_Q_ITERATION 100
+#define MAX_Q_ITERATION 40
 #define MAX_NEURAL_ITERATION 50000
 
 typedef struct _sample {
@@ -77,16 +77,16 @@ class ContinuousAcTAg : public arch::AAgent<> {
   float max_reward = std::numeric_limits<float>::min();
   
   const std::vector<float>& runf(float r, const std::vector<float>& sensors,
-                                bool learning, bool goal_reached, bool last_step) override {
+                                bool learning, bool goal_reached, bool) override {
 
     double reward = r;
-    if (reward >= 1.f) {
-      reward = 13000;
-
-//             uint keeped = 2000 - internal_time;
-//             reward = 100 * log2(keeped + 2);
-    } else
-      reward = exp((reward - 0.01)*4000) * 0.01;
+//     if (reward >= 1.f) {
+//       reward = 13000;
+// 
+// //             uint keeped = 2000 - internal_time;
+// //             reward = 100 * log2(keeped + 2);
+//     } else
+//       reward = exp((reward - 0.01)*4000) * 0.01;
     
 //     if(max_reward < reward)
 //       max_reward = reward;
@@ -347,7 +347,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj.size()), dq);
 
 //         fann_randomize_weights(nn->getNeuralNet(), -0.025, 0.025);
-        nn->learn(dq.data, MAX_NEURAL_ITERATION, 0, LEARNING_PRECISION);
+        nn->learn(dq.data, 5000, 0, 0.001);
 
 // not updated
 //                 uint number_par = 6;
@@ -361,19 +361,26 @@ class ContinuousAcTAg : public arch::AAgent<> {
         return fann_get_MSE(nn->getNeuralNet());
       };
 
-//             bib::Converger::determinist<>(iter, eval, 250, 0.0005, 1);
-
-      NN best_nn = nullptr;
-      auto save_best = [&]() {
-        best_nn = fann_copy(nn->getNeuralNet());
-      };
-
-      bib::Converger::min_stochastic<>(iter, eval, save_best, MAX_Q_ITERATION, LEARNING_PRECISION * 10, 0, MIN_Q_ITERATION);
-      nn->copy(best_nn);
-      fann_destroy(best_nn);
-
+//       CHOOSE
+      bib::Converger::determinist<>(iter, eval, 20, 0.0005, 1);
+// OR
+//       NN best_nn = nullptr;
+//       auto save_best = [&]() {
+//         if(best_nn != nullptr)
+//              fann_destroy(best_nn);
+//         best_nn = fann_copy(nn->getNeuralNet());
+//       };
+// 
+//       bib::Converger::min_stochastic<>(iter, eval, save_best, MAX_Q_ITERATION, LEARNING_PRECISION * 10, 1, MIN_Q_ITERATION);
+//       if(best_nn != nullptr)
+//         nn->copy(best_nn);
+//       fann_destroy(best_nn);
+//       END CHOOSE
+      
+      
+      
       dq.free();
-//       LOG_DEBUG("number of data " << trajectory.size());
+      LOG_DEBUG("number of data " << trajectory.size());
       
       //puring by scoring
       for(auto it = current_trajectory.begin(); it != current_trajectory.end() ; it++){
@@ -385,7 +392,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
           trajectory.insert(*it);
       }
 
-      while(trajectory.size() > 2000){
+      while(trajectory.size() > 10000){
           trajectory.erase(trajectory.begin());
       }
           
@@ -412,11 +419,11 @@ class ContinuousAcTAg : public arch::AAgent<> {
  protected:
   void _display(std::ostream& out) const override {
     out << sum_weighted_reward << " " << std::setw(8) << std::fixed << std::setprecision(5) << 
-    nn->error() << " " << trajectory.size() << " " << std::setw(25) << std::fixed << std::setprecision(22) << sum_score_replayed() ;
+    nn->error() << " " << trajectory.size() << " " << std::setw(8) << std::fixed << std::setprecision(8) << sum_score_replayed() ;
   }
   
   void _dump(std::ostream& out) const override {
-    out <<" " << std::setw(25) << std::fixed << std::setprecision(22) << 
+    out <<" " << std::setw(8) << std::fixed << std::setprecision(8) << 
     sum_weighted_reward << " " << std::setw(8) << std::fixed << 
     std::setprecision(5) << nn->error() << " " << trajectory.size() ;
   }

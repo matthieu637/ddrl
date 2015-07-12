@@ -138,15 +138,15 @@ public:
 //             for (uint i = 0; i < next_action->size(); i++)
 //                 next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
 //         }
-        
-        last_pure_action.reset(next_action);
-        if(learning){
-           vector<float>* randomized_action = bib::Proba<float>::multidimentionnalGaussianWReject(*next_action, noise);
-//            delete next_action;
-           next_action = randomized_action;
+
+        last_pure_action.reset(new vector<float>(*next_action));
+        if(learning) {
+            vector<float>* randomized_action = bib::Proba<float>::multidimentionnalGaussianWReject(*next_action, noise);
+            delete next_action;
+            next_action = randomized_action;
         }
         last_action.reset(next_action);
-        
+
 
         last_state.clear();
         for (uint i = 0; i < sensors.size(); i++)
@@ -155,7 +155,7 @@ public:
         return *next_action;
     }
 
-    
+
     void _unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) override {
 //         epsilon             = pt->get<float>("agent.epsilon");
 //         gamma               = pt->get<float>("agent.gamma");
@@ -188,7 +188,7 @@ public:
         aware_ac_time = false;
 
         vnn = new MLP(nb_sensors, hidden_unit, nb_sensors, alpha);
-        ann = new LinMLP(nb_sensors , nb_motors);
+        ann = new LinMLP(nb_sensors , nb_motors, alpha);
         if (boost::filesystem::exists("trajectory.data")) {
             decltype(trajectory)* obj = bib::XMLEngine::load<decltype(trajectory)>("trajectory", "trajectory.data");
             trajectory = *obj;
@@ -213,7 +213,7 @@ public:
         global_pow_gamma = 1.f;
         internal_time = 0;
         trajectory.clear();
-        
+
 //         noise = 0.99998*noise;
         fann_reset_MSE(vnn->getNeuralNet());
     }
@@ -259,60 +259,62 @@ public:
         const std::vector<sample>& vtraj;
         const OfflineCaclaAg* ptr;
     };
-    
-    void removeOldPolicyTrajectory(){
-      for(auto iter = trajectory.begin(); iter != trajectory.end(); ) {
+
+    void removeOldPolicyTrajectory() {
+        for(auto iter = trajectory.begin(); iter != trajectory.end(); ) {
             sample sm = *iter;
             vector<float> *ac = ann->computeOut(sm.s);
-            
+
             bool eq = true;
             for(uint i = 0; i != sm.a.size(); i++)
                 if (ac->at(i) != sm.a[i]) {
 //                   LOG_DEBUG(ac->at(i) << " " << sm.a[i]);
-                  eq =false;
-                  break;
+                    eq =false;
+                    break;
                 }
 //             if (*ac != sm.a) {
             if (!eq) {
-                    trajectory.erase(iter++);
+                trajectory.erase(iter++);
             } else {
-                    ++iter;
+                ++iter;
             }
-      }
+        }
     }
 
     void end_episode() override {
-      
-      if (trajectory.size() > 0) {
+
+        if (trajectory.size() > 0) {
             //remove trace of old policy
-        
+
             std::vector<sample> vtraj(trajectory.size());
             std::copy(trajectory.begin(), trajectory.end(), vtraj.begin());
 
             ParraVtoVNext dq(vtraj, this);
 
             auto iter = [&]() {
-              tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj.size()), dq);
+                tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj.size()), dq);
 
-              fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
-              vnn->learn(dq.data, 10000, 0, 0.0001);
+                fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
+                vnn->learn(dq.data, 10000, 0, 0.0001);
 
-      //                 uint number_par = 6;
-      //                 ParrallelLearnFromScratch plfs(dq.data, nn->getNeuralNet(), number_par);
-      //                 tbb::parallel_for(tbb::blocked_range<uint>(0, number_par), plfs);
-      //                 nn->copy(plfs.bestNN());
-      //                 plfs.free();
+                //                 uint number_par = 6;
+                //                 ParrallelLearnFromScratch plfs(dq.data, nn->getNeuralNet(), number_par);
+                //                 tbb::parallel_for(tbb::blocked_range<uint>(0, number_par), plfs);
+                //                 nn->copy(plfs.bestNN());
+                //                 plfs.free();
             };
 
             auto eval = [&]() {
-              return fann_get_MSE(vnn->getNeuralNet());
+                return fann_get_MSE(vnn->getNeuralNet());
             };
 
-      //             bib::Converger::determinist<>(iter, eval, 250, 0.0005, 1);
+            //             bib::Converger::determinist<>(iter, eval, 250, 0.0005, 1);
 
             NN best_nn = nullptr;
             auto save_best = [&]() {
-              best_nn = fann_copy(vnn->getNeuralNet());
+                if(best_nn != nullptr)
+                  fann_destroy(best_nn);
+                best_nn = fann_copy(vnn->getNeuralNet());
             };
 
             bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10);
@@ -320,40 +322,42 @@ public:
             fann_destroy(best_nn);
 
             dq.free();
-      //       LOG_DEBUG("number of data " << trajectory.size());
-          }
-      
-      struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
-      
-      uint n=0;
-      for(auto it = trajectory.begin(); it != trajectory.end() ;++it){
-          sample sm = *it;
+            //       LOG_DEBUG("number of data " << trajectory.size());
 
-          double target = sm.r;
-          if (!sm.goal_reached) {
-              double nextV = vnn->computeOut(sm.next_s, {});
-              target += gamma * nextV;
-          }
-          
-          double mine = vnn->computeOut(sm.s, {});
 
-          if(target > mine){
-            for (uint i = 0; i < nb_sensors ; i++)
-              data->input[n][i] = sm.s[i];
-            for (uint i = 0; i < nb_motors; i++)
-              data->output[n][i] = sm.pure_a[i];
-            
-            n++;
-          }
-      }
-      
-      struct fann_train_data* subdata = fann_subset_train_data(data, 0, n);
-      
-      ann->learn(subdata, 5000, 0, 0.0001);
-      
-      fann_destroy_train(subdata);
-      fann_destroy_train(data);
-      
+            struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
+
+            uint n=0;
+            for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+                sample sm = *it;
+
+                double target = sm.r;
+                if (!sm.goal_reached) {
+                    double nextV = vnn->computeOut(sm.next_s, {});
+                    target += gamma * nextV;
+                }
+
+                double mine = vnn->computeOut(sm.s, {});
+
+                if(target > mine) {
+                    for (uint i = 0; i < nb_sensors ; i++)
+                        data->input[n][i] = sm.s[i];
+                    for (uint i = 0; i < nb_motors; i++)
+                        data->output[n][i] = sm.pure_a[i];
+
+                    n++;
+                }
+            }
+
+            if(n > 0) {
+                struct fann_train_data* subdata = fann_subset_train_data(data, 0, n);
+
+                ann->learn(subdata, 5000, 0, 0.0001);
+
+                fann_destroy_train(subdata);
+            }
+            fann_destroy_train(data);
+        }
 //       removeOldPolicyTrajectory();
     }
 
@@ -372,12 +376,12 @@ protected:
     void _display(std::ostream& out) const override {
         out << sum_weighted_reward << " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << trajectory.size();
     }
-    
-  void _dump(std::ostream& out) const override {
-    out <<" " << std::setw(25) << std::fixed << std::setprecision(22) << 
-    sum_weighted_reward << " " << std::setw(8) << std::fixed << 
-    std::setprecision(5) << vnn->error() << " " << trajectory.size() ;
-  }
+
+    void _dump(std::ostream& out) const override {
+        out <<" " << std::setw(25) << std::fixed << std::setprecision(22) <<
+            sum_weighted_reward << " " << std::setw(8) << std::fixed <<
+            std::setprecision(5) << vnn->error() << " " << trajectory.size() ;
+    }
 
 private:
     uint nb_motors;

@@ -76,5 +76,5 @@ echo "####### To monitor : ######"
 echo "cd $LIB/extern/lhpo/ && ./count.bash $LIB/../gen-data/$1"
 
 echo "####### Statistics : ######"
-echo "cd $LIB/extern/lhpo/ && ./stats_all.bash $LIB/../gen-data/$1"
+echo "cd $LIB/extern/lhpo/ && ./stats.bash $LIB/../gen-data/$1"
 

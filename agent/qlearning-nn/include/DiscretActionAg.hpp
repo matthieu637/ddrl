@@ -29,8 +29,12 @@ class DiscretActionAg : public arch::AAgent<> {
     delete rlparam;
   }
 
-  const std::vector<float>& run(float reward, const std::vector<float>& sensors,
-                                bool learning, bool goal_reached) override {
+  const std::vector<float>& runf(float reward, const std::vector<float>& sensors,
+                                bool learning, bool goal_reached, bool finished) override {
+                                  
+    if(reward >= 1.)
+      reward = 1000;
+        
     EnvState s(new std::vector<float>(sensors));
     sml::DAction* ac;
     if (learning)
@@ -92,7 +96,7 @@ class DiscretActionAg : public arch::AAgent<> {
  protected:
   void _display(std::ostream& stdout) const override {
 #ifndef NDEBUG
-    stdout << " TTT " << algo->history_size() << " " << algo->weight_sum() << " " << algo->mse();
+    stdout << " TTT " << algo->history_size() << " " << algo->weight_sum() << " " << algo->mse() << " " << std::setprecision(5) << weighted_reward;
 #endif
   }
 

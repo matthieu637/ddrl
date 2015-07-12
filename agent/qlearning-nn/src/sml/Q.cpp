@@ -46,7 +46,7 @@ DAction *QTable::argmax(const DState &name) const {
   unsigned int hashState = name.hash();
   unsigned int beginRange = hashState * atmpl->sizeNeeded();
 
-  unsigned int imax = bib::Seed::unifRandInt(atmpl->sizeNeeded());
+  unsigned int imax = bib::Seed::unifRandInt(atmpl->sizeNeeded()-1);
   //      LOG_DEBUG(imax << " " << hashState << " " << atmpl->sizeNeeded() << "
   //      " << beginRange << " " << name << " " << map->size());
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
@@ -55,7 +55,7 @@ DAction *QTable::argmax(const DState &name) const {
   return new DAction(atmpl, imax);
 }
 DAction *QTable::argmax() const {
-  unsigned int imax = bib::Seed::unifRandInt( atmpl->sizeNeeded() );
+  unsigned int imax = bib::Seed::unifRandInt( atmpl->sizeNeeded()-1);
   // unsigned int imax = 0;
   //     LOG_DEBUG(imax << " " << hashState << " " << atmpl->sizeNeeded() << " "
   //     << name["angle"] << " " << name["distance"] );
@@ -65,7 +65,7 @@ DAction *QTable::argmax() const {
   return new DAction(atmpl, imax);
 }
 double QTable::max() const {
-  unsigned int imax = bib::Seed::unifRandInt( atmpl->sizeNeeded() );
+  unsigned int imax = bib::Seed::unifRandInt( atmpl->sizeNeeded()-1);
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
     if (map->at(imax) < map->at(j)) imax = j;
 
@@ -73,7 +73,7 @@ double QTable::max() const {
 }
 DAction *QTable::argmax(const std::vector<int> *action_time,
                         double gamma) const {
-  unsigned int imax = bib::Seed::unifRandInt( atmpl->sizeNeeded() );
+  unsigned int imax = bib::Seed::unifRandInt( atmpl->sizeNeeded()-1);
   double _max = map->at(imax) * powf(gamma, action_time->at(imax));
 
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++) {
@@ -87,7 +87,7 @@ DAction *QTable::argmax(const std::vector<int> *action_time,
 }
 
 double QTable::min() const {
-  unsigned int imin = bib::Seed::unifRandInt( atmpl->sizeNeeded() );
+  unsigned int imin = bib::Seed::unifRandInt( atmpl->sizeNeeded()-1);
   for (unsigned int j = 0; j < atmpl->sizeNeeded(); j++)
     if (map->at(imin) > map->at(j)) imin = j;
 

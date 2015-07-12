@@ -56,3 +56,15 @@ TEST(Seed, MultiThreadSafeGenerator) {
 
   EXPECT_GT(diffVec(X, Y), 20.);
 }
+
+TEST(Seed, UnifRandIntRange)
+{
+  for(uint n=0;n < 1000;n++){
+    int r = bib::Seed::unifRandInt(3);
+    
+    EXPECT_GE(r, 0);
+    EXPECT_LE(r, 3);
+  }
+  
+  
+}
