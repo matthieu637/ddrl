@@ -76,13 +76,6 @@ public:
                                   bool learning, bool goal_reached) override {
 
         double reward = r;
-        if (reward >= 1.f) {
-            reward = 13000;
-//             reward = 1;
-        } else {
-            reward = exp((reward - 0.01) * 4000) * 0.01;
-//             reward = 0;
-        }
         internal_time ++;
 
         weighted_reward += reward * pow_gamma;
@@ -94,8 +87,7 @@ public:
         time_for_ac--;
         if (time_for_ac == 0 || goal_reached) {
             const std::vector<float>& next_action = _run(weighted_reward, sensors, learning, goal_reached);
-//             time_for_ac = bib::Utils::transform(next_action[nb_motors], -1., 1., min_ac_time, max_ac_time);
-            time_for_ac =4;
+            time_for_ac = decision_each;
 
             for (uint i = 0; i < nb_motors; i++)
                 returned_ac[i] = next_action[i];
@@ -107,7 +99,7 @@ public:
         return returned_ac;
     }
 
-    double noise = 0.4;
+    
     const std::vector<float>& _run(float reward, const std::vector<float>& sensors,
                                    bool learning, bool goal_reached) {
 
@@ -117,10 +109,6 @@ public:
 
             double vtarget = reward;
             if (!goal_reached) {
-//             if(aware_ac_time)
-//               nn->learn(last_state, *last_action, reward + pow(gamma, bib::Utils::transform(last_action->at(last_action->size()-1),-1.,1., min_ac_time, max_ac_time) ) * nextQ);
-//             else
-
                 double nextV = vnn->computeOut(sensors, {});
                 vtarget += gamma * nextV;
             }
@@ -134,7 +122,7 @@ public:
             trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
         }
 
-//         if (learning && bib::Utils::rand01() < alpha) {
+//         if (learning && bib::Utils::rand01() < alpha) { // alpha ??
 //             for (uint i = 0; i < next_action->size(); i++)
 //                 next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
 //         }
@@ -156,46 +144,36 @@ public:
     }
 
 
-    void _unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) override {
-//         epsilon             = pt->get<float>("agent.epsilon");
-//         gamma               = pt->get<float>("agent.gamma");
-//         alpha               = pt->get<float>("agent.alpha");
-//         hidden_unit         = pt->get<int>("agent.hidden_unit");
-// //     rlparam->activation          = pt->get<std::string>("agent.activation_function_hidden");
-// //     rlparam->activation_stepness = pt->get<float>("agent.activation_steepness_hidden");
-// //
-// //     rlparam->repeat_replay = pt->get<int>("agent.replay");
-// //
-// //     int action_per_motor   = pt->get<int>("agent.action_per_motor");
-// //
-// //     sml::ActionFactory::getInstance()->gridAction(nb_motors, action_per_motor);
-// //     actions = new sml::list_tlaction(sml::ActionFactory::getInstance()->getActions());
-// //
-// //     act_templ = new sml::ActionTemplate( {"effectors"}, {sml::ActionFactory::getInstance()->getActionsNumber()});
-// //     ainit = new sml::DAction(act_templ, {0});
-// //     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
-        hidden_unit = 25;
-        gamma = 0.99; // < 0.99  => gamma ^ 2000 = 0 && gamma != 1 -> better to reach the goal at the very end
-//         gamma = 1.0d;
-        //check 0,0099×((1−0.95^1999)÷(1−0.95))
-        //r_max_no_goal×((1−gamma^1999)÷(1−gamma)) < r_max_goal * gamma^2000 && gamma^2000 != 0
-        alpha = 0.05;
-        epsilon = 0.1;
-
-        min_ac_time = 4;
-        max_ac_time = 4;
-
-        aware_ac_time = false;
-
-        vnn = new MLP(nb_sensors, hidden_unit, nb_sensors, alpha);
-        ann = new LinMLP(nb_sensors , nb_motors, alpha);
-        if (boost::filesystem::exists("trajectory.data")) {
-            decltype(trajectory)* obj = bib::XMLEngine::load<decltype(trajectory)>("trajectory", "trajectory.data");
-            trajectory = *obj;
-            delete obj;
-
-            end_episode();
-        }
+    void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
+        gamma               = pt->get<float>("agent.gamma");
+//         alpha_a               = pt->get<float>("agent.alpha_a");
+        hidden_unit_v         = pt->get<int>("agent.hidden_unit_v");
+        hidden_unit_a        = pt->get<int>("agent.hidden_unit_a");
+        noise               = pt->get<float>("agent.noise");
+        decision_each = pt->get<int>("agent.decision_each");
+        
+//         noise = 0.4;
+//         hidden_unit_v = 25;
+//         gamma = 0.99;
+//         alpha_a = 0.05;
+//         decision_each = 4;
+        
+        if(hidden_unit_v == 0)
+          vnn = new LinMLP(nb_sensors , nb_motors, 0.0);
+        else 
+          vnn = new MLP(nb_sensors, hidden_unit_v, nb_sensors, 0.0);
+        
+        if(hidden_unit_a == 0)
+          ann = new LinMLP(nb_sensors , nb_motors, 0.0);
+        else 
+          ann = new MLP(nb_sensors, hidden_unit_a, nb_sensors, 0.0);
+//         if (boost::filesystem::exists("trajectory.data")) {
+//             decltype(trajectory)* obj = bib::XMLEngine::load<decltype(trajectory)>("trajectory", "trajectory.data");
+//             trajectory = *obj;
+//             delete obj;
+// 
+//             end_episode();
+//         }
     }
 
     void start_episode(const std::vector<float>& sensors) override {
@@ -214,7 +192,6 @@ public:
         internal_time = 0;
         trajectory.clear();
 
-//         noise = 0.99998*noise;
         fann_reset_MSE(vnn->getNeuralNet());
     }
 
@@ -268,6 +245,27 @@ public:
             bool eq = true;
             for(uint i = 0; i != sm.a.size(); i++)
                 if (ac->at(i) != sm.a[i]) {
+//                   LOG_DEBUG(ac->at(i) << " " << sm.a[i]);
+                    eq =false;
+                    break;
+                }
+//             if (*ac != sm.a) {
+            if (!eq) {
+                trajectory.erase(iter++);
+            } else {
+                ++iter;
+            }
+        }
+    }
+    
+    void removeOldPolicyTrajectory2() {
+        for(auto iter = trajectory.begin(); iter != trajectory.end(); ) {
+            sample sm = *iter;
+            vector<float> *ac = ann->computeOut(sm.s);
+
+            bool eq = true;
+            for(uint i = 0; i != sm.pure_a.size(); i++)
+                if (ac->at(i) != sm.pure_a[i]) {
 //                   LOG_DEBUG(ac->at(i) << " " << sm.a[i]);
                     eq =false;
                     break;
@@ -344,6 +342,8 @@ public:
                         data->input[n][i] = sm.s[i];
                     for (uint i = 0; i < nb_motors; i++)
                         data->output[n][i] = sm.pure_a[i];
+//                     should explain why
+//                            data->output[n][i] = sm.a[i];
 
                     n++;
                 }
@@ -358,7 +358,9 @@ public:
             }
             fann_destroy_train(data);
         }
-//       removeOldPolicyTrajectory();
+        
+//         removeOldPolicyTrajectory();
+        removeOldPolicyTrajectory2();
     }
 
     void save(const std::string& path) override {
@@ -393,15 +395,12 @@ private:
     double global_pow_gamma;
     double sum_weighted_reward;
 
-    uint min_ac_time;
-    uint max_ac_time;
-
     uint internal_time;
+    uint decision_each;
 
-    bool aware_ac_time;
-
-    double epsilon, alpha, gamma;
-    uint hidden_unit;
+    double gamma, noise;
+    uint hidden_unit_v;
+    uint hidden_unit_a;
 
     std::shared_ptr<std::vector<float>> last_action;
     std::shared_ptr<std::vector<float>> last_pure_action;

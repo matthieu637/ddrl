@@ -17,11 +17,12 @@
 #include <bib/XMLEngine.hpp>
 #include "MLP.hpp"
 
-#define NBSOL_OPT 10
-#define LEARNING_PRECISION 0.0001
-#define MIN_Q_ITERATION 10
-#define MAX_Q_ITERATION 40
-#define MAX_NEURAL_ITERATION 50000
+#define NBSOL_OPT 4
+#define LEARNING_PRECISION 0.00001
+#define MIN_Q_ITERATION 5
+#define MAX_Q_ITERATION 20
+#define MAX_NEURAL_ITERATION 20000
+#define DATA_KEEPT 6000
 
 typedef struct _sample {
   std::vector<float> s;
@@ -110,7 +111,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
     if (time_for_ac == 0 || goal_reached) {
       const std::vector<float>& next_action = _run(weighted_reward, sensors, learning, goal_reached);
 //       time_for_ac = bib::Utils::transform(next_action[nb_motors], -1., 1., min_ac_time, max_ac_time);
-      time_for_ac = 5;
+      time_for_ac = 4;
 
       for (uint i = 0; i < nb_motors; i++)
         returned_ac[i] = next_action[i];
@@ -164,10 +165,15 @@ class ContinuousAcTAg : public arch::AAgent<> {
         current_trajectory.push_back(*ppair.first);
     }
 
-    if (!softmax && learning && bib::Utils::rand01() < alpha) {
+    if (!softmax && learning && bib::Utils::rand01() < epsilon) {
       for (uint i = 0; i < next_action->size(); i++)
         next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
     }
+    
+//     vector<float>* randomized_action = bib::Proba<float>::multidimentionnalGaussianWReject(*next_action, 0.4);
+//     delete next_action;
+//     next_action = randomized_action;
+    
     last_action.reset(next_action);
 
     last_state.clear();
@@ -195,13 +201,13 @@ class ContinuousAcTAg : public arch::AAgent<> {
 // //     act_templ = new sml::ActionTemplate( {"effectors"}, {sml::ActionFactory::getInstance()->getActionsNumber()});
 // //     ainit = new sml::DAction(act_templ, {0});
 // //     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
-    hidden_unit = 15;
+    hidden_unit = 40;
     gamma = 0.99; // < 0.99  => gamma ^ 2000 = 0 && gamma != 1 -> better to reach the goal at the very end
 //     gamma = 1.0d;
     //check 0,0099×((1−0.95^1999)÷(1−0.95))
     //r_max_no_goal×((1−gamma^1999)÷(1−gamma)) < r_max_goal * gamma^2000 && gamma^2000 != 0
     alpha = 0.05;
-    epsilon = 0.2;
+    epsilon = 0.05;
 
     min_ac_time = 4;
     max_ac_time = 4;
@@ -347,7 +353,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj.size()), dq);
 
 //         fann_randomize_weights(nn->getNeuralNet(), -0.025, 0.025);
-        nn->learn(dq.data, 5000, 0, 0.001);
+        nn->learn(dq.data, MAX_NEURAL_ITERATION, 0, LEARNING_PRECISION);
 
 // not updated
 //                 uint number_par = 6;
@@ -362,19 +368,19 @@ class ContinuousAcTAg : public arch::AAgent<> {
       };
 
 //       CHOOSE
-      bib::Converger::determinist<>(iter, eval, 20, 0.0005, 1);
+//       bib::Converger::determinist<>(iter, eval, 10, 0.001, 1);
 // OR
-//       NN best_nn = nullptr;
-//       auto save_best = [&]() {
-//         if(best_nn != nullptr)
-//              fann_destroy(best_nn);
-//         best_nn = fann_copy(nn->getNeuralNet());
-//       };
-// 
-//       bib::Converger::min_stochastic<>(iter, eval, save_best, MAX_Q_ITERATION, LEARNING_PRECISION * 10, 1, MIN_Q_ITERATION);
-//       if(best_nn != nullptr)
-//         nn->copy(best_nn);
-//       fann_destroy(best_nn);
+      NN best_nn = nullptr;
+      auto save_best = [&]() {
+        if(best_nn != nullptr)
+             fann_destroy(best_nn);
+        best_nn = fann_copy(nn->getNeuralNet());
+      };
+
+      bib::Converger::min_stochastic<>(iter, eval, save_best, MAX_Q_ITERATION, LEARNING_PRECISION, 1, MIN_Q_ITERATION);
+      if(best_nn != nullptr)
+        nn->copy(best_nn);
+      fann_destroy(best_nn);
 //       END CHOOSE
       
       
@@ -392,7 +398,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
           trajectory.insert(*it);
       }
 
-      while(trajectory.size() > 10000){
+      while(trajectory.size() > DATA_KEEPT){
           trajectory.erase(trajectory.begin());
       }
           
@@ -418,7 +424,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
 
  protected:
   void _display(std::ostream& out) const override {
-    out << sum_weighted_reward << " " << std::setw(8) << std::fixed << std::setprecision(5) << 
+    out << std::setw(8) << std::fixed << std::setprecision(5) << sum_weighted_reward << " " << std::setw(8) << std::fixed << std::setprecision(5) << 
     nn->error() << " " << trajectory.size() << " " << std::setw(8) << std::fixed << std::setprecision(8) << sum_score_replayed() ;
   }
   
