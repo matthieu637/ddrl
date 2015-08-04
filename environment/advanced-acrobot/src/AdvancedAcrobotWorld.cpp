@@ -10,10 +10,10 @@
 
 
 AdvancedAcrobotWorld::AdvancedAcrobotWorld(
-  const std::vector<bone_joint>& _types, const std::vector<bool>& _actuators)
+  const std::vector<bone_joint>& _types, const std::vector<bool>& _actuators,
+    bool add_time_in_state, bool _normalization)
   : odeworld(ODEFactory::getInstance()->createWorld()),
-    types(_types),
-    actuators(_actuators) {
+    types(_types), actuators(_actuators), normalization(_normalization) {
   ASSERT(_types.size() == (_actuators.size() - 1),
          "actuators " << _actuators.size() << " not compatible with types "
          << _types.size());
@@ -31,6 +31,9 @@ AdvancedAcrobotWorld::AdvancedAcrobotWorld(
       internal_state.push_back(dJointGetSliderPosition(joints[i + 1]));
       internal_state.push_back(dJointGetSliderPositionRate(joints[i + 1]));
     }
+    
+  if(add_time_in_state)
+    internal_state.push_back(0.);
 
   _activated_motors = 0;
   for (bool b : _actuators)
@@ -129,7 +132,7 @@ void nearCallback(void* data, dGeomID o1, dGeomID o2) {
   }
 }
 
-void AdvancedAcrobotWorld::step(const vector<float>& motors) {
+void AdvancedAcrobotWorld::step(const vector<float>& motors, uint current_step, uint max_step_per_instance) {
   // No collision in this world
 
   // nearCallbackData d = {this};
@@ -161,22 +164,41 @@ void AdvancedAcrobotWorld::step(const vector<float>& motors) {
 
   dJointGroupEmpty(odeworld.contactgroup);
 
-  update_state();
+  update_state(current_step, max_step_per_instance);
 }
 
-void AdvancedAcrobotWorld::update_state(){
+const std::vector<float> AdvancedAcrobotWorld::NORMALIZED_VEC({28,62,71});
+
+void AdvancedAcrobotWorld::update_state(uint current_step, uint max_step_per_instance){
   uint begin_index = 0;
-  internal_state[begin_index++] = dJointGetHingeAngle(joints[0]);
-  internal_state[begin_index++] = dJointGetHingeAngleRate(joints[0]);
+  
+  if(normalization)
+    internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngle(joints[0]), -M_PI, M_PI, -1, 1);
+  else
+    internal_state[begin_index++] = dJointGetHingeAngle(joints[0]);
+  
+  if(normalization)
+    internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngleRate(joints[0]), -NORMALIZED_VEC[0], NORMALIZED_VEC[0], -1, 1);
+  else
+    internal_state[begin_index++] = dJointGetHingeAngleRate(joints[0]);
+  
   for (unsigned int i = 0; i < types.size(); i++)
     if (types[i] == HINGE) {
-      internal_state[begin_index++] = dJointGetHingeAngle(joints[i + 1]);
-      internal_state[begin_index++] = dJointGetHingeAngleRate(joints[i + 1]);
+      if(normalization)
+        internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngle(joints[i + 1]), -M_PI, M_PI, -1, 1);
+      else
+        internal_state[begin_index++] = dJointGetHingeAngle(joints[i + 1]);
+      
+      if(normalization && i+1 < NORMALIZED_VEC.size())
+          internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngleRate(joints[i + 1]), -NORMALIZED_VEC[i + 1], NORMALIZED_VEC[i + 1], -1, 1);
+      else
+          internal_state[begin_index++] = dJointGetHingeAngleRate(joints[i + 1]);
     } else {
       internal_state[begin_index++] = dJointGetSliderPosition(joints[i + 1]);
-      internal_state[begin_index++] =
-        dJointGetSliderPositionRate(joints[i + 1]);
-    } 
+      internal_state[begin_index++] = dJointGetSliderPositionRate(joints[i + 1]);
+    }
+    
+    internal_state[begin_index] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
 }
 
 const std::vector<float>& AdvancedAcrobotWorld::state() const {
@@ -218,7 +240,7 @@ void AdvancedAcrobotWorld::resetPositions() {
 
   dJointGroupEmpty(odeworld.contactgroup);
   
-  update_state();
+  update_state(0, 1);
 }
 
 float AdvancedAcrobotWorld::perf() const {

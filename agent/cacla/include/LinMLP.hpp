@@ -17,6 +17,8 @@ public:
         fann_set_activation_steepness_output(neural_net, 1.);
         fann_set_learning_rate(neural_net, alpha);
         fann_randomize_weights(neural_net, -0.3, 0.3);
+        
+        lecun(input);
     }
     
     

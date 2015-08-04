@@ -69,7 +69,7 @@ void ParallelOptimization::operator()(const tbb::blocked_range<uint>& r) const {
 //         static std::vector<uint> full {0,1,2,4, 0,1,3,4, 0,0,1,4}; //perf -> -3
 //         static std::vector<uint> full {0,1,2,4, 0,4,3,4, 0,0,4,4}; //perf -> -5
     //20
-    static std::vector<uint> full {0, 1, 2, 4, 3, 4, 0, 4, 1, 3, 4, 4, 0, 4, 0, 4, 0, 4, 0, 4};
+    static std::vector<uint> full {0, 4, 1, 2, 3, 4, 0, 4, 1, 3, 4, 4, 0, 4, 0, 4, 0, 4, 0, 4};
     strategy = thread >= 20 ? full[8 + (thread % 12)] : full[thread] ;
 //     strategy = full[thread % full.size()];
 

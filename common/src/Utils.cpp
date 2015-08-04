@@ -66,4 +66,21 @@ float Utils::euclidien_dist3D(float x1, float x2, float y1, float y2, float z1,
                               float z2) {
   return sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2) + pow(z1 - z2, 2));
 }
+
+float Utils::euclidien_dist(const std::vector<float>& v1, const std::vector<float>& v2, float dmax){
+  float sum = 0;
+  for(uint i=0;i < v1.size();i++)
+    sum += pow(v1[i] - v2[i], 2);
+  
+  return sqrt(sum) / (v1.size() * dmax);
+}
+
+float Utils::euclidien_dist_ref(const std::vector<float>& v1, float refp){
+  float sum = 0;
+  for(uint i=0;i < v1.size();i++)
+    sum += pow(v1[i] - refp, 2);
+  
+  return sqrt(sum) / (v1.size());
+}
+
 }  // namespace bib

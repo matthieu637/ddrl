@@ -12,14 +12,13 @@
 class AdvancedAcrobotWorldView : public AdvancedAcrobotWorld {
  public:
   AdvancedAcrobotWorldView(const std::string &,
-                           const std::vector<bone_joint> &types = {HINGE,
-                                                                   HINGE
-                                                                  },
-                           const std::vector<bool> &actuators = {false, false,
-                                                                 true
-                                                                });
+                           const std::vector<bone_joint> &types = {HINGE, HINGE},
+                           const std::vector<bool> &actuators = {false, false, true},
+                           bool add_time_in_state = false,
+                           bool normalization = false
+                          );
   ~AdvancedAcrobotWorldView();
-  void step(const std::vector<float> &motors);
+  void step(const std::vector<float> &motors, uint current_step, uint max_step_per_instance);
 
  public:
   std::list<dGeomID> geoms;

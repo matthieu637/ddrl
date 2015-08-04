@@ -81,9 +81,9 @@ void threadloop(const std::string& goodpath) {
 
 AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
   const std::string& path, const std::vector<bone_joint>& types,
-  const std::vector<bool>& actuators)
-  : AdvancedAcrobotWorld(types, actuators),
-    requestEnd(false),
+  const std::vector<bool>& actuators, bool _add_time_in_state, bool normalization)
+  : AdvancedAcrobotWorld(types, actuators, _add_time_in_state, normalization),
+    requestEnd(false), 
     speed(1),
     ignoreMotor(false) {
   std::string goodpath = path;
@@ -135,14 +135,14 @@ AdvancedAcrobotWorldView::~AdvancedAcrobotWorldView() {
   HACKclose();
 }
 
-void AdvancedAcrobotWorldView::step(const std::vector<float>& motors) {
+void AdvancedAcrobotWorldView::step(const std::vector<float>& motors, uint current_step, uint max_step_per_instance) {
   std::vector<float> modified_motors(motors.size(), 0);
   if (!inst->ignoreMotor) {
     for (unsigned int i = 0; i < motors.size(); i++)
       modified_motors[i] = motors[i];
   }
 
-  AdvancedAcrobotWorld::step(modified_motors);
+  AdvancedAcrobotWorld::step(modified_motors, current_step, max_step_per_instance);
 
   // approximative human vision smooth
   // usleep(25 * 1000);

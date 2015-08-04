@@ -22,6 +22,7 @@
 #include "UNLF2.hpp"
 #include "bib/Logger.hpp"
 #include <bib/Converger.hpp>
+#include <bib/Seed.hpp>
 
 using OPTPP::Constraint;
 using OPTPP::CompoundConstraint;
@@ -85,10 +86,42 @@ class MLP {
     fann_set_learning_rate(neural_net, alpha);
     fann_set_activation_steepness_hidden(neural_net, 0.5);
     fann_set_activation_steepness_output(neural_net, 1.);
+    lecun(input);
   }
   
   MLP(unsigned int input, unsigned int sensors) : size_input_state(input), size_sensors(sensors), size_motors(size_input_state - sensors){
      
+  }
+  
+  MLP(unsigned int input, unsigned int hidden, unsigned int motors) : size_input_state(input), size_sensors(input), size_motors(motors){
+    neural_net = fann_create_standard(3, input, hidden, motors);
+
+    fann_set_activation_function_hidden(neural_net, FANN_SIGMOID_SYMMETRIC);
+
+    fann_set_activation_function_output(neural_net, FANN_SIGMOID_SYMMETRIC);  // motor are normalized
+    fann_set_learning_momentum(neural_net, 0.);
+    fann_set_train_error_function(neural_net, FANN_ERRORFUNC_LINEAR);
+    fann_set_train_stop_function(neural_net, FANN_STOPFUNC_MSE);
+    fann_set_learning_rate(neural_net, 0.);
+    fann_set_activation_steepness_hidden(neural_net, 0.5);
+    fann_set_activation_steepness_output(neural_net, 1.);
+    
+    lecun(input);
+  }
+  
+  void lecun(int input){
+    fann_set_activation_steepness_hidden(neural_net, 2.f/3.f);
+    
+    fann_type *last_weight;
+    fann_type *weights = neural_net->weights;
+    last_weight = weights + neural_net->total_connections;
+    std::normal_distribution<fann_type> dist(0, sqrt(input)/2);
+
+    for(; weights != last_weight; weights++)
+      *weights = (fann_type) dist(*bib::Seed::random_engine());
+    
+    //+normalization of inputs
+    // mean on 0 + same covariance
   }
 
   virtual ~MLP() {
@@ -241,3 +274,4 @@ class MLP {
 };
 
 #endif  // MLP_H
+

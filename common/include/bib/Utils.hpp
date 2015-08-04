@@ -77,6 +77,10 @@ class Utils {
 
   static float euclidien_dist3D(float x1, float x2, float y1, float y2,
                                 float z1, float z2);
+  
+  static float euclidien_dist(const std::vector<float>& v1, const std::vector<float>& v2, float dmax);
+  
+  static float euclidien_dist_ref(const std::vector<float>& v1, float refp);
 };
 }  // namespace bib
 

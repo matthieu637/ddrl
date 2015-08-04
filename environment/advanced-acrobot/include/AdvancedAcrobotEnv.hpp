@@ -138,15 +138,29 @@ private:
         actuators   = bib::to_array<bool>(properties->get<std::string>("environment.actuators"));
         problem     = str2prob(properties->get<std::string>("environment.problem"));
         problem->setEnv(this);
-
+        
+        bool add_time_in_state = false;
+        try {
+              add_time_in_state = properties->get<bool>("environment.add_time_in_state");
+        }catch(boost::exception const& ) {
+            LOG_INFO("doest not add time in state");
+        }
+        
+        bool normalization = false;
+        try {
+              normalization = properties->get<bool>("environment.normalization");
+        }catch(boost::exception const& ) { 
+            LOG_INFO("doest not normalize");
+        }
+        
         if (visible)
-            instance = new AdvancedAcrobotWorldView("data/textures", *bones, *actuators);
+            instance = new AdvancedAcrobotWorldView("data/textures", *bones, *actuators, add_time_in_state, normalization);
         else
-            instance = new AdvancedAcrobotWorld(*bones, *actuators);
+            instance = new AdvancedAcrobotWorld(*bones, *actuators, add_time_in_state, normalization);
     }
 
     void _apply(const std::vector<float>& actuators) {
-        instance->step(actuators);
+        instance->step(actuators, current_step, max_step_per_instance);
     }
 
     void _next_instance() {

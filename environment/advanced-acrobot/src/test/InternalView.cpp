@@ -14,7 +14,7 @@ void way2() {
     for (int i = 0; i < 5000; i++) {
       std::vector<float> motors(simu.activated_motors(),
                                 bib::Utils::randin(-1, 1));
-      simu.step(motors);
+      simu.step(motors, i, 5000);
     }
   }
 }
