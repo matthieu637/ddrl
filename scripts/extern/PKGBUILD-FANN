@@ -1,0 +1,23 @@
+# Contributor: Andreas Hauser <andy-aur@splashground.de>
+# Maintainer: Beej Jorgensen <beej@beej.us>
+pkgname=fann
+pkgver=2.2.0
+pkgrel=1
+pkgdesc="Fast artificial neural network library"
+arch=('x86_64')
+license=('LGPL2.1')
+depends=('glibc')
+makedepends=('cmake')
+source=("git://git.code.sf.net/u/matthieu637/fann")
+md5sums=('SKIP')
+
+build() {
+  cd $srcdir/fann
+  cmake -D CMAKE_INSTALL_PREFIX=/usr/local .
+  make
+}
+
+package() {
+  cd $srcdir/fann
+  make DESTDIR=$pkgdir install
+}
