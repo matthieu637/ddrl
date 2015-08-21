@@ -93,6 +93,7 @@ class Simulator {
     std::list<double> all_rewards;
 
     while (env->hasInstance()) {
+      uint step = 0;
       Stat stat;
       std::vector<double> perceptions = env->perceptions();
       agent->start_episode(perceptions);
@@ -104,6 +105,7 @@ class Simulator {
         env->apply(actuators);
         stat.dump(episode, perceptions, actuators, reward);
         all_rewards.push_back(reward);
+        step++;
       }
 
       // if the environment is in a final state
@@ -116,15 +118,16 @@ class Simulator {
 
       env->next_instance();
       agent->end_episode();
-    }
 
-    dump_and_display(episode, all_rewards, env, agent, learning);
+      dump_and_display(episode, all_rewards, env, agent, learning, step);
+    }
+    
     if(learning)
       save_agent(agent, episode);
   }
 
   void dump_and_display(unsigned int episode, const std::list<double>& all_rewards, Environment* env,
-                        Agent* ag, bool learning) {
+                        Agent* ag, bool learning, uint step) {
     bool display = episode % display_log_each == 0;
     bool dump = episode % dump_log_each == 0;
 
@@ -140,6 +143,7 @@ class Simulator {
                  << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.var
                  << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.max
                  << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.min
+                 << std::left << std::setw(6) << std::fixed << step
                  << " " << env_dump << " " << agent_dump);
       }
 
@@ -148,7 +152,7 @@ class Simulator {
         bib::Dumper<Agent, bool, bool> agent_dump(ag, false, true);
         LOG_FILE(learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE,
                  episode << " " << reward_stats.mean << " " << reward_stats.var << " " <<
-                 reward_stats.max << " " << reward_stats.min << env_dump << agent_dump);
+                 reward_stats.max << " " << reward_stats.min << " " << step << env_dump << agent_dump);
       }
     }
   }

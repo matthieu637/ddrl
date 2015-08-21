@@ -47,16 +47,16 @@ public:
 //         output[i] = x[i];
     }
     
-    float mmin = -50;
-    float mmax = 50;
-    
-    mmin = -1;
-    mmax = 1;
-    
-    output[0] = bib::Utils::transform(x[0], -M_PI, M_PI, mmin, mmax);
-    output[1] = bib::Utils::transform(x[1], -28, 28, mmin, mmax);
-    output[2] = bib::Utils::transform(x[2], -M_PI, M_PI, mmin, mmax);
-    output[3] = bib::Utils::transform(x[3], -62, 62, mmin, mmax);
+//     float mmin = -50;
+//     float mmax = 50;
+//     
+//     mmin = -1;
+//     mmax = 1;
+//     
+//     output[0] = bib::Utils::transform(x[0], -M_PI, M_PI, mmin, mmax);
+//     output[1] = bib::Utils::transform(x[1], -28, 28, mmin, mmax);
+//     output[2] = bib::Utils::transform(x[2], -M_PI, M_PI, mmin, mmax);
+//     output[3] = bib::Utils::transform(x[3], -62, 62, mmin, mmax);
       
       
 //     output[4] = bib::Utils::transform(x[4], 0, 500, mmin, mmax);
@@ -98,8 +98,13 @@ class BaseCaclaAg : public arch::AAgent<> {
   const std::vector<double>& run(double r, const std::vector<double>& sensors,
                                 bool learning, bool goal_reached) override {
 
-//     std::vector<double> s(nb_sensors);
-//     obs.transform(s, sensors);
+    const std::vector<double>* sin;
+    if(standard_score){
+      std::vector<double> s(nb_sensors);
+      obs.transform(s, sensors);
+      sin = &s;
+    } else
+      sin = &sensors;
 
 //     if(r >= 1.)
 //       noise = 0.00f;
@@ -115,7 +120,7 @@ class BaseCaclaAg : public arch::AAgent<> {
 
     time_for_ac--;
     if (time_for_ac == 0 || goal_reached) {
-      const std::vector<double>& next_action = _run(weighted_reward, sensors, learning, goal_reached);
+      const std::vector<double>& next_action = _run(weighted_reward, *sin, learning, goal_reached);
       time_for_ac = decision_each;
 
       for (uint i = 0; i < nb_motors; i++)
@@ -193,11 +198,12 @@ class BaseCaclaAg : public arch::AAgent<> {
     hidden_unit_v       = pt->get<int>("agent.hidden_unit_v");
     hidden_unit_a       = pt->get<int>("agent.hidden_unit_a");
     decision_each       = pt->get<int>("agent.decision_each");
-
+    plus_var_version    = pt->get<bool>("agent.plus_var_version");
+    standard_score      = pt->get<bool>("agent.standard_score");
+    
     beta = 0.001;
     delta_var = 1;
-    plus_var_version = false;
-
+    
     if(hidden_unit_v == 0){
       vnn = new LinMLP(nb_sensors, 1, alpha_v);
       fann_set_activation_function_output(vnn->getNeuralNet(), FANN_LINEAR);
@@ -361,6 +367,7 @@ class BaseCaclaAg : public arch::AAgent<> {
 
   double beta, delta_var;
   bool plus_var_version;
+  bool standard_score;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;
