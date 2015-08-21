@@ -14,7 +14,11 @@ if [ ! -e extern/lhpo ] ; then
 	git clone https://github.com/matthieu637/lhpo.git
 else
 	cd extern/lhpo
-	git pull > /dev/null
+	timeout 2 git pull > /dev/null
+
+	if [ $? -ne 0 ] ; then
+		echo "timeout cannot pull"
+	fi
 fi
 
 if [ $# -ne 3 ] ; then
