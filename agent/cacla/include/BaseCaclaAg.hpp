@@ -27,16 +27,11 @@ public:
     update_mean_var(x);
   
     for(uint i=0; i < column; i++){
-//       if(var[i] != 0.d)
-// //         output[i] = (x[i] - mean[i]) / ( sqrt(var[i]) / 0.26115f );
-//         output[i] = (x[i] - mean[i]) / sqrt(var[i]) ;
-//       else 
         output[i] = (x[i] - mean[i]);
-//         output[i] /= 60.f;
+
         if(var[i] != 0.d)
           output[i] /= sqrt(var[i]) / 0.26115f;
       
-//         output[i] *= 2;
 //       if(output[i] > 1.d)
 //         output[i] = 1.d;
 //       else if(output[i] < -1.d)
@@ -175,9 +170,15 @@ class BaseCaclaAg : public arch::AAgent<> {
     }
 
     if(learning) {
-      vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
-      delete next_action;
-      next_action = randomized_action;
+      if(gaussian_policy){
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
+        delete next_action;
+        next_action = randomized_action;
+      } else {
+        if(bib::Utils::rand01() < 0.05)
+          for (uint i = 0; i < next_action->size(); i++)
+            next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
+      }
     }
     last_action.reset(next_action);
 
@@ -200,6 +201,7 @@ class BaseCaclaAg : public arch::AAgent<> {
     decision_each       = pt->get<int>("agent.decision_each");
     plus_var_version    = pt->get<bool>("agent.plus_var_version");
     standard_score      = pt->get<bool>("agent.standard_score");
+    gaussian_policy     = pt->get<bool>("agent.gaussian_policy");
     
     beta = 0.001;
     delta_var = 1;
@@ -368,6 +370,7 @@ class BaseCaclaAg : public arch::AAgent<> {
   double beta, delta_var;
   bool plus_var_version;
   bool standard_score;
+  bool gaussian_policy;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;
