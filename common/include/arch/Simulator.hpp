@@ -84,23 +84,23 @@ class Simulator {
     env->unique_destroy();
     delete env;
 
-    LOG_FILE(DEFAULT_END_FILE, "" << (float)(time_spend.finish() / 60.f));  // in minutes
+    LOG_FILE(DEFAULT_END_FILE, "" << (double)(time_spend.finish() / 60.f));  // in minutes
   }
 
  private:
   void run_episode(bool learning, unsigned int episode) {
     env->reset_episode();
-    std::list<float> all_rewards;
+    std::list<double> all_rewards;
 
     while (env->hasInstance()) {
       Stat stat;
-      std::vector<float> perceptions = env->perceptions();
+      std::vector<double> perceptions = env->perceptions();
       agent->start_episode(perceptions);
 
       while (env->running()) {
         perceptions = env->perceptions();
-        float reward = env->performance();
-        const std::vector<float>& actuators = agent->runf(reward, perceptions, learning, false, false);
+        double reward = env->performance();
+        const std::vector<double>& actuators = agent->runf(reward, perceptions, learning, false, false);
         env->apply(actuators);
         stat.dump(episode, perceptions, actuators, reward);
         all_rewards.push_back(reward);
@@ -110,7 +110,7 @@ class Simulator {
       //        i.e it didn't reach the number of step but finished well
       // then we call the algorithm a last time to give him this information
       perceptions = env->perceptions();
-      float reward = env->performance();
+      double reward = env->performance();
       agent->runf(reward, perceptions, learning, env->final_state(), true);
       all_rewards.push_back(reward);
 
@@ -123,7 +123,7 @@ class Simulator {
       save_agent(agent, episode);
   }
 
-  void dump_and_display(unsigned int episode, const std::list<float>& all_rewards, Environment* env,
+  void dump_and_display(unsigned int episode, const std::list<double>& all_rewards, Environment* env,
                         Agent* ag, bool learning) {
     bool display = episode % display_log_each == 0;
     bool dump = episode % dump_log_each == 0;

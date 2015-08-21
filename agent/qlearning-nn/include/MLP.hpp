@@ -5,7 +5,7 @@
 #include <functional>
 #include <thread>
 
-#include "doublefann.h"
+#include "fann/doublefann.h"
 #include "opt++/newmat.h"
 #include "opt++/NLF.h"
 #include "opt++/BoundConstraint.h"
@@ -15,7 +15,7 @@
 #include "opt++/OptBCNewton.h"
 #include "opt++/OptBaNewton.h"
 #include "opt++/OptDHNIPS.h"
-#include <fann_data.h>
+#include <fann/fann_data.h>
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 
@@ -43,7 +43,7 @@ using NEWMAT::SymmetricMatrix;
 typedef struct fann* NN;
 struct passdata {
   NN neural_net;
-  const std::vector<float>& inputs;
+  const std::vector<double>& inputs;
 };
 
 void init_hs65_zero(int ndim, ColumnVector& x);
@@ -53,7 +53,7 @@ void hs65(int mode, int ndim, const ColumnVector& x, double& fx,
 
 
 struct ParallelOptimization {
-  ParallelOptimization(const NN _neural_net, const std::vector<float>& _inputs, const std::vector<float>& _init_search,
+  ParallelOptimization(const NN _neural_net, const std::vector<double>& _inputs, const std::vector<double>& _init_search,
                        uint _size_motors, uint number_parra);
   ~ParallelOptimization();
   void operator()(const tbb::blocked_range<uint>& r) const;
@@ -61,18 +61,18 @@ struct ParallelOptimization {
 
  private:
   const NN neural_net;
-  const std::vector<float>& inputs;
-  const std::vector<float>& init_search;
+  const std::vector<double>& inputs;
+  const std::vector<double>& init_search;
   const uint ndim;
  public:
-  std::vector < std::vector<float>* > a;
+  std::vector < std::vector<double>* > a;
   std::vector<double>* cost;
 };
 
 class MLP {
  public:
 
-  MLP(unsigned int input, unsigned int hidden, unsigned int sensors, float alpha) : size_input_state(input),
+  MLP(unsigned int input, unsigned int hidden, unsigned int sensors, double alpha) : size_input_state(input),
     size_sensors(sensors), size_motors(size_input_state - sensors) {
     neural_net = fann_create_standard(3, input, hidden, 1);
 
@@ -86,14 +86,17 @@ class MLP {
     fann_set_learning_rate(neural_net, alpha);
     fann_set_activation_steepness_hidden(neural_net, 0.5);
     fann_set_activation_steepness_output(neural_net, 1.);
+    
     lecun(input);
   }
-  
-  MLP(unsigned int input, unsigned int sensors) : size_input_state(input), size_sensors(sensors), size_motors(size_input_state - sensors){
-     
+
+  MLP(unsigned int input, unsigned int sensors) : size_input_state(input), size_sensors(sensors),
+    size_motors(size_input_state - sensors) {
+
   }
-  
-  MLP(unsigned int input, unsigned int hidden, unsigned int motors) : size_input_state(input), size_sensors(input), size_motors(motors){
+
+  MLP(unsigned int input, unsigned int hidden, unsigned int motors) : size_input_state(input), size_sensors(input),
+    size_motors(motors) {
     neural_net = fann_create_standard(3, input, hidden, motors);
 
     fann_set_activation_function_hidden(neural_net, FANN_SIGMOID_SYMMETRIC);
@@ -105,21 +108,46 @@ class MLP {
     fann_set_learning_rate(neural_net, 0.);
     fann_set_activation_steepness_hidden(neural_net, 0.5);
     fann_set_activation_steepness_output(neural_net, 1.);
-    
+
     lecun(input);
   }
-  
-  void lecun(int input){
-    fann_set_activation_steepness_hidden(neural_net, 2.f/3.f);
-    
-    fann_type *last_weight;
-    fann_type *weights = neural_net->weights;
-    last_weight = weights + neural_net->total_connections;
-    std::normal_distribution<fann_type> dist(0, sqrt(input)/2);
 
-    for(; weights != last_weight; weights++)
-      *weights = (fann_type) dist(*bib::Seed::random_engine());
+  void lecun(int input) {
+//     fann_set_activation_steepness_hidden(neural_net, 2.f/3.f);
+    fann_set_activation_steepness_hidden(neural_net, atanh(1.d/sqrt(3.d)));
+    fann_set_activation_function_hidden(neural_net, FANN_SIGMOID_SYMMETRIC_LECUN);
+ 
+    std::map<uint, uint> nb_inputs;
+    uint neuron = 0;
     
+    struct fann_layer *layer_it;
+    struct fann_neuron *neuron_it;
+
+    for(layer_it = neural_net->first_layer; layer_it != neural_net->last_layer; layer_it++)
+      for(neuron_it = layer_it->first_neuron; neuron_it != layer_it->last_neuron; neuron_it++){   
+        nb_inputs[neuron] = neuron_it->last_con - neuron_it->first_con;
+        neuron++;
+      } 
+
+    unsigned int source_index = 0;
+    unsigned int destination_index = 0;
+
+    for(layer_it = neural_net->first_layer; layer_it != neural_net->last_layer; layer_it++)
+        for(neuron_it = layer_it->first_neuron; neuron_it != layer_it->last_neuron; neuron_it++){
+            for (uint idx = neuron_it->first_con; idx < neuron_it->last_con; idx++){
+                uint to_neuron = destination_index;
+                double stddev = sqrt(nb_inputs[to_neuron])/2;
+                if(nb_inputs[to_neuron] == 0)
+                  stddev = sqrt(input)/2;
+                
+                std::normal_distribution<fann_type> dist(0, stddev);
+                neural_net->weights[source_index] = (fann_type) dist(*bib::Seed::random_engine());
+
+                source_index++;
+            }    
+            destination_index++;
+        }
+        
     //+normalization of inputs
     // mean on 0 + same covariance
   }
@@ -128,7 +156,7 @@ class MLP {
     fann_destroy(neural_net);
   }
 
-  void learn(const std::vector<float>& sensors, const std::vector<float>& motors, float toval) {
+  void learn(const std::vector<double>& sensors, const std::vector<double>& motors, double toval) {
     fann_type out[1];
     out[0] = toval;
 
@@ -143,10 +171,10 @@ class MLP {
     fann_train(neural_net, inputs, out);
     delete[] inputs;
   }
-  
-  void learn(const std::vector<float>& inputs, const std::vector<float>& outputs) {
+
+  void learn(const std::vector<double>& inputs, const std::vector<double>& outputs) {
     fann_type* out = new fann_type[outputs.size()];
-    for(uint j=0;j < outputs.size();j++)
+    for(uint j=0; j < outputs.size(); j++)
       out[j] = outputs[j];
 
     fann_type* in = new fann_type[inputs.size()];
@@ -158,11 +186,12 @@ class MLP {
     delete[] out;
   }
 
-  void learn(struct fann_train_data* data, uint max_epoch=10000, uint display_each = 0, float precision = 0.00001) {
+  void learn(struct fann_train_data* data, uint max_epoch=10000, uint display_each = 0, double precision = 0.00001) {
     learn(neural_net, data, max_epoch, display_each, precision);
   }
 
-  static void learn(NN neural_net, struct fann_train_data* data, uint max_epoch, uint display_each, float precision) {
+  static void learn(NN neural_net, struct fann_train_data* data, uint max_epoch, uint display_each, double precision) {
+    //FANN_TRAIN_BATCH FANN_TRAIN_RPROP
     fann_set_training_algorithm(neural_net, FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
     fann_set_train_error_function(neural_net, FANN_ERRORFUNC_TANH);
 
@@ -176,11 +205,11 @@ class MLP {
     bib::Converger::determinist<>(iter, eval, max_epoch, precision, display_each);
   }
 
-  double computeOut(const std::vector<float>& sensors, const std::vector<float>& motors) const {
+  double computeOut(const std::vector<double>& sensors, const std::vector<double>& motors) const {
     return computeOut(neural_net, sensors, motors);
   }
 
-  static double computeOut(NN neural_net, const std::vector<float>& sensors, const std::vector<float>& motors) {
+  static double computeOut(NN neural_net, const std::vector<double>& sensors, const std::vector<double>& motors) {
     uint m = sensors.size();
     uint n = motors.size();
     fann_type* inputs = new fann_type[m + n];
@@ -193,12 +222,12 @@ class MLP {
     delete[] inputs;
     return out[0];
   }
-  
-  std::vector<float>* computeOut(const std::vector<float>& in) const {
+
+  std::vector<double>* computeOut(const std::vector<double>& in) const {
     return computeOut(neural_net, in);
   }
-  
-  static std::vector<float>* computeOut(NN neural_net, const std::vector<float>& in) {
+
+  static std::vector<double>* computeOut(NN neural_net, const std::vector<double>& in) {
     uint m = in.size();
 
     fann_type* inputs = new fann_type[m];
@@ -206,8 +235,8 @@ class MLP {
       inputs[j] = in[j];
 
     fann_type* out = fann_run(neural_net, inputs);
-    std::vector<float>* outputs = new std::vector<float>(fann_get_num_output(neural_net));
-    for(uint j=0;j < outputs->size();j++)
+    std::vector<double>* outputs = new std::vector<double>(fann_get_num_output(neural_net));
+    for(uint j=0; j < outputs->size(); j++)
       outputs->at(j) = out[j];
     delete[] inputs;
     return outputs;
@@ -222,11 +251,11 @@ class MLP {
    * @param nb_solution kept it empty if you do not care to be traped in local maxima
    * If you want to try to found a global maxima you can increase this number however there is no garanty
    *
-   * @return std::vector< float >* your job to delete it
+   * @return std::vector< double >* your job to delete it
    */
 
-  virtual std::vector<float>* optimized(const std::vector<float>& inputs, const std::vector<float>& init_search = {},
-                                uint nb_solution = 12) const {
+  virtual std::vector<double>* optimized(const std::vector<double>& inputs, const std::vector<double>& init_search = {},
+                                        uint nb_solution = 12) const {
 
     ParallelOptimization para(neural_net, inputs, init_search, size_motors, nb_solution);
     tbb::parallel_for(tbb::blocked_range<uint>(0, nb_solution), para);
@@ -264,6 +293,26 @@ class MLP {
 
   double error() {
     return fann_get_MSE(neural_net);
+  }
+  
+  double weightSum(){
+#ifndef NDEBUG
+        double sum = 0.f;
+        struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(neural_net), sizeof(struct fann_connection));
+
+        for(uint j=0; j<fann_get_total_connections(neural_net); j++)
+            connections[j].weight=0;
+
+        fann_get_connection_array(neural_net, connections);
+
+        for(uint j=0; j<fann_get_total_connections(neural_net); j++)
+            sum += std::fabs(connections[j].weight);
+
+        free(connections);
+        return sum;
+#else
+        return 0;
+#endif
   }
 
  protected:

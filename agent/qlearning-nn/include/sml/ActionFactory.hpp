@@ -11,8 +11,8 @@
 namespace sml {
 
 struct TemporalLinearMotor {
-  float a;
-  float b;
+  double a;
+  double b;
 
   friend class boost::serialization::access;
   template <typename Archive>
@@ -65,7 +65,7 @@ class ActionFactory : public bib::Singleton<ActionFactory> {
 
   void read(const std::string &);
 
-  static std::vector<float> *computeOutputs(const DAction *ac, int timestep,
+  static std::vector<double> *computeOutputs(const DAction *ac, int timestep,
       const sml::list_tlaction &actions);
 
  private:

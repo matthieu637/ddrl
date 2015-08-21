@@ -8,7 +8,7 @@
 #include "sml/QLearning.hpp"
 #include "sml/ActionFactory.hpp"
 
-typedef boost::shared_ptr<std::vector<float>> EnvState;
+typedef boost::shared_ptr<std::vector<double>> EnvState;
 
 class DiscretActionAg : public arch::AAgent<> {
  public:
@@ -29,20 +29,20 @@ class DiscretActionAg : public arch::AAgent<> {
     delete rlparam;
   }
 
-  const std::vector<float>& runf(float reward, const std::vector<float>& sensors,
-                                bool learning, bool goal_reached, bool finished) override {
-                                  
+  const std::vector<double>& runf(double reward, const std::vector<double>& sensors,
+                                 bool learning, bool goal_reached, bool) override {
+
     if(reward >= 1.)
       reward = 1000;
-        
-    EnvState s(new std::vector<float>(sensors));
+
+    EnvState s(new std::vector<double>(sensors));
     sml::DAction* ac;
     if (learning)
       ac = algo->learn(s, reward, goal_reached);
     else
       ac = algo->decision(s, false);
 
-    vector<float>* outputs = sml::ActionFactory::computeOutputs(ac, 0, *actions);
+    vector<double>* outputs = sml::ActionFactory::computeOutputs(ac, 0, *actions);
     if (!learning)
       delete ac;
 
@@ -54,13 +54,13 @@ class DiscretActionAg : public arch::AAgent<> {
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
     rlparam = new sml::RLParam;
-    rlparam->epsilon             = pt->get<float>("agent.epsilon");
-    rlparam->gamma               = pt->get<float>("agent.gamma");
+    rlparam->epsilon             = pt->get<double>("agent.epsilon");
+    rlparam->gamma               = pt->get<double>("agent.gamma");
 
-    rlparam->alpha               = pt->get<float>("agent.alpha");
+    rlparam->alpha               = pt->get<double>("agent.alpha");
     rlparam->hidden_unit         = pt->get<int>("agent.hidden_unit");
     rlparam->activation          = pt->get<std::string>("agent.activation_function_hidden");
-    rlparam->activation_stepness = pt->get<float>("agent.activation_steepness_hidden");
+    rlparam->activation_stepness = pt->get<double>("agent.activation_steepness_hidden");
 
     rlparam->repeat_replay = pt->get<int>("agent.replay");
 
@@ -74,8 +74,8 @@ class DiscretActionAg : public arch::AAgent<> {
     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
   }
 
-  void start_episode(const std::vector<float>& sensors) override {
-    EnvState s(new std::vector<float>(sensors));
+  void start_episode(const std::vector<double>& sensors) override {
+    EnvState s(new std::vector<double>(sensors));
     algo->startEpisode(s, *ainit);
     weighted_reward = 0;
     pow_gamma = 1.d;
@@ -96,7 +96,8 @@ class DiscretActionAg : public arch::AAgent<> {
  protected:
   void _display(std::ostream& stdout) const override {
 #ifndef NDEBUG
-    stdout << " TTT " << algo->history_size() << " " << algo->weight_sum() << " " << algo->mse() << " " << std::setprecision(5) << weighted_reward;
+    stdout << " TTT " << algo->history_size() << " " << algo->weight_sum() << " " << algo->mse() << " " <<
+           std::setprecision(5) << weighted_reward;
 #endif
   }
 

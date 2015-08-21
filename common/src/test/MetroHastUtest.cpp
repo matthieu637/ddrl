@@ -13,12 +13,12 @@ struct UnkownDistribution {
     density_factor = analytic_density;
   }
 
-  float eval(const std::shared_ptr<std::vector<float>>& x) {
+  double eval(const std::shared_ptr<std::vector<double>>& x) {
     return eval(*x);
   }
 
-  float eval(const std::vector<float>& x) {
-    float x1, x2;
+  double eval(const std::vector<double>& x) {
+    double x1, x2;
     x1 = x[0];
     x2 = x[1];
     if (x1 > 1)
@@ -34,11 +34,11 @@ struct UnkownDistribution {
     return (x1 * x1 + 3 * x2 * x2) * exp(-x1 * x1 - x2 * x2);
   }
 
-  float density(const std::shared_ptr<std::vector<float>>& x) {
+  double density(const std::shared_ptr<std::vector<double>>& x) {
     return eval(*x) / density_factor;
   }
 
-  float density(std::vector<float>& x) {
+  double density(std::vector<double>& x) {
     return eval(x) / density_factor;
   }
 
@@ -49,11 +49,11 @@ struct UnkownDistribution {
 TEST(MetropolisHasting, OneStepConsistency) {
   UnkownDistribution dist;
 
-  bib::MCMC<UnkownDistribution, float> mcmc(&dist);
+  bib::MCMC<UnkownDistribution, double> mcmc(&dist);
 
-  float mean_llw = 0;
+  double mean_llw = 0;
   for (uint n = 0; n < 100; n++) {
-    std::vector<float> xinit(2, 0);
+    std::vector<double> xinit(2, 0);
     xinit[0] = 0;
     xinit[1] = 0;
 
@@ -62,7 +62,7 @@ TEST(MetropolisHasting, OneStepConsistency) {
     std::ofstream outfile("mcmc.data", std::ios::out);
     double loglike = 0.;
     for (uint i = 0; i < sample_number ; i++) {
-      std::shared_ptr<std::vector<float>> point = mcmc.oneStep(0.3, xinit, 8);
+      std::shared_ptr<std::vector<double>> point = mcmc.oneStep(0.3, xinit, 8);
       xinit[0] = 0;
       xinit[1] = 0;
 
@@ -85,26 +85,26 @@ TEST(MetropolisHasting, OneStepConsistency) {
 TEST(MetropolisHasting, MultiStepConsistency) {
   UnkownDistribution dist;
 
-  bib::MCMC<UnkownDistribution, float> mcmc(&dist);
+  bib::MCMC<UnkownDistribution, double> mcmc(&dist);
 
-  float mean_llw = 0;
+  double mean_llw = 0;
   for (uint n = 0; n < 100; n++) {
-    std::vector<float> xinit(2, 0);
+    std::vector<double> xinit(2, 0);
     xinit[0] = 0;
     xinit[1] = 0;
 
-    std::vector< std::shared_ptr<std::vector<float>> >* points = mcmc.multiStepReject(1000, 0.3, xinit);
+    std::vector< std::shared_ptr<std::vector<double>> >* points = mcmc.multiStepReject(1000, 0.3, xinit);
 
     std::ofstream outfile("mcmc2.data", std::ios::out);
     for (auto line = points->begin(); line != points->end(); ++line) {
-      std::shared_ptr<std::vector<float>> point = *line;
+      std::shared_ptr<std::vector<double>> point = *line;
       for (const auto & v : *point)
         outfile << v << " ";
       outfile << std::endl;
     }
 
     outfile.close();
-    float lg = bib::Proba<float>::loglikelihood<std::vector< std::shared_ptr<std::vector<float> > >, UnkownDistribution>
+    double lg = bib::Proba<double>::loglikelihood<std::vector< std::shared_ptr<std::vector<double> > >, UnkownDistribution>
                (*points, &dist);
     mean_llw += lg;
 
@@ -119,26 +119,26 @@ TEST(MetropolisHasting, MultiStepConsistency) {
 TEST(MetropolisHasting, MultiStepWithInitConsistency) {
   UnkownDistribution dist;
 
-  bib::MCMC<UnkownDistribution, float> mcmc(&dist);
+  bib::MCMC<UnkownDistribution, double> mcmc(&dist);
 
-  float mean_llw = 0;
+  double mean_llw = 0;
   for (uint n = 0; n < 100; n++) {
-    std::vector<float> xinit(2, 0);
+    std::vector<double> xinit(2, 0);
     xinit[0] = 0;
     xinit[1] = 1;
 
-    std::vector< std::shared_ptr<std::vector<float>> >* points = mcmc.multiStepReject(1000, 0.3, xinit);
+    std::vector< std::shared_ptr<std::vector<double>> >* points = mcmc.multiStepReject(1000, 0.3, xinit);
 
     std::ofstream outfile("mcmc3.data", std::ios::out);
     for (auto line = points->begin(); line != points->end(); ++line) {
-      std::shared_ptr<std::vector<float>> point = *line;
+      std::shared_ptr<std::vector<double>> point = *line;
       for (const auto & v : *point)
         outfile << v << " ";
       outfile << std::endl;
     }
 
     outfile.close();
-    float lg = bib::Proba<float>::loglikelihood<std::vector< std::shared_ptr<std::vector<float> > >, UnkownDistribution>
+    double lg = bib::Proba<double>::loglikelihood<std::vector< std::shared_ptr<std::vector<double> > >, UnkownDistribution>
                (*points, &dist);
     mean_llw += lg;
 

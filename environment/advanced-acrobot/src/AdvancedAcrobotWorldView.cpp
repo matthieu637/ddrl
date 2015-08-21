@@ -83,7 +83,7 @@ AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
   const std::string& path, const std::vector<bone_joint>& types,
   const std::vector<bool>& actuators, bool _add_time_in_state, bool normalization)
   : AdvancedAcrobotWorld(types, actuators, _add_time_in_state, normalization),
-    requestEnd(false), 
+    requestEnd(false),
     speed(1),
     ignoreMotor(false) {
   std::string goodpath = path;
@@ -135,8 +135,8 @@ AdvancedAcrobotWorldView::~AdvancedAcrobotWorldView() {
   HACKclose();
 }
 
-void AdvancedAcrobotWorldView::step(const std::vector<float>& motors, uint current_step, uint max_step_per_instance) {
-  std::vector<float> modified_motors(motors.size(), 0);
+void AdvancedAcrobotWorldView::step(const std::vector<double>& motors, uint current_step, uint max_step_per_instance) {
+  std::vector<double> modified_motors(motors.size(), 0);
   if (!inst->ignoreMotor) {
     for (unsigned int i = 0; i < motors.size(); i++)
       modified_motors[i] = motors[i];

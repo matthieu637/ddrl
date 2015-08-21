@@ -17,20 +17,21 @@
 #include <bib/XMLEngine.hpp>
 #include "MLP.hpp"
 
-#define NBSOL_OPT 4
-#define LEARNING_PRECISION 0.00001
-#define MIN_Q_ITERATION 5
-#define MAX_Q_ITERATION 20
-#define MAX_NEURAL_ITERATION 20000
-#define DATA_KEEPT 6000
+#define NBSOL_OPT 2
+#define LEARNING_PRECISION 0.0001
+#define MIN_Q_ITERATION 10
+#define MAX_Q_ITERATION 30
+#define MAX_NEURAL_ITERATION 10000
+#define DATA_KEEPT 1000
 
 typedef struct _sample {
-  std::vector<float> s;
-  std::vector<float> a;
-  std::vector<float> next_s;
+  std::vector<double> s;
+  std::vector<double> a;
+  std::vector<double> next_s;
   double r;
   bool goal_reached;
   double score;
+  int replayed;
 
   friend class boost::serialization::access;
   template <typename Archive>
@@ -44,8 +45,9 @@ typedef struct _sample {
   }
 
   bool operator< (const _sample& b) const {
+//     return replayed > b.replayed;
     if(score < b.score)
-        return true;
+      return true;
     for (uint i = 0; i < s.size(); i++)
       if (s[i] < b.s[i])
         return true;
@@ -74,31 +76,14 @@ class ContinuousAcTAg : public arch::AAgent<> {
   virtual ~ContinuousAcTAg() {
     delete nn;
   }
-  
-  float max_reward = std::numeric_limits<float>::min();
-  
-  const std::vector<float>& runf(float r, const std::vector<float>& sensors,
-                                bool learning, bool goal_reached, bool) override {
+
+  double max_reward = std::numeric_limits<double>::min();
+
+  const std::vector<double>& runf(double r, const std::vector<double>& sensors,
+                                 bool learning, bool goal_reached, bool) override {
 
     double reward = r;
-//     if (reward >= 1.f) {
-//       reward = 13000;
-// 
-// //             uint keeped = 2000 - internal_time;
-// //             reward = 100 * log2(keeped + 2);
-//     } else
-//       reward = exp((reward - 0.01)*4000) * 0.01;
-    
-//     if(max_reward < reward)
-//       max_reward = reward;
-//                                   
-//     if(!goal_reached && !last_step)
-//       reward = 0;
-//     else
-//       reward = max_reward;
-//     if(!goal_reached)
-//       reward = 0;
-    
+
     internal_time ++;
 
     weighted_reward += reward * pow_gamma;
@@ -109,7 +94,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
 
     time_for_ac--;
     if (time_for_ac == 0 || goal_reached) {
-      const std::vector<float>& next_action = _run(weighted_reward, sensors, learning, goal_reached);
+      const std::vector<double>& next_action = _run(weighted_reward, sensors, learning, goal_reached);
 //       time_for_ac = bib::Utils::transform(next_action[nb_motors], -1., 1., min_ac_time, max_ac_time);
       time_for_ac = 4;
 
@@ -123,24 +108,24 @@ class ContinuousAcTAg : public arch::AAgent<> {
     return returned_ac;
   }
 
-  const std::vector<float>& _run(float reward, const std::vector<float>& sensors,
+  const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
                                  bool learning, bool goal_reached) {
-    vector<float>* next_action = nullptr;
+    vector<double>* next_action = nullptr;
 
     if (softmax) {
       struct NNDistribution {
         MLP* mlp;
-        const std::vector<float>& sensors;
-        NNDistribution(MLP* _mlp, const std::vector<float>& _sensors): mlp(_mlp), sensors(_sensors) {}
+        const std::vector<double>& sensors;
+        NNDistribution(MLP* _mlp, const std::vector<double>& _sensors): mlp(_mlp), sensors(_sensors) {}
 
-        float eval(const std::vector<float>& x) {
+        double eval(const std::vector<double>& x) {
           return mlp->computeOut(sensors, x);
         }
       };
       NNDistribution dist(nn, sensors);
-      bib::MCMC<NNDistribution, float> mcmc(&dist);
-      static std::vector<float> xinit(2, 0);
-      next_action = new vector<float>(*mcmc.oneStep(0.35, xinit, 5).get());
+      bib::MCMC<NNDistribution, double> mcmc(&dist);
+      static std::vector<double> xinit(2, 0);
+      next_action = new vector<double>(*mcmc.oneStep(0.35, xinit, 5).get());
     } else {
       if (init_old_ac && last_action.get() != nullptr)
         next_action = nn->optimized(sensors, *last_action, NBSOL_OPT);
@@ -160,20 +145,25 @@ class ContinuousAcTAg : public arch::AAgent<> {
 //         nn->learn(last_state, *last_action, reward);
 //       }
 //             trajectory.push_back( {last_state, *last_action, sensors, reward});
-      auto ppair = trajectory.insert( {last_state, *last_action, sensors, reward, goal_reached, (uint)0});
+      auto ppair = trajectory.insert( {last_state, *last_action, sensors, reward, goal_reached, (uint)0, (uint)0});
+//       auto ppair = trajectory.insert( {last_state, *last_pure_action, sensors, reward, goal_reached, (uint)0, (uint)0});
       if(ppair.second)
         current_trajectory.push_back(*ppair.first);
     }
 
+    last_pure_action.reset(new vector<double>(*next_action));
+    
     if (!softmax && learning && bib::Utils::rand01() < epsilon) {
       for (uint i = 0; i < next_action->size(); i++)
         next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
     }
-    
-//     vector<float>* randomized_action = bib::Proba<float>::multidimentionnalGaussianWReject(*next_action, 0.4);
-//     delete next_action;
-//     next_action = randomized_action;
-    
+
+//     if (!softmax && learning){
+//       vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, 0.4);
+//       delete next_action;
+//       next_action = randomized_action;
+//     }
+
     last_action.reset(next_action);
 
     last_state.clear();
@@ -184,12 +174,12 @@ class ContinuousAcTAg : public arch::AAgent<> {
   }
 
   void _unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) override {
-//         epsilon             = pt->get<float>("agent.epsilon");
-//         gamma               = pt->get<float>("agent.gamma");
-//         alpha               = pt->get<float>("agent.alpha");
+//         epsilon             = pt->get<double>("agent.epsilon");
+//         gamma               = pt->get<double>("agent.gamma");
+//         alpha               = pt->get<double>("agent.alpha");
 //         hidden_unit         = pt->get<int>("agent.hidden_unit");
 // //     rlparam->activation          = pt->get<std::string>("agent.activation_function_hidden");
-// //     rlparam->activation_stepness = pt->get<float>("agent.activation_steepness_hidden");
+// //     rlparam->activation_stepness = pt->get<double>("agent.activation_steepness_hidden");
 // //
 // //     rlparam->repeat_replay = pt->get<int>("agent.replay");
 // //
@@ -201,12 +191,12 @@ class ContinuousAcTAg : public arch::AAgent<> {
 // //     act_templ = new sml::ActionTemplate( {"effectors"}, {sml::ActionFactory::getInstance()->getActionsNumber()});
 // //     ainit = new sml::DAction(act_templ, {0});
 // //     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
-    hidden_unit = 40;
-    gamma = 0.99; // < 0.99  => gamma ^ 2000 = 0 && gamma != 1 -> better to reach the goal at the very end
+    hidden_unit = 10;
+    gamma = 0.9; // < 0.99  => gamma ^ 2000 = 0 && gamma != 1 -> better to reach the goal at the very end
 //     gamma = 1.0d;
     //check 0,0099×((1−0.95^1999)÷(1−0.95))
     //r_max_no_goal×((1−gamma^1999)÷(1−gamma)) < r_max_goal * gamma^2000 && gamma^2000 != 0
-    alpha = 0.05;
+
     epsilon = 0.05;
 
     min_ac_time = 4;
@@ -217,22 +207,23 @@ class ContinuousAcTAg : public arch::AAgent<> {
     softmax = false;
 
 //     nn = new MLP(nb_sensors + nb_motors + 1, hidden_unit, nb_sensors, alpha);
-    nn = new MLP(nb_sensors + nb_motors, hidden_unit, nb_sensors, alpha);
-    if (boost::filesystem::exists("trajectory.data")) {
-      decltype(trajectory)* obj = bib::XMLEngine::load<decltype(trajectory)>("trajectory", "trajectory.data");
-      trajectory = *obj;
-      delete obj;
-
-      end_episode();
-    }
+    nn = new MLP(nb_sensors + nb_motors, hidden_unit, nb_sensors, 0.0);
+//     if (boost::filesystem::exists("trajectory.data")) {
+//       decltype(trajectory)* obj = bib::XMLEngine::load<decltype(trajectory)>("trajectory", "trajectory.data");
+//       trajectory = *obj;
+//       delete obj;
+//
+//       end_episode();
+//     }
   }
 
-  void start_episode(const std::vector<float>& sensors) override {
+  void start_episode(const std::vector<double>& sensors) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
     last_action = nullptr;
+    last_pure_action = nullptr;
 
     weighted_reward = 0;
     pow_gamma = 1.d;
@@ -242,7 +233,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
     internal_time = 0;
 //     trajectory.clear();
     current_trajectory.clear();
-    max_reward = std::numeric_limits<float>::min();
+    max_reward = std::numeric_limits<double>::min();
   }
 
   struct ParrallelLearnFromScratch {
@@ -321,7 +312,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
 
         double delta = sm.r;
         if (!sm.goal_reached) {
-          std::vector<float>* best_action = ptr->nn->optimized(sm.next_s, {}, NBSOL_OPT);
+          std::vector<double>* best_action = ptr->nn->optimized(sm.next_s, {}, NBSOL_OPT);
           double nextQ = MLP::computeOut(local_nn, sm.next_s, *best_action);
           if (ptr->aware_ac_time)
             delta += pow(ptr->gamma, bib::Utils::transform(sm.a[ptr->nb_motors + ptr->nb_sensors], -1., 1., ptr->min_ac_time,
@@ -373,44 +364,51 @@ class ContinuousAcTAg : public arch::AAgent<> {
       NN best_nn = nullptr;
       auto save_best = [&]() {
         if(best_nn != nullptr)
-             fann_destroy(best_nn);
+          fann_destroy(best_nn);
         best_nn = fann_copy(nn->getNeuralNet());
       };
 
-      bib::Converger::min_stochastic<>(iter, eval, save_best, MAX_Q_ITERATION, LEARNING_PRECISION, 1, MIN_Q_ITERATION);
+      bib::Converger::min_stochastic<>(iter, eval, save_best, MAX_Q_ITERATION, LEARNING_PRECISION, 0, MIN_Q_ITERATION);
       if(best_nn != nullptr)
         nn->copy(best_nn);
       fann_destroy(best_nn);
 //       END CHOOSE
-      
-      
-      
+
+
+
       dq.free();
-      LOG_DEBUG("number of data " << trajectory.size());
-      
+//       LOG_DEBUG("number of data " << trajectory.size());
+
       //puring by scoring
-      for(auto it = current_trajectory.begin(); it != current_trajectory.end() ; it++){
-          trajectory.erase(*it);
-          it->score = sum_weighted_reward;
+      for(auto it = current_trajectory.begin(); it != current_trajectory.end() ; it++) {
+        trajectory.erase(*it);
+        it->score = sum_weighted_reward;
       }
       
-      for(auto it = current_trajectory.begin(); it != current_trajectory.end() ; it++){
-          trajectory.insert(*it);
+//       for(auto it = trajectory.begin(); it != trajectory.end() ; it++) {
+//         sample sa = *it;
+//         trajectory.erase(*it);
+//         sa.replayed++;
+//         trajectory.insert(sa);
+//       }
+
+      for(auto it = current_trajectory.begin(); it != current_trajectory.end() ; it++) {
+        trajectory.insert(*it);
       }
 
-      while(trajectory.size() > DATA_KEEPT){
-          trajectory.erase(trajectory.begin());
+      while(trajectory.size() > DATA_KEEPT) {
+        trajectory.erase(trajectory.begin());
       }
-          
+
     }
   }
-  
+
   double sum_score_replayed() const {
-      double sum= 0;
-      for(auto it = trajectory.begin(); it != trajectory.end() ; it++){
-          sum += it->score;
-      } 
-      return sum;
+    double sum= 0;
+    for(auto it = trajectory.begin(); it != trajectory.end() ; it++) {
+      sum += it->score;
+    }
+    return sum;
   }
 
   void save(const std::string& path) override {
@@ -424,14 +422,16 @@ class ContinuousAcTAg : public arch::AAgent<> {
 
  protected:
   void _display(std::ostream& out) const override {
-    out << std::setw(8) << std::fixed << std::setprecision(5) << sum_weighted_reward << " " << std::setw(8) << std::fixed << std::setprecision(5) << 
-    nn->error() << " " << trajectory.size() << " " << std::setw(8) << std::fixed << std::setprecision(8) << sum_score_replayed() ;
+    out << std::setw(8) << std::fixed << std::setprecision(5) << sum_weighted_reward << " " << std::setw(
+          8) << std::fixed << std::setprecision(5) <<
+        nn->error() << " " << trajectory.size() << " " << std::setw(8) << std::fixed << std::setprecision(
+          8) << sum_score_replayed() ;
   }
-  
+
   void _dump(std::ostream& out) const override {
-    out <<" " << std::setw(8) << std::fixed << std::setprecision(8) << 
-    sum_weighted_reward << " " << std::setw(8) << std::fixed << 
-    std::setprecision(5) << nn->error() << " " << trajectory.size() ;
+    out <<" " << std::setw(8) << std::fixed << std::setprecision(8) <<
+        sum_weighted_reward << " " << std::setw(8) << std::fixed <<
+        std::setprecision(5) << nn->error() << " " << trajectory.size() ;
   }
 
  private:
@@ -454,20 +454,22 @@ class ContinuousAcTAg : public arch::AAgent<> {
 
   bool softmax;
 
-  double epsilon, alpha, gamma;
+  double epsilon, gamma;
   uint hidden_unit;
 
-  std::shared_ptr<std::vector<float>> last_action;
-  std::vector<float> last_state;
+  std::shared_ptr<std::vector<double>> last_action;
+  std::shared_ptr<std::vector<double>> last_pure_action;
+  std::vector<double> last_state;
 
-  std::vector<float> returned_ac;
+  std::vector<double> returned_ac;
 
   std::set<sample> trajectory;
   std::list<sample> current_trajectory;
-//     std::list<sample> trajectory;
+// //     std::list<sample> trajectory;
 
   MLP* nn;
 };
 
 #endif
+
 

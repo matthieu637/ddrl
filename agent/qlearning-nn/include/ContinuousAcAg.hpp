@@ -20,13 +20,13 @@ class ContinuousAcAg : public arch::AAgent<> {
     delete nn;
   }
 
-  const std::vector<float>& run(float reward, const std::vector<float>& sensors,
+  const std::vector<double>& run(double reward, const std::vector<double>& sensors,
                                 bool learning, bool goal_reached) override {
     if(reward >= 1.f) {
       reward = 100;
     }
 
-    vector<float>* next_action = nn->optimized(sensors);
+    vector<double>* next_action = nn->optimized(sensors);
 
     if (last_action.get() != nullptr && learning) {  // Update Q
       double nextQ = nn->computeOut(sensors, *next_action);
@@ -50,12 +50,12 @@ class ContinuousAcAg : public arch::AAgent<> {
   }
 
   void _unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) override {
-//         epsilon             = pt->get<float>("agent.epsilon");
-//         gamma               = pt->get<float>("agent.gamma");
-//         alpha               = pt->get<float>("agent.alpha");
+//         epsilon             = pt->get<double>("agent.epsilon");
+//         gamma               = pt->get<double>("agent.gamma");
+//         alpha               = pt->get<double>("agent.alpha");
 //         hidden_unit         = pt->get<int>("agent.hidden_unit");
 // //     rlparam->activation          = pt->get<std::string>("agent.activation_function_hidden");
-// //     rlparam->activation_stepness = pt->get<float>("agent.activation_steepness_hidden");
+// //     rlparam->activation_stepness = pt->get<double>("agent.activation_steepness_hidden");
 // //
 // //     rlparam->repeat_replay = pt->get<int>("agent.replay");
 // //
@@ -74,8 +74,8 @@ class ContinuousAcAg : public arch::AAgent<> {
     nn = new MLP(nb_sensors + nb_motors, hidden_unit, nb_sensors, alpha);
   }
 
-  void start_episode(const std::vector<float>& sensors) override {
-//     EnvState s(new std::vector<float>(sensors));
+  void start_episode(const std::vector<double>& sensors) override {
+//     EnvState s(new std::vector<double>(sensors));
 //     algo->startEpisode(s, *ainit);
 //     weighted_reward = 0;
 //     pow_gamma = 1.d;
@@ -108,8 +108,8 @@ class ContinuousAcAg : public arch::AAgent<> {
   double epsilon, alpha, gamma;
   uint hidden_unit;
 
-  std::shared_ptr<std::vector<float>> last_action;
-  std::vector<float> last_state;
+  std::shared_ptr<std::vector<double>> last_action;
+  std::vector<double> last_state;
 
   MLP* nn;
 };

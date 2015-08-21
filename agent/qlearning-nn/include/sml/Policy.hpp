@@ -13,14 +13,14 @@ using std::string;
 namespace sml {
 
 struct RLParam {
-  float epsilon;
-  float alpha;
-  float gamma;
+  double epsilon;
+  double alpha;
+  double gamma;
   unsigned int repeat_replay;
   int memory_size;
 
   int hidden_unit;
-  float activation_stepness;
+  double activation_stepness;
   std::string activation;
 };
 

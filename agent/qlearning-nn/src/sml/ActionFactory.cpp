@@ -113,11 +113,11 @@ void ActionFactory::gridAction(unsigned int numberMotor, unsigned int actionPerM
   actions.clear();
 
   std::vector<TemporalLinearMotor> tlm(actionPerMotor);
-  float factor = 2.f / (static_cast<float>(actionPerMotor) - 1.f);
+  double factor = 2.f / (static_cast<double>(actionPerMotor) - 1.f);
 
   for (unsigned int i = 0; i < actionPerMotor; i++) {
     tlm[i].a = 0.f;
-    tlm[i].b = (factor * (static_cast<float>(i))) - 1.f;
+    tlm[i].b = (factor * (static_cast<double>(i))) - 1.f;
   }
 
   numberAction = static_cast<unsigned int>(pow(actionPerMotor, numberMotor));
@@ -157,11 +157,11 @@ void ActionFactory::randomLinearAction(int numberMotor, int timestepMin,
     TemporalLinearAction ac;
     ac.temporal_extension = bib::Utils::randin(timestepMin, timestepMax);
     for (int motor = 0; motor < numberMotor; motor++) {
-      float y1 = bib::Utils::rand01();
-      float y2 = bib::Utils::rand01();
+      double y1 = bib::Utils::rand01();
+      double y2 = bib::Utils::rand01();
 
       TemporalLinearMotor tlm;
-      tlm.a = static_cast<float>((y2 - y1) / ac.temporal_extension);
+      tlm.a = static_cast<double>((y2 - y1) / ac.temporal_extension);
       tlm.b = y2;
       ac.motors.push_back(tlm);
     }
@@ -200,13 +200,13 @@ void ActionFactory::randomFixedAction(int numberMotor, int timestepMin,
   randomFixedAction(numberMotor, numberAction, timestepMin, timestepMax);
 }
 
-std::vector<float>* ActionFactory::computeOutputs(
+std::vector<double>* ActionFactory::computeOutputs(
   const DAction* ac, int timestep, const sml::list_tlaction& actions) {
   int ac_id = ac->get(0);
   const TemporalLinearAction& action = actions.at(ac_id);
 
   int nb_motors = action.motors.size();
-  std::vector<float>* outputs = new std::vector<float>(nb_motors, 0.5);
+  std::vector<double>* outputs = new std::vector<double>(nb_motors, 0.5);
 
   for (int motor = 0; motor < nb_motors; motor++)
     outputs->operator[](motor) =

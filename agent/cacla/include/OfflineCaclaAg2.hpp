@@ -1,5 +1,5 @@
-#ifndef OFFLINECACLAAG_HPP
-#define OFFLINECACLAAG_HPP
+#ifndef OFFLINECACLAAG2_HPP
+#define OFFLINECACLAAG2_HPP
 
 #include <vector>
 #include <string>
@@ -20,9 +20,11 @@
 
 typedef struct _sample {
   std::vector<float> s;
+  std::vector<float> s_combination;
   std::vector<float> pure_a;
   std::vector<float> a;
   std::vector<float> next_s;
+  std::vector<float> next_s_combination;
   double r;
   bool goal_reached;
 
@@ -98,17 +100,38 @@ class OfflineCaclaAg : public arch::AAgent<> {
     return returned_ac;
   }
 
+  std::vector<float>* combine(const std::vector<float>& sensors, MLP* ann) {
+    std::vector<float>* inp = new std::vector<float>(nb_sensors + additionnal_input_vnn);
+    for(uint i=0; i<nb_sensors; i++)
+      inp->at(i) = sensors[i];
+
+    typedef struct fann_connection sfn;
+    unsigned int number_connection = fann_get_total_connections(ann->getNeuralNet());
+    sfn* connections = reinterpret_cast<sfn*>(calloc(number_connection, sizeof(sfn)));
+
+    fann_get_connection_array(ann->getNeuralNet(), connections);
+
+    for(uint i=nb_sensors; i<nb_sensors+additionnal_input_vnn; i++)
+      inp->at(i) = connections[i-nb_sensors].weight;
+
+    free(connections);
+
+    return inp;
+  }
 
   const std::vector<float>& _run(float reward, const std::vector<float>& sensors,
                                  bool learning, bool goal_reached) {
 
     vector<float>* next_action = ann->computeOut(sensors);
+    vector<float>* combination = combine(sensors,ann);
 
     if (last_action.get() != nullptr && learning) {  // Update Q
 
+
       double vtarget = reward;
       if (!goal_reached) {
-        double nextV = vnn->computeOut(sensors, {});
+
+        double nextV = vnn->computeOut(*combination, {});
         vtarget += gamma * nextV;
       }
 //             double lastv = vnn->computeOut(last_state, *next_action);
@@ -118,7 +141,10 @@ class OfflineCaclaAg : public arch::AAgent<> {
 //             if (vtarget > lastv) //increase this action
 //                 ann->learn(last_state, *last_action);
 
-      trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
+      double mine = vnn->computeOut(last_state, {});
+      if (vtarget > mine)
+        trajectory.insert( {last_state, last_state_combinaison, *last_pure_action, *last_action, sensors, *combination, reward, goal_reached});
+      trajectory_v.insert( {last_state, last_state_combinaison, *last_pure_action, *last_action, sensors, *combination, reward, goal_reached});
     }
 
 //         if (learning && bib::Utils::rand01() < alpha) { // alpha ??
@@ -136,8 +162,15 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
 
     last_state.clear();
+    last_state_combinaison.clear();
+
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
+
+    for (uint i = 0; i < combination->size(); i++)
+      last_state_combinaison.push_back(combination->at(i));
+
+    delete combination;
 
     return *next_action;
   }
@@ -157,15 +190,20 @@ class OfflineCaclaAg : public arch::AAgent<> {
 //         alpha_a = 0.05;
 //         decision_each = 4;
 
-    if(hidden_unit_v == 0)
-      vnn = new LinMLP(nb_sensors , 1, 0.0);
+    if(hidden_unit_a == 0)
+      additionnal_input_vnn = nb_motors * (nb_sensors + 1);
     else
-      vnn = new MLP(nb_sensors, hidden_unit_v, nb_sensors, 0.0);
+      additionnal_input_vnn = nb_motors * (nb_sensors + 1) * (hidden_unit_a + 1);
 
     if(hidden_unit_a == 0)
       ann = new LinMLP(nb_sensors , nb_motors, 0.0);
     else
       ann = new MLP(nb_sensors, hidden_unit_a, nb_motors);
+
+    if(hidden_unit_v == 0)
+      vnn = new LinMLP(nb_sensors + additionnal_input_vnn, 1, 0.0);
+    else
+      vnn = new MLP(nb_sensors + additionnal_input_vnn, hidden_unit_v, nb_sensors + additionnal_input_vnn, 0.0);
 //         if (boost::filesystem::exists("trajectory.data")) {
 //             decltype(trajectory)* obj = bib::XMLEngine::load<decltype(trajectory)>("trajectory", "trajectory.data");
 //             trajectory = *obj;
@@ -177,8 +215,16 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
   void start_episode(const std::vector<float>& sensors) override {
     last_state.clear();
+    last_state_combinaison.clear();
+
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
+
+    vector<float>* combination = combine(sensors,ann);
+    for (uint i = 0; i < combination->size(); i++)
+      last_state_combinaison.push_back(combination->at(i));
+
+    delete combination;
 
     last_action = nullptr;
     last_pure_action = nullptr;
@@ -196,11 +242,11 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
   struct ParraVtoVNext {
     ParraVtoVNext(const std::vector<sample>& _vtraj, const OfflineCaclaAg* _ptr) : vtraj(_vtraj), ptr(_ptr) {
-      data = fann_create_train(vtraj.size(), ptr->nb_sensors, 1);
+      data = fann_create_train(vtraj.size(), ptr->nb_sensors + ptr->additionnal_input_vnn, 1);
       for (uint n = 0; n < vtraj.size(); n++) {
         sample sm = vtraj[n];
-        for (uint i = 0; i < ptr->nb_sensors ; i++)
-          data->input[n][i] = sm.s[i];
+        for (uint i = 0; i < ptr->nb_sensors + ptr->additionnal_input_vnn ; i++)
+          data->input[n][i] = sm.s_combination[i];
       }
     }
 
@@ -221,7 +267,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
         double delta = sm.r;
         if (!sm.goal_reached) {
-          double nextV = MLP::computeOut(local_nn, sm.next_s, {});
+          double nextV = MLP::computeOut(local_nn, sm.next_s_combination, {});
           delta += ptr->gamma * nextV;
         }
 
@@ -283,8 +329,8 @@ class OfflineCaclaAg : public arch::AAgent<> {
     if (trajectory.size() > 0) {
       //remove trace of old policy
 
-      std::vector<sample> vtraj(trajectory.size());
-      std::copy(trajectory.begin(), trajectory.end(), vtraj.begin());
+      std::vector<sample> vtraj(trajectory_v.size());
+      std::copy(trajectory_v.begin(), trajectory_v.end(), vtraj.begin());
 
       ParraVtoVNext dq(vtraj, this);
 
@@ -330,24 +376,24 @@ class OfflineCaclaAg : public arch::AAgent<> {
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
         sample sm = *it;
 
-        double target = sm.r;
-        if (!sm.goal_reached) {
-          double nextV = vnn->computeOut(sm.next_s, {});
-          target += gamma * nextV;
-        }
-
-        double mine = vnn->computeOut(sm.s, {});
-
-        if(target > mine) {
-          for (uint i = 0; i < nb_sensors ; i++)
-            data->input[n][i] = sm.s[i];
-          for (uint i = 0; i < nb_motors; i++)
-            data->output[n][i] = sm.pure_a[i];
+//                 double target = sm.r;
+//                 if (!sm.goal_reached) {
+//                     double nextV = vnn->computeOut(sm.next_s_combination, {});
+//                     target += gamma * nextV;
+//                 }
+//
+//                 double mine = vnn->computeOut(sm.s_combination, {});
+//
+//                 if(target > mine) {
+        for (uint i = 0; i < nb_sensors ; i++)
+          data->input[n][i] = sm.s[i];
+        for (uint i = 0; i < nb_motors; i++)
+          data->output[n][i] = sm.pure_a[i];
 //                     should explain why
 //                            data->output[n][i] = sm.a[i];
 
-          n++;
-        }
+        n++;
+//                 }
       }
 
       if(n > 0) {
@@ -367,7 +413,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
   void save(const std::string& path) override {
     ann->save(path+".actor");
     vnn->save(path+".critic");
-    bib::XMLEngine::save<>(trajectory, "trajectory", "trajectory.data");
+//         bib::XMLEngine::save<>(trajectory, "trajectory", "trajectory.data");
   }
 
   void load(const std::string& path) override {
@@ -377,8 +423,9 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
  protected:
   void _display(std::ostream& out) const override {
-    out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " " << std::setw(
-          8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << trajectory.size();
+    out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " "
+        << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise
+        << " " << trajectory.size() << " " << trajectory_v.size();
   }
 
   void _dump(std::ostream& out) const override {
@@ -403,14 +450,17 @@ class OfflineCaclaAg : public arch::AAgent<> {
   double gamma, noise;
   uint hidden_unit_v;
   uint hidden_unit_a;
+  uint additionnal_input_vnn;
 
   std::shared_ptr<std::vector<float>> last_action;
   std::shared_ptr<std::vector<float>> last_pure_action;
   std::vector<float> last_state;
+  std::vector<float> last_state_combinaison;
 
   std::vector<float> returned_ac;
 
   std::set<sample> trajectory;
+  std::set<sample> trajectory_v;
 //     std::list<sample> trajectory;
 
   MLP* ann;

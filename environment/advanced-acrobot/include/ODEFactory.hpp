@@ -24,11 +24,11 @@ class ODEFactory : public bib::Singleton<ODEFactory> {
   friend class bib::Singleton<ODEFactory>;
 
  public:
-  ODEObject *createBox(const ODEWorld &world, float x, float y, float z,
-                       float lx, float ly, float lz, float density,
+  ODEObject *createBox(const ODEWorld &world, double x, double y, double z,
+                       double lx, double ly, double lz, double density,
                        bool linkBody = true);
-  ODEObject *createSphere(const ODEWorld &world, float x, float y, float z,
-                          float radius, float density,
+  ODEObject *createSphere(const ODEWorld &world, double x, double y, double z,
+                          double radius, double density,
                           bool linkBody = true);
 
   ODEWorld createWorld();

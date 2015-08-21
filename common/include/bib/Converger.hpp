@@ -10,7 +10,7 @@ namespace bib {
 class Converger {
  public:
   template<typename Function1, typename Function2>
-  static uint determinist(Function1 && iter, Function2 && eval, uint max_epoch, float precision, uint display_each = 0) {
+  static uint determinist(Function1 && iter, Function2 && eval, uint max_epoch, double precision, uint display_each = 0) {
 
     bool converged = false;
     bool limit_reached = false;
@@ -44,7 +44,7 @@ class Converger {
 
   template<typename Function1, typename Function2, typename Function3>
   static uint min_stochastic(Function1 && iter, Function2 && eval, Function3 && save, uint max_epoch,
-                             float precision, uint display_each = 0, uint number_consecp = 20) {
+                             double precision, uint display_each = 0, uint number_consecp = 20) {
 
     bool converged = false;
     bool limit_reached = false;

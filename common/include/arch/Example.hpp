@@ -15,7 +15,7 @@ class ExampleEnv : public arch::AEnvironment<> {
     for (unsigned int i = 0; i < internal_state.size(); i++)
       internal_state[i] = bib::Utils::randin(-1, 1);
   }
-  const std::vector<float>& perceptions() const {
+  const std::vector<double>& perceptions() const {
     return internal_state;
   }
   unsigned int number_of_actuators() const {
@@ -24,18 +24,18 @@ class ExampleEnv : public arch::AEnvironment<> {
   unsigned int number_of_sensors() const {
     return internal_state.size();
   }
-  float performance() const {
+  double performance() const {
     return 0;
   }
-  void _apply(const std::vector<float>&) {}
+  void _apply(const std::vector<double>&) {}
 
-  std::vector<float> internal_state;
+  std::vector<double> internal_state;
 };
 
 class ExampleAgent : public arch::AAgent<> {
  public:
   ExampleAgent(unsigned int nb_motors, unsigned int) : actuator(nb_motors) {}
-  const std::vector<float>& run(float, const std::vector<float>&, bool, bool) override {
+  const std::vector<double>& run(double, const std::vector<double>&, bool, bool) override {
     for (unsigned int i = 0; i < actuator.size(); i++)
       actuator[i] = bib::Utils::randin(-1, 1);
     return actuator;
@@ -44,7 +44,7 @@ class ExampleAgent : public arch::AAgent<> {
   virtual ~ExampleAgent() {
   }
 
-  std::vector<float> actuator;
+  std::vector<double> actuator;
 };
 }  // namespace arch
 

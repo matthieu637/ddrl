@@ -1,18 +1,18 @@
 #include "MLP.hpp"
 
 #include <vector>
-#include "doublefann.h"
+#include "fann/doublefann.h"
 #include "bib/Assert.hpp"
 #include <bib/Utils.hpp>
 
 #define activation_function(x, lambda) tanh(lambda * x)
 
-ParallelOptimization::ParallelOptimization(const NN _neural_net, const std::vector<float>& _inputs,
-    const std::vector<float>& _init_search,
+ParallelOptimization::ParallelOptimization(const NN _neural_net, const std::vector<double>& _inputs,
+    const std::vector<double>& _init_search,
     uint _size_motors, uint number_parra): neural_net(_neural_net), inputs(_inputs), init_search(_init_search),
   ndim(_size_motors), a(number_parra) {
   for (uint i = 0; i < number_parra; i++)
-    a[i] = new std::vector<float>(_size_motors);
+    a[i] = new std::vector<double>(_size_motors);
 
   cost = new std::vector<double>(number_parra);
 }
@@ -175,7 +175,7 @@ class my_weights {
   typedef struct fann_connection sfn;
 
  public:
-  my_weights(NN neural_net, const std::vector<float>& sensors, const ColumnVector& x, uint _m, uint _n) : m(_m), n(_n) {
+  my_weights(NN neural_net, const std::vector<double>& sensors, const ColumnVector& x, uint _m, uint _n) : m(_m), n(_n) {
     _lambda = fann_get_activation_steepness(neural_net, 1, 0);
 
     unsigned int number_connection = fann_get_total_connections(neural_net);

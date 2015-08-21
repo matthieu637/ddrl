@@ -20,11 +20,11 @@ class Utils {
  public:
   ///
   // /\brief Retourner 0 ou 1
-  static float rand01();
+  static double rand01();
 
-  static bool rand01(float);
+  static bool rand01(double);
 
-  static float randin(float a, float b);
+  static double randin(double a, double b);
 
   static bool randBool();
 
@@ -35,22 +35,22 @@ class Utils {
   ///   c,d: intervalle [c,d]
   static double transform(double x, double a, double b, double c, double d);
 
-  static float *genNrand(int N, float max);
+  static double *genNrand(int N, double max);
 
   typedef struct {
-    float var;
-    float mean;
-    float max;
-    float min;
+    double var;
+    double mean;
+    double max;
+    double min;
   } V3M;
 
   template <typename T>
   static V3M statistics(const T &_list) {
-    float mean = 0.f;
-    float min = *_list.cbegin();
-    float max = *_list.cbegin();
+    double mean = 0.f;
+    double min = *_list.cbegin();
+    double max = *_list.cbegin();
     for (auto it = _list.cbegin(); it != _list.cend(); ++it) {
-      float p = *it;
+      double p = *it;
       mean += p;
 
       if (p > max)
@@ -58,29 +58,29 @@ class Utils {
       else if (p < min)
         min = p;
     }
-    mean = (mean / static_cast<float>(_list.size()));
+    mean = (mean / static_cast<double>(_list.size()));
 
-    float variance = 0.f;
+    double variance = 0.f;
     for (auto it = _list.cbegin(); it != _list.cend(); ++it) {
-      float p = *it;
+      double p = *it;
       variance += p * p;
     }
-    variance = (variance / static_cast<float>(_list.size()));
+    variance = (variance / static_cast<double>(_list.size()));
     variance = variance - mean * mean;
 
     return {variance, mean, max, min};
   }
 
-  static float euclidien_dist1D(float x1, float x2);
+  static double euclidien_dist1D(double x1, double x2);
 
-  static float euclidien_dist2D(float x1, float x2, float y1, float y2);
+  static double euclidien_dist2D(double x1, double x2, double y1, double y2);
 
-  static float euclidien_dist3D(float x1, float x2, float y1, float y2,
-                                float z1, float z2);
-  
-  static float euclidien_dist(const std::vector<float>& v1, const std::vector<float>& v2, float dmax);
-  
-  static float euclidien_dist_ref(const std::vector<float>& v1, float refp);
+  static double euclidien_dist3D(double x1, double x2, double y1, double y2,
+                                double z1, double z2);
+
+  static double euclidien_dist(const std::vector<double>& v1, const std::vector<double>& v2, double dmax);
+
+  static double euclidien_dist_ref(const std::vector<double>& v1, double refp);
 };
 }  // namespace bib
 

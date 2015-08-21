@@ -8,10 +8,10 @@ namespace bib {
 
 class Seed {
  public:
-   
+
   /**
    * [0; max]
-   **/ 
+   **/
   static int unifRandInt(int max) {
     std::uniform_int_distribution<int> dis(0, max);
     return dis(engine);
@@ -19,7 +19,7 @@ class Seed {
 
   /**
    * [min; max]
-   **/ 
+   **/
   static int unifRandInt(int min, int max) {
     std::uniform_int_distribution<int> dis(min, max);
     return dis(engine);

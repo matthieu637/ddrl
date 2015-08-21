@@ -23,7 +23,7 @@ TEST(AdvancedAcrobotEnv, RewardNormalized) {
   AdvancedAcrobotEnv env;
   env.unique_invoke(&properties, &command_args);
   arch::ExampleAgent ag(env.number_of_actuators(), env.number_of_sensors());
-  std::vector<float> s(env.number_of_sensors(), 0.);
+  std::vector<double> s(env.number_of_sensors(), 0.);
 
   for (uint i = 0; i < 5000; i++) {
     env.apply(ag.run(0, s, false, false));

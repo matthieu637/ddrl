@@ -44,9 +44,9 @@ ODEFactory::~ODEFactory() {
   dCloseODE();
 }
 
-ODEObject *ODEFactory::createBox(const ODEWorld &world, float x, float y,
-                                 float z, float lx, float ly, float lz,
-                                 float density, bool linkBody) {
+ODEObject *ODEFactory::createBox(const ODEWorld &world, double x, double y,
+                                 double z, double lx, double ly, double lz,
+                                 double density, bool linkBody) {
   dGeomID boxgeom = dCreateBox(world.space_id, lx, ly, lz);
 
   dMass m;
@@ -68,8 +68,8 @@ ODEObject *ODEFactory::createBox(const ODEWorld &world, float x, float y,
   return box;
 }
 
-ODEObject *ODEFactory::createSphere(const ODEWorld &world, float x, float y,
-                                    float z, float radius, float density,
+ODEObject *ODEFactory::createSphere(const ODEWorld &world, double x, double y,
+                                    double z, double radius, double density,
                                     bool linkBody) {
   dGeomID sphgeom = dCreateSphere(world.space_id, radius);
 

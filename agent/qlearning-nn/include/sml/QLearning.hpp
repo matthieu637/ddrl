@@ -228,8 +228,8 @@ class QLearning : public Policy<State> {
   void load(boost::archive::xml_iarchive*) {}
 
 #ifndef NDEBUG
-  float mse() {
-    float s = 0.f;
+  double mse() {
+    double s = 0.f;
     for (unsigned int i = 0; i < atmpl->sizeNeeded(); i++) {
       s += fann_get_MSE(neural_networks[i]);
       fann_reset_MSE(neural_networks[i]);
@@ -302,7 +302,7 @@ class QLearning : public Policy<State> {
   }
 
 #ifndef NDEBUG
-  float weight_sum() {
+  double weight_sum() {
     double sum = 0.f;
     for (unsigned int i = 0; i < atmpl->sizeNeeded(); i++) {
       typedef struct fann_connection sfn;
