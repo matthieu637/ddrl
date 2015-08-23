@@ -34,8 +34,10 @@ target_link_libraries(adacrobot-on ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
-execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/acrobot.ini config.ini)
-execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash config.ini data/cacla.ini config.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/acrobot.ini data/base-ada.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-ada.ini data/base-cacla-off.ini ada-cacla-off.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-ada.ini data/base-cacla-on.ini ada-cacla-on.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-ada.ini data/base-cacla-off-3d.ini ada-cacla-off-3d.ini)
 
 # -------------------
 # Unit Test
