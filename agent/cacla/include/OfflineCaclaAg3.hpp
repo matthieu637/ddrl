@@ -99,9 +99,9 @@ class OfflineCaclaAg : public arch::AAgent<> {
           removeOldPolicyTrajectory();
         }
         
-        LOG_DEBUG(trajectory_a->size() << " " << trajectory_a->count_inserted << " " << trajectory_a->count_removed << " - " <<
-          trajectory_v->size() << " " << trajectory_v->count_inserted << " " << trajectory_v->count_removed 
-        );
+//         LOG_DEBUG(trajectory_a->size() << " " << trajectory_a->count_inserted << " " << trajectory_a->count_removed << " - " <<
+//           trajectory_v->size() << " " << trajectory_v->count_inserted << " " << trajectory_v->count_removed 
+//         );
       }
 
       SASRG_sample vsampl = {last_state, *last_pure_action, sensors, reward, goal_reached};
