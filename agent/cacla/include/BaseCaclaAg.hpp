@@ -18,65 +18,7 @@
 #include <bib/Combinaison.hpp>
 #include "MLP.hpp"
 #include "LinMLP.hpp"
-
-class Observer{
-public:
-  Observer(uint _size) : column(_size), data_number(0), mean(_size, 0), var(_size, 0), subvar(_size, 0){}
-  
-  void transform(std::vector<double>& output, const std::vector<double> x){
-    update_mean_var(x);
-  
-    for(uint i=0; i < column; i++){
-        output[i] = (x[i] - mean[i]);
-
-        if(var[i] != 0.d)
-          output[i] /= sqrt(var[i]) / 0.26115f;
-      
-//       if(output[i] > 1.d)
-//         output[i] = 1.d;
-//       else if(output[i] < -1.d)
-//         output[i] = -1.d;
-      
-//       LOG_DEBUG(mean[i] << " " << subvar[i] << " " << var[i] << " " << x[i] << " " << output[i]);
-        
-//         output[i] = x[i];
-    }
-    
-//     float mmin = -50;
-//     float mmax = 50;
-//     
-//     mmin = -1;
-//     mmax = 1;
-//     
-//     output[0] = bib::Utils::transform(x[0], -M_PI, M_PI, mmin, mmax);
-//     output[1] = bib::Utils::transform(x[1], -28, 28, mmin, mmax);
-//     output[2] = bib::Utils::transform(x[2], -M_PI, M_PI, mmin, mmax);
-//     output[3] = bib::Utils::transform(x[3], -62, 62, mmin, mmax);
-      
-      
-//     output[4] = bib::Utils::transform(x[4], 0, 500, mmin, mmax);
-  }
-  
-private:
-  void update_mean_var(const std::vector<double>& x){
-    double dndata_number = data_number + 1;
-    double ddata_number = data_number;
-    for(uint i=0; i < column; i++){
-      mean[i] = (mean[i] * ddata_number + x[i])/dndata_number;
-    
-      subvar[i] = (subvar[i] * ddata_number + (x[i]*x[i]))/dndata_number;
-      var[i] = subvar[i] - (mean[i]*mean[i]);
-    }
-    
-    data_number ++;
-  }
-  
-  uint column;
-  ulong data_number;
-  std::vector<double> mean;
-  std::vector<double> var;
-  std::vector<double> subvar;
-};
+#include "Trajectory.hpp"
 
 class BaseCaclaAg : public arch::AAgent<> {
  public:
@@ -175,7 +117,7 @@ class BaseCaclaAg : public arch::AAgent<> {
         delete next_action;
         next_action = randomized_action;
       } else {
-        if(bib::Utils::rand01() < 0.05)
+        if(bib::Utils::rand01() < noise)
           for (uint i = 0; i < next_action->size(); i++)
             next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
       }
@@ -202,6 +144,8 @@ class BaseCaclaAg : public arch::AAgent<> {
     plus_var_version    = pt->get<bool>("agent.plus_var_version");
     standard_score      = pt->get<bool>("agent.standard_score");
     gaussian_policy     = pt->get<bool>("agent.gaussian_policy");
+    if(!gaussian_policy)
+      noise=0.1;
     
     beta = 0.001;
     delta_var = 1;
@@ -236,6 +180,10 @@ class BaseCaclaAg : public arch::AAgent<> {
     sum_weighted_reward = 0;
     global_pow_gamma = 1.f;
     internal_time = 0;
+    
+    noise *= 0.999;
+    alpha_a *= 0.99999f;
+    alpha_v *= 0.99999f;
 
     fann_reset_MSE(vnn->getNeuralNet());
   }

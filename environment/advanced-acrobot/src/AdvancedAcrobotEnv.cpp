@@ -25,6 +25,11 @@ ProblemDefinition* str2prob(const std::string& s1) {
     return new ReachLimitWellInformed;
   else if (s == "REACHLIMITPOORINFORMEDMAX")
     return new ReachLimitPoorInformedMax;
+  else if (s == "REACHLIMITPOORINFORMEDNOGAMMA")
+    return new ReachLimitPoorInformedNoGamma;
 
+  LOG_INFO("wrong problem argument");
+  exit(1);
+  
   return new KeepHigh;
 }

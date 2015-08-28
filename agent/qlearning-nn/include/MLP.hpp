@@ -72,7 +72,7 @@ struct ParallelOptimization {
 class MLP {
  public:
 
-  MLP(unsigned int input, unsigned int hidden, unsigned int sensors, double alpha) : size_input_state(input),
+  MLP(unsigned int input, unsigned int hidden, unsigned int sensors, double alpha, bool _lecun=false) : size_input_state(input),
     size_sensors(sensors), size_motors(size_input_state - sensors) {
     neural_net = fann_create_standard(3, input, hidden, 1);
 
@@ -87,7 +87,8 @@ class MLP {
     fann_set_activation_steepness_hidden(neural_net, 0.5);
     fann_set_activation_steepness_output(neural_net, 1.);
     
-    lecun(input);
+    if(_lecun)
+      lecun(input);
   }
 
   MLP(unsigned int input, unsigned int sensors) : size_input_state(input), size_sensors(sensors),
@@ -95,7 +96,7 @@ class MLP {
 
   }
 
-  MLP(unsigned int input, unsigned int hidden, unsigned int motors) : size_input_state(input), size_sensors(input),
+  MLP(unsigned int input, unsigned int hidden, unsigned int motors, bool _lecun=false) : size_input_state(input), size_sensors(input),
     size_motors(motors) {
     neural_net = fann_create_standard(3, input, hidden, motors);
 
@@ -109,7 +110,8 @@ class MLP {
     fann_set_activation_steepness_hidden(neural_net, 0.5);
     fann_set_activation_steepness_output(neural_net, 1.);
 
-    lecun(input);
+    if(_lecun)
+      lecun(input);
   }
 
   void lecun(int input) {

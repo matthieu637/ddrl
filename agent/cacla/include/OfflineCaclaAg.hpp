@@ -19,10 +19,10 @@
 #include "LinMLP.hpp"
 
 typedef struct _sample {
-  std::vector<float> s;
-  std::vector<float> pure_a;
-  std::vector<float> a;
-  std::vector<float> next_s;
+  std::vector<double> s;
+  std::vector<double> pure_a;
+  std::vector<double> a;
+  std::vector<double> next_s;
   double r;
   bool goal_reached;
 
@@ -71,7 +71,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
     delete ann;
   }
 
-  const std::vector<float>& run(float r, const std::vector<float>& sensors,
+  const std::vector<double>& run(double r, const std::vector<double>& sensors,
                                 bool learning, bool goal_reached) override {
 
     double reward = r;
@@ -85,7 +85,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
     time_for_ac--;
     if (time_for_ac == 0 || goal_reached) {
-      const std::vector<float>& next_action = _run(weighted_reward, sensors, learning, goal_reached);
+      const std::vector<double>& next_action = _run(weighted_reward, sensors, learning, goal_reached);
       time_for_ac = decision_each;
 
       for (uint i = 0; i < nb_motors; i++)
@@ -99,10 +99,10 @@ class OfflineCaclaAg : public arch::AAgent<> {
   }
 
 
-  const std::vector<float>& _run(float reward, const std::vector<float>& sensors,
+  const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
                                  bool learning, bool goal_reached) {
 
-    vector<float>* next_action = ann->computeOut(sensors);
+    vector<double>* next_action = ann->computeOut(sensors);
 
     if (last_action.get() != nullptr && learning) {  // Update Q
 
@@ -126,9 +126,9 @@ class OfflineCaclaAg : public arch::AAgent<> {
 //                 next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
 //         }
 
-    last_pure_action.reset(new vector<float>(*next_action));
+    last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
-      vector<float>* randomized_action = bib::Proba<float>::multidimentionnalGaussianWReject(*next_action, noise);
+      vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
       delete next_action;
       next_action = randomized_action;
     }
@@ -144,11 +144,11 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
-    gamma               = pt->get<float>("agent.gamma");
-//         alpha_a               = pt->get<float>("agent.alpha_a");
+    gamma               = pt->get<double>("agent.gamma");
+//         alpha_a               = pt->get<double>("agent.alpha_a");
     hidden_unit_v         = pt->get<int>("agent.hidden_unit_v");
     hidden_unit_a        = pt->get<int>("agent.hidden_unit_a");
-    noise               = pt->get<float>("agent.noise");
+    noise               = pt->get<double>("agent.noise");
     decision_each = pt->get<int>("agent.decision_each");
 
 //         noise = 0.4;
@@ -175,7 +175,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
 //         }
   }
 
-  void start_episode(const std::vector<float>& sensors) override {
+  void start_episode(const std::vector<double>& sensors) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -239,7 +239,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
   void removeOldPolicyTrajectory() {
     for(auto iter = trajectory.begin(); iter != trajectory.end(); ) {
       sample sm = *iter;
-      vector<float> *ac = ann->computeOut(sm.s);
+      vector<double> *ac = ann->computeOut(sm.s);
 
       bool eq = true;
       for(uint i = 0; i != sm.a.size(); i++)
@@ -260,7 +260,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
   void removeOldPolicyTrajectory2() {
     for(auto iter = trajectory.begin(); iter != trajectory.end(); ) {
       sample sm = *iter;
-      vector<float> *ac = ann->computeOut(sm.s);
+      vector<double> *ac = ann->computeOut(sm.s);
 
       bool eq = true;
       for(uint i = 0; i != sm.pure_a.size(); i++)
@@ -404,11 +404,11 @@ class OfflineCaclaAg : public arch::AAgent<> {
   uint hidden_unit_v;
   uint hidden_unit_a;
 
-  std::shared_ptr<std::vector<float>> last_action;
-  std::shared_ptr<std::vector<float>> last_pure_action;
-  std::vector<float> last_state;
+  std::shared_ptr<std::vector<double>> last_action;
+  std::shared_ptr<std::vector<double>> last_pure_action;
+  std::vector<double> last_state;
 
-  std::vector<float> returned_ac;
+  std::vector<double> returned_ac;
 
   std::set<sample> trajectory;
 //     std::list<sample> trajectory;

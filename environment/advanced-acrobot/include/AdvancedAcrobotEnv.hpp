@@ -46,6 +46,19 @@ class ReachLimitPoorInformed : public ProblemDefinition {
   }
 };
 
+class ReachLimitPoorInformedNoGamma : public ProblemDefinition {
+ public:
+  double performance(AdvancedAcrobotWorld* instance) {
+    if (instance->perf() > 0.99d)
+      return 1.00d;
+    else
+      return -1.00d;
+  }
+  bool still_running(AdvancedAcrobotWorld* instance) const {
+    return instance->perf() <= 0.99f;
+  }
+};
+
 class ReachLimitPoorInformedMax : public ProblemDefinition {
  public:
   double performance(AdvancedAcrobotWorld* instance) {

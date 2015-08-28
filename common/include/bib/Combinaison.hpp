@@ -10,7 +10,7 @@ class Combinaison {
   template<typename Function1>
   static void continuous(Function1 && eval, uint dimension, double min=-1.f, double max=1.f, uint discretization=30) {
     
-    std::vector<double> x(dimension, -1.f);
+    std::vector<double> x(dimension, min);
     _continuous<Function1>(x, 0, eval, dimension, min, max, discretization);
   }
   

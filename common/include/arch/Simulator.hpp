@@ -139,11 +139,11 @@ class Simulator {
         bib::Dumper<Agent, bool, bool> agent_dump(ag, true, false);
         LOG_INFO((learning ? "L " : "T ")
                  << std::left << std::setw(6) << std::setfill(' ') << episode
-                 << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.mean
-                 << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.var
-                 << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.max
-                 << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.min
-                 << std::left << std::setw(6) << std::fixed << step
+                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.mean
+                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.var
+                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.max
+                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.min
+                 << std::left << std::setw(7) << std::fixed << step
                  << " " << env_dump << " " << agent_dump);
       }
 

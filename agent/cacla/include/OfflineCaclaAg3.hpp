@@ -39,10 +39,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
   const std::vector<double>& runf(double r, const std::vector<double>& sensors,
                                  bool learning, bool goal_reached, bool finished) override {
 
-    if(r >= 1.) 
-      noise = 0.0005;
-    
-
     double reward = r;
     internal_time ++;
 
@@ -85,20 +81,34 @@ class OfflineCaclaAg : public arch::AAgent<> {
       sum_VS += mine;
 
       if (vtarget > mine /*&& (!finished || goal_reached)*/) {//increase this action
-//         SA_sample as = {last_state, *last_action};
-        SA_sample as = {last_state, *last_pure_action};
+        
+        SA_sample as;
+        if(update_pure_ac)
+          as = {last_state, *last_pure_action};
+        else 
+          as = {last_state, *last_action};
+        
+//         LOG_DEBUG(trajectory_a->size() << " " << trajectory_a->count_inserted << " " << trajectory_a->count_removed << " - " <<
+//           trajectory_v->size() << " " << trajectory_v->count_inserted << " " << trajectory_v->count_removed 
+//         );
 
         trajectory_a->addPoint(as);
 
-//         update_actor();
-//         removeOldPolicyTrajectory2();
-
-//         LOG_DEBUG(trajectory_a->size()<< " " << trajectory_v->size());
+        if(online_update){
+          update_actor();
+          removeOldPolicyTrajectory();
+        }
+        
+        LOG_DEBUG(trajectory_a->size() << " " << trajectory_a->count_inserted << " " << trajectory_a->count_removed << " - " <<
+          trajectory_v->size() << " " << trajectory_v->count_inserted << " " << trajectory_v->count_removed 
+        );
       }
 
       SASRG_sample vsampl = {last_state, *last_pure_action, sensors, reward, goal_reached};
       trajectory_v->addPoint(vsampl);
-//       update_critic();
+      
+      if(online_update)
+        update_critic();
     }
 
     last_pure_action.reset(new vector<double>(*next_action));
@@ -131,28 +141,37 @@ class OfflineCaclaAg : public arch::AAgent<> {
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
     gamma               = pt->get<double>("agent.gamma");
 //         alpha_a               = pt->get<double>("agent.alpha_a");
-    hidden_unit_v         = pt->get<int>("agent.hidden_unit_v");
-    hidden_unit_a        = pt->get<int>("agent.hidden_unit_a");
+    hidden_unit_v       = pt->get<int>("agent.hidden_unit_v");
+    hidden_unit_a       = pt->get<int>("agent.hidden_unit_a");
     noise               = pt->get<double>("agent.noise");
-    decision_each = pt->get<int>("agent.decision_each");
+    decision_each       = pt->get<int>("agent.decision_each");
+    lecun_activation    = pt->get<bool>("agent.lecun_activation");
+    online_update       = pt->get<bool>("agent.online_update");
+    update_pure_ac      = pt->get<bool>("agent.update_pure_ac");
+    kd_tree_autoremove  = pt->get<bool>("agent.kd_tree_autoremove");
+    clear_trajectory    = pt->get<bool>("agent.clear_trajectory");
+    update_vtraj_actor  = pt->get<bool>("agent.update_vtraj_actor");
+    transform_proba     = pt->get<double>("agent.transform_proba");
 
     episode=-1;
 
     if(hidden_unit_v == 0)
-      vnn = new LinMLP(nb_sensors , 1, 0.0);
+      vnn = new LinMLP(nb_sensors , 1, 0.0, lecun_activation);
     else
-      vnn = new MLP(nb_sensors, hidden_unit_v, nb_sensors, 0.0);
+      vnn = new MLP(nb_sensors, hidden_unit_v, nb_sensors, 0.0, lecun_activation);
 
     if(hidden_unit_a == 0)
-      ann = new LinMLP(nb_sensors , nb_motors, 0.0);
+      ann = new LinMLP(nb_sensors , nb_motors, 0.0, lecun_activation);
     else
-      ann = new MLP(nb_sensors, hidden_unit_a, nb_motors);
+      ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
     
     //need normalization of s
-    trajectory_a = new Trajectory<SA_sample>(nb_sensors, 0.5f, false);
+//     trajectory_a = new Trajectory<SA_sample>(nb_sensors, 0.5f, false);
+    trajectory_a = new Trajectory<SA_sample>(nb_sensors, transform_proba, kd_tree_autoremove);
     
     //don't need normalization if removeTrajectory
-    trajectory_v = new Trajectory<SASRG_sample>(nb_sensors, 0.5f, false);
+//     trajectory_v = new Trajectory<SASRG_sample>(nb_sensors, 0.5f, false);
+    trajectory_v = new Trajectory<SASRG_sample>(nb_sensors, transform_proba, kd_tree_autoremove);
     
 //         if (boost::filesystem::exists("trajectory.data")) {
 //             decltype(trajectory)* obj = bib::XMLEngine::load<decltype(trajectory)>("trajectory", "trajectory.data");
@@ -184,11 +203,13 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
     fann_reset_MSE(vnn->getNeuralNet());
     
-    trajectory_a->clear();
-    trajectory_v->clear();
+    if(clear_trajectory){
+      trajectory_a->clear();
+      trajectory_v->clear();
+    }
     
 //     if(episode % 50 == 0)
-        mean_sum_VS.clear();
+    mean_sum_VS.clear();
     
     episode ++;
   }
@@ -196,14 +217,16 @@ class OfflineCaclaAg : public arch::AAgent<> {
   void end_episode() override {
     mean_sum_VS.push_back(sum_VS);
     
-//     if(episode % 50 == 0)
-        update_actor();
+    if(!online_update){
+      update_actor();
     
-//         removeOldPolicyTrajectory2();
+      removeOldPolicyTrajectory();
         
-        write_valuef_file("v_before.data");
-        update_critic();
-        write_valuef_file("v_after.data");
+//         write_valuef_file("v_before.data");
+      update_critic();
+//         write_valuef_file("v_after.data");
+     
+    }
   }
   
   void write_valuef_file(const std::string& file){
@@ -223,8 +246,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
 /*
       function doit()
       close all; clear all; 
-      X=load("v_after.data");
-      X=load("v_before.data"); 
+      X=load("v_after.data"); % X=load("v_before.data"); 
       tmp_ = X(:,2); X(:,2) = X(:,3); X(:,3) = tmp_;
       key = X(:, 1:2);
       for i=1:size(key, 1)
@@ -279,18 +301,19 @@ class OfflineCaclaAg : public arch::AAgent<> {
     const OfflineCaclaAg* ptr;
   };
 
-  void removeOldPolicyTrajectory2() {
+  void removeOldPolicyTrajectory() {
+    
+    if(!update_vtraj_actor)
+      return;
 
     for(auto iter = trajectory_v->tree().begin(); iter != trajectory_v->tree().end(); ) {
       SASRG_sample sm = *iter;
       vector<double> *ac = ann->computeOut(sm.s);
 
       double dist = bib::Utils::euclidien_dist(*ac, sm.a, 2);
-      // more distance, more proba to drop
-      //LOG_DEBUG(dist);
-      double probatransform = 1.f;//near 1 -> proba = dist
-      dist = pow(dist, probatransform);
-      if (!sm.goal_reached && bib::Utils::rand01() < dist) {
+
+      double proba = 1.f - pow(dist, transform_proba);
+      if (!sm.goal_reached && proba > 0 && bib::Utils::rand01() < proba) {
         trajectory_v->tree().erase(iter++);
       } else {
         ++iter;
@@ -404,6 +427,9 @@ class OfflineCaclaAg : public arch::AAgent<> {
   double pow_gamma;
   double global_pow_gamma;
   double sum_weighted_reward;
+  
+  bool lecun_activation, online_update, update_pure_ac, kd_tree_autoremove, clear_trajectory, update_vtraj_actor;
+  double transform_proba;
   
   std::vector<double> mean_sum_VS;
   double sum_VS;
