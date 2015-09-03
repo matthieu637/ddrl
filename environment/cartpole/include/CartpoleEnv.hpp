@@ -1,5 +1,5 @@
-#ifndef ADVANCEDACROBOTENV_H
-#define ADVANCEDACROBOTENV_H
+#ifndef CARTPOLEENV_H
+#define CARTPOLEENV_H
 
 #include <string>
 #include <vector>
@@ -25,6 +25,8 @@ class CartpoleEnv : public arch::AEnvironment<> {
   }
 
   double performance() const {
+    if(final_state())
+      return -1.f;
     return 1.f;
   }
 

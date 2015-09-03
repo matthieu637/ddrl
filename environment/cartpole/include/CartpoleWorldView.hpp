@@ -32,4 +32,4 @@ class CartpoleWorldView : public CartpoleWorld {
   double modified_motor = -2.f;
 };
 
-#endif  // ADVANCEDACROBOTWORLDVIEW_HPP
+#endif  // CARTPOLEWORLDVIEW_HPP

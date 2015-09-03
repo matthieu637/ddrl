@@ -10,8 +10,8 @@
 
 #define BONE_LENGTH 0.2
 #define BONE_LARGER 0.04
-#define STARTING_Z 0.5
 
+#define MAX_SLIDER_POSITON 0.5
 #define GRAVITY -9.81
 #define BONE_DENSITY 1062  // Average human body density
 #define MAX_TORQUE_SLIDER 1.5
@@ -46,6 +46,7 @@ class CartpoleWorld {
   std::vector<double> internal_state;
 
  private:
+  bool add_time_in_state;
   bool normalization;
 
   static const std::vector<double> NORMALIZED_VEC;

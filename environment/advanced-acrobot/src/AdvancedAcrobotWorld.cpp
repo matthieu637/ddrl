@@ -11,9 +11,9 @@
 
 AdvancedAcrobotWorld::AdvancedAcrobotWorld(
   const std::vector<bone_joint>& _types, const std::vector<bool>& _actuators,
-  bool add_time_in_state, bool _normalization)
+  bool _add_time_in_state, bool _normalization)
   : odeworld(ODEFactory::getInstance()->createWorld()),
-    types(_types), actuators(_actuators), normalization(_normalization) {
+    types(_types), actuators(_actuators), add_time_in_state(_add_time_in_state), normalization(_normalization) {
   ASSERT(_types.size() == (_actuators.size() - 1),
          "actuators " << _actuators.size() << " not compatible with types "
          << _types.size());
@@ -200,7 +200,8 @@ void AdvancedAcrobotWorld::update_state(uint current_step, uint max_step_per_ins
       internal_state[begin_index++] = dJointGetSliderPositionRate(joints[i + 1]);
     }
 
-  internal_state[begin_index] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
+  if(add_time_in_state)
+    internal_state[begin_index] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
 }
 
 const std::vector<double>& AdvancedAcrobotWorld::state() const {

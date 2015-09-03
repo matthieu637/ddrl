@@ -9,8 +9,8 @@
 #include "ODEFactory.hpp"
 
 
-CartpoleWorld::CartpoleWorld(bool add_time_in_state, bool _normalization)
-  : odeworld(ODEFactory::getInstance()->createWorld()), normalization(_normalization) {
+CartpoleWorld::CartpoleWorld(bool _add_time_in_state, bool _normalization)
+  : odeworld(ODEFactory::getInstance()->createWorld()), add_time_in_state(_add_time_in_state), normalization(_normalization) {
 
   dWorldSetGravity(odeworld.world_id, 0, 0.0, GRAVITY);
 
@@ -23,6 +23,8 @@ CartpoleWorld::CartpoleWorld(bool add_time_in_state, bool _normalization)
 
   if(add_time_in_state)
     internal_state.push_back(0.);
+  
+  resetPositions();
 }
 
 CartpoleWorld::~CartpoleWorld() {
@@ -53,8 +55,8 @@ void CartpoleWorld::createWorld() {
   dJointID first_slider = dJointCreateSlider(odeworld.world_id, nullptr);
   dJointAttach(first_slider, 0, first_bone->getID());
   dJointSetSliderAxis(first_slider, 1, 0, 0);
-  dJointSetSliderParam(first_slider, dParamHiStop, 0.4);
-  dJointSetSliderParam(first_slider, dParamLoStop, -0.4);
+  dJointSetSliderParam(first_slider, dParamHiStop, MAX_SLIDER_POSITON);
+  dJointSetSliderParam(first_slider, dParamLoStop, -MAX_SLIDER_POSITON);
   joints.push_back(first_slider);
   
   ODEObject* second_bone = ODEFactory::getInstance()->createBox(
@@ -70,7 +72,7 @@ void CartpoleWorld::createWorld() {
 
 }
 
-void nearCallback(void* data, dGeomID o1, dGeomID o2) {
+void nearCallbackCartpole(void* data, dGeomID o1, dGeomID o2) {
   int n;
   nearCallbackDataCartpole* d = reinterpret_cast<nearCallbackDataCartpole*>(data);
   CartpoleWorld* inst = d->inst;
@@ -108,7 +110,7 @@ void CartpoleWorld::step(const vector<double>& motors, uint current_step, uint m
   // No collision in this world
 
   nearCallbackDataCartpole d = {this};
-  dSpaceCollide(odeworld.space_id, &d, &nearCallback);
+  dSpaceCollide(odeworld.space_id, &d, &nearCallbackCartpole);
 
   unsigned int begin_index = 0;
   double force = 0.f;
@@ -175,12 +177,16 @@ void CartpoleWorld::update_state(uint current_step, uint max_step_per_instance) 
 //   internal_state[begin_index] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
   uint begin_index = 0;
   
-  internal_state[begin_index++]=dJointGetSliderPosition(joints[0]);
-  internal_state[begin_index++]=dJointGetSliderPositionRate(joints[0]);
-  internal_state[begin_index++]=dJointGetHingeAngle(joints[1]);
-  internal_state[begin_index++]=dJointGetHingeAngleRate(joints[1]);
+  internal_state[begin_index++] = dJointGetSliderPosition(joints[0]);
+  internal_state[begin_index++] = dJointGetSliderPositionRate(joints[0]);
+  internal_state[begin_index++] = dJointGetHingeAngle(joints[1]);
+  internal_state[begin_index++] = dJointGetHingeAngleRate(joints[1]);
   
-  internal_state[begin_index] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
+  if( fabs(dJointGetSliderPosition(joints[0])) >= MAX_SLIDER_POSITON )
+    touchGround=true;
+  
+  if(add_time_in_state)
+    internal_state[begin_index] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
 }
 
 const std::vector<double>& CartpoleWorld::state() const {
@@ -218,9 +224,18 @@ void CartpoleWorld::resetPositions() {
 
   touchGround = false;
   
-  Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
-  dWorldStep(odeworld.world_id, WORLD_STEP);
-  lock.release();
+  double r = bib::Utils::rand01();
+  r = r <= 0.5 ? r - 1.f : r;
+  r *= MAX_TORQUE_SLIDER;
+  dJointAddSliderForce(joints[0], r);
+    
+  for (uint n=0; n < 10; n++){    
+    Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
+    dWorldStep(odeworld.world_id, WORLD_STEP);
+    lock.release();
+  }
+  
+  dJointAddSliderForce(joints[0], 0);
 
   dJointGroupEmpty(odeworld.contactgroup);
 

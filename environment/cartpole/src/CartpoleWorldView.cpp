@@ -9,7 +9,7 @@
 
 static CartpoleWorldView* inst = nullptr;
 
-void parseCommand(int cmd) {
+void parseCommandCartpole(int cmd) {
   static float xyz[3] = {-0.03, -0.97, 0.2};
   static float hpr[3] = {90, 0, 0};
 
@@ -51,23 +51,23 @@ void parseCommand(int cmd) {
     inst->resetPositions();
     LOG_DEBUG("resetPositions should not be used");
     break;
-  case 'w':
+  case 'x':
     inst->modified_motor = -1.f;
     LOG_DEBUG("motors applied");
     break;
-  case 'x':
+  case 'w':
     inst->modified_motor = 1.f;
     LOG_DEBUG("motors applied");
     break;
   }
 }
 
-void threadloop(const std::string& goodpath) {
+void threadloopCartpole(const std::string& goodpath) {
   ASSERT(inst != nullptr, "not instantiated " << goodpath);
   inst->fn.version = DS_VERSION;
   inst->fn.start = 0;
   inst->fn.step = &Draw::drawLoop;
-  inst->fn.command = &parseCommand;
+  inst->fn.command = &parseCommandCartpole;
   inst->fn.stop = 0;
   inst->fn.path_to_textures = goodpath.c_str();
 
@@ -86,8 +86,7 @@ void threadloop(const std::string& goodpath) {
   }
 }
 
-CartpoleWorldView::CartpoleWorldView(
-  const std::string& path, bool _add_time_in_state, bool normalization)
+CartpoleWorldView::CartpoleWorldView(const std::string& path, bool _add_time_in_state, bool normalization)
   : CartpoleWorld(_add_time_in_state, normalization),
     requestEnd(false),
     speed(1),
@@ -125,7 +124,7 @@ CartpoleWorldView::CartpoleWorldView(
 //     geoms.push_back(debug1->getGeom());
 //     geoms.push_back(debug2->getGeom());
 
-  eventThread = new tbb::tbb_thread(threadloop, goodpath);
+  eventThread = new tbb::tbb_thread(threadloopCartpole, goodpath);
 }
 
 CartpoleWorldView::~CartpoleWorldView() {
@@ -144,7 +143,7 @@ CartpoleWorldView::~CartpoleWorldView() {
 void CartpoleWorldView::step(const std::vector<double>& motors, uint current_step, uint max_step_per_instance) {
   std::vector<double> modified_motors(motors.size(), 0);
   if (!inst->ignoreMotor) {
-    if(inst->modified_motor < -2.f)
+    if(inst->modified_motor <= -2.f)
       for (unsigned int i = 0; i < motors.size(); i++)
         modified_motors[i] = motors[i];
     else 

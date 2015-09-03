@@ -361,7 +361,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
     }
 
 //         removeOldPolicyTrajectory();
-    removeOldPolicyTrajectory2();
+//     removeOldPolicyTrajectory2();
   }
 
   void save(const std::string& path) override {

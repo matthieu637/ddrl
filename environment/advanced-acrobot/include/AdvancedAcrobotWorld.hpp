@@ -57,6 +57,7 @@ class AdvancedAcrobotWorld {
   bool goalBeenReached;
   bool goalFailed;
   unsigned int _activated_motors;
+  bool add_time_in_state;
   bool normalization;
 
   static const std::vector<double> NORMALIZED_VEC;

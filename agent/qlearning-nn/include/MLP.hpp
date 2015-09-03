@@ -275,6 +275,30 @@ class MLP {
 
     return para.a[imin];
   }
+  
+  std::vector<double>* optimizedBruteForce(const std::vector<double>& inputs, double discre=0.1){
+    std::vector<double> motors(1);
+
+    motors[0] = -1.f;
+    double imax = -1.f;
+    double vmax = computeOut(inputs, motors);
+    
+    for(double a=-1+discre; a <= 1; a+=discre){
+      motors[0] = a;
+      double val = computeOut(inputs, motors);
+      if(val > vmax){
+        vmax = val;
+        imax = a;
+      }
+    }
+
+    std::vector<double>* outputs = new std::vector<double>(size_motors);
+//     for(uint j=0; j < outputs->size(); j++)
+//       outputs->at(j) = out[j];
+    outputs->at(0) = imax;
+    return outputs;
+    
+  }
 
   void copy(NN new_nn) {
     fann_destroy(neural_net);

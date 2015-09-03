@@ -15,9 +15,11 @@
 #include "bib/Utils.hpp"
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
+#include <bib/Combinaison.hpp>
 #include "MLP.hpp"
 #include "LinMLP.hpp"
 #include "Trajectory.hpp"
+#include "../../qlearning-nn/include/MLP.hpp"
 
 class OfflineCaclaAg : public arch::AAgent<> {
  public:
@@ -27,19 +29,14 @@ class OfflineCaclaAg : public arch::AAgent<> {
   }
 
   virtual ~OfflineCaclaAg() {
-    delete trajectory_a;
     delete trajectory_v;
     
     delete vnn;
-    delete ann;
   }
 
-  const std::vector<float>& runf(float r, const std::vector<float>& sensors,
+  const std::vector<double>& runf(double r, const std::vector<double>& sensors,
                                  bool learning, bool goal_reached, bool finished) override {
-    if(r >= 1.) {
-      noise = 0.0005;
-    }
-    
+
     double reward = r;
     internal_time ++;
 
@@ -51,7 +48,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
     time_for_ac--;
     if (time_for_ac == 0 || goal_reached) {
-      const std::vector<float>& next_action = _runf(weighted_reward, sensors, learning, goal_reached, finished);
+      const std::vector<double>& next_action = _runf(weighted_reward, sensors, learning, goal_reached, finished);
       time_for_ac = decision_each;
 
       for (uint i = 0; i < nb_motors; i++)
@@ -64,11 +61,10 @@ class OfflineCaclaAg : public arch::AAgent<> {
     return returned_ac;
   }
 
+  const std::vector<double>& _runf(double reward, const std::vector<double>& sensors,
+                                  bool learning, bool goal_reached, bool) {
 
-  const std::vector<float>& _runf(float reward, const std::vector<float>& sensors,
-                                  bool learning, bool goal_reached, bool finished) {
-
-    vector<float>* next_action = ann->computeOut(sensors);
+    vector<double>* next_action = vnn->optimizedBruteForce(sensors);
 
     if (last_action.get() != nullptr && learning) {  // Update Q
 
@@ -79,32 +75,26 @@ class OfflineCaclaAg : public arch::AAgent<> {
       }
 
       double mine = vnn->computeOut(last_state, *last_action);
+      sum_VS += mine;
 
-      if (vtarget > mine && episode % 5 == 0 /*&& (!finished || goal_reached)*/) {//increase this action
-
-//         trajectory_a->insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
-        ann->learn(last_state, *last_action);
-        
-        //error here cause only lake on policy not on value fonction - false Q(s,a) -> R + g * Q(sn, A)
-//         if(!finished)
-//           update_critic();
-      }
-
-      QSASRG_sample vsampl = {last_state, *last_action, sensors, reward, goal_reached};
-//       QSASRG_sample vsampl = {last_state, *last_pure_action, sensors, reward, goal_reached};
+      QSASRG_sample vsampl = {last_state, *last_pure_action, sensors, reward, goal_reached};
       trajectory_v->addPoint(vsampl);
+      
+      if(online_update)
+        update_critic();
     }
 
-//         if (learning && bib::Utils::rand01() < alpha) { // alpha ??
-//             for (uint i = 0; i < next_action->size(); i++)
-//                 next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
-//         }
-
-    last_pure_action.reset(new vector<float>(*next_action));
+    last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
-      vector<float>* randomized_action = bib::Proba<float>::multidimentionnalGaussianWReject(*next_action, noise);
+      //gaussian policy
+      vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
       delete next_action;
       next_action = randomized_action;
+      
+      //e greedy
+//       if(bib::Utils::rand01() < 0.05)
+//         for (uint i = 0; i < next_action->size(); i++)
+//             next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
     }
     last_action.reset(next_action);
 
@@ -113,38 +103,46 @@ class OfflineCaclaAg : public arch::AAgent<> {
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
+//         LOG_DEBUG(last_state[0] << " "<< last_state[1]<< " "<< last_state[2]<< " "<< last_state[3]<< " "<<
+//              last_state[4]);
+//     LOG_FILE("test_ech.data", last_state[0] << " "<< last_state[1]<< " "<< last_state[2]<< " "<< last_state[3]<< " "<<
+//              last_state[4]);
     return *next_action;
   }
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
-    gamma               = pt->get<float>("agent.gamma");
-    alpha_a               = pt->get<float>("agent.alpha_a");
-    hidden_unit_v         = pt->get<int>("agent.hidden_unit_v");
-    hidden_unit_a        = pt->get<int>("agent.hidden_unit_a");
-    noise               = pt->get<float>("agent.noise");
-    decision_each = pt->get<int>("agent.decision_each");
+    gamma               = pt->get<double>("agent.gamma");
+    hidden_unit_v       = pt->get<int>("agent.hidden_unit_v");
+    noise               = pt->get<double>("agent.noise");
+    decision_each       = pt->get<int>("agent.decision_each");
+    lecun_activation    = pt->get<bool>("agent.lecun_activation");
+    online_update       = pt->get<bool>("agent.online_update");
+    kd_tree_autoremove  = pt->get<bool>("agent.kd_tree_autoremove");
+    transform_proba     = pt->get<double>("agent.transform_proba");
 
-    episode=0;
+    episode=-1;
 
-    if(hidden_unit_v == 0)
-      vnn = new LinMLP(nb_sensors + nb_motors , 1, 0.0);
-    else
-      vnn = new MLP(nb_sensors + nb_motors, hidden_unit_v, nb_sensors, 0.0);
+//     if(hidden_unit_v == 0)
+//       vnn = new LinMLP(nb_sensors , 1, 0.0, lecun_activation);
+//     else
+      vnn = new MLP(nb_sensors + nb_motors, hidden_unit_v, nb_sensors, 0.0, lecun_activation);
 
-    if(hidden_unit_a == 0)
-      ann = new LinMLP(nb_sensors , nb_motors, alpha_a);
-    else {
-      ann = new MLP(nb_sensors, hidden_unit_a, nb_motors);
-      fann_set_learning_rate(ann->getNeuralNet(), alpha_a);
-    }
+    //don't need normalization if removeTrajectory
+//     trajectory_v = new Trajectory<QSASRG_sample>(nb_sensors, 0.5f, false);
+    trajectory_v = new Trajectory<QSASRG_sample>(nb_sensors, transform_proba, kd_tree_autoremove);
+    
+//         if (boost::filesystem::exists("trajectory.data")) {
+//             decltype(trajectory)* obj = bib::XMLEngine::load<decltype(trajectory)>("trajectory", "trajectory.data");
+//             trajectory = *obj;
+//             delete obj;
+//
+//             end_episode();
+//         }
 
-    trajectory_a = new Trajectory<SA_sample>(nb_sensors, 0.5f, false);
-//     trajectory_v = new Trajectory<QSASRG_sample>(nb_sensors + nb_motors, 1.f, true, 1.5f);
-    trajectory_v = new Trajectory<QSASRG_sample>(nb_sensors + nb_motors, 0.5f, true, 0.5f);
   }
 
-  void start_episode(const std::vector<float>& sensors) override {
+  void start_episode(const std::vector<double>& sensors) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -158,13 +156,65 @@ class OfflineCaclaAg : public arch::AAgent<> {
     sum_weighted_reward = 0;
     global_pow_gamma = 1.f;
     internal_time = 0;
-//         trajectory_v->clear();
-//         trajectory_a->clear();
-    episode ++;
+    
+    
+    sum_VS = 0;
 
     fann_reset_MSE(vnn->getNeuralNet());
+    
+    trajectory_v->clear();
+    
+//     if(episode % 50 == 0)
+    mean_sum_VS.clear();
+    
+    episode ++;
   }
 
+  void end_episode() override {
+    mean_sum_VS.push_back(sum_VS);
+    
+    if(!online_update){
+        
+//         write_valuef_file("v_before.data");
+      update_critic();
+//         write_valuef_file("v_after.data");
+     
+    }
+    
+//     write_valuef_file("v_after.data." + episode);
+  }
+  
+  void write_valuef_file(const std::string& file){
+      
+      std::ofstream out;
+      out.open(file, std::ofstream::out);
+    
+      auto iter = [&](const std::vector<double>& x) {
+        std::vector<double> m(nb_motors);
+        for(uint i=nb_sensors; i < nb_motors + nb_sensors;i++)
+          m[i - nb_sensors] = x[nb_sensors + i];
+        out << vnn->computeOut(x, m);
+        out << std::endl;
+      };
+      
+      bib::Combinaison::continuous<>(iter, nb_sensors+nb_motors, -1, 1, 6);
+      out.close();
+/*
+      function doit()
+      close all; clear all; 
+      X=load("v_after.data"); % X=load("v_before.data"); 
+      tmp_ = X(:,2); X(:,2) = X(:,3); X(:,3) = tmp_;
+      key = X(:, 1:2);
+      for i=1:size(key, 1)
+       subkey = find(sum(X(:, 1:2) == key(i,:), 2) == 2);
+       data(end+1, :) = [key(i, :) mean(X(subkey, end))];
+      endfor
+      [xx,yy] = meshgrid (linspace (-1,1,300));
+      griddata(data(:,1), data(:,2), data(:,3), xx, yy, "linear"); xlabel('theta_1'); ylabel('theta_2');
+      endfunction
+*/    
+  }
+  
   struct ParraVtoVNext {
     ParraVtoVNext(const std::vector<QSASRG_sample>& _vtraj, const OfflineCaclaAg* _ptr) : vtraj(_vtraj), ptr(_ptr),
       actions(vtraj.size()) {
@@ -177,7 +227,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
         for (uint i= ptr->nb_sensors ; i < ptr->nb_sensors + ptr->nb_motors; i++)
           data->input[n][i] = sm.a[i - ptr->nb_sensors];
 
-        actions[n] = ptr->ann->computeOut(sm.next_s);
+        actions[n] = ptr->vnn->optimizedBruteForce(sm.next_s);
       }
     }
 
@@ -187,9 +237,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
     void free() {
       fann_destroy_train(data);
-      for (uint n = 0; n < vtraj.size(); n++) {
-        delete actions[n];
-      }
     }
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
@@ -214,11 +261,12 @@ class OfflineCaclaAg : public arch::AAgent<> {
     struct fann_train_data* data;
     const std::vector<QSASRG_sample>& vtraj;
     const OfflineCaclaAg* ptr;
-    std::vector<std::vector<float>*> actions;
+    std::vector<std::vector<double>*> actions;
   };
 
-  void update_critic(){
+  void update_critic() {
     if (trajectory_v->size() > 0) {
+      //remove trace of old policy
 
       std::vector<QSASRG_sample> vtraj(trajectory_v->size());
       std::copy(trajectory_v->tree().begin(), trajectory_v->tree().end(), vtraj.begin());
@@ -243,7 +291,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
       };
 
 // CHOOSE BETWEEN determinist or stochastic (don't change many)
-//       bib::Converger::determinist<>(iter, eval, 30, 0.0001, 0);
+//             bib::Converger::determinist<>(iter, eval, 30, 0.0001, 0);
 // OR
       NN best_nn = nullptr;
       auto save_best = [&]() {
@@ -257,52 +305,17 @@ class OfflineCaclaAg : public arch::AAgent<> {
       fann_destroy(best_nn);
 // END CHOOSE
 
-      dq.free(); 
-      
+      dq.free();
+      //       LOG_DEBUG("number of data " << trajectory.size());
     }
-  }
-  
-  void end_episode() override {
-      update_critic();
-// ACTION LEARNING
-//             struct fann_train_data* data = fann_create_train(trajectory_a->size(), nb_sensors, nb_motors);
-//
-//             uint n=0;
-//             for(auto it = trajectory_a->begin(); it != trajectory_a->end() ; ++it) {
-//                 sample sm = *it;
-//
-//                 for (uint i = 0; i < nb_sensors ; i++)
-//                     data->input[n][i] = sm.s[i];
-//                 for (uint i = 0; i < nb_motors; i++)
-// //                     data->output[n][i] = sm.pure_a[i];
-// //                     should explain why
-//                     data->output[n][i] = sm.a[i];
-//
-//                 n++;
-//             }
-//
-//             if(n > 0) {
-//                 struct fann_train_data* subdata = fann_subset_train_data(data, 0, n);
-//
-//                 ann->learn(subdata, 5000, 0, 0.0001);
-//
-//                 fann_destroy_train(subdata);
-//             }
-//             fann_destroy_train(data);
-//
-
-//             trajectory_v->clear();
-//             trajectory_a->clear();
   }
 
   void save(const std::string& path) override {
-    ann->save(path+".actor");
     vnn->save(path+".critic");
-//     bib::XMLEngine::save<>(trajectory, "trajectory", "trajectory.data");
+//     bib::XMLEngine::save<>(trajectory_v, "trajectory", "trajectory.data");
   }
 
   void load(const std::string& path) override {
-    ann->load(path+".actor");
     vnn->load(path+".critic");
   }
 
@@ -310,7 +323,8 @@ class OfflineCaclaAg : public arch::AAgent<> {
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " " <<
         std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " <<
-        trajectory_v->size() << " " << trajectory_a->size();
+        trajectory_v->size() << " " << bib::Utils::statistics(mean_sum_VS).mean << " " << mean_sum_VS.size() << 
+        " " << vnn->weightSum();
   }
 
   void _dump(std::ostream& out) const override {
@@ -328,25 +342,30 @@ class OfflineCaclaAg : public arch::AAgent<> {
   double pow_gamma;
   double global_pow_gamma;
   double sum_weighted_reward;
+  
+  double alpha_a;
+  bool lecun_activation, online_update, kd_tree_autoremove;
+  double transform_proba;
+  
+  std::vector<double> mean_sum_VS;
+  double sum_VS;
 
   uint internal_time;
   uint decision_each;
   uint episode;
 
-  double gamma, noise, alpha_a;
+  double gamma, noise;
   uint hidden_unit_v;
   uint hidden_unit_a;
 
-  std::shared_ptr<std::vector<float>> last_action;
-  std::shared_ptr<std::vector<float>> last_pure_action;
-  std::vector<float> last_state;
+  std::shared_ptr<std::vector<double>> last_action;
+  std::shared_ptr<std::vector<double>> last_pure_action;
+  std::vector<double> last_state;
 
-  std::vector<float> returned_ac;
+  std::vector<double> returned_ac;
 
-  Trajectory<SA_sample>* trajectory_a;
   Trajectory<QSASRG_sample>* trajectory_v;
 
-  MLP* ann;
   MLP* vnn;
 };
 
