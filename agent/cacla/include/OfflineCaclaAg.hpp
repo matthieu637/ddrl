@@ -150,7 +150,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
     hidden_unit_a        = pt->get<int>("agent.hidden_unit_a");
     noise               = pt->get<double>("agent.noise");
     decision_each = pt->get<int>("agent.decision_each");
-
+    update_pure_ac =  pt->get<bool>("agent.update_pure_ac");
 //         noise = 0.4;
 //         hidden_unit_v = 25;
 //         gamma = 0.99;
@@ -341,10 +341,15 @@ class OfflineCaclaAg : public arch::AAgent<> {
         if(target > mine) {
           for (uint i = 0; i < nb_sensors ; i++)
             data->input[n][i] = sm.s[i];
-          for (uint i = 0; i < nb_motors; i++)
-            data->output[n][i] = sm.pure_a[i];
+          if(update_pure_ac){
+            for (uint i = 0; i < nb_motors; i++)
+              data->output[n][i] = sm.pure_a[i];
+          } else {
+            for (uint i = 0; i < nb_motors; i++)
+              data->output[n][i] = sm.a[i];
+          }
 //                     should explain why
-//                            data->output[n][i] = sm.a[i];
+// //                            data->output[n][i] = sm.a[i];
 
           n++;
         }
@@ -396,6 +401,8 @@ class OfflineCaclaAg : public arch::AAgent<> {
   double pow_gamma;
   double global_pow_gamma;
   double sum_weighted_reward;
+  
+  bool update_pure_ac;
 
   uint internal_time;
   uint decision_each;

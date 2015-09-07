@@ -87,14 +87,14 @@ class OfflineCaclaAg : public arch::AAgent<> {
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
       //gaussian policy
-      vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
-      delete next_action;
-      next_action = randomized_action;
+//       vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
+//       delete next_action;
+//       next_action = randomized_action;
       
       //e greedy
-//       if(bib::Utils::rand01() < 0.05)
-//         for (uint i = 0; i < next_action->size(); i++)
-//             next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
+      if(bib::Utils::rand01() < 0.05)
+        for (uint i = 0; i < next_action->size(); i++)
+            next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
     }
     last_action.reset(next_action);
 
@@ -181,7 +181,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
      
     }
     
-//     write_valuef_file("v_after.data." + episode);
+    write_valuef_file("v_after.data." + std::to_string(episode));
   }
   
   void write_valuef_file(const std::string& file){
@@ -190,6 +190,9 @@ class OfflineCaclaAg : public arch::AAgent<> {
       out.open(file, std::ofstream::out);
     
       auto iter = [&](const std::vector<double>& x) {
+        for(uint i=0;i < x.size();i++)
+          out << x[i] << " ";
+          
         std::vector<double> m(nb_motors);
         for(uint i=nb_sensors; i < nb_motors + nb_sensors;i++)
           m[i - nb_sensors] = x[nb_sensors + i];
@@ -197,20 +200,21 @@ class OfflineCaclaAg : public arch::AAgent<> {
         out << std::endl;
       };
       
-      bib::Combinaison::continuous<>(iter, nb_sensors+nb_motors, -1, 1, 6);
+      bib::Combinaison::continuous<>(iter, nb_sensors+nb_motors, -M_PI, M_PI, 6);
       out.close();
 /*
-      function doit()
       close all; clear all; 
-      X=load("v_after.data"); % X=load("v_before.data"); 
-      tmp_ = X(:,2); X(:,2) = X(:,3); X(:,3) = tmp_;
-      key = X(:, 1:2);
-      for i=1:size(key, 1)
-       subkey = find(sum(X(:, 1:2) == key(i,:), 2) == 2);
-       data(end+1, :) = [key(i, :) mean(X(subkey, end))];
-      endfor
-      [xx,yy] = meshgrid (linspace (-1,1,300));
-      griddata(data(:,1), data(:,2), data(:,3), xx, yy, "linear"); xlabel('theta_1'); ylabel('theta_2');
+      function doit(ep)
+        X=load(strcat("v_after.data.",num2str(ep)));
+        tmp_ = X(:,1); X(:,1) = X(:,3); X(:,3) = tmp_;
+        tmp_ = X(:,2); X(:,2) = X(:,5); X(:,5) = tmp_;
+        key = X(:, 1:2);
+        for i=1:size(key, 1)
+        subkey = find(sum(X(:, 1:2) == key(i,:), 2) == 2);
+        data(end+1, :) = [key(i, :) mean(X(subkey, end))];
+        endfor
+        [xx,yy] = meshgrid (linspace (-pi,pi,300));
+        griddata(data(:,1), data(:,2), data(:,3), xx, yy, "linear"); xlabel('theta'); ylabel('a');
       endfunction
 */    
   }
@@ -291,18 +295,18 @@ class OfflineCaclaAg : public arch::AAgent<> {
       };
 
 // CHOOSE BETWEEN determinist or stochastic (don't change many)
-//             bib::Converger::determinist<>(iter, eval, 30, 0.0001, 0);
+            bib::Converger::determinist<>(iter, eval, 30, 0.0001, 0);
 // OR
-      NN best_nn = nullptr;
-      auto save_best = [&]() {
-        if(best_nn != nullptr)
-          fann_destroy(best_nn);
-        best_nn = fann_copy(vnn->getNeuralNet());
-      };
-
-      bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10);
-      vnn->copy(best_nn);
-      fann_destroy(best_nn);
+//       NN best_nn = nullptr;
+//       auto save_best = [&]() {
+//         if(best_nn != nullptr)
+//           fann_destroy(best_nn);
+//         best_nn = fann_copy(vnn->getNeuralNet());
+//       };
+// 
+//       bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10);
+//       vnn->copy(best_nn);
+//       fann_destroy(best_nn);
 // END CHOOSE
 
       dq.free();

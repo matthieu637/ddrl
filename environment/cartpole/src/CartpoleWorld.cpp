@@ -229,7 +229,7 @@ void CartpoleWorld::resetPositions() {
   r *= MAX_TORQUE_SLIDER;
   dJointAddSliderForce(joints[0], r);
     
-  for (uint n=0; n < 10; n++){    
+  for (uint n=0; n < 5; n++){    
     Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
     dWorldStep(odeworld.world_id, WORLD_STEP);
     lock.release();

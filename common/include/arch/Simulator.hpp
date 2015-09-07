@@ -134,7 +134,7 @@ class Simulator {
     if (dump || display) {
       bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
 
-      if (display) {
+      if (display && ((display_learning && learning) || !learning)) {
         bib::Dumper<Environment, bool, bool> env_dump(env, true, false);
         bib::Dumper<Agent, bool, bool> agent_dump(ag, true, false);
         LOG_INFO((learning ? "L " : "T ")
@@ -203,6 +203,12 @@ class Simulator {
     dump_log_each               = properties->get<unsigned int>("simulation.dump_log_each");
     display_log_each            = properties->get<unsigned int>("simulation.display_log_each");
     save_agent_each             = properties->get<unsigned int>("simulation.save_agent_each");
+    
+    try{
+      display_learning            = properties->get<bool>("simulation.display_learning");
+    } catch(boost::exception const& ) {
+      display_learning            = true;
+    }
 
 #ifndef NDEBUG
     well_init = true;
@@ -217,6 +223,8 @@ class Simulator {
   unsigned int dump_log_each;
   unsigned int display_log_each;
   unsigned int save_agent_each;
+  
+  bool display_learning;
 
   boost::property_tree::ptree* properties;
   boost::program_options::variables_map* command_args;

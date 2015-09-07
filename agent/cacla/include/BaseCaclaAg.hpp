@@ -181,9 +181,9 @@ class BaseCaclaAg : public arch::AAgent<> {
     global_pow_gamma = 1.f;
     internal_time = 0;
     
-    noise *= 0.999;
-    alpha_a *= 0.99999f;
-    alpha_v *= 0.99999f;
+//     noise *= 0.999;
+//     alpha_a *= 0.99999f;
+//     alpha_v *= 0.99999f;
 
     fann_reset_MSE(vnn->getNeuralNet());
   }
