@@ -113,6 +113,10 @@ class MLP {
     if(_lecun)
       lecun(input);
   }
+  
+  MLP(const MLP& m) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors) {
+      neural_net = fann_copy(m.neural_net);
+  }
 
   void lecun(int input) {
 //     fann_set_activation_steepness_hidden(neural_net, 2.f/3.f);

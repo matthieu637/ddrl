@@ -17,12 +17,12 @@
 #include <bib/XMLEngine.hpp>
 #include "MLP.hpp"
 
-#define NBSOL_OPT 2
+#define NBSOL_OPT 4
 #define LEARNING_PRECISION 0.0001
 #define MIN_Q_ITERATION 10
 #define MAX_Q_ITERATION 30
 #define MAX_NEURAL_ITERATION 10000
-#define DATA_KEEPT 1000
+#define DATA_KEEPT 70*2
 
 typedef struct _sample {
   std::vector<double> s;
@@ -30,7 +30,7 @@ typedef struct _sample {
   std::vector<double> next_s;
   double r;
   bool goal_reached;
-  double score;
+//   double score;
   int replayed;
 
   friend class boost::serialization::access;
@@ -41,27 +41,30 @@ typedef struct _sample {
     ar& BOOST_SERIALIZATION_NVP(next_s);
     ar& BOOST_SERIALIZATION_NVP(r);
     ar& BOOST_SERIALIZATION_NVP(goal_reached);
-    ar& BOOST_SERIALIZATION_NVP(score);
+//     ar& BOOST_SERIALIZATION_NVP(score);
   }
 
   bool operator< (const _sample& b) const {
 //     return replayed > b.replayed;
-    if(score < b.score)
-      return true;
-    for (uint i = 0; i < s.size(); i++)
-      if (s[i] < b.s[i])
-        return true;
-    for (uint i = 0; i < a.size(); i++)
-      if (a[i] < b.a[i])
-        return true;
-    for (uint i = 0; i < next_s.size(); i++)
-      if (next_s[i] < b.next_s[i])
-        return true;
+//     if(score < b.score)
+//       return true;
+    
+    for (uint i = 0; i < s.size(); i++) {
+      if(s[i] != b.s[i])
+        return s[i] < b.s[i];
+    }
+    
+    for (uint i = 0; i < a.size(); i++) {
+      if(a[i] != b.a[i])
+        return a[i] < b.a[i];
+    }
+    
+    for (uint i = 0; i < next_s.size(); i++) {
+      if(next_s[i] != b.next_s[i])
+        return next_s[i] < b.next_s[i];
+    }
 
-    if (r < b.r)
-      return true;
-
-    return goal_reached < b.goal_reached;
+    return r < b.r;
   }
 
 } sample;
@@ -127,10 +130,11 @@ class ContinuousAcTAg : public arch::AAgent<> {
       static std::vector<double> xinit(2, 0);
       next_action = new vector<double>(*mcmc.oneStep(0.35, xinit, 5).get());
     } else {
-      if (init_old_ac && last_action.get() != nullptr)
-        next_action = nn->optimized(sensors, *last_action, NBSOL_OPT);
-      else
-        next_action = nn->optimized(sensors, {}, NBSOL_OPT);
+//       if (init_old_ac && last_action.get() != nullptr)
+//         next_action = nn->optimized(sensors, *last_action, NBSOL_OPT);
+//       else
+//         next_action = nn->optimized(sensors, {}, NBSOL_OPT);
+      next_action = nn->optimizedBruteForce(sensors);
     }
 
     if (last_action.get() != nullptr && learning) {  // Update Q
@@ -145,10 +149,10 @@ class ContinuousAcTAg : public arch::AAgent<> {
 //         nn->learn(last_state, *last_action, reward);
 //       }
 //             trajectory.push_back( {last_state, *last_action, sensors, reward});
-      auto ppair = trajectory.insert( {last_state, *last_action, sensors, reward, goal_reached, (uint)0, (uint)0});
+      trajectory.push_back( {last_state, *last_action, sensors, reward, goal_reached,0});
 //       auto ppair = trajectory.insert( {last_state, *last_pure_action, sensors, reward, goal_reached, (uint)0, (uint)0});
-      if(ppair.second)
-        current_trajectory.push_back(*ppair.first);
+//       if(ppair.second)
+//         current_trajectory.push_back(*ppair.first);
     }
 
     last_pure_action.reset(new vector<double>(*next_action));
@@ -158,6 +162,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
         next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
     }
 
+//     gaussian
 //     if (!softmax && learning){
 //       vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, 0.4);
 //       delete next_action;
@@ -191,8 +196,8 @@ class ContinuousAcTAg : public arch::AAgent<> {
 // //     act_templ = new sml::ActionTemplate( {"effectors"}, {sml::ActionFactory::getInstance()->getActionsNumber()});
 // //     ainit = new sml::DAction(act_templ, {0});
 // //     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
-    hidden_unit = 10;
-    gamma = 0.9; // < 0.99  => gamma ^ 2000 = 0 && gamma != 1 -> better to reach the goal at the very end
+    hidden_unit = 70;
+    gamma = 0.99; // < 0.99  => gamma ^ 2000 = 0 && gamma != 1 -> better to reach the goal at the very end
 //     gamma = 1.0d;
     //check 0,0099×((1−0.95^1999)÷(1−0.95))
     //r_max_no_goal×((1−gamma^1999)÷(1−gamma)) < r_max_goal * gamma^2000 && gamma^2000 != 0
@@ -231,7 +236,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
     sum_weighted_reward = 0;
     global_pow_gamma = 1.f;
     internal_time = 0;
-//     trajectory.clear();
+    trajectory.clear();
     current_trajectory.clear();
     max_reward = std::numeric_limits<double>::min();
   }
@@ -312,12 +317,13 @@ class ContinuousAcTAg : public arch::AAgent<> {
 
         double delta = sm.r;
         if (!sm.goal_reached) {
-          std::vector<double>* best_action = ptr->nn->optimized(sm.next_s, {}, NBSOL_OPT);
+//           std::vector<double>* best_action = ptr->nn->optimized(sm.next_s, {}, NBSOL_OPT);
+          std::vector<double>* best_action = ptr->nn->optimizedBruteForce(sm.next_s);
           double nextQ = MLP::computeOut(local_nn, sm.next_s, *best_action);
-          if (ptr->aware_ac_time)
-            delta += pow(ptr->gamma, bib::Utils::transform(sm.a[ptr->nb_motors + ptr->nb_sensors], -1., 1., ptr->min_ac_time,
-                         ptr->max_ac_time)) * nextQ;
-          else
+//           if (ptr->aware_ac_time)
+//             delta += pow(ptr->gamma, bib::Utils::transform(sm.a[ptr->nb_motors + ptr->nb_sensors], -1., 1., ptr->min_ac_time,
+//                          ptr->max_ac_time)) * nextQ;
+//           else
             delta += ptr->gamma * nextQ;
           delete best_action;
         }
@@ -334,6 +340,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
   };
 
   void end_episode() override {
+    
     if (trajectory.size() > 0) {
       std::vector<sample> vtraj(trajectory.size());
       std::copy(trajectory.begin(), trajectory.end(), vtraj.begin());
@@ -377,37 +384,47 @@ class ContinuousAcTAg : public arch::AAgent<> {
 
 
       dq.free();
-//       LOG_DEBUG("number of data " << trajectory.size());
-
-      //puring by scoring
-      for(auto it = current_trajectory.begin(); it != current_trajectory.end() ; it++) {
-        trajectory.erase(*it);
-        it->score = sum_weighted_reward;
-      }
-      
-//       for(auto it = trajectory.begin(); it != trajectory.end() ; it++) {
-//         sample sa = *it;
+// //       LOG_DEBUG("number of data " << trajectory.size());
+// 
+//       //puring by scoring
+//       for(auto it = current_trajectory.begin(); it != current_trajectory.end() ; it++) {
 //         trajectory.erase(*it);
-//         sa.replayed++;
-//         trajectory.insert(sa);
+//         it->score = sum_weighted_reward;
+//       }
+//       
+// //       for(auto it = trajectory.begin(); it != trajectory.end() ; it++) {
+// //         sample sa = *it;
+// //         trajectory.erase(*it);
+// //         sa.replayed++;
+// //         trajectory.insert(sa);
+// //       }
+// 
+//       for(auto it = current_trajectory.begin(); it != current_trajectory.end() ; it++) {
+//         trajectory.insert(*it);
+//       }
+// 
+//       while(trajectory.size() > DATA_KEEPT) {
+//         trajectory.erase(trajectory.begin());
 //       }
 
-      for(auto it = current_trajectory.begin(); it != current_trajectory.end() ; it++) {
-        trajectory.insert(*it);
-      }
-
-      while(trajectory.size() > DATA_KEEPT) {
-        trajectory.erase(trajectory.begin());
-      }
-
+//       current_trajectory.clear();
+//       for(auto it = trajectory.begin(); it != trajectory.end() ; it++ ) {
+//         sample sa = *it;
+//         sa.replayed++;
+//         if(sa.replayed < DATA_KEEPT){
+//           current_trajectory.push_back(sa);
+//         }
+//       }
+//       trajectory.clear();
+//       trajectory.insert(trajectory.begin(), current_trajectory.begin(), current_trajectory.end());
     }
   }
 
   double sum_score_replayed() const {
     double sum= 0;
-    for(auto it = trajectory.begin(); it != trajectory.end() ; it++) {
-      sum += it->score;
-    }
+//     for(auto it = trajectory.begin(); it != trajectory.end() ; it++) {
+//       sum += it->score;
+//     }
     return sum;
   }
 
@@ -463,9 +480,9 @@ class ContinuousAcTAg : public arch::AAgent<> {
 
   std::vector<double> returned_ac;
 
-  std::set<sample> trajectory;
+//   std::set<sample> trajectory;
   std::list<sample> current_trajectory;
-// //     std::list<sample> trajectory;
+  std::list<sample> trajectory;
 
   MLP* nn;
 };
