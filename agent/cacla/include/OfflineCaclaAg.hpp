@@ -137,6 +137,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
     clear_trajectory        = pt->get<bool>("agent.clear_trajectory");
     compare_old_policy      = pt->get<bool>("agent.compare_old_policy");
     update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
+    vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
     
     if(!gaussian_policy)
       noise = 0.05;

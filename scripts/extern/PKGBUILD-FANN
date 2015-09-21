@@ -1,6 +1,6 @@
 # Contributor: Andreas Hauser <andy-aur@splashground.de>
 # Maintainer: Beej Jorgensen <beej@beej.us>
-pkgname=fann
+pkgname=fann-mine
 pkgver=2.2.0
 pkgrel=1
 pkgdesc="Fast artificial neural network library"

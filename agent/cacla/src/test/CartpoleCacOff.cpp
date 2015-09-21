@@ -2,9 +2,9 @@
 #include "arch/Simulator.hpp"
 #include "arch/Example.hpp"
 #include "CartpoleEnv.hpp"
-// #include "OfflineCaclaAg.hpp"
+#include "OfflineCaclaAg.hpp"
 // #include "OfflineCaclaAg2.hpp"
-#include "OfflineCaclaAg3.hpp"
+// #include "OfflineCaclaAg3.hpp"
 // #include "OfflineCaclaAg3Aon.hpp"
 // #include "OfflineCaclaAg4.hpp"
 
