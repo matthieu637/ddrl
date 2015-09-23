@@ -1,251 +1,255 @@
 #include "AdvancedAcrobotWorld.hpp"
-#include "ODEFactory.hpp"
-#include <bib/Utils.hpp>
-#include <ode/ode.h>
+
 #include <functional>
+#include <vector>
+#include <algorithm>
+#include "ode/ode.h"
 
-AdvancedAcrobotWorld::AdvancedAcrobotWorld(const std::vector<bone_joint>& _types, const std::vector<bool>& _actuators):
-    odeworld(ODEFactory::getInstance()->createWorld()), types(_types), actuators(_actuators)
-{
-    ASSERT(_types.size() == (_actuators.size() - 1), "actuators " << _actuators.size() <<  " not compatible with types " << _types.size());
-    dWorldSetGravity(odeworld.world_id, 0, 0.0, GRAVITY);
+#include "bib/Utils.hpp"
+#include "ODEFactory.hpp"
 
-    createWorld(_types);
 
-    internal_state.push_back(dJointGetHingeAngle(joints[0]));
-    internal_state.push_back(dJointGetHingeAngleRate(joints[0]));
-    for(unsigned int i =0; i<_types.size(); i++)
-        if(_types[i] == HINGE) {
-            internal_state.push_back(dJointGetHingeAngle(joints[i+1]));
-            internal_state.push_back(dJointGetHingeAngleRate(joints[i+1]));
-        }
-        else {
-            internal_state.push_back(dJointGetSliderPosition(joints[i+1]));
-            internal_state.push_back(dJointGetSliderPositionRate(joints[i+1]));
-        }
+AdvancedAcrobotWorld::AdvancedAcrobotWorld(
+  const std::vector<bone_joint>& _types, const std::vector<bool>& _actuators,
+    bool add_time_in_state, bool _normalization)
+  : odeworld(ODEFactory::getInstance()->createWorld()),
+    types(_types), actuators(_actuators), normalization(_normalization) {
+  ASSERT(_types.size() == (_actuators.size() - 1),
+         "actuators " << _actuators.size() << " not compatible with types "
+         << _types.size());
+  dWorldSetGravity(odeworld.world_id, 0, 0.0, GRAVITY);
 
-    _activated_motors =0;
-    for (bool b : _actuators)
-        if(b)
-            _activated_motors++;
+  createWorld(_types);
+
+  internal_state.push_back(dJointGetHingeAngle(joints[0]));
+  internal_state.push_back(dJointGetHingeAngleRate(joints[0]));
+  for (unsigned int i = 0; i < _types.size(); i++)
+    if (_types[i] == HINGE) {
+      internal_state.push_back(dJointGetHingeAngle(joints[i + 1]));
+      internal_state.push_back(dJointGetHingeAngleRate(joints[i + 1]));
+    } else {
+      internal_state.push_back(dJointGetSliderPosition(joints[i + 1]));
+      internal_state.push_back(dJointGetSliderPositionRate(joints[i + 1]));
+    }
+    
+  if(add_time_in_state)
+    internal_state.push_back(0.);
+
+  _activated_motors = 0;
+  for (bool b : _actuators)
+    if (b) _activated_motors++;
 }
 
-AdvancedAcrobotWorld::~AdvancedAcrobotWorld()
-{
-    for(ODEObject* o : bones) {
-        dGeomDestroy(o->getGeom());
-        dBodyDestroy(o->getID());
-        delete o;
+AdvancedAcrobotWorld::~AdvancedAcrobotWorld() {
+  for (ODEObject * o : bones) {
+    dGeomDestroy(o->getGeom());
+    dBodyDestroy(o->getID());
+    delete o;
+  }
+
+  dGeomDestroy(ground);
+
+  ODEFactory::getInstance()->destroyWorld(odeworld);
+}
+
+void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint>& types) {
+  ASSERT(types.size() > 0, "number of types :" << types.size());
+
+  float bone_length = BONE_LENGTH;
+  float bone_larger = BONE_LARGER;
+  float starting_z = STARTING_Z + bone_length * actuators.size() - bone_length / 2.f;
+
+  ground = ODEFactory::getInstance()->createGround(odeworld);
+
+  //  Create the first fixed bone with it's joint
+  ODEObject* first_bone = ODEFactory::getInstance()->createBox(
+                            odeworld, 0., 0, starting_z, bone_larger, bone_larger, bone_length,
+                            BONE_DENSITY, true);
+
+  bones.push_back(first_bone);
+
+  dJointID first_hinge = dJointCreateHinge(odeworld.world_id, nullptr);
+  dJointAttach(first_hinge, 0, first_bone->getID());
+  dJointSetHingeAnchor(first_hinge, 0, 0, starting_z + bone_length / 2.);
+  dJointSetHingeAxis(first_hinge, 0, 1, 0);
+  joints.push_back(first_hinge);
+
+  //  Create the other bone relative to the first one
+  for (bone_joint type : types) {
+    float my_starting_z = starting_z - bone_length * bones.size();
+    ODEObject* next = ODEFactory::getInstance()->createBox(
+                        odeworld, 0., 0, my_starting_z, bone_larger, bone_larger, bone_length,
+                        BONE_DENSITY, true);
+
+    if (type == HINGE) {
+      dJointID next_hinge = dJointCreateHinge(odeworld.world_id, nullptr);
+      dJointAttach(next_hinge, bones.back()->getID(), next->getID());
+      dJointSetHingeAnchor(next_hinge, 0, 0, my_starting_z + bone_length / 2.);
+      dJointSetHingeAxis(next_hinge, 0, 1, 0);
+      joints.push_back(next_hinge);
+    } else {  // type == SLIDER
+      dJointID next_slider = dJointCreateSlider(odeworld.world_id, nullptr);
+      dJointAttach(next_slider, bones.back()->getID(), next->getID());
+      dJointSetSliderAxis(next_slider, 0, 0, 1);
+      dJointSetSliderParam(next_slider, dParamLoStop, -bone_length);
+      dJointSetSliderParam(next_slider, dParamHiStop, 0.);
+      joints.push_back(next_slider);
     }
 
-
-    dGeomDestroy(ground);
-
-    ODEFactory::getInstance()->destroyWorld(odeworld);
+    bones.push_back(next);
+  }
 }
 
-void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint>& types)
-{
-    ASSERT(types.size() > 0, "number of types :" << types.size());
+void nearCallback(void* data, dGeomID o1, dGeomID o2) {
+  int n;
+  nearCallbackData* d = reinterpret_cast<nearCallbackData*>(data);
+  AdvancedAcrobotWorld* inst = d->inst;
 
-    float bone_length = BONE_LENGTH;
-    float bone_larger = BONE_LARGER;
-    float starting_z = STARTING_Z + bone_length * types.size();
+  // exit without doing anything if the two bodies are connected by a joint
+  dBodyID b1 = dGeomGetBody(o1);
+  dBodyID b2 = dGeomGetBody(o2);
+  if (b1 && b2 && dAreConnectedExcluding(b1, b2, dJointTypeContact)) return;
 
-    ground = ODEFactory::getInstance()->createGround(odeworld);
+  const int N = 10;
+  dContact contact[N];
+  n = dCollide(o1, o2, N, &contact[0].geom, sizeof(dContact));
+  if (n > 0) {
+    for (int i = 0; i < n; i++) {
+      contact[i].surface.mode = dContactSlip1 | dContactSlip2 |
+                                dContactSoftERP | dContactSoftCFM |
+                                dContactApprox1;
+      contact[i].surface.mu = dInfinity;
+      contact[i].surface.slip1 = 0.5;
+      contact[i].surface.slip2 = 0.5;
+      contact[i].surface.soft_erp = 0.95;
+      contact[i].surface.soft_cfm = 0.5;
 
-
-//  Create the first fixed bone with it's joint
-    ODEObject* first_bone = ODEFactory::getInstance()->createBox(odeworld, 0., 0, starting_z, bone_larger, bone_larger, bone_length, BONE_DENSITY, BONE_MASS,true);
-    bones.push_back(first_bone);
-
-    dJointID first_hinge = dJointCreateHinge(odeworld.world_id, nullptr);
-    dJointAttach(first_hinge, 0, first_bone->getID());
-    dJointSetHingeAnchor(first_hinge, 0, 0, starting_z+bone_length/2.);
-    dJointSetHingeAxis(first_hinge, 0, 1, 0);
-    joints.push_back(first_hinge);
-
-//  Create the other bone relative to the first one
-    for (bone_joint type : types) {
-        float my_starting_z = starting_z - bone_length * bones.size();
-        ODEObject* next = ODEFactory::getInstance()->createBox(odeworld, 0., 0, my_starting_z, bone_larger, bone_larger, bone_length, BONE_DENSITY, BONE_MASS,true);
-
-        if(type == HINGE) {
-            dJointID next_hinge = dJointCreateHinge(odeworld.world_id, nullptr);
-            dJointAttach(next_hinge, bones.back()->getID(), next->getID());
-            dJointSetHingeAnchor(next_hinge, 0, 0, my_starting_z+bone_length/2.);
-            dJointSetHingeAxis(next_hinge, 0, 1, 0);
-            joints.push_back(next_hinge);
-        } else //type == SLIDER
-        {
-            dJointID next_slider = dJointCreateSlider(odeworld.world_id, nullptr);
-            dJointAttach(next_slider, bones.back()->getID(), next->getID());
-            dJointSetSliderAxis(next_slider, 0, 0, 1);
-            dJointSetSliderParam(next_slider, dParamLoStop, -bone_length);
-            dJointSetSliderParam(next_slider, dParamHiStop, 0.);
-            joints.push_back(next_slider);
-        }
-
-        bones.push_back(next);
+      dJointID c = dJointCreateContact(
+                     inst->odeworld.world_id, inst->odeworld.contactgroup, &contact[i]);
+      dJointAttach(c, dGeomGetBody(contact[i].geom.g1),
+                   dGeomGetBody(contact[i].geom.g2));
     }
+  }
 }
 
-void nearCallback (void *data, dGeomID o1, dGeomID o2)
-{
-    int i,n;
-    nearCallbackData* d = (nearCallbackData*) data;
-    AdvancedAcrobotWorld* inst = d->inst;
+void AdvancedAcrobotWorld::step(const vector<float>& motors, uint current_step, uint max_step_per_instance) {
+  // No collision in this world
 
-    // exit without doing anything if the two bodies are connected by a joint
-    dBodyID b1 = dGeomGetBody(o1);
-    dBodyID b2 = dGeomGetBody(o2);
-    if (b1 && b2 && dAreConnectedExcluding (b1,b2,dJointTypeContact)) return;
+  // nearCallbackData d = {this};
+  // dSpaceCollide(odeworld.space_id, &d, &nearCallback);
 
-    const int N = 10;
-    dContact contact[N];
-    n = dCollide (o1,o2,N,&contact[0].geom,sizeof(dContact));
-    if (n > 0) {
-        for (i=0; i<n; i++) {
-            contact[i].surface.mode = dContactSlip1 | dContactSlip2 |
-                                      dContactSoftERP | dContactSoftCFM | dContactApprox1 ;
-            contact[i].surface.mu = dInfinity;
-            contact[i].surface.slip1 = 0.5;
-            contact[i].surface.slip2 = 0.5;
-            contact[i].surface.soft_erp = 0.95;
-            contact[i].surface.soft_cfm = 0.5;
+  unsigned int begin_index = 0;
+  double force = 0.f;
+  if (actuators[0]) {
+    force = bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE);
+    dJointAddHingeTorque(joints[0], force);
+  }
 
-            dJointID c = dJointCreateContact (inst->odeworld.world_id,
-                                              inst->odeworld.contactgroup,
-                                              &contact[i]);
-            dJointAttach (c,
-                          dGeomGetBody(contact[i].geom.g1),
-                          dGeomGetBody(contact[i].geom.g2));
-        }
+  for (unsigned int i = 1; i < actuators.size(); i++)
+    if (actuators[i]) {
+      if (types[i - 1] == HINGE)
+        force = bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE);
+      else
+        force = bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_SLIDER, MAX_TORQUE_SLIDER);
+
+      dJointAddHingeTorque(joints[i], force);
     }
+
+  ASSERT(begin_index == motors.size(),
+         "wrong number of motors " << begin_index << " " << motors.size() << " " << actuators.size());
+
+  Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
+  dWorldStep(odeworld.world_id, WORLD_STEP);
+  lock.release();
+
+  dJointGroupEmpty(odeworld.contactgroup);
+
+  update_state(current_step, max_step_per_instance);
 }
 
-void AdvancedAcrobotWorld::step(const vector<float>& motors) // *
-{
-    nearCallbackData d = {this};
+const std::vector<float> AdvancedAcrobotWorld::NORMALIZED_VEC({28,62,71});
 
-    dSpaceCollide (odeworld.space_id, &d, &nearCallback);
-
-    unsigned int begin_index = 0;
-    if(actuators[0])
-        dJointAddHingeTorque(joints[0], bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE));
-
-    for (unsigned int i=1; i<actuators.size(); i++)
-        if(actuators[i]) {
-            if(types[i-1] == HINGE)
-                dJointAddHingeTorque(joints[i], bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE));
-            else
-                dJointAddSliderForce(joints[i], bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_SLIDER, MAX_TORQUE_SLIDER));
-        }
-
-    ASSERT(begin_index == motors.size(), "wrong number of motors "<< begin_index << " " << motors.size() << " " << actuators.size());
-
-    Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
-    dWorldStep (odeworld.world_id, WORLD_STEP);
-    lock.release();
-
-    dJointGroupEmpty (odeworld.contactgroup);
-
-    begin_index = 0;
+void AdvancedAcrobotWorld::update_state(uint current_step, uint max_step_per_instance){
+  uint begin_index = 0;
+  
+  if(normalization)
+    internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngle(joints[0]), -M_PI, M_PI, -1, 1);
+  else
     internal_state[begin_index++] = dJointGetHingeAngle(joints[0]);
+  
+  if(normalization)
+    internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngleRate(joints[0]), -NORMALIZED_VEC[0], NORMALIZED_VEC[0], -1, 1);
+  else
     internal_state[begin_index++] = dJointGetHingeAngleRate(joints[0]);
-    for(unsigned int i =0; i<types.size(); i++)
-        if(types[i] == HINGE) {
-            internal_state[begin_index++] = dJointGetHingeAngle(joints[i+1]);
-            internal_state[begin_index++] = dJointGetHingeAngleRate(joints[i+1]);
-        }
-        else {
-            internal_state[begin_index++] = dJointGetSliderPosition(joints[i+1]);
-            internal_state[begin_index++] = dJointGetSliderPositionRate(joints[i+1]);
-        }
+  
+  for (unsigned int i = 0; i < types.size(); i++)
+    if (types[i] == HINGE) {
+      if(normalization)
+        internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngle(joints[i + 1]), -M_PI, M_PI, -1, 1);
+      else
+        internal_state[begin_index++] = dJointGetHingeAngle(joints[i + 1]);
+      
+      if(normalization && i+1 < NORMALIZED_VEC.size())
+          internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngleRate(joints[i + 1]), -NORMALIZED_VEC[i + 1], NORMALIZED_VEC[i + 1], -1, 1);
+      else
+          internal_state[begin_index++] = dJointGetHingeAngleRate(joints[i + 1]);
+    } else {
+      internal_state[begin_index++] = dJointGetSliderPosition(joints[i + 1]);
+      internal_state[begin_index++] = dJointGetSliderPositionRate(joints[i + 1]);
+    }
+    
+    internal_state[begin_index] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
 }
 
-const std::vector<float>& AdvancedAcrobotWorld::state() const
-{
-    return internal_state;
+const std::vector<float>& AdvancedAcrobotWorld::state() const {
+  return internal_state;
 }
 
-unsigned int AdvancedAcrobotWorld::activated_motors() {
-    return _activated_motors;
+unsigned int AdvancedAcrobotWorld::activated_motors() const {
+  return _activated_motors;
 }
 
-std::vector<float>* AdvancedAcrobotWorld::current_joint_forces() const
-{
-    std::vector<float>* forces = new std::vector<float>;
+void AdvancedAcrobotWorld::resetPositions() {
+  float starting_z = STARTING_Z + BONE_LENGTH * actuators.size() - BONE_LENGTH / 2.f;
 
-//     internal_state.push_back(dJointGetHingeAngle(joints[0]));
-//     internal_state.push_back(dJointGetHingeAngleRate(joints[0]));
-//
-//     for(unsigned int i =0; i<types.size(); i++)
-//         if(types[i] == HINGE) {
-//             internal_state.push_back(dJointGetHingeAngle(joints[i+1]));
-//             internal_state.push_back(dJointGetHingeAngleRate(joints[i+1]));
-//         }
-//         else {
-//             internal_state.push_back(dJointGetSliderPosition(joints[i]));
-//             internal_state.push_back(dJointGetSliderPositionRate(joints[i]));
-//         }
+  if (actuators[0]) dJointAddHingeTorque(joints[0], 0);
 
-    return forces;
-}
-
-void AdvancedAcrobotWorld::resetPositions()
-{
-    float starting_z = STARTING_Z + BONE_LENGTH * types.size();
-
-    if(actuators[0])
-        dJointAddHingeTorque(joints[0], 0);
-
-    for (unsigned int i=1; i<actuators.size(); i++)
-        if(actuators[i]) {
-            if(types[i-1] == HINGE)
-                dJointAddHingeTorque(joints[i], 0);
-            else
-                dJointAddSliderForce(joints[i], 0);
-        }
-
-    dMatrix3 R;
-    dRFromEulerAngles(R, 0, 0, 0);
-
-    unsigned int i=0;
-    for(ODEObject* o : bones) {
-        dBodySetRotation(o->getID(), R);
-        dBodySetForce(o->getID(), 0,0,0);
-        dBodySetLinearVel(o->getID(), 0,0,0);
-        dBodySetAngularVel(o->getID(), 0,0,0);
-        dBodySetPosition(o->getID(), 0,0, starting_z - BONE_LENGTH * i++);
+  for (unsigned int i = 1; i < actuators.size(); i++)
+    if (actuators[i]) {
+      if (types[i - 1] == HINGE)
+        dJointAddHingeTorque(joints[i], 0);
+      else
+        dJointAddSliderForce(joints[i], 0);
     }
 
-    Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
-    dWorldStep (odeworld.world_id, WORLD_STEP);
-    lock.release();
+  dMatrix3 R;
+  dRFromEulerAngles(R, 0, 0, 0);
 
-    dJointGroupEmpty (odeworld.contactgroup);
+  unsigned int i = 0;
+  for (ODEObject * o : bones) {
+    dBodySetRotation(o->getID(), R);
+    dBodySetForce(o->getID(), 0, 0, 0);
+    dBodySetLinearVel(o->getID(), 0, 0, 0);
+    dBodySetAngularVel(o->getID(), 0, 0, 0);
+    dBodySetPosition(o->getID(), 0, 0, starting_z - BONE_LENGTH * i++);
+  }
+
+  Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
+  dWorldStep(odeworld.world_id, WORLD_STEP);
+  lock.release();
+
+  dJointGroupEmpty(odeworld.contactgroup);
+  
+  update_state(0, 1);
 }
 
-float AdvancedAcrobotWorld::perf() const
-{
-    dVector3 result;
-    dBodyGetRelPointPos(bones.back()->getID(), 0,0, 0, result);
-    return result[2]-STARTING_Z;
+float AdvancedAcrobotWorld::perf() const {
+  float normalize = 2.f * BONE_LENGTH * actuators.size();
+
+  dVector3 result;
+  dBodyGetRelPointPos(bones.back()->getID(), 0, 0, - BONE_LENGTH / 2.f, result);
+
+//   LOG_DEBUG( result[2] << " " << (result[2] - STARTING_Z) <<" "
+//   <<normalize<< " " << (result[2] - STARTING_Z) / normalize );
+  return bib::Utils::transform(result[2] - STARTING_Z, 0.f, normalize, 0.f, 1.f);
 }
-
-
-bool AdvancedAcrobotWorld::end()
-{
-    return goalBeenReached;
-}
-
-bool AdvancedAcrobotWorld::prematureEnd()
-{
-    return goalFailed;
-}
-
-
-
-
-

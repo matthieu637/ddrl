@@ -1,8 +1,10 @@
 #ifndef DRAW_HPP
 #define DRAW_HPP
 
+#include <list>
+#include "ode/ode.h"
+
 #include "drawstuff.h"
-#include <ode/ode.h>
 
 #ifdef dDOUBLE
 #define dsDrawBox dsDrawBoxD
@@ -14,15 +16,13 @@
 
 #include "ODEFactory.hpp"
 
+class Draw {
+ public:
+  static std::list<dGeomID> *geoms;
 
-class Draw
-{
-public:
-    static std::list<dGeomID>* geoms;
-    
-    static void drawGeom (dGeomID g, const dReal *pos, const dReal *R);
-    
-    static void drawLoop (int);
+  static void drawGeom(dGeomID g, const dReal *pos, const dReal *R);
+
+  static void drawLoop(int);
 };
 
 #endif

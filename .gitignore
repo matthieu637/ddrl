@@ -15,3 +15,15 @@
 */*/*/*/.directory
 */*/*/*/*/.directory
 build
+extern
+cppcheck-result.xml
+doc/
+build_report.log
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+.cproject
+.project
+eclipse
+gen-data

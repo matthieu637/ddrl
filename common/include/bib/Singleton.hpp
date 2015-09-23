@@ -1,11 +1,14 @@
 #ifndef SINGLETON_HPP
 #define SINGLETON_HPP
 
+#include <list>
+#include <memory>
+
 #include "Assert.hpp"
 
 ///
-///\file Singleton.hpp
-///\brief Template de base pour le pattern singleton
+// /\file Singleton.hpp
+// /\brief Template de base pour le pattern singleton
 ///
 ///
 /// \example Pour l'utiliser il suffit de faire hériter la classe par celle-ci
@@ -16,39 +19,31 @@
 namespace bib {
 
 template <class T>
-class Singleton
-{
+class Singleton {
+ public:
+  ///
+  // /\brief Méthode statique et public pour récupérer l'instance du singleton
+  ///
+  static T* getInstance() {
+    ASSERT(_singleton != nullptr, "singleton never created");
+    return _singleton.get();
+  }
 
+  ///
+  // /\brief Constructeur privée/protected pour empécher l'instanciation
+  /// n'importe où
+  ///
+ protected:
+  Singleton() {}
+ public:
+  virtual ~Singleton() {}
 
-public:
-///
-///\brief Méthode statique et public pour récupérer l'instance du singleton
-///
-    static T* getInstance()
-    {
-
-        ASSERT(_singleton != nullptr, "singleton never created");
-        return _singleton;
-    }
-    
-    static void endInstance() {
-	delete _singleton;
-    }
-///
-///\brief Constructeur privée/protected pour empécher l'instanciation n'importe où
-///
-protected:
-    Singleton() {}
-    virtual ~Singleton() {}
-
-private:
-    static T* _singleton;
+ private:
+  static std::shared_ptr<T> _singleton;
 };
 
 template <class T>
-T *Singleton<T>::_singleton = new T;
-
-}
+std::shared_ptr<T> Singleton<T>::_singleton = std::shared_ptr<T>(new T);
+}  // namespace bib
 
 #endif
-
