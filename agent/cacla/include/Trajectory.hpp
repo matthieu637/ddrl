@@ -130,6 +130,48 @@ typedef struct _qsasrg_sample {
 } QSASRG_sample;
 
 
+typedef struct _qsasrgpa_sample {
+  std::vector<double> s;
+  std::vector<double> a;
+  std::vector<double> next_s;
+  double r;
+  bool goal_reached;
+  std::vector<double> pa;
+  
+  typedef double value_type;
+
+  friend class boost::serialization::access;
+  template <typename Archive>
+  void serialize(Archive& ar, const unsigned int v) {
+    ar& BOOST_SERIALIZATION_NVP(s);
+    ar& BOOST_SERIALIZATION_NVP(a);
+    ar& BOOST_SERIALIZATION_NVP(next_s);
+    ar& BOOST_SERIALIZATION_NVP(r);
+    ar& BOOST_SERIALIZATION_NVP(goal_reached);
+    ar& BOOST_SERIALIZATION_NVP(pa);
+  }
+
+  bool operator< (const _qsasrgpa_sample& b) const {
+    for (uint i = 0; i < s.size(); i++) {
+      if(s[i] != b.s[i])
+        return s[i] < b.s[i];
+    }
+    
+    for (uint i = 0; i < a.size(); i++) {
+      if(a[i] != b.a[i])
+        return a[i] < b.a[i];
+    }
+    
+    return false;
+  }
+    
+  inline double operator[](size_t const N) const{
+        size_t l = s.size();
+        return N < l ? s[N] : a[N-l];
+  }
+  
+} QSASRGPA_sample;
+
 template<typename Struct>
 struct UniqTest
 {

@@ -19,7 +19,6 @@
 #include "MLP.hpp"
 #include "LinMLP.hpp"
 #include "Trajectory.hpp"
-#include "../../qlearning-nn/include/MLP.hpp"
 
 class OfflineCaclaAg : public arch::AAgent<> {
  public:
@@ -29,7 +28,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
   }
 
   virtual ~OfflineCaclaAg() {
-    delete trajectory_a;
     delete trajectory_v;
     
     delete vnn;
@@ -92,10 +90,12 @@ class OfflineCaclaAg : public arch::AAgent<> {
 //           trajectory_v->size() << " " << trajectory_v->count_inserted << " " << trajectory_v->count_removed 
 //         );
 
-        trajectory_a->addPoint(as);
+        if(update_pure_ac)
+          ann->learn(last_state, *last_pure_action);
+        else
+          ann->learn(last_state, *last_action);
 
         if(online_update){
-          update_actor();
           removeOldPolicyTrajectory();
         }
         
@@ -140,7 +140,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
     gamma               = pt->get<double>("agent.gamma");
-//         alpha_a               = pt->get<double>("agent.alpha_a");
+    alpha_a             = pt->get<double>("agent.alpha_a");
     hidden_unit_v       = pt->get<int>("agent.hidden_unit_v");
     hidden_unit_a       = pt->get<int>("agent.hidden_unit_a");
     noise               = pt->get<double>("agent.noise");
@@ -161,14 +161,12 @@ class OfflineCaclaAg : public arch::AAgent<> {
       vnn = new MLP(nb_sensors, hidden_unit_v, nb_sensors, 0.0, lecun_activation);
 
     if(hidden_unit_a == 0)
-      ann = new LinMLP(nb_sensors , nb_motors, 0.0, lecun_activation);
-    else
+      ann = new LinMLP(nb_sensors , nb_motors, alpha_a, lecun_activation);
+    else {
       ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
-    
-    //need normalization of s
-//     trajectory_a = new Trajectory<SA_sample>(nb_sensors, 0.5f, false);
-    trajectory_a = new Trajectory<SA_sample>(nb_sensors, transform_proba, kd_tree_autoremove);
-    
+      fann_set_learning_rate(ann->getNeuralNet(), alpha_a);
+    }
+
     //don't need normalization if removeTrajectory
 //     trajectory_v = new Trajectory<SASRG_sample>(nb_sensors, 0.5f, false);
     trajectory_v = new Trajectory<SASRG_sample>(nb_sensors, transform_proba, kd_tree_autoremove);
@@ -204,7 +202,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
     fann_reset_MSE(vnn->getNeuralNet());
     
     if(clear_trajectory){
-      trajectory_a->clear();
       trajectory_v->clear();
     }
     
@@ -218,8 +215,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
     mean_sum_VS.push_back(sum_VS);
     
     if(!online_update){
-      update_actor();
-    
       removeOldPolicyTrajectory();
         
 //         write_valuef_file("v_before.data");
@@ -323,30 +318,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
     }
   }
 
-
-  void update_actor() {
-    if(trajectory_a->size() > 0) {
-
-      struct fann_train_data* data = fann_create_train(trajectory_a->size(), nb_sensors, nb_motors);
-
-      uint n=0;
-      for(auto it = trajectory_a->tree().begin(); it != trajectory_a->tree().end() ; ++it) {
-        SA_sample sm = *it;
-
-        for (uint i = 0; i < nb_sensors ; i++)
-          data->input[n][i] = sm.s[i];
-        for (uint i = 0; i < nb_motors; i++)
-          data->output[n][i] = sm.a[i];
-
-        n++;
-      }
-
-      ann->learn(data, 5000, 0, 0.0001);
-
-      fann_destroy_train(data);
-    }
-  }
-
   void update_critic() {
     if (trajectory_v->size() > 0) {
       //remove trace of old policy
@@ -408,7 +379,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " " <<
         std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " <<
-        trajectory_v->size() << " " << trajectory_a->size() << " " << bib::Utils::statistics(mean_sum_VS).mean << " " << mean_sum_VS.size() << 
+        trajectory_v->size() << " " << bib::Utils::statistics(mean_sum_VS).mean << " " << mean_sum_VS.size() << 
         " " << vnn->weightSum() << " " <<ann->weightSum();
   }
 
@@ -428,6 +399,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
   double global_pow_gamma;
   double sum_weighted_reward;
   
+  double alpha_a;
   bool lecun_activation, online_update, update_pure_ac, kd_tree_autoremove, clear_trajectory, update_vtraj_actor;
   double transform_proba;
   
@@ -448,7 +420,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
   std::vector<double> returned_ac;
 
-  Trajectory<SA_sample>* trajectory_a;
   Trajectory<SASRG_sample>* trajectory_v;
 
   MLP* ann;

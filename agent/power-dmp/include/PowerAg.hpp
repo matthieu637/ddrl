@@ -30,8 +30,8 @@ class PowerAg : public arch::AAgent<> {
   virtual ~PowerAg() {
     delete algo;
   }
-  const std::vector<float>& run(float, const std::vector<float>&, bool, bool);
-  void start_episode(const std::vector<float>& sensors) override;
+  const std::vector<double>& run(double, const std::vector<double>&, bool, bool);
+  void start_episode(const std::vector<double>& sensors) override;
   void end_episode() override;
   void save(const std::string& path) override;
   void load(const std::string& path) override;
@@ -39,12 +39,12 @@ class PowerAg : public arch::AAgent<> {
         config.n_steps_max = pt->get<int>("environment.max_step_per_instance");
         config.n_episodes = pt->get<int>("simulation.max_episode");
         config.n_instances = pt->get<int>("environment.instance_per_episode");
-        config.var_init = pt->get<float>("agent.var_init");
+        config.var_init = pt->get<double>("agent.var_init");
         config.n_states_per_kernels = pt->get<int>("agent.n_states_per_kernels");
         //config.n_basis_per_dim = bib::to_array<unsigned int>(properties->get<std::string>("agent.n_basis_per_dim"));
         config.n_basis_per_dim = pt->get<int>("agent.n_basis_per_dim");
-        config.width_kernel = pt->get<float>("agent.width_kernel");
-        config.d_variance = pt->get<float>("agent.d_variance");
+        config.width_kernel = pt->get<double>("agent.width_kernel");
+        config.d_variance = pt->get<double>("agent.d_variance");
         config.elite = pt->get<int>("agent.elite");
         config.elite_variance = pt->get<int>("agent.elite_variance");
         config.n_motors = n_motors;
@@ -57,19 +57,19 @@ class PowerAg : public arch::AAgent<> {
         algo->setPointeurEpisode(&episode);
   }
   Eigen::VectorXf normalDistribution(int size);
-  const float PI = 3.14159265358979f;
+  const double PI = 3.14159265358979f;
 
   private:
-  std::vector<float> actuator;
-  std::vector< std::pair<float,int>> s_Return;
+  std::vector<double> actuator;
+  std::vector< std::pair<double,int>> s_Return;
   unsigned int iter;
   unsigned int episode;
-  std::vector<float> rewards;
-  float best_value;
-  float reward;
-  float best_reward;
-  float best_reward_episode;
-  float y_max;
+  std::vector<double> rewards;
+  double best_value;
+  double reward;
+  double best_reward;
+  double best_reward_episode;
+  double y_max;
   Config config;
   unsigned int pas;
   unsigned int n_motors;

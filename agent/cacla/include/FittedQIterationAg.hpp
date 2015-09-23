@@ -21,15 +21,15 @@
 #include "Trajectory.hpp"
 #include "../../qlearning-nn/include/MLP.hpp"
 
-class OfflineCaclaAg : public arch::AAgent<> {
+class FittedQACAg : public arch::AAgent<> {
  public:
-  OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
+  FittedQACAg(unsigned int _nb_motors, unsigned int _nb_sensors)
     : nb_motors(_nb_motors), nb_sensors(_nb_sensors), time_for_ac(1), returned_ac(nb_motors) {
 
   }
 
-  virtual ~OfflineCaclaAg() {
-    delete trajectory_v;
+  virtual ~FittedQACAg() {
+    delete trajectory;
     
     delete vnn;
   }
@@ -64,37 +64,28 @@ class OfflineCaclaAg : public arch::AAgent<> {
   const std::vector<double>& _runf(double reward, const std::vector<double>& sensors,
                                   bool learning, bool goal_reached, bool) {
 
-    vector<double>* next_action = vnn->optimizedBruteForce(sensors);
+    
+    vector<double>* next_action = ann->computeOut(sensors);
 
     if (last_action.get() != nullptr && learning) {  // Update Q
 
-      double vtarget = reward;
-      if (!goal_reached) {
-        double nextV = vnn->computeOut(sensors, *next_action);
-        vtarget += gamma * nextV;
-      }
-
-      double mine = vnn->computeOut(last_state, *last_action);
-      sum_VS += mine;
-
-      QSASRG_sample vsampl = {last_state, *last_pure_action, sensors, reward, goal_reached};
-      trajectory_v->addPoint(vsampl);
-      
-      if(online_update)
-        update_critic();
+      QSASRG_sample vsampl = {last_state, *last_action, sensors, reward, goal_reached};
+      trajectory->addPoint(vsampl); 
     }
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
       //gaussian policy
-//       vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
-//       delete next_action;
-//       next_action = randomized_action;
-      
-      //e greedy
-      if(bib::Utils::rand01() < 0.05)
-        for (uint i = 0; i < next_action->size(); i++)
-            next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
+      if(gaussian_policy){
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
+        delete next_action;
+        next_action = randomized_action;
+      }else {
+        //e greedy
+        if(bib::Utils::rand01() < noise)
+          for (uint i = 0; i < next_action->size(); i++)
+              next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
+      }
     }
     last_action.reset(next_action);
 
@@ -112,34 +103,37 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
-    gamma               = pt->get<double>("agent.gamma");
-    hidden_unit_v       = pt->get<int>("agent.hidden_unit_v");
-    noise               = pt->get<double>("agent.noise");
-    decision_each       = pt->get<int>("agent.decision_each");
-    lecun_activation    = pt->get<bool>("agent.lecun_activation");
-    online_update       = pt->get<bool>("agent.online_update");
-    kd_tree_autoremove  = pt->get<bool>("agent.kd_tree_autoremove");
-    transform_proba     = pt->get<double>("agent.transform_proba");
+    gamma                       = pt->get<double>("agent.gamma");
+    hidden_unit_v               = pt->get<int>("agent.hidden_unit_v");
+    hidden_unit_a               = pt->get<int>("agent.hidden_unit_a");
+    noise                       = pt->get<double>("agent.noise");
+    decision_each               = pt->get<int>("agent.decision_each");
+    lecun_activation            = pt->get<bool>("agent.lecun_activation");
+    kd_tree_autoremove          = pt->get<bool>("agent.kd_tree_autoremove");
+    transform_proba             = pt->get<double>("agent.transform_proba");
+    determinist_vnn_update      = pt->get<bool>("agent.determinist_vnn_update");
+    gaussian_policy             = pt->get<bool>("agent.gaussian_policy");
+    clear_trajectory            = pt->get<bool>("agent.clear_trajectory");
+    vnn_from_scratch            = pt->get<bool>("agent.vnn_from_scratch");
 
+    if(!gaussian_policy)
+      noise = 0.05;
+    
     episode=-1;
 
-//     if(hidden_unit_v == 0)
-//       vnn = new LinMLP(nb_sensors , 1, 0.0, lecun_activation);
-//     else
+    if(hidden_unit_v == 0)
+      vnn = new LinMLP(nb_sensors + nb_motors , 1, 0.0, lecun_activation);
+    else
       vnn = new MLP(nb_sensors + nb_motors, hidden_unit_v, nb_sensors, 0.0, lecun_activation);
+    
+    if(hidden_unit_a == 0)
+      ann = new LinMLP(nb_sensors , nb_motors, 0.0, lecun_activation);
+    else
+      ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
 
     //don't need normalization if removeTrajectory
-//     trajectory_v = new Trajectory<QSASRG_sample>(nb_sensors, 0.5f, false);
-    trajectory_v = new Trajectory<QSASRG_sample>(nb_sensors, transform_proba, kd_tree_autoremove);
+    trajectory = new Trajectory<QSASRG_sample>(nb_sensors, transform_proba, kd_tree_autoremove);
     
-//         if (boost::filesystem::exists("trajectory.data")) {
-//             decltype(trajectory)* obj = bib::XMLEngine::load<decltype(trajectory)>("trajectory", "trajectory.data");
-//             trajectory = *obj;
-//             delete obj;
-//
-//             end_episode();
-//         }
-
   }
 
   void start_episode(const std::vector<double>& sensors) override {
@@ -162,26 +156,47 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
     fann_reset_MSE(vnn->getNeuralNet());
     
-    trajectory_v->clear();
+    if(clear_trajectory)
+      trajectory->clear();
     
-//     if(episode % 50 == 0)
     mean_sum_VS.clear();
     
     episode ++;
   }
+  
+  void update_actor(){
+    if (trajectory->size() > 0) {
+
+      struct fann_train_data* data = fann_create_train(trajectory->size(), nb_sensors, nb_motors);
+
+      uint n=0;
+      for(auto it = trajectory->tree().begin(); it != trajectory->tree().end() ; ++it) {
+          QSASRG_sample sm = *it;
+
+          vector<double>* ac = vnn->optimized(sm.s, {}, 2);
+        
+          for (uint i = 0; i < nb_sensors ; i++)
+            data->input[n][i] = sm.s[i];
+          for (uint i = 0; i < nb_motors; i++)
+            data->output[n][i] = ac->at(i);
+          
+          delete ac;
+      }
+      
+      ann->learn(data, 5000, 0, 0.0001);
+
+      fann_destroy_train(data);
+    }
+  }
 
   void end_episode() override {
     mean_sum_VS.push_back(sum_VS);
-    
-    if(!online_update){
-        
+           
 //         write_valuef_file("v_before.data");
       update_critic();
 //         write_valuef_file("v_after.data");
-     
-    }
-    
-    write_valuef_file("v_after.data." + std::to_string(episode));
+
+//     write_valuef_file("v_after.data." + std::to_string(episode));
   }
   
   void write_valuef_file(const std::string& file){
@@ -220,7 +235,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
   }
   
   struct ParraVtoVNext {
-    ParraVtoVNext(const std::vector<QSASRG_sample>& _vtraj, const OfflineCaclaAg* _ptr) : vtraj(_vtraj), ptr(_ptr),
+    ParraVtoVNext(const std::vector<QSASRG_sample>& _vtraj, const FittedQACAg* _ptr) : vtraj(_vtraj), ptr(_ptr),
       actions(vtraj.size()) {
 
       data = fann_create_train(vtraj.size(), ptr->nb_sensors + ptr->nb_motors, 1);
@@ -231,7 +246,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
         for (uint i= ptr->nb_sensors ; i < ptr->nb_sensors + ptr->nb_motors; i++)
           data->input[n][i] = sm.a[i - ptr->nb_sensors];
 
-        actions[n] = ptr->vnn->optimizedBruteForce(sm.next_s);
+        actions[n] = ptr->ann->computeOut(sm.next_s);
       }
     }
 
@@ -241,6 +256,19 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
     void free() {
       fann_destroy_train(data);
+      
+      for(auto it : actions)
+        delete it;
+    }
+    
+    void update_actions(){
+      for(auto it : actions)
+        delete it;
+      
+      for (uint n = 0; n < vtraj.size(); n++){
+        QSASRG_sample sm = vtraj[n];
+        actions[n] = ptr->ann->computeOut(sm.next_s);
+      }
     }
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
@@ -264,50 +292,50 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
     struct fann_train_data* data;
     const std::vector<QSASRG_sample>& vtraj;
-    const OfflineCaclaAg* ptr;
+    const FittedQACAg* ptr;
     std::vector<std::vector<double>*> actions;
   };
 
   void update_critic() {
-    if (trajectory_v->size() > 0) {
+    if (trajectory->size() > 0) {
       //remove trace of old policy
 
-      std::vector<QSASRG_sample> vtraj(trajectory_v->size());
-      std::copy(trajectory_v->tree().begin(), trajectory_v->tree().end(), vtraj.begin());
+      std::vector<QSASRG_sample> vtraj(trajectory->size());
+      std::copy(trajectory->tree().begin(), trajectory->tree().end(), vtraj.begin());
+      //std::shuffle(vtraj.begin(), vtraj.end()); //useless due to rprop batch
 
       ParraVtoVNext dq(vtraj, this);
 
       auto iter = [&]() {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj.size()), dq);
 
-//         fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
+        if(vnn_from_scratch)
+          fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
         vnn->learn(dq.data, 10000, 0, 0.0001);
-
-        //                 uint number_par = 6;
-        //                 ParrallelLearnFromScratch plfs(dq.data, nn->getNeuralNet(), number_par);
-        //                 tbb::parallel_for(tbb::blocked_range<uint>(0, number_par), plfs);
-        //                 nn->copy(plfs.bestNN());
-        //                 plfs.free();
+        
+        update_actor();
+        dq.update_actions();
       };
 
       auto eval = [&]() {
         return fann_get_MSE(vnn->getNeuralNet());
       };
 
-// CHOOSE BETWEEN determinist or stochastic (don't change many)
-            bib::Converger::determinist<>(iter, eval, 30, 0.0001, 0);
-// OR
-//       NN best_nn = nullptr;
-//       auto save_best = [&]() {
-//         if(best_nn != nullptr)
-//           fann_destroy(best_nn);
-//         best_nn = fann_copy(vnn->getNeuralNet());
-//       };
-// 
-//       bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10);
-//       vnn->copy(best_nn);
-//       fann_destroy(best_nn);
-// END CHOOSE
+      
+      if(determinist_vnn_update)
+        bib::Converger::determinist<>(iter, eval, 30, 0.0001, 0);
+      else {
+        NN best_nn = nullptr;
+        auto save_best = [&]() {
+          if(best_nn != nullptr)
+            fann_destroy(best_nn);
+          best_nn = fann_copy(vnn->getNeuralNet());
+        };
+
+        bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10);
+        vnn->copy(best_nn);
+        fann_destroy(best_nn);
+      }
 
       dq.free();
       //       LOG_DEBUG("number of data " << trajectory.size());
@@ -316,7 +344,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
   void save(const std::string& path) override {
     vnn->save(path+".critic");
-//     bib::XMLEngine::save<>(trajectory_v, "trajectory", "trajectory.data");
+//     bib::XMLEngine::save<>(trajectory, "trajectory", "trajectory.data");
   }
 
   void load(const std::string& path) override {
@@ -327,14 +355,14 @@ class OfflineCaclaAg : public arch::AAgent<> {
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " " <<
         std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " <<
-        trajectory_v->size() << " " << bib::Utils::statistics(mean_sum_VS).mean << " " << mean_sum_VS.size() << 
+        trajectory->size() << " " << bib::Utils::statistics(mean_sum_VS).mean << " " << mean_sum_VS.size() << 
         " " << vnn->weightSum();
   }
 
   void _dump(std::ostream& out) const override {
     out <<" " << std::setw(25) << std::fixed << std::setprecision(22) <<
         sum_weighted_reward << " " << std::setw(8) << std::fixed <<
-        std::setprecision(5) << vnn->error() << " " << trajectory_v->size() ;
+        std::setprecision(5) << vnn->error() << " " << trajectory->size() ;
   }
 
  private:
@@ -348,7 +376,8 @@ class OfflineCaclaAg : public arch::AAgent<> {
   double sum_weighted_reward;
   
   double alpha_a;
-  bool lecun_activation, online_update, kd_tree_autoremove;
+  bool lecun_activation, kd_tree_autoremove, determinist_vnn_update, gaussian_policy,
+    clear_trajectory, vnn_from_scratch;
   double transform_proba;
   
   std::vector<double> mean_sum_VS;
@@ -368,9 +397,10 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
   std::vector<double> returned_ac;
 
-  Trajectory<QSASRG_sample>* trajectory_v;
+  Trajectory<QSASRG_sample>* trajectory;
 
   MLP* vnn;
+  MLP* ann;
 };
 
 #endif
