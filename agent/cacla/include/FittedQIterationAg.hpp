@@ -173,7 +173,7 @@ class FittedQACAg : public arch::AAgent<> {
       for(auto it = trajectory->tree().begin(); it != trajectory->tree().end() ; ++it) {
           QSASRG_sample sm = *it;
 
-          vector<double>* ac = vnn->optimized(sm.s, {}, 2);
+          vector<double>* ac = vnn->optimized(sm.s, {}, 4);
         
           for (uint i = 0; i < nb_sensors ; i++)
             data->input[n][i] = sm.s[i];
