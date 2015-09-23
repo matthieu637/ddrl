@@ -27,3 +27,13 @@ cmake_install.cmake
 .project
 eclipse
 gen-data
+*.toc
+*.log
+*.bbl
+*.blg
+*.out
+*.aux
+*.gz
+*.backup
+.backup
+*.pdf
