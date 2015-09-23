@@ -124,7 +124,7 @@ void nearCallback (void *data, dGeomID o1, dGeomID o2)
     }
 }
 
-void AdvancedAcrobotWorld::step(const vector<float>& motors)
+void AdvancedAcrobotWorld::step(const vector<float>& motors) // *
 {
     nearCallbackData d = {this};
 

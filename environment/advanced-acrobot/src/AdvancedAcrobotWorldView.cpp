@@ -28,7 +28,7 @@ void parseCommand(int cmd) {
         dsSetViewpoint (xyz,hpr);
         break;
     case 's':
-        bib::Logger::PRINT_ELEMENTS_FT(inst->state(), "STATE : ",6,2);
+g        bib::Logger::PRINT_ELEMENTS_FT(inst->state(), "STATE : ",6,2);
         LOG_DEBUG("PERFORMANCE " << inst->perf());
         break;
     case 'v':
