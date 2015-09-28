@@ -36,7 +36,7 @@
 
 \begin{document}
 %style file for ESANN manuscripts
-\title{LaTeX style file for ESANN manuscripts}
+\title{Episodic Non-Linear Reinforcement Learning\\ in Continuous State-Action Space}
 
 %***********************************************************************
 % AUTHORS INFORMATION AREA
@@ -66,12 +66,8 @@ Address of Second Author's school - Country of Second Author's school\\
 \maketitle
 
 \begin{abstract}
-Type your 100 words abstract here. Please do not modify the style
-of the paper. In particular, keep the text offsets to zero when
-possible (see above in this `ESANNV2.tex' sample file). You may
-\emph{slightly} modify it when necessary, but strictly respecting
-the margin requirements is mandatory (see the instructions to
-authors for more details).
+Dealing with continuous actions in reinforcement learning is 
+a difficult ....
 \end{abstract}
 
 \section{Introduction}
@@ -82,11 +78,16 @@ authors for more details).
 
 \input{tex/background.tex}
 
+\section{Algorithms}
 
-\section{Citation}
-This ESANNV2.tex file defines how to insert references, both for
-BiBTeX and non-BiBTeX users.  Please read the instructions in this
-file. \cite{Antos2008}
+\input{tex/algo.tex}
+
+\section{Experimental Setup}
+
+\input{tex/exp.tex}
+
+\cite{Antos2008}
+
 
 % ****************************************************************************
 % BIBLIOGRAPHY AREA
