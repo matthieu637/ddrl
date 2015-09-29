@@ -1,5 +1,36 @@
 \subsection{Reinforcement learning}
 
+RL is a framework that models sequential decision
+problems where an agent learns to make better decisions while interacting with
+the environment. After an agent performs an action, the state changes and the
+agent receives a numerical value, called reward, that encodes information
+about the quality of the action just taken. The goal of the agent is to maximize
+her long-term expected total reward. Because it is possible that actions associated 
+with low reward will allow the agent to reach high-reward states, the agent
+needs to estimate somehow (by trial-and-error) the value of making an action in
+a given state.
+
+The underlying formalism of RL is that of {\em Markov Decision Processes} (MDPs).
+An MDP is formally defined as a tuple $\langle S, A, T, R \rangle$ where $S$ is a set of states, $A$ a set of actions, $T : S \times A \times S \rightarrow [0, 1]$ 
+are transition probabilities between states
+($T(s,a,s')=p(s'|a,s)$ is the probability of reaching state $s'$ from state $s$ after executing action $a$) and 
+$R : S \times A \rightarrow \mathbb{R}$ is a reward signal. A \textit{policy} $\pi : S \times A \rightarrow [0, 1]$ encodes how the agent will behave (the probability
+to take an action in a given state).
+The {\em optimal} policy $\pi^*$ is the policy maximizing the expected discounted reward, that is :
+\begin{equation}
+\pi^* = \underset{\pi}{\operatorname{arg\,max}}\ E \Big[ \sum\limits_{t=0}^{\infty} \gamma^t \times R(s_t, \pi_t(s_t)) \Big]
+\end{equation}
+where $t$ denotes a time step and $0 < \gamma < 1$ is a discount factor.
+In MDPs, since $T$ and $R$ are given, an optimal policy $\pi^*$ can be computed offline using dynamic programming (e.g., value iteration, policy                                                                  
+iteration) \cite{Howard1960} for instance.
+
+In the RL setting, the agent however does not know the transition probabilities $T$ and the reward function $R$.
+There are two main approaches for learning an optimal policy in RL: model-based approach and model-free approach.
+While {\em model-based} methods aim at learning $T$ and $R$,
+{\em model-free methods} are computationally more viable techniques
+that perform online learning storing an estimation of $Q : S \times A \rightarrow \mathbb{R}$, the (sequential) values of actions in each state,
+or $V : S \rightarrow \mathbb{R}$ the value of each state.
+
 \subsection{Critic only}
 Fitted Q Iteration \cite{Riedmiller2005} is a value iteration based on a collected data $(s_t, a_t,r_{t+1}, s_{t+1})_{t=\{1,...,N\}}$ of one episode containing $N$ steps.
 
