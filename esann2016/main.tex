@@ -3,6 +3,32 @@
 \usepackage[latin1]{inputenc}
 \usepackage{amssymb,amsmath,array}
 
+%%% own packages
+\usepackage{amsfonts} %\mathcal
+\usepackage[colorinlistoftodos]{todonotes} %\todo
+\usepackage{transparent}%\drawft
+
+
+%%% own command
+\newcommand{\mytodo}[2]{
+\todo[inline,caption={}]{To be done by \textbf{#1}. \\ #2}
+}
+
+\newcommand{\DRAFT}[1]
+{ ~\\ 
+  {\transparent{0.4}
+    \fbox{
+      \begin{minipage}[b]{0.9\linewidth}
+	{\footnotesize 
+	  #1  
+	}   
+      \end{minipage}
+    }   
+  }   
+}
+
+
+
 %***********************************************************************
 % !!!! IMPORTANT NOTICE ON TEXT MARGINS !!!!!
 %***********************************************************************
@@ -85,8 +111,6 @@ a difficult ....
 \section{Experimental Setup}
 
 \input{tex/exp.tex}
-
-\cite{Antos2008}
 
 
 % ****************************************************************************

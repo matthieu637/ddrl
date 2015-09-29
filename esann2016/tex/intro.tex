@@ -1,25 +1,26 @@
+\mytodo{MZ}{\textbackslash mytodo}
+The purpose of this article is to design an reinforcement learning algorithm following this 3 main hypothesis :
+1) dealing with continuous states and actions space in order to respond to realistic problems.
+2) do not require domain knowledge for the designer, the main knowledge should be the definition of the reward function.
+This mainly implies to use non-linear model (as neural networks) to avoid the definition of basis functions and
+making possible the emergence of internal representations. Thus no model of the environment nor prior trajectories should
+be provided to the algorithm.
+3) being data efficient : in many realistic tasks like robotics it is time-consuming and costly to produce data.
+Thus the data produced should be well exploited and don't be forgotten just after being used.
 
-
-
-\begin{itemize}
- \item data efficiency : importance sampling
- \item non linearity
- \item continuous
-\end{itemize}
-
-without model without prior trajectories.
-
-
+\DRAFT{
+Moreover they're all episodic (discrete time), with stationary policies and deals with
+discounted rewards.
 
 The non linearity is sought to be able to automatically extract representations
 without any domain knowledge. Thus the learned model have less restrictions,
 it is not necessary to design properly some basis functions.
 
-This is a first step towards deep reinforcement learning with continuous action space.
+This is also a first step towards deep reinforcement learning with continuous action space.
 
 Firstly, the existing algorithms and theirs limitations are described, 
 an experimental comparison.
-
+}
 
 
 

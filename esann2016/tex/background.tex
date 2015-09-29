@@ -1,3 +1,20 @@
+\subsection{Reinforcement learning}
+
+\subsection{Critic only}
+Fitted Q Iteration \cite{Riedmiller2005} is a value iteration based on a collected data $(s_t, a_t,r_{t+1}, s_{t+1})_{t=\{1,...,N\}}$ of one episode containing $N$ steps.
+
+\begin{equation}
+ Q_{k+1} = \underset{Q \in \mathcal{F}}{\text{argmin}} \sum_{t=1}^{N} \Big[ Q(x_t, a_t) - \big( r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(x_{t+1}, a') \big) \Big]^2
+\end{equation}
+
+\DRAFT{
+
+\cite{Antos2008} provides an extension for continuous actions space.
+
+In this case, the model
+
+importance sampling
+
 \begin{itemize}
  \item Actor only
  \begin{itemize}
@@ -13,6 +30,4 @@
  \item Critic only : problem with continuous action space
 \end{itemize}
 
-Q fitted Iteration which is a value iteration based on collected experiences.
-
-In this case, the model
+}
