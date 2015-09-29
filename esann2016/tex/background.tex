@@ -18,7 +18,7 @@ $R : S \times A \rightarrow \mathbb{R}$ is a reward signal. A \textit{policy} $\
 to take an action in a given state).
 The {\em optimal} policy $\pi^*$ is the policy maximizing the expected discounted reward, that is :
 \begin{equation}
-\pi^* = \underset{\pi}{\operatorname{arg\,max}}\ E \Big[ \sum\limits_{t=0}^{\infty} \gamma^t \times R(s_t, \pi_t(s_t)) \Big]
+\pi^* = \underset{\pi}{\operatorname{arg\,max}}\ \mathbb{E} \Big[ \sum\limits_{t=0}^{\infty} \gamma^t \times R(s_t, \pi_t(s_t)) \Big]
 \end{equation}
 where $t$ denotes a time step and $0 < \gamma < 1$ is a discount factor.
 In MDPs, since $T$ and $R$ are given, an optimal policy $\pi^*$ can be computed offline using dynamic programming (e.g., value iteration, policy                                                                  
@@ -31,12 +31,26 @@ While {\em model-based} methods aim at learning $T$ and $R$,
 that perform online learning storing an estimation of $Q : S \times A \rightarrow \mathbb{R}$, the (sequential) values of actions in each state,
 or $V : S \rightarrow \mathbb{R}$ the value of each state.
 
+\begin{equation}
+ V^\pi(s) = \mathbb{E}_\pi \Big[ \sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s \Big]
+\end{equation}
+
+\begin{equation}
+ Q^\pi(s, a) = \mathbb{E}_\pi \Big[ \sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s, a_t = a \Big]
+\end{equation}
+
+
 \subsection{Critic only}
 Fitted Q Iteration \cite{Riedmiller2005} is a value iteration based on a collected data $(s_t, a_t,r_{t+1}, s_{t+1})_{t=\{1,...,N\}}$ of one episode containing $N$ steps.
 
 \begin{equation}
- Q_{k+1} = \underset{Q \in \mathcal{F}}{\text{argmin}} \sum_{t=1}^{N} \Big[ Q(x_t, a_t) - \big( r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(x_{t+1}, a') \big) \Big]^2
+ Q_{k+1} = \underset{Q \in \mathcal{F}}{\text{argmin}} \sum_{t=1}^{N} \Big[ Q(s_t, a_t) - \big( r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a') \big) \Big]^2
 \end{equation}
+
+\begin{equation}
+ Q(s_t, a_t) =  r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a')
+\end{equation}
+
 
 \DRAFT{
 
