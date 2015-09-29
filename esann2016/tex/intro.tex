@@ -1,12 +1,13 @@
-\mytodo{MZ}{\textbackslash mytodo}
 Reinforcement learning (RL) \cite{Sutton1998} is a framework for solving sequential decision
 problems where an agent interacts with the environment and adapt her policy
 taking into account a numerical reward signal. RL agents can autonomously
 learn somewhat difficult tasks, like navigating a maze or playing a video game \cite{Tesauro1994}.
+While the basic setting of RL is now well established, a number of researchers have been
+studying variants where environments provides continuous spaces with more and more practical problems.
 
-learning by demonstration of by imitation
-
-The purpose of this article is to design an reinforcement learning algorithm following theses 3 main hypothesis :
+% learning by demonstration of by imitation
+% Seek to be generic rather than faster.
+The purpose of this article is to design an RL algorithm following theses 3 main hypothesis :
 1) dealing with continuous states and actions space in order to respond to realistic problems.
 2) do not require domain knowledge for the designer, the main knowledge should be the definition of the reward function.
 This mainly implies to use non-linear model (as neural networks) to avoid the definition of basis functions and
@@ -14,25 +15,12 @@ making possible the emergence of internal representations. Thus no model of the 
 be provided to the algorithm.
 3) being data efficient : in many realistic tasks like robotics it is time-consuming and costly to produce data.
 Thus the data produced should be well exploited and don't be forgotten just after being used.
+The global setup is episodic (discrete time), with stationary policies and maximize the
+discounted rewards criterion.
 
-\DRAFT{
-Moreover they're all episodic (discrete time), with stationary policies and deals with
-discounted rewards.
+% The non linearity is sought to be able to automatically extract representations
+% without any domain knowledge. Thus the learned model have less restrictions,
+% it is not necessary to design properly some basis functions.
 
-The non linearity is sought to be able to automatically extract representations
-without any domain knowledge. Thus the learned model have less restrictions,
-it is not necessary to design properly some basis functions.
-
-This is also a first step towards deep reinforcement learning with continuous action space.
-
-Firstly, the existing algorithms and theirs limitations are described, 
-an experimental comparison.
-
-We'll present 3 state of the art algorithms that fulfill 2 different hypothesis. \\
-1) 2) cacla, CMAES ?\\
-1) 3) fitted natural actor critic, Power\\
-2) 3) fitted q iteration\\
-}
-
-
-
+Firstly, the common RL background with the existing algorithms and theirs limitations are described.
+Then the main algorithm of this paper is exposed with an experimental comparison on multiple environments.
