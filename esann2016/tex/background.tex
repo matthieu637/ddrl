@@ -24,7 +24,7 @@ where $t$ denotes a time step and $0 < \gamma < 1$ is a discount factor.
 In MDPs, since $T$ and $R$ are given, an optimal policy $\pi^*$ can be computed offline using dynamic programming (e.g., value iteration, policy                                                                  
 iteration) \cite{Howard1960} for instance.
 
-In the RL setting, the agent however does not know the transition probabilities $T$ and the reward function $R$.
+The agent however does not know the transition probabilities $T$ and the reward function $R$.
 There are two main approaches for learning an optimal policy in RL: model-based approach and model-free approach.
 While {\em model-based} methods aim at learning $T$ and $R$,
 {\em model-free methods} are computationally more viable techniques
@@ -50,6 +50,19 @@ Fitted Q Iteration \cite{Riedmiller2005} is a value iteration based on a collect
 \begin{equation}
  Q(s_t, a_t) =  r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a')
 \end{equation}
+
+
+\subsection{Actor only}
+
+\subsection{Actor Critic}
+
+\begin{tabular}{|p{3.4cm}|>{\centering\arraybackslash}p{1.2cm}|>{\centering\arraybackslash}p{3cm}|>{\centering\arraybackslash}p{1.8cm}|}
+ \hline
+ ~\mbox{Algorithms} ~ \mbox{Criterions} & Cacla, CMAES & Fitted Natural Actor-critic, Power & Fitted Q iteration \\ \hline
+ 1) Continuous Actions & $\times$ & $\times$ & \\ \hline
+ 2) Low Knowledge & $\times$ & & $\times$ \\ \hline
+ 3) Data Efficient &  & $\times$ & $\times$\\ \hline
+\end{tabular}
 
 
 \DRAFT{
@@ -80,3 +93,4 @@ We'll present 3 state of the art algorithms that fulfill 2 different hypothesis.
 1) 3) fitted natural actor critic, Power\\
 2) 3) fitted q iteration\\
 }
+
