@@ -1,5 +1,5 @@
 Reinforcement learning (RL) \cite{Sutton1998} is a framework for solving sequential decision
-problems where an agent interacts with the environment and adapt her policy
+problems where an agent interacts with the environment and adapt \myCorr{her}{its}  policy
 taking into account a numerical reward signal. RL agents can autonomously
 learn somewhat difficult tasks, like navigating a maze or playing a video game \cite{Tesauro1994}.
 While the basic setting of RL is now well established, a number of researchers have been
@@ -10,7 +10,7 @@ studying variants where environments provides continuous spaces with more and mo
 The purpose of this article is to design an RL algorithm following theses 3 main hypothesis :
 1) dealing with continuous states and actions space in order to respond to realistic problems.
 2) do not require domain knowledge for the designer, the main knowledge should be the definition of the reward function.
-This mainly implies to use non-linear model (as neural networks) to avoid the definition of basis functions and
+\mySugg{}{Il faudrait peut-etre dire plus longuement qu'une methode classique pour l'approximation de la fonction de valeur est d'utiliser une combinaison lineaire de fonction de base, mais qu'il faut alors choisir les fonction de base. D'ou ensuite ta remarque.}This mainly implies to use non-linear model (as neural networks) to avoid the definition of basis functions and
 making possible the emergence of internal representations. Thus no model of the environment nor prior trajectories should
 be provided to the algorithm.
 3) being data efficient : in many realistic tasks like robotics it is time-consuming and costly to produce data.

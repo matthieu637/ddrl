@@ -4,8 +4,8 @@ RL is a framework that models sequential decision
 problems where an agent learns to make better decisions while interacting with
 the environment. After an agent performs an action, the state changes and the
 agent receives a numerical value, called reward, that encodes information
-about the quality of the action just taken. The goal of the agent is to maximize
-her long-term expected total reward. Because it is possible that actions associated 
+about the quality of the \mySugg{action just taken}{state just reached}. The goal of the agent is to maximize
+\myCorr{her}{its} long-term expected total reward. Because it is possible that actions associated 
 with low reward will allow the agent to reach high-reward states, the agent
 needs to estimate somehow (by trial-and-error) the value of making an action in
 a given state.
@@ -41,6 +41,9 @@ or $V : S \rightarrow \mathbb{R}$ the value of each state.
 
 
 \subsection{Critic only}
+
+\mytodo{MZ}{Je pense qu'il faudrait peut-etre une introduction un peu plus large des 'critic' avant de presenter FittedQ. Parler des méthodes d'apprximation en general, car la famille de LSTD est bien etudie pour les critic.}
+
 Fitted Q Iteration \cite{Riedmiller2005} is a value iteration based on a collected data $(s_t, a_t,r_{t+1}, s_{t+1})_{t=\{1,...,N\}}$ of one episode containing $N$ steps.
 
 \begin{equation}

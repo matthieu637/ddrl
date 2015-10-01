@@ -28,6 +28,36 @@
   }   
 }
 
+% ------------------ Pour correction ------------------------
+\usepackage{xcolor}
+\usepackage{xspace}
+\usepackage{ulem}
+\usepackage[outerbars]{changebar} % permet de positionner les
+                                  % barres en marge externe
+\setcounter{changebargrey}{20} % permet de fixer le niveau de
+                               % gris des barres
+
+\newcommand{\myCorr}[2]{%
+  \cbstart%
+  \sout{#1}%
+  {\textcolor{red}{#2}}\xspace%
+  \cbend%
+}%
+
+\newcommand{\mySugg}[2]{%
+  \cbstart%
+  \underline{$<$#1$>$}%
+  {\textcolor{blue}{#2}}\xspace%
+  \cbend%
+}%
+
+\newcommand{\myComm}[1]{%
+  \cbstart%
+  {\textcolor{green}{$\diamondsuit$}}%
+  \marginpar{{\tiny \textcolor{green}{#1}}}\xspace%
+  \cbend%
+}%
+% -----------------------------------------------------------
 
 
 
@@ -97,6 +127,10 @@ Address of Second Author's school - Country of Second Author's school\\
 Dealing with continuous actions in reinforcement learning is 
 a difficult ....
 \end{abstract}
+
+\mytodo{?}{Juste pour dire que j'ai rajoute une commande $\backslash$myCorr quand je pense qu'il faut corriger. Et $\backslash$mySugg quand je fais des suggestions. Moins jolies que ton $\backslash$todo neanmoins...}
+
+
 
 \section{Introduction}
 
