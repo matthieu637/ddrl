@@ -31,13 +31,13 @@ While {\em model-based} methods aim at learning $T$ and $R$,
 that perform online learning storing an estimation of $Q : S \times A \rightarrow \mathbb{R}$, the (sequential) values of actions in each state,
 or $V : S \rightarrow \mathbb{R}$ the value of each state.
 
-\begin{equation}
- V^\pi(s) = \mathbb{E}_\pi \Big[ \sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s \Big]
-\end{equation}
-
-\begin{equation}
- Q^\pi(s, a) = \mathbb{E}_\pi \Big[ \sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s, a_t = a \Big]
-\end{equation}
+% \begin{equation}
+%  V^\pi(s) = \mathbb{E}_\pi \Big[ \sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s \Big]
+% \end{equation}
+% 
+% \begin{equation}
+%  Q^\pi(s, a) = \mathbb{E}_\pi \Big[ \sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s, a_t = a \Big]
+% \end{equation}
 
 
 \subsection{Critic only}
@@ -50,8 +50,12 @@ Fitted Q Iteration \cite{Riedmiller2005} is a value iteration based on a collect
  Q_{k+1} = \underset{Q \in \mathcal{F}}{\text{argmin}} \sum_{t=1}^{N} \Big[ Q(s_t, a_t) - \big( r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a') \big) \Big]^2
 \end{equation}
 
+% \begin{equation}
+%  Q(s_t, a_t) =  r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a')
+% \end{equation}
+
 \begin{equation}
- Q(s_t, a_t) =  r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a')
+ \Delta W = - \eta \big( Q(s_t, a_t) - r_{t+1} + \gamma Q_k(s_{t+1}, \pi(s_{t+1}) \big) \frac{\partial Q(s_t, a_t)}{\partial W}
 \end{equation}
 
 
