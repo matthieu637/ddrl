@@ -37,4 +37,5 @@ gen-data
 *.backup
 .backup
 *.pdf
+*.cb[0-9]*
 *.cb
