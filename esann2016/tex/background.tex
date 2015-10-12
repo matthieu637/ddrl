@@ -31,6 +31,18 @@ While {\em model-based} methods aim at learning $T$ and $R$,
 that perform online learning storing an estimation of $Q : S \times A \rightarrow \mathbb{R}$, the (sequential) values of actions in each state,
 or $V : S \rightarrow \mathbb{R}$ the value of each state.
 
+In a small and discrete environment it is possible to store Q or V as a table.
+Notice however that in many tasks, the number of states and actions are
+too large so that the agent cannot store it in a table. The problem of
+continuous states can be tackled with discretization; however the number of
+states will often explode. Even with the memory and computational power to
+handle very large tables, reinforcement learning with Q values represented in the
+tabular form suffers from the lack of generalization, meaning that what is learned
+in a state does not impact the knowledge about the value of similar states.
+A solution to these problems is to use an approximation function, that provide
+a means for both efficient computation and support for generalization.
+
+
 % \begin{equation}
 %  V^\pi(s) = \mathbb{E}_\pi \Big[ \sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s \Big]
 % \end{equation}
@@ -41,6 +53,19 @@ or $V : S \rightarrow \mathbb{R}$ the value of each state.
 
 
 \subsection{Critic only}
+La caractéristique ppale de ces méthodes est de dériver une politique directement à partir des fonctions
+de valeurs. Elles ont été le plus étudié car fonctionnent bien dans des les environemenst discrets.
+On peut citer (QLearning, Sarsa, LSTD)
+
+Nous allons décrire une méthode 
+
+Thoses methods
+widely studied
+As RL methods has been well studied for discretization
+The policy is entierely determined by the value fonction.
+
+
+The main 
 
 \mytodo{MZ}{Je pense qu'il faudrait peut-etre une introduction un peu plus large des 'critic' avant de presenter FittedQ. Parler des méthodes d'apprximation en general, car la famille de LSTD est bien etudie pour les critic.}
 
@@ -58,10 +83,29 @@ Fitted Q Iteration \cite{Riedmiller2005} is a value iteration based on a collect
  \Delta W = - \eta \big( Q(s_t, a_t) - r_{t+1} + \gamma Q_k(s_{t+1}, \pi(s_{t+1}) \big) \frac{\partial Q(s_t, a_t)}{\partial W}
 \end{equation}
 
+Le problème principale de ces méthodes est qu'elles ne sont pas applicable avec des actions continues
+car repose sur l'énumération de toutes les actions possibles. Ce qui n'est pas envisageable dans un
+espace continue à grande dimensions.
 
 \subsection{Actor only}
 
+de l'autre cote il est possible de ne pas utiliser du tout de fonction de valeurs.
+Définir une polique 
+
+mise à jour par exemple à partir de $ \frac{\partial J}{\partial \theta} $
+
+On the other hand 
+direct policy search
+
+L'inconvénient ppale est la variabilité du cout.
+
 \subsection{Actor Critic}
+
+Those methods tries to combine the advantage of both previous methods.
+
+Parmis eux : cacla et fitted natural actor critic.
+
+Notre algorithme fait partie de cette famille.
 
 \begin{tabular}{|p{3.4cm}|>{\centering\arraybackslash}p{1.2cm}|>{\centering\arraybackslash}p{3cm}|>{\centering\arraybackslash}p{1.8cm}|}
  \hline
