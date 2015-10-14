@@ -27,7 +27,7 @@ class Converger {
 
       if (epoch > 1 && fabs(eval() - last_mse) < precision && fabs(last2_mse - last_mse) < precision) {
         converged = true;
-      } else {
+      } else if(epoch > 1) {
         converged = eval() < precision;
       }
 
@@ -52,8 +52,8 @@ class Converger {
 
     uint epoch = 0;
     uint consecutive_bad_movement = 0;
-    double last_mse = 0;
-    double last2_mse = 0;
+    double last_mse = std::numeric_limits<double>::max();
+    double last2_mse = std::numeric_limits<double>::max();
     double minv = std::numeric_limits<double>::max();
 
     if (display_each == 0)
@@ -74,7 +74,7 @@ class Converger {
 
       if (epoch > 1 && fabs(v - last_mse) < precision && fabs(last2_mse - last_mse) < precision) {
         converged = true;
-      } else {
+      } else if(epoch > 1) {
         converged = v < precision;
       }
 

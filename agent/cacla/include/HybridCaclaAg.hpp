@@ -73,11 +73,11 @@ class HybridCaclaAg : public arch::AAgent<> {
 
       double vtarget = reward;
       if (!goal_reached) {
-        double nextV = vnn->computeOut(sensors, {});
+        double nextV = vnn->computeOutVF(sensors, {});
         vtarget += gamma * nextV;
       }
 
-      double mine = vnn->computeOut(last_state, {});
+      double mine = vnn->computeOutVF(last_state, {});
       sum_VS += mine;
 
       if (vtarget > mine /*&& (!finished || goal_reached)*/) {//increase this action
@@ -233,7 +233,7 @@ class HybridCaclaAg : public arch::AAgent<> {
       auto iter = [&](const std::vector<double>& x) {
         for(uint i=0;i < x.size();i++)
           out << x[i] << " ";
-        out << vnn->computeOut(x, {});
+        out << vnn->computeOutVF(x, {});
         out << std::endl;
       };
       
@@ -282,7 +282,7 @@ class HybridCaclaAg : public arch::AAgent<> {
 
         double delta = sm.r;
         if (!sm.goal_reached) {
-          double nextV = MLP::computeOut(local_nn, sm.next_s, {});
+          double nextV = MLP::computeOutVF(local_nn, sm.next_s, {});
           delta += ptr->gamma * nextV;
         }
 

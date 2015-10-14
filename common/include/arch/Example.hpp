@@ -5,6 +5,7 @@
 
 #include "arch/AAgent.hpp"
 #include "arch/AEnvironment.hpp"
+#include "../bib/Utils.hpp"
 #include "bib/Utils.hpp"
 
 namespace arch {
@@ -46,6 +47,125 @@ class ExampleAgent : public arch::AAgent<> {
 
   std::vector<double> actuator;
 };
+
+template <typename T>
+T gaussian(T x, T m, T s)
+{
+    static const T inv_sqrt_2pi = 0.3989422804014327;
+    T a = (x - m) / s;
+
+    return (inv_sqrt_2pi / s) * std::exp(-T(0.5f) * a * a);
+}
+
+class SimpleEnv1D : public arch::AEnvironment<> {
+ public:
+  SimpleEnv1D() : s(1) {
+//       s[0] = -0.7;
+    s[0] = bib::Utils::randin(-1, 1);
+  }
+  
+  void _reset_episode() {
+    s[0] = bib::Utils::randin(-1, 1);
+  }
+  
+  const std::vector<double>& perceptions() const {
+    return s;
+  }
+  
+  unsigned int number_of_actuators() const {
+    return 1;
+  }
+  
+  bool final_state() const override {
+    return performance() >= 0.;
+  }
+  
+  unsigned int number_of_sensors() const {
+    return s.size();
+  }
+  
+  double performance() const {
+//     y_1\left(x,b,a\right)=\frac{1}{a\sqrt{2\pi }}e^{-\frac{\left(x-b\right)^2}{2a^2}}
+//     -4+y_1\left(x,\ 0.7,\ 0.05\right)+y_1\left(x,\ 1,\ 0.1\right)+10\cdot y_1\left(x,\ -0.7,\ 1\right)
+//     return -4 + gaussian<double>(s[0], 0.7f, 0.05) + gaussian<double>(s[0], 1.f, 0.1f) + 10.f * gaussian<double>(s[0], -0.7f, 1.f);
+    return -1.f + gaussian<double>(s[0], 0.7f, 0.05);
+  }
+  
+  void _apply(const std::vector<double>& a) {
+    s[0] = s[0] + a[0] / 2.f; 
+    if( s[0] > 1.f)
+      s[0] = 1.f;
+    else if( s[0] < -1.f)
+      s[0] = -1.f;
+  }
+  
+  void unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) {
+    instance_per_episode    = 1;
+    max_step_per_instance   = 5;
+  }
+
+  std::vector<double> s;
+};
+
+// -1 -0.5(-1) 1(-1) 0(-1)
+// -1 -0.5(-1) 1(-1) 0(-1)
+// -1 0.25(-1) 0.5(1)
+class SimpleEnv1DFixedTraj : public arch::AEnvironment<> {
+ public:
+  SimpleEnv1DFixedTraj() : s({{-1}, {-0.5}, {1}, {0}}), s_goal({{-1}, {0.25}, {0.5}}) {
+    current_step = 0;
+    current_episode = -1;
+  }
+  
+  void _reset_episode() {
+    current_step = 0;
+    current_episode++;
+  }
+  
+  const std::vector<double>& perceptions() const {   
+    if(current_episode <= 1)
+      return s[current_step];
+    
+    return s_goal[current_step];
+  }
+  
+  unsigned int number_of_actuators() const {
+    return 1;
+  }
+  
+  bool final_state() const override {
+    if(current_episode <= 1)
+      return false;
+    
+    return current_step >= 2;
+  }
+  
+  unsigned int number_of_sensors() const {
+    return 1;
+  }
+  
+  double performance() const {
+    if(current_episode <= 1 || current_step < 2)
+      return -1.f;
+    
+    return 1.f;
+  }
+  
+  void _apply(const std::vector<double>&) {
+    current_step++;
+  }
+  
+  void unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) {
+    instance_per_episode    = 1;
+    max_step_per_instance   = 3;
+  }
+
+  const std::vector< std::vector<double> > s;
+  const std::vector< std::vector<double> > s_goal;
+  uint current_step;
+  uint current_episode;
+};
+
 }  // namespace arch
 
 #endif  // EXAMPLE_H

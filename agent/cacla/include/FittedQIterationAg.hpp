@@ -69,7 +69,7 @@ class FittedQACAg : public arch::AAgent<> {
 
     if (last_action.get() != nullptr && learning) {  // Update Q
 
-      QSASRG_sample vsampl = {last_state, *last_action, sensors, reward, goal_reached};
+      QSASRGR_sample vsampl = {last_state, *last_action, sensors, reward, goal_reached, 0};
       trajectory->addPoint(vsampl); 
     }
 
@@ -132,7 +132,7 @@ class FittedQACAg : public arch::AAgent<> {
       ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
 
     //don't need normalization if removeTrajectory
-    trajectory = new Trajectory<QSASRG_sample>(nb_sensors, transform_proba, kd_tree_autoremove);
+    trajectory = new Trajectory<QSASRGR_sample>(nb_sensors, transform_proba, kd_tree_autoremove);
     
   }
 
@@ -171,7 +171,7 @@ class FittedQACAg : public arch::AAgent<> {
 
       uint n=0;
       for(auto it = trajectory->tree().begin(); it != trajectory->tree().end() ; ++it) {
-          QSASRG_sample sm = *it;
+          QSASRGR_sample sm = *it;
 
           vector<double>* ac = vnn->optimized(sm.s, {}, 4);
         
@@ -197,50 +197,28 @@ class FittedQACAg : public arch::AAgent<> {
 //         write_valuef_file("v_after.data");
 
 //     write_valuef_file("v_after.data." + std::to_string(episode));
-  }
-  
-  void write_valuef_file(const std::string& file){
       
-      std::ofstream out;
-      out.open(file, std::ofstream::out);
-    
-      auto iter = [&](const std::vector<double>& x) {
-        for(uint i=0;i < x.size();i++)
-          out << x[i] << " ";
-          
-        std::vector<double> m(nb_motors);
-        for(uint i=nb_sensors; i < nb_motors + nb_sensors;i++)
-          m[i - nb_sensors] = x[nb_sensors + i];
-        out << vnn->computeOut(x, m);
-        out << std::endl;
-      };
+    if(!clear_trajectory){
+      std::list<QSASRGR_sample> current_trajectory;
+      for(auto it = trajectory->tree().begin(); it != trajectory->tree().end() ; it++ ) {
+        QSASRGR_sample sa = *it;
+        sa.replayed++;
+        if(sa.replayed < 3)
+          current_trajectory.push_back(sa);
+      }
+      trajectory->clear();
       
-      bib::Combinaison::continuous<>(iter, nb_sensors+nb_motors, -M_PI, M_PI, 6);
-      out.close();
-/*
-      close all; clear all; 
-      function doit(ep)
-        X=load(strcat("v_after.data.",num2str(ep)));
-        tmp_ = X(:,1); X(:,1) = X(:,3); X(:,3) = tmp_;
-        tmp_ = X(:,2); X(:,2) = X(:,5); X(:,5) = tmp_;
-        key = X(:, 1:2);
-        for i=1:size(key, 1)
-        subkey = find(sum(X(:, 1:2) == key(i,:), 2) == 2);
-        data(end+1, :) = [key(i, :) mean(X(subkey, end))];
-        endfor
-        [xx,yy] = meshgrid (linspace (-pi,pi,300));
-        griddata(data(:,1), data(:,2), data(:,3), xx, yy, "linear"); xlabel('theta'); ylabel('a');
-      endfunction
-*/    
+      trajectory->tree().insert(current_trajectory.begin(), current_trajectory.end());
+    }
   }
   
   struct ParraVtoVNext {
-    ParraVtoVNext(const std::vector<QSASRG_sample>& _vtraj, const FittedQACAg* _ptr) : vtraj(_vtraj), ptr(_ptr),
+    ParraVtoVNext(const std::vector<QSASRGR_sample>& _vtraj, const FittedQACAg* _ptr) : vtraj(_vtraj), ptr(_ptr),
       actions(vtraj.size()) {
 
       data = fann_create_train(vtraj.size(), ptr->nb_sensors + ptr->nb_motors, 1);
       for (uint n = 0; n < vtraj.size(); n++) {
-        QSASRG_sample sm = vtraj[n];
+        QSASRGR_sample sm = vtraj[n];
         for (uint i = 0; i < ptr->nb_sensors ; i++)
           data->input[n][i] = sm.s[i];
         for (uint i= ptr->nb_sensors ; i < ptr->nb_sensors + ptr->nb_motors; i++)
@@ -266,7 +244,7 @@ class FittedQACAg : public arch::AAgent<> {
         delete it;
       
       for (uint n = 0; n < vtraj.size(); n++){
-        QSASRG_sample sm = vtraj[n];
+        QSASRGR_sample sm = vtraj[n];
         actions[n] = ptr->ann->computeOut(sm.next_s);
       }
     }
@@ -276,7 +254,7 @@ class FittedQACAg : public arch::AAgent<> {
       struct fann* local_nn = fann_copy(ptr->vnn->getNeuralNet());
 
       for (size_t n = range.begin(); n < range.end(); n++) {
-        QSASRG_sample sm = vtraj[n];
+        QSASRGR_sample sm = vtraj[n];
 
         double delta = sm.r;
         if (!sm.goal_reached) {
@@ -291,7 +269,7 @@ class FittedQACAg : public arch::AAgent<> {
     }
 
     struct fann_train_data* data;
-    const std::vector<QSASRG_sample>& vtraj;
+    const std::vector<QSASRGR_sample>& vtraj;
     const FittedQACAg* ptr;
     std::vector<std::vector<double>*> actions;
   };
@@ -300,7 +278,7 @@ class FittedQACAg : public arch::AAgent<> {
     if (trajectory->size() > 0) {
       //remove trace of old policy
 
-      std::vector<QSASRG_sample> vtraj(trajectory->size());
+      std::vector<QSASRGR_sample> vtraj(trajectory->size());
       std::copy(trajectory->tree().begin(), trajectory->tree().end(), vtraj.begin());
       //std::shuffle(vtraj.begin(), vtraj.end()); //useless due to rprop batch
 
@@ -397,7 +375,7 @@ class FittedQACAg : public arch::AAgent<> {
 
   std::vector<double> returned_ac;
 
-  Trajectory<QSASRG_sample>* trajectory;
+  Trajectory<QSASRGR_sample>* trajectory;
 
   MLP* vnn;
   MLP* ann;

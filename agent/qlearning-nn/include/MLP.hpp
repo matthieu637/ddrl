@@ -40,6 +40,8 @@ using NEWMAT::ColumnVector;
 using NEWMAT::Matrix;
 using NEWMAT::SymmetricMatrix;
 
+#define STANDARD_MLP
+
 typedef struct fann* NN;
 struct passdata {
   NN neural_net;
@@ -74,15 +76,21 @@ class MLP {
 
   MLP(unsigned int input, unsigned int hidden, unsigned int sensors, double alpha, bool _lecun=false) : size_input_state(input),
     size_sensors(sensors), size_motors(size_input_state - sensors) {
+#ifdef STANDARD_MLP
     neural_net = fann_create_standard(3, input, hidden, 1);
+    
+    fann_set_training_algorithm(neural_net, FANN_TRAIN_INCREMENTAL);
+    fann_set_train_stop_function(neural_net, FANN_STOPFUNC_MSE);
+#else
+    neural_net = fann_create_shortcut(2, input, 1);
+#endif
 
     fann_set_activation_function_hidden(neural_net, FANN_SIGMOID_SYMMETRIC);
 
     fann_set_activation_function_output(neural_net, FANN_LINEAR);  // Linear cause Q(s,a) isn't normalized
     fann_set_learning_momentum(neural_net, 0.);
     fann_set_train_error_function(neural_net, FANN_ERRORFUNC_LINEAR);
-    fann_set_training_algorithm(neural_net, FANN_TRAIN_INCREMENTAL);
-    fann_set_train_stop_function(neural_net, FANN_STOPFUNC_MSE);
+    
     fann_set_learning_rate(neural_net, alpha);
     fann_set_activation_steepness_hidden(neural_net, 0.5);
     fann_set_activation_steepness_output(neural_net, 1.);
@@ -98,8 +106,12 @@ class MLP {
 
   MLP(unsigned int input, unsigned int hidden, unsigned int motors, bool _lecun=false) : size_input_state(input), size_sensors(input),
     size_motors(motors) {
+#ifdef STANDARD_MLP
     neural_net = fann_create_standard(3, input, hidden, motors);
-
+#else
+    neural_net = fann_create_shortcut(2, input, motors);
+#endif
+    
     fann_set_activation_function_hidden(neural_net, FANN_SIGMOID_SYMMETRIC);
 
     fann_set_activation_function_output(neural_net, FANN_SIGMOID_SYMMETRIC);  // motor are normalized
@@ -110,11 +122,13 @@ class MLP {
     fann_set_activation_steepness_hidden(neural_net, 0.5);
     fann_set_activation_steepness_output(neural_net, 1.);
 
-    if(_lecun)
+    if(_lecun){
       lecun(input);
+      _lecun_check = true;
+    }
   }
   
-  MLP(const MLP& m) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors) {
+  MLP(const MLP& m) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors), _lecun_check(m._lecun_check) {
       neural_net = fann_copy(m.neural_net);
   }
 
@@ -197,6 +211,28 @@ class MLP {
   }
 
   static void learn(NN neural_net, struct fann_train_data* data, uint max_epoch, uint display_each, double precision) {
+
+    //FANN_TRAIN_BATCH FANN_TRAIN_RPROP
+    fann_set_training_algorithm(neural_net, FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
+    fann_set_train_error_function(neural_net, FANN_ERRORFUNC_TANH);
+
+#ifdef STANDARD_MLP
+    auto iter = [&]() {
+      fann_train_epoch(neural_net, data);
+
+    };
+    auto eval = [&]() {
+      return fann_get_MSE(neural_net);
+    };
+
+    //determinist is clearly non optimal
+    bib::Converger::determinist<>(iter, eval, max_epoch, precision, display_each);
+#else
+    fann_cascadetrain_on_data(neural_net, data, 15, display_each, precision);
+#endif
+  }
+  
+  void learn_stoch(struct fann_train_data* data, uint max_epoch=10000, uint display_each = 0, double precision = 0.00001, uint stable_over=50){
     //FANN_TRAIN_BATCH FANN_TRAIN_RPROP
     fann_set_training_algorithm(neural_net, FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
     fann_set_train_error_function(neural_net, FANN_ERRORFUNC_TANH);
@@ -207,15 +243,23 @@ class MLP {
     auto eval = [&]() {
       return fann_get_MSE(neural_net);
     };
-
-    bib::Converger::determinist<>(iter, eval, max_epoch, precision, display_each);
+    
+    NN best_nn = nullptr;
+    auto save_best = [&]() {
+      if(best_nn != nullptr)
+        fann_destroy(best_nn);
+      best_nn = fann_copy(neural_net);
+    };
+    bib::Converger::min_stochastic<>(iter, eval, save_best, max_epoch, precision, display_each, stable_over);
+    copy(best_nn);
+    fann_destroy(best_nn); 
   }
 
-  double computeOut(const std::vector<double>& sensors, const std::vector<double>& motors) const {
-    return computeOut(neural_net, sensors, motors);
+  double computeOutVF(const std::vector<double>& sensors, const std::vector<double>& motors) const {
+    return computeOutVF(neural_net, sensors, motors);
   }
 
-  static double computeOut(NN neural_net, const std::vector<double>& sensors, const std::vector<double>& motors) {
+  static double computeOutVF(NN neural_net, const std::vector<double>& sensors, const std::vector<double>& motors) {
     uint m = sensors.size();
     uint n = motors.size();
     fann_type* inputs = new fann_type[m + n];
@@ -230,10 +274,10 @@ class MLP {
   }
 
   std::vector<double>* computeOut(const std::vector<double>& in) const {
-    return computeOut(neural_net, in);
+    return computeOut(neural_net, in, _lecun_check);
   }
 
-  static std::vector<double>* computeOut(NN neural_net, const std::vector<double>& in) {
+  static std::vector<double>* computeOut(NN neural_net, const std::vector<double>& in, bool _lecun_check) {
     uint m = in.size();
 
     fann_type* inputs = new fann_type[m];
@@ -242,8 +286,19 @@ class MLP {
 
     fann_type* out = fann_run(neural_net, inputs);
     std::vector<double>* outputs = new std::vector<double>(fann_get_num_output(neural_net));
-    for(uint j=0; j < outputs->size(); j++)
-      outputs->at(j) = out[j];
+    if(_lecun_check){
+      for(uint j=0; j < outputs->size(); j++){
+        if(out[j] > 1.f)
+          outputs->at(j)= 1.f;
+        else if (out[j] < -1.f)
+          outputs->at(j) = -1.f;
+        else
+          outputs->at(j) = out[j];
+      }
+    } else {
+      for(uint j=0; j < outputs->size(); j++)
+        outputs->at(j) = out[j];
+    }
     delete[] inputs;
     return outputs;
   }
@@ -285,11 +340,11 @@ class MLP {
 
     motors[0] = -1.f;
     double imax = -1.f;
-    double vmax = computeOut(inputs, motors);
+    double vmax = computeOutVF(inputs, motors);
     
     for(double a=-1+discre; a <= 1; a+=discre){
       motors[0] = a;
-      double val = computeOut(inputs, motors);
+      double val = computeOutVF(inputs, motors);
       if(val > vmax){
         vmax = val;
         imax = a;
@@ -350,6 +405,7 @@ class MLP {
   unsigned int size_input_state;
   unsigned int size_sensors;
   unsigned int size_motors;
+  bool _lecun_check = false;
 };
 
 #endif  // MLP_H

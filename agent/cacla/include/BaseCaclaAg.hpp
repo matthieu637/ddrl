@@ -90,10 +90,10 @@ class BaseCaclaAg : public arch::AAgent<> {
 
       double vtarget = reward;
       if (!goal_reached) {
-        double nextV = vnn->computeOut(sensors, {});
+        double nextV = vnn->computeOutVF(sensors, {});
         vtarget += gamma * nextV;
       }
-      double lastv = vnn->computeOut(last_state, *next_action);
+      double lastv = vnn->computeOutVF(last_state, *next_action);
 
       vnn->learn(last_state, {}, vtarget);
       double delta = vtarget - lastv;
@@ -226,7 +226,8 @@ class BaseCaclaAg : public arch::AAgent<> {
       auto iter = [&](const std::vector<double>& x) {
         for(uint i=0;i < x.size();i++)
           out << x[i] << " ";
-        out << ann->computeOut(x, {});
+//         out << ann->computeOut(x)[0];
+        LOG_ERROR("todo");
         out << std::endl;
       };
       
@@ -254,7 +255,7 @@ class BaseCaclaAg : public arch::AAgent<> {
       auto iter = [&](const std::vector<double>& x) {
         for(uint i=0;i < x.size();i++)
           out << x[i] << " ";
-        out << vnn->computeOut(x, {});
+        out << vnn->computeOutVF(x, {});
         out << std::endl;
       };
       

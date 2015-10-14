@@ -105,23 +105,31 @@ function buildDir(){
                 if [ -e build ]; then
                         if [ $FORCE_REMOVE -eq 0 ]; then
                                 echo "INFO : $subdir already contains a build directory. Just recall..."
-				if [ -e build/release ] ; then
-					cmakeBuildRecall release
+				if [ $BUILD_DEBUG -eq  1 ] ; then
+					if [ -e build/debug ] ; then
+						cmakeBuildRecall debug
+					else
+						cmakeBuild debug Debug
+					fi
 				else
-					cmakeBuild release Release
-				fi
+					if [ -e build/release ] ; then
+						cmakeBuildRecall release
+					else
+						cmakeBuild release Release
+					fi
 
-				if [ -e build/debug ] ; then
-					cmakeBuildRecall debug
-				else
-					cmakeBuild debug Debug
-				fi
-
-
-				if [ -e build/relwithdeb ] ; then
-					cmakeBuildRecall relwithdeb
-				else
-                			cmakeBuild relwithdeb RelWithDebInfo
+					if [ -e build/debug ] ; then
+						cmakeBuildRecall debug
+					else
+						cmakeBuild debug Debug
+					fi
+	
+	
+					if [ -e build/relwithdeb ] ; then
+						cmakeBuildRecall relwithdeb
+					else
+	                			cmakeBuild relwithdeb RelWithDebInfo
+					fi
 				fi
 
                                 continue
@@ -137,9 +145,13 @@ function buildDir(){
 
                 #building
                 mkdir build
-                cmakeBuild release Release
-                cmakeBuild debug Debug
-                cmakeBuild relwithdeb RelWithDebInfo
+		if [ $BUILD_DEBUG -eq  1 ] ; then
+			cmakeBuild debug Debug
+		else
+	                cmakeBuild release Release
+	                cmakeBuild debug Debug
+	                cmakeBuild relwithdeb RelWithDebInfo
+		fi
 
                 echo "INFO : $subdir well builed. Congratz."
                 hr
@@ -229,7 +241,8 @@ function echo_usage(){
 	echo "codeblocks | CB : generates Codeblocks projects"
 	echo "eclipse | EC : generates Eclipse projects"
 	echo "--force : always remove old build without asking"
-	echo "--clear : remove old build"
+	echo "--clear : remove old build (without build)"
+	echo "--debug : build only debug"
 	echo "--report : merge all report into one (build_report.log) usefull for continuous integration"
 	echo "--help | -h : displays this message"
 }
@@ -237,6 +250,7 @@ function echo_usage(){
 export CMAKE_ARGS=''
 export FORCE_REMOVE=''
 export CLEAR=0
+export BUILD_DEBUG=0
 REPORT=0
 BUILD_OUTSIDE=0
 
@@ -264,6 +278,9 @@ do
 			;;
 		"--clear")
 			CLEAR=1
+			;;
+		"--debug")
+			export BUILD_DEBUG=1
 			;;
 	esac
 done
