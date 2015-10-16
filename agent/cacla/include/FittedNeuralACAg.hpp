@@ -24,8 +24,13 @@
 
 #define PRECISION 0.01
 #define CONVERG_PRECISION 0.0001
-#define DEBUG_FILE
-#define BATCH_SIZE 200
+
+#ifndef NDEBUG
+// #define DEBUG_FILE
+#endif
+
+#define POINT_FOR_ONE_DIMENSION 30
+#define FACTOR_DIMENSION_INCREASE 0.2
 
 typedef struct _sample {
   std::vector<double> s;
@@ -77,7 +82,9 @@ class FittedNeuralACAg : public arch::AAgent<> {
 
   }
 
-  virtual ~FittedNeuralACAg() {    
+  virtual ~FittedNeuralACAg() {  
+    write_policy_file("P");
+    
     delete critic;
     delete ann;
   }
@@ -202,11 +209,22 @@ class FittedNeuralACAg : public arch::AAgent<> {
     max_iteration = log(PRECISION) / log(gamma);
     LOG_DEBUG("gamma : " << gamma << " => max_iter : " << max_iteration );
     
-    if(!learnV){
-      hidden_unit_v *= 2;
-      LOG_DEBUG("learn Q => hidden_unit_v : " << hidden_unit_v );
+    max_actor_batch_size = POINT_FOR_ONE_DIMENSION;
+    double local_increment = 0;
+    for(uint i = 1; i <= nb_sensors; i++)
+      local_increment += 1.f / pow(i, FACTOR_DIMENSION_INCREASE);
+    max_actor_batch_size *= local_increment;
+    
+    if(learnV)
+      max_critic_batch_size = max_actor_batch_size;
+    else {
+      for(uint i= 1 + nb_sensors; i <= nb_sensors + nb_motors ; i++)
+        local_increment += 1.f / pow(i, FACTOR_DIMENSION_INCREASE);
+      max_critic_batch_size = POINT_FOR_ONE_DIMENSION * local_increment;
     }
     
+    LOG_DEBUG("max_actor_batch_size : " << max_actor_batch_size << " - max_critic_batch_size : " << max_critic_batch_size);
+      
     if(!gaussian_policy){
       noise = 0.15;
       LOG_DEBUG("greedy policy " << noise);
@@ -292,7 +310,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
       if(trajectory_a.size() == 0)
         return;
     
-      struct fann_train_data* data = fann_create_train(trajectory_a.size()+10, nb_sensors, nb_motors);
+      struct fann_train_data* data = fann_create_train(trajectory_a.size()+max_actor_batch_size, nb_sensors, nb_motors);
       
       uint n=0;
       KDE proba_s_explo;
@@ -335,7 +353,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
       
       bib::Logger::getInstance()->closeFile("aP" + std::to_string(episode));
       
-      if(n == 0){//nothing new => quit
+      if(n == 0 || trajectory_q.size() + trajectory_q_last.size() < 2 ){//nothing new => quit
         fann_destroy_train(data);
         return;
       }
@@ -367,7 +385,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
         std::copy(vtraj.begin(), vtraj.end(), std::back_inserter(vtraj_local));
         
         std::vector<sample> vtraj_is_state;
-        generateSubData(vtraj_is_state, vtraj_local, min(15, trajectory_q.size() + trajectory_q_last.size() ));
+        generateSubData(vtraj_is_state, vtraj_local, min(max_actor_batch_size, trajectory_q.size() + trajectory_q_last.size() ));
         
         proba_s.calc_bandwidth();
         for(auto sm : vtraj_is_state) {
@@ -431,7 +449,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
 
       write_valuef_added_file("aQ." + std::to_string(episode));
       
-      write_policy_file("P." + std::to_string(episode));
+//       write_policy_file("P." + std::to_string(episode));
       write_state_dis("pcs" + std::to_string(episode));
       
       update_critic();
@@ -521,7 +539,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
   }
   
   void write_policy_file(const std::string& file){
-#ifdef DEBUG_FILE
+// #ifdef DEBUG_FILE
       std::ofstream out;
       out.open(file, std::ofstream::out);
     
@@ -537,13 +555,13 @@ class FittedNeuralACAg : public arch::AAgent<> {
       
       bib::Combinaison::continuous<>(iter, nb_sensors, -1, 1, 200);
       out.close();
-#endif
+// #endif
   }
   
   //importance sampling + multi drawn
   void createMiniBatchV(std::vector<sample>& vtraj_final, std::vector<sample>& vtraj_local){
       vtraj_final.clear();
-      vtraj_final.reserve(BATCH_SIZE);
+      vtraj_final.reserve(max_critic_batch_size);
       
       if(vtraj_local.size() == 0){
         for(auto sm : trajectory_q_last){
@@ -577,12 +595,12 @@ class FittedNeuralACAg : public arch::AAgent<> {
       }
       
       if(!regularize_space_distribution){
-        generateSubData(vtraj_final, vtraj_local, min(BATCH_SIZE, vtraj_local.size()));
+        generateSubData(vtraj_final, vtraj_local, min(max_critic_batch_size, vtraj_local.size()));
         return;
       }
         
       std::vector<sample> vtraj_before_ps;
-      generateSubData(vtraj_before_ps, vtraj_local, min(BATCH_SIZE, vtraj_local.size()));
+      generateSubData(vtraj_before_ps, vtraj_local, min(max_critic_batch_size, vtraj_local.size()));
       
       if(learnV){
         KDE proba_s_local;
@@ -613,7 +631,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
         }
       }
       
-      generateSubData(vtraj_final, vtraj_before_ps, min(BATCH_SIZE, vtraj_before_ps.size()));
+      generateSubData(vtraj_final, vtraj_before_ps, min(max_critic_batch_size, vtraj_before_ps.size()));
   }
 
   //importance sampling
@@ -739,6 +757,8 @@ class FittedNeuralACAg : public arch::AAgent<> {
     importance_sampling, is_multi_drawn, encourage_absorbing,
     importance_sampling_actor, learnV, regularize_space_distribution, 
     sample_update, td_sample_actor_update, regularize_p0_distribution, regularize_pol_distribution;
+    
+  size_t max_actor_batch_size, max_critic_batch_size;
   
   uint internal_time;
   uint decision_each;

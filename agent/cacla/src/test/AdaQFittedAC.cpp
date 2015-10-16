@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
 //   arch::Simulator<arch::SimpleEnv1D, FittedQACAg> s;
   arch::Simulator<arch::SimpleEnv1D, FittedNeuralACAg> s;
 //   arch::Simulator<arch::SimpleEnv1DFixedTraj, FittedNeuralACAg> s;
-  
+//   arch::Simulator<AdvancedAcrobotEnv, FittedNeuralACAg> s;  
 
   s.init(argc, argv);
 

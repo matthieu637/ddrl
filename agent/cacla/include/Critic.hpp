@@ -4,7 +4,9 @@
 #include <bib/Combinaison.hpp>
 #include <MLP.hpp>
 
-#define DEBUG_FILE
+#ifndef NDEBUG
+// #define DEBUG_FILE
+#endif
 
 template <typename Sample>
 class Critic {
