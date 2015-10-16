@@ -44,35 +44,35 @@ TEST(MLP, ConsistentActivationFunction) {
   double lambda = 0.5;
   fann_set_activation_steepness_output(nn.getNeuralNet(), lambda);
   fann_set_activation_steepness(nn.getNeuralNet(), lambda, 1, 0);
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), tanh(lambda * 1.) / 2.);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), tanh(lambda * 1.) / 2.);
 
   lambda = 0.8;
   fann_set_activation_steepness(nn.getNeuralNet(), lambda, 1, 0);
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), tanh(lambda * 1.) / 2.);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), tanh(lambda * 1.) / 2.);
 
   ac[0] = -1;
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), tanh(lambda * -1.) / 2.);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), tanh(lambda * -1.) / 2.);
 
   lambda = 0.5;
   fann_set_activation_steepness(nn.getNeuralNet(), lambda, 1, 0);
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), tanh(lambda * -1.) / 2.);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), tanh(lambda * -1.) / 2.);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, 0.f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
   fann_set_weight(nn.getNeuralNet(), 2, 4, 0.f);
   fann_set_weight(nn.getNeuralNet(), 3, 4, 5.f);
 
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), 5.f / 2.f);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), 5.f / 2.f);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, 0.2f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.4f);
   fann_set_weight(nn.getNeuralNet(), 2, 4, 0.6f);
   fann_set_weight(nn.getNeuralNet(), 3, 4, 0.8f);
 
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), (tanh(lambda * (-1. * 0.2f + 0.4f)) * 0.6f + 0.8f) / 2.f);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), (tanh(lambda * (-1. * 0.2f + 0.4f)) * 0.6f + 0.8f) / 2.f);
 
   fann_set_activation_steepness_output(nn.getNeuralNet(), 1.f);
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac),  tanh(lambda * (-1. * 0.2f + 0.4f)) * 0.6f + 0.8f);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac),  tanh(lambda * (-1. * 0.2f + 0.4f)) * 0.6f + 0.8f);
 }
 
 
@@ -95,7 +95,7 @@ TEST(MLP, LearnOpposite) {
     std::vector<double> ac(1);
     ac[0] = x1;
 
-    EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), out);
+    EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), out);
   }
 
   // Learn
@@ -121,7 +121,7 @@ TEST(MLP, LearnOpposite) {
     std::vector<double> ac(1);
     ac[0] = x1;
 
-    EXPECT_EQ(nn.computeOut(sens, ac), out);
+    EXPECT_EQ(nn.computeOutVF(sens, ac), out);
   }
 }
 
@@ -160,8 +160,8 @@ TEST(MLP, LearnAndOr) {
     std::vector<double> ac(1);
     ac[0] = x3;
 
-    EXPECT_GT(nn.computeOut(sens, ac), out - 0.02);
-    EXPECT_LT(nn.computeOut(sens, ac), out + 0.02);
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.02);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.02);
   }
 }
 
@@ -377,7 +377,7 @@ TEST(MLP, OptimizeOpposite) {
     std::vector<double> ac(1);
     ac[0] = x1;
 
-    EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), out);
+    EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), out);
   }
 
   std::vector<double>* ac = nn.optimized(sens);
@@ -447,10 +447,10 @@ TEST(MLP, OptimizeAndOr) {
     sens[1] = x2;
 
     std::vector<double>* ac = nn.optimized(sens);
-    double his_sol = nn.computeOut(sens, *ac);
+    double his_sol = nn.computeOutVF(sens, *ac);
 
     ac->at(0) = 1.f;
-    double my_sol = nn.computeOut(sens, *ac);
+    double my_sol = nn.computeOutVF(sens, *ac);
 
     EXPECT_GE(his_sol, my_sol - 0.01);
     delete ac;
@@ -482,7 +482,7 @@ TEST(MLP, OptimizeMultiDim) {
   for (uint n = 0; n < 100 ; n++) {
     std::vector<double> sens(0);
     std::vector<double>* ac = nn.optimized(sens);
-    double his_sol = nn.computeOut(sens, *ac);
+    double his_sol = nn.computeOutVF(sens, *ac);
     double my_sol = 1.;
 
     EXPECT_GE(his_sol, my_sol - 0.01);
@@ -518,7 +518,7 @@ TEST(MLP, OptimizeNonExtremum) {
       double out = x1 * x1 - x1;
       ac[0] = x1;
 
-      double myout = nn.computeOut(sens, ac);
+      double myout = nn.computeOutVF(sens, ac);
       EXPECT_GT(myout, sensv * out - 0.1);
       EXPECT_LT(myout, sensv * out + 0.1);
       LOG_FILE("OptimizeNonExtremum.data", x1 << " " << myout << " " << out);
@@ -572,7 +572,7 @@ TEST(MLP, Optimize2LocalMaxima) {
     double out = - cos(5.*x1) / 2.;
     ac[0] = x1;
 
-    double myout = nn.computeOut(sens, ac);
+    double myout = nn.computeOutVF(sens, ac);
     LOG_FILE("Optimize2LocalMaxima.data", x1 << " " << myout << " " << out);
 //     close all; X=load('Optimize2LocalMaxima.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');
   }
@@ -632,7 +632,7 @@ TEST(MLP, OptimizeTrapInEvilLocalOptimal) {
     double out = sin(-3 * x1 * x1 * x1 + 2 * x1 * x1 + x1);
     ac[0] = x1;
 
-    double myout = nn.computeOut(sens, ac);
+    double myout = nn.computeOutVF(sens, ac);
     LOG_FILE("OptimizeTrapInEvilLocalOptimal.data", x1 << " " << myout << " " << out);
 //     close all; X=load('OptimizeTrapInEvilLocalOptimal.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');
   }
@@ -643,9 +643,9 @@ TEST(MLP, OptimizeTrapInEvilLocalOptimal) {
   double precision = 0.1;
 
   if(acopt->at(0) < -0.7 - precision || acopt->at(0) > -0.7 + precision) {
-    LOG_DEBUG(nn.computeOut(sens, *acopt));
+    LOG_DEBUG(nn.computeOutVF(sens, *acopt));
     ac[0] = -0.7;
-    LOG_DEBUG(nn.computeOut(sens, ac));
+    LOG_DEBUG(nn.computeOutVF(sens, ac));
   }
 
   EXPECT_GT(acopt->at(0), -0.7 - precision);
@@ -691,7 +691,7 @@ TEST(MLP, OptimizePlateau) {
     double out = x1 >= 0.2 ? 1. : 0.2;
     ac[0] = x1;
 
-    double myout = nn.computeOut(sens, ac);
+    double myout = nn.computeOutVF(sens, ac);
     LOG_FILE("OptimizePlateau.data", x1 << " " << myout << " " << out);
 //     close all; X=load('OptimizePlateau.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');
   }

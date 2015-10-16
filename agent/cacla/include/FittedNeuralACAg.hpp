@@ -83,8 +83,6 @@ class FittedNeuralACAg : public arch::AAgent<> {
   }
 
   virtual ~FittedNeuralACAg() {  
-    write_policy_file("P");
-    
     delete critic;
     delete ann;
   }
@@ -250,6 +248,11 @@ class FittedNeuralACAg : public arch::AAgent<> {
       exit(1);
     }
     
+    if(regularize_space_distribution && !importance_sampling){
+      LOG_ERROR("regularize_space_distribution doesn't make sense without importance_sampling");
+      exit(1);
+    }
+    
     if(importance_sampling && !regularize_p0_distribution && !regularize_pol_distribution &&
       !regularize_space_distribution){
       LOG_ERROR("importance_sampling doesn't make sense without at least one regularize_X");
@@ -263,11 +266,6 @@ class FittedNeuralACAg : public arch::AAgent<> {
     
     if(sample_update && learnV){
       LOG_ERROR("sample_update doesn't make sense when learning V");
-      exit(1);
-    }
-    
-    if(!importance_sampling && regularize_space_distribution){
-      LOG_ERROR("regularize_space_distribution doesn't make sense without importance_sampling");
       exit(1);
     }
     
@@ -449,7 +447,8 @@ class FittedNeuralACAg : public arch::AAgent<> {
 
       write_valuef_added_file("aQ." + std::to_string(episode));
       
-//       write_policy_file("P." + std::to_string(episode));
+      if(episode % 10 == 0)
+        write_policy_file("P." + std::to_string(episode));
       write_state_dis("pcs" + std::to_string(episode));
       
       update_critic();
@@ -553,7 +552,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
         delete ac;
       };
       
-      bib::Combinaison::continuous<>(iter, nb_sensors, -1, 1, 200);
+      bib::Combinaison::continuous<>(iter, nb_sensors, -1, 1, 100);
       out.close();
 // #endif
   }

@@ -122,7 +122,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
         NNDistribution(MLP* _mlp, const std::vector<double>& _sensors): mlp(_mlp), sensors(_sensors) {}
 
         double eval(const std::vector<double>& x) {
-          return mlp->computeOut(sensors, x);
+          return mlp->computeOutVF(sensors, x);
         }
       };
       NNDistribution dist(nn, sensors);
@@ -319,7 +319,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
         if (!sm.goal_reached) {
 //           std::vector<double>* best_action = ptr->nn->optimized(sm.next_s, {}, NBSOL_OPT);
           std::vector<double>* best_action = ptr->nn->optimizedBruteForce(sm.next_s);
-          double nextQ = MLP::computeOut(local_nn, sm.next_s, *best_action);
+          double nextQ = MLP::computeOutVF(local_nn, sm.next_s, *best_action);
 //           if (ptr->aware_ac_time)
 //             delta += pow(ptr->gamma, bib::Utils::transform(sm.a[ptr->nb_motors + ptr->nb_sensors], -1., 1., ptr->min_ac_time,
 //                          ptr->max_ac_time)) * nextQ;

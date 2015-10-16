@@ -29,7 +29,7 @@ class ContinuousAcAg : public arch::AAgent<> {
     vector<double>* next_action = nn->optimized(sensors);
 
     if (last_action.get() != nullptr && learning) {  // Update Q
-      double nextQ = nn->computeOut(sensors, *next_action);
+      double nextQ = nn->computeOutVF(sensors, *next_action);
       if (!goal_reached)
         nn->learn(last_state, *last_action, reward + gamma * nextQ);
       else
