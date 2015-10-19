@@ -447,8 +447,8 @@ class FittedNeuralACAg : public arch::AAgent<> {
 
       write_valuef_added_file("aQ." + std::to_string(episode));
       
-      if(episode % 10 == 0)
-        write_policy_file("P." + std::to_string(episode));
+//       if(episode % 10 == 0)
+//         write_policy_file("P." + std::to_string(episode));
       write_state_dis("pcs" + std::to_string(episode));
       
       update_critic();
