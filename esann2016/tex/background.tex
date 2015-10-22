@@ -118,7 +118,8 @@ The actor is updated as
 
 It is a online algorithm that doesn't retains data from previous experiences except through the
 value function. On the contrary, fitted natural actor critic \cite{Melo2008} tries to exploit 
-at the maximum the data already collected. The critic updates is close the Q Fitted Iteration :
+at the maximum the data already collected by replaying them with importance sampling. 
+The critic updates is close the Q Fitted Iteration :
 \begin{equation}
  V_{k+1} = \underset{V \in \mathcal{F}}{\text{arg min}} \sum_{t=1}^{N} 
  \frac{1}{\hat{\mu}(s_t)} 
@@ -160,11 +161,4 @@ Several state of the art algorithms that fulfill 2 different hypothesis have bee
  3) Data Efficient &  & $\times$ & $\times$\\ \hline
 \end{tabular}
 
-
-\DRAFT{
-
-\cite{Antos2008} provides an extension for continuous actions space.
-
-importance sampling
-}
 
