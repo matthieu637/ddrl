@@ -37,14 +37,27 @@ class ExampleAgent : public arch::AAgent<> {
  public:
   ExampleAgent(unsigned int nb_motors, unsigned int) : actuator(nb_motors) {}
   const std::vector<double>& run(double, const std::vector<double>&, bool, bool) override {
-    for (unsigned int i = 0; i < actuator.size(); i++)
-      actuator[i] = bib::Utils::randin(-1, 1);
+    time_for_ac--;
+    if (time_for_ac == 0) {
+      time_for_ac = decision_each;
+      for (unsigned int i = 0; i < actuator.size(); i++)
+        actuator[i] = bib::Utils::randin(-1, 1);
+    }
     return actuator;
+  }
+  
+  void start_episode(const std::vector<double>&) override {
+    time_for_ac = 1;
   }
 
   virtual ~ExampleAgent() {
   }
+  
+  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
+    decision_each                       = pt->get<int>("agent.decision_each");
+  }
 
+  int decision_each, time_for_ac;
   std::vector<double> actuator;
 };
 

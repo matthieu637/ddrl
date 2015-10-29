@@ -62,8 +62,8 @@ public:
         return vnn->computeOutVF(s, a);
     }
 
-    void write_critic_file(const std::string& file) {
 #if defined(DEBUG_FILE) && !defined(NDEBUG)
+    void write_critic_file(const std::string& file) {
         std::ofstream out;
         if(learnV)
             out.open("V." + file, std::ofstream::out);
@@ -96,6 +96,8 @@ public:
             bib::Combinaison::continuous<>(iter_Q, nb_sensors+nb_motors, -1, 1, 50);
 
         out.close();
+#else 
+    void write_critic_file(const std::string&) {
 #endif
     }
 

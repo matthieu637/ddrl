@@ -201,7 +201,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
         double delta = sm.r;
         if (!sm.goal_reached) {
-          double nextV = MLP::computeOut(local_nn, sm.next_s, {});
+          double nextV = MLP::computeOutVF(local_nn, sm.next_s, {});
           delta += ptr->gamma * nextV;
         }
 
@@ -279,13 +279,13 @@ class OfflineCaclaAg : public arch::AAgent<> {
         if(!compare_old_policy){
           target = sm.r;
           if (!sm.goal_reached) {
-            double nextV = vnn->computeOut(sm.next_s, {});
+            double nextV = vnn->computeOutVF(sm.next_s, {});
             target += gamma * nextV;
           }
-          mine = vnn->computeOut(sm.s, {});
+          mine = vnn->computeOutVF(sm.s, {});
         } else {
-          double newV = vnn->computeOut(sm.s, {});
-          double oldV = old_vnn->computeOut(sm.s, {});
+          double newV = vnn->computeOutVF(sm.s, {});
+          double oldV = old_vnn->computeOutVF(sm.s, {});
           
           target = newV;
           mine = oldV;
