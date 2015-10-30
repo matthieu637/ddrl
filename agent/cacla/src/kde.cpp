@@ -276,7 +276,7 @@ void KDE::add_data(double x, double y){
 	add_data(tmp);
 }
 
-void KDE::add_data(vector<double>& x){
+void KDE::add_data(const vector<double>& x){
 
 	if(data_matrix.size() == 0){
 		for(size_t i = 0; i < x.size(); i++){

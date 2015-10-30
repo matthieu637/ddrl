@@ -135,17 +135,22 @@ class FittedNeuralACAg : public arch::AAgent<> {
         }
       }
 
-      trajectory_q_last.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0, 0});
+      sample sm = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0, 0};
+      trajectory_q_last.insert(sm);
       proba_s.add_data(last_state);
       
       std::vector<double> sa;
       mergeSA(sa, last_state, *last_action);
       proba_sa.add_data(sa);
       
-      trajectory_a.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0, 0});
+      trajectory_a.insert(sm);
+      
+      if(online_actor_update)
+        update_actor_online(sm);
+      
       if(goal_reached)
         if(encourage_absorbing)
-          trajectory_q_absorbing.push_back( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0, 0});
+          trajectory_q_absorbing.push_back(sm);
     }
 
     last_pure_action.reset(new vector<double>(*next_action));
@@ -184,7 +189,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
     decision_each                       = pt->get<int>("agent.decision_each");
     
     vnn_from_scratch                    = pt->get<bool>("agent.vnn_from_scratch");
-    co_update                           = pt->get<bool>("agent.co_update");
+    online_actor_update                 = pt->get<bool>("agent.online_actor_update");
     
     lecun_activation                    = pt->get<bool>("agent.lecun_activation");
     gaussian_policy                     = pt->get<bool>("agent.gaussian_policy");
@@ -251,7 +256,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
     }
     
     if(td_sample_actor_update && sample_update){
-      LOG_ERROR("td_sample_actor_update implies sample_update");
+      LOG_ERROR("td_sample_actor_update implies not sample_update");
       exit(1);
     }
     
@@ -293,6 +298,122 @@ class FittedNeuralACAg : public arch::AAgent<> {
     trajectory_a.clear();
     
     episode ++;
+  }
+  
+  void update_actor_online(const sample& sm){
+      struct fann_train_data* data = fann_create_train(max_actor_batch_size+2, nb_sensors, nb_motors);
+
+      uint n=0;
+      KDE proba_s_explo;
+      
+      if (std::equal(sm.a.begin(), sm.a.end(), sm.pure_a.begin())){
+        fann_destroy_train(data);
+        return;
+      }
+      
+      double exploration, exploitation;
+      if(!td_sample_actor_update){
+        if(!sample_update){//TD error
+          exploration = critic->evaluateExploration(sm);
+          exploitation = critic->evaluateExploitation(sm);
+        } else { // Sample error
+          exploration = critic->getMLP()->computeOutVF(sm.next_s, sm.a);
+          exploitation = critic->getMLP()->computeOutVF(sm.next_s, sm.pure_a);
+        }
+      } else {
+        exploration = critic->evaluateExploration(sm);
+        exploitation = critic->evaluateExploitation(sm);
+        if(exploration < exploitation) {
+          exploration = critic->getMLP()->computeOutVF(sm.next_s, sm.a);
+          exploitation = critic->getMLP()->computeOutVF(sm.next_s, sm.pure_a); 
+        }
+      }
+      
+      write_policy_data("aP" + std::to_string(episode), sm.s, sm.a, exploration - exploitation);
+      
+      if(exploration > exploitation){
+        proba_s_explo.add_data(sm.s);
+        
+        for (uint i = 0; i < nb_sensors ; i++)
+          data->input[n][i] = sm.s[i];
+        for (uint i = 0; i < nb_motors; i++)
+          data->output[n][i] = sm.a[i];
+        n++;
+      }
+      
+      bib::Logger::getInstance()->closeFile("aP" + std::to_string(episode));
+      
+      if(n == 0 || trajectory_q.size() + trajectory_q_last.size() < 2 ){//nothing new => quit
+        fann_destroy_train(data);
+        return;
+      }
+      
+      MLP generative_model(*ann);
+      
+      std::vector<sample> vtraj;
+      vtraj.reserve(trajectory_q.size() + trajectory_q_last.size());
+      std::copy(trajectory_q.begin(), trajectory_q.end(), std::back_inserter(vtraj));
+      std::copy(trajectory_q_last.begin(), trajectory_q_last.end(), std::back_inserter(vtraj));
+      
+//       proba_s.set_bandwidth_opt_type(2);
+//       too long to compute
+    
+      for(auto it = vtraj.begin(); it != vtraj.end() ; ++it) {
+        double p_s = 1 + proba_s.pdf(it->s);
+        it->pfull_data = (1.f / (p_s));
+      }
+      
+      auto eval = [&]() {
+        return fann_get_MSE(ann->getNeuralNet());
+      };
+            
+      auto iter = [&]() {
+        uint n_local = n;
+        std::vector<sample> vtraj_local;
+        vtraj_local.reserve(vtraj.size());
+        std::copy(vtraj.begin(), vtraj.end(), std::back_inserter(vtraj_local));
+        
+        std::vector<sample> vtraj_is_state;
+        generateSubData(vtraj_is_state, vtraj_local, min(max_actor_batch_size, trajectory_q.size() + trajectory_q_last.size() ));
+        
+        proba_s.calc_bandwidth();
+        for(auto sm : vtraj_is_state) {
+          double p_s_expl = 1 + proba_s_explo.pdf(sm.s, proba_s.get_default_bandwidth_map(), 1.5f);
+          p_s_expl = p_s_expl * p_s_expl;
+          sm.pfull_data = (1.f / (p_s_expl)) ;
+        }
+        
+        std::vector<sample> vtraj_is;
+        generateSubData(vtraj_is, vtraj_is_state, vtraj_is_state.size());
+        write_policy_addeddata("aaP" + std::to_string(episode), vtraj_is, generative_model);
+         
+        for(sample sm : vtraj_is) {
+          for (uint i = 0; i < nb_sensors ; i++)
+              data->input[n_local][i] = sm.s[i];
+        
+          vector<double>* next_action = generative_model.computeOut(sm.s);
+          for (uint i = 0; i < nb_motors; i++)
+            data->output[n_local][i] = next_action->at(i);
+          delete next_action;
+          
+          n_local++;
+        }
+        
+        struct fann_train_data* subdata = fann_subset_train_data(data, 0, n_local);
+
+        ann->learn(subdata, 100, 0, CONVERG_PRECISION);
+
+        fann_destroy_train(subdata);
+      };
+
+      if(importance_sampling_actor)
+        bib::Converger::determinist<>(iter, eval, 10, CONVERG_PRECISION, 0);
+      else
+        iter();
+//       for(uint i=0; i < 10 ; i++)
+//         iter();
+
+      fann_destroy_train(data);
   }
   
   void update_actor(){
@@ -337,7 +458,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
             for (uint i = 0; i < nb_motors; i++)
               data->output[n][i] = sm.a[i];
             n++;
-        } 
+        }
       }
       
       bib::Logger::getInstance()->closeFile("aP" + std::to_string(episode));
@@ -442,10 +563,10 @@ class FittedNeuralACAg : public arch::AAgent<> {
 //         write_policy_file("P." + std::to_string(episode));
       write_state_dis("pcs" + std::to_string(episode));
       
-      update_critic();
-      
-      if(!co_update)
+      if(!online_actor_update)
         update_actor();
+      
+      update_critic();
       
       for (auto sm : trajectory_q_last)
         trajectory_q.insert(sm);
@@ -693,12 +814,12 @@ class FittedNeuralACAg : public arch::AAgent<> {
         else
           critic->getMLP()->learn_stoch(dq->data, 10000, 0, CONVERG_PRECISION);
         
-        if(co_update){
-          update_actor();
-          vtraj_precompute.clear();
-          if(!learnV)
-            dq->update_actions();
-        }
+//         if(co_update){
+//           update_actor();
+//           vtraj_precompute.clear();
+//           if(!learnV)
+//             dq->update_actions();
+//         }
         
         if(is_multi_drawn){
           dq->free();
@@ -757,8 +878,8 @@ class FittedNeuralACAg : public arch::AAgent<> {
   
   double alpha_a;
   uint max_iteration;
-  bool lecun_activation, gaussian_policy,
-    clear_trajectory, vnn_from_scratch, co_update, 
+  bool lecun_activation, gaussian_policy, online_actor_update,
+    clear_trajectory, vnn_from_scratch, 
     importance_sampling, is_multi_drawn, encourage_absorbing,
     importance_sampling_actor, learnV, regularize_space_distribution, 
     sample_update, td_sample_actor_update, regularize_p0_distribution, regularize_pol_distribution;

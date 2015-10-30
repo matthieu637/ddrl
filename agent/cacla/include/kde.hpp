@@ -19,7 +19,7 @@ public:
 	~KDE(){};
     void add_data(double x);
     void add_data(double x, double y);
-    void add_data(vector<double>& x);
+    void add_data(const vector<double>& x);
     void set_bandwidth_opt_type(int x);
     void set_kernel_type(int x);
     double get_min(int x){curr_var = x;default_bandwidth();return(min_map[x]-(extension*default_bandwidth_map[x]));};
