@@ -14,7 +14,8 @@ int main(int argc, char **argv) {
 //   arch::Simulator<arch::SimpleEnv1D, FittedNeuralACAg> s;
 //   arch::Simulator<arch::SimpleEnv1D, arch::ExampleAgent> s;
 //   arch::Simulator<arch::SimpleEnv1DFixedTraj, FittedNeuralACAg> s;
-  arch::Simulator<AdvancedAcrobotEnv, FittedNeuralACAg, arch::MotorEpisodeStat> s;
+//   arch::Simulator<AdvancedAcrobotEnv, FittedNeuralACAg, arch::MotorEpisodeStat> s;
+  arch::Simulator<AdvancedAcrobotEnv, FittedNeuralACAg> s;
 
   s.init(argc, argv);
 

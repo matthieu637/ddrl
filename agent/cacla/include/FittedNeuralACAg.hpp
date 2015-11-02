@@ -205,7 +205,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
     regularize_pol_distribution         = pt->get<bool>("agent.regularize_pol_distribution");
     sample_update                       = pt->get<bool>("agent.sample_update");
     td_sample_actor_update              = pt->get<bool>("agent.td_sample_actor_update");
-    
+    actor_update_determinist_range      = pt->get<bool>("agent.actor_update_determinist_range");
     
     max_iteration = log(PRECISION) / log(gamma);
     LOG_DEBUG("gamma : " << gamma << " => max_iter : " << max_iteration );
@@ -378,21 +378,36 @@ class FittedNeuralACAg : public arch::AAgent<> {
         generateSubData(vtraj_is_state, vtraj_local, min(max_actor_batch_size, trajectory_q.size() + trajectory_q_last.size() ));
         
         proba_s.calc_bandwidth();
-        for(auto sm : vtraj_is_state) {
-          double p_s_expl = 1 + proba_s_explo.pdf(sm.s, proba_s.get_default_bandwidth_map(), 1.5f);
-          p_s_expl = p_s_expl * p_s_expl;
-          sm.pfull_data = (1.f / (p_s_expl)) ;
+        std::vector<sample> vtraj_is;
+        
+        if(!actor_update_determinist_range){
+          for(auto _sm : vtraj_is_state) {
+            double p_s_expl = 1 + proba_s_explo.pdf(_sm.s, proba_s.get_default_bandwidth_map(), 1.5f);
+            p_s_expl = p_s_expl * p_s_expl;
+            _sm.pfull_data = (1.f / (p_s_expl)) ;
+          }
+          
+          generateSubData(vtraj_is, vtraj_is_state, vtraj_is_state.size());
+        } else {
+          for(auto _sm : vtraj_is_state){
+            bool data_ok = true;
+            for(uint i=0; i < nb_sensors && data_ok; i++)
+              if(fabs(_sm.s[i] - sm.s[i]) < proba_s.get_default_bandwidth_map().at(i)){
+                data_ok = false;
+                break;
+              }
+            if(data_ok)
+              vtraj_is.push_back(_sm);
+          }
         }
         
-        std::vector<sample> vtraj_is;
-        generateSubData(vtraj_is, vtraj_is_state, vtraj_is_state.size());
         write_policy_addeddata("aaP" + std::to_string(episode), vtraj_is, generative_model);
          
-        for(sample sm : vtraj_is) {
+        for(sample _sm : vtraj_is) {
           for (uint i = 0; i < nb_sensors ; i++)
-              data->input[n_local][i] = sm.s[i];
+              data->input[n_local][i] = _sm.s[i];
         
-          vector<double>* next_action = generative_model.computeOut(sm.s);
+          vector<double>* next_action = generative_model.computeOut(_sm.s);
           for (uint i = 0; i < nb_motors; i++)
             data->output[n_local][i] = next_action->at(i);
           delete next_action;
@@ -509,7 +524,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
         proba_s.calc_bandwidth();
         std::vector<sample> vtraj_is;
         
-        if(false){
+        if(!actor_update_determinist_range){
           for(auto sm : vtraj_is_state) {
             double p_s_expl = 1 + proba_s_explo.pdf(sm.s, proba_s.get_default_bandwidth_map(), 1.5f);
             p_s_expl = p_s_expl * p_s_expl;
