@@ -10,6 +10,7 @@
 #include "MLP.hpp"
 #include <bib/Utils.hpp>
 #include <bib/MetropolisHasting.hpp>
+#include <bib/Combinaison.hpp>
 
 #define NB_SOL_OPTIMIZATION 25
 
@@ -23,6 +24,13 @@ double AND(double x1, double x2) {
   if (x1 == 1.f && x2 == 1.f)
     return 1.f;
   return -1.f;
+}
+
+double LECUNIZATION(double x){ 
+  if(x == 1.f) 
+    return 1.5f;
+  else
+    return -1.5f;
 }
 
 double sech(double x) {
@@ -704,4 +712,195 @@ TEST(MLP, OptimizePlateau) {
   EXPECT_GT(acopt->at(0), 0.2 - precision);
 
   delete acopt;
+}
+
+TEST(MLP, ConsistentActivationFunctionLecun) {
+  MLP nn(1, 1, 0, 0.01f, true);
+
+  fann_set_weight(nn.getNeuralNet(), 0, 2, 1.f);
+  fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
+  fann_set_weight(nn.getNeuralNet(), 2, 4, 1.f);
+  fann_set_weight(nn.getNeuralNet(), 3, 4, 0.f);
+  
+  std::vector<double> sens(0);
+  std::vector<double> ac(1);
+  ac[0] = 1.d;
+
+  double lambda = atanh(1.d/sqrt(3.d));
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), sqrt(3.d)*tanh(lambda * 1.d));
+
+  ac[0] = 1.5d;
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), sqrt(3.d)*tanh(lambda * 1.5d));//1.31
+  
+  fann_set_weight(nn.getNeuralNet(), 0, 2, 0.f);
+  fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
+  fann_set_weight(nn.getNeuralNet(), 2, 4, 0.f);
+  fann_set_weight(nn.getNeuralNet(), 3, 4, 5.f);
+
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), 5.f);
+
+  fann_set_weight(nn.getNeuralNet(), 0, 2, 0.2f);
+  fann_set_weight(nn.getNeuralNet(), 1, 2, 0.4f);
+  fann_set_weight(nn.getNeuralNet(), 2, 4, 0.6f);
+  fann_set_weight(nn.getNeuralNet(), 3, 4, 0.8f);
+
+  ac[0] = -1.d;
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), (sqrt(3.d)*tanh(lambda * (-1. * 0.2f + 0.4f)) * 0.6f + 0.8f));
+}
+
+TEST(MLP, LearnAndOrLecun) {
+  MLP nn(3, 10, 2, 0.05f, true);
+
+  // Learn
+  for (uint n = 0; n < 10000 ; n++) {
+    double x1 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x2 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x3 = bib::Utils::randBool() ? 1.f : -1.f;
+
+    double out = AND(OR(x1, x2), x3);
+
+    std::vector<double> sens(2);
+    sens[0] = x1;
+    sens[1] = x2;
+    std::vector<double> ac(1);
+    ac[0] = x3;
+    
+    nn.learn(sens, ac, out);
+  }
+
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x2 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x3 = bib::Utils::randBool() ? 1.f : -1.f;
+
+    double out = AND(OR(x1, x2), x3);
+
+    std::vector<double> sens(2);
+    sens[0] = x1;
+    sens[1] = x2;
+    std::vector<double> ac(1);
+    ac[0] = x3;
+
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.02);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.02);
+  }
+}
+
+TEST(MLP, LearnAndOrLecun2) {
+  MLP nn(3, 5, 1, true);
+
+  struct fann_train_data* data = fann_create_train(2*2*2, 3, 1);
+   
+  uint n = 0;
+  auto iter = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->input[n][1]= x[1];
+    data->input[n][2]= x[2];
+    
+    double out = AND(OR(x[0], x[1]), x[2]);
+    data->output[n][0]= out;
+    n++;
+  };
+    
+  bib::Combinaison::continuous<>(iter, 3, -1, 1, 1);
+  
+  nn.learn_stoch(data, 20000, 0, 0.00000001);
+  
+  fann_destroy_train(data);
+
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x2 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x3 = bib::Utils::randBool() ? 1.f : -1.f;
+
+    double out = AND(OR(x1, x2), x3);
+
+    std::vector<double> sens(2);
+    sens[0] = x1;
+    sens[1] = x2;
+    std::vector<double> ac(1);
+    ac[0] = x3;
+
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.02);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.02);
+    
+    std::vector<double> in(3);
+    in[0] = x1;
+    in[1] = x2;
+    in[2] = x3;
+    std::vector<double>* outnn = nn.computeOut(in);
+    
+    EXPECT_GT(outnn->at(0), out - 0.05);
+    EXPECT_LT(outnn->at(0), out + 0.05);
+    
+    delete outnn;
+  }
+}
+
+TEST(MLP, LearnAndOrLecun3) {
+  MLP nn(3, 5, 1, true);
+  MLP nn_nolecun(3, 5, 1);
+
+  struct fann_train_data* data = fann_create_train(2*2*2, 3, 1);
+   
+  uint n = 0;
+  auto iter = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->input[n][1]= x[1];
+    data->input[n][2]= x[2];
+    
+    double out = LECUNIZATION(AND(OR(x[0], x[1]), x[2]));
+    data->output[n][0]= out;
+    n++;
+  };
+    
+  bib::Combinaison::continuous<>(iter, 3, -1, 1, 1);
+  
+  nn.learn_stoch(data, 20000, 0, 0.00000001);
+  nn_nolecun.learn_stoch(data, 20000, 0, 0.00000001);
+  
+  fann_destroy_train(data);
+  
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x2 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x3 = bib::Utils::randBool() ? 1.f : -1.f;
+
+    double out = LECUNIZATION(AND(OR(x1, x2), x3));
+
+    std::vector<double> sens(2);
+    sens[0] = x1;
+    sens[1] = x2;
+    std::vector<double> ac(1);
+    ac[0] = x3;
+
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.02);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.02);
+        
+    std::vector<double> in(3);
+    in[0] = x1;
+    in[1] = x2;
+    in[2] = x3;
+    std::vector<double>* outnn = nn.computeOut(in);
+    
+    EXPECT_GE(outnn->at(0), -1.f);
+    EXPECT_LE(outnn->at(0), 1.f);
+    
+    EXPECT_GE(nn_nolecun.computeOutVF(sens, ac), -1.f);
+    EXPECT_LE(nn_nolecun.computeOutVF(sens, ac), 1.f);
+    
+    if(out > 0){
+      EXPECT_DOUBLE_EQ(outnn->at(0), 1.f);
+      EXPECT_DOUBLE_EQ(nn_nolecun.computeOutVF(sens, ac), 1.f);
+    }
+    else {
+      EXPECT_DOUBLE_EQ(outnn->at(0), -1.f);
+      EXPECT_DOUBLE_EQ(nn_nolecun.computeOutVF(sens, ac), -1.f);
+    }
+    
+    delete outnn;
+  }
 }

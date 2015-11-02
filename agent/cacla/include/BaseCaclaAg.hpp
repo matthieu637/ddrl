@@ -144,6 +144,8 @@ class BaseCaclaAg : public arch::AAgent<> {
     plus_var_version    = pt->get<bool>("agent.plus_var_version");
     standard_score      = pt->get<bool>("agent.standard_score");
     gaussian_policy     = pt->get<bool>("agent.gaussian_policy");
+    lecun_activation    = pt->get<bool>("agent.lecun_activation");
+    
     if(!gaussian_policy)
       noise=0.1;
     
@@ -151,19 +153,21 @@ class BaseCaclaAg : public arch::AAgent<> {
     delta_var = 1;
     
     if(hidden_unit_v == 0){
-      vnn = new LinMLP(nb_sensors, 1, alpha_v);
+      vnn = new LinMLP(nb_sensors, 1, alpha_v, lecun_activation);
       fann_set_activation_function_output(vnn->getNeuralNet(), FANN_LINEAR);
     } else
-      vnn = new MLP(nb_sensors, hidden_unit_v, nb_sensors, alpha_v);
+      vnn = new MLP(nb_sensors, hidden_unit_v, nb_sensors, alpha_v, lecun_activation);
 
     if(hidden_unit_a == 0){
-      ann = new LinMLP(nb_sensors , nb_motors, alpha_a);
-//       fann_set_activation_function_output(vnn->getNeuralNet(), FANN_LINEAR);
+      ann = new LinMLP(nb_sensors , nb_motors, alpha_a, lecun_activation);
     }
      else {
-      ann = new MLP(nb_sensors, hidden_unit_a, nb_motors);
-      fann_set_learning_rate(ann->getNeuralNet(), alpha_a);
+      ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
+      fann_set_training_algorithm(ann->getNeuralNet(), FANN_TRAIN_INCREMENTAL);
     }
+    
+    fann_set_learning_rate(ann->getNeuralNet(), alpha_a / fann_get_total_connections(ann->getNeuralNet()));
+    fann_set_learning_rate(vnn->getNeuralNet(), alpha_v / fann_get_total_connections(vnn->getNeuralNet()));
   }
 
   void start_episode(const std::vector<double>& sensors) override {
@@ -320,6 +324,7 @@ class BaseCaclaAg : public arch::AAgent<> {
   bool plus_var_version;
   bool standard_score;
   bool gaussian_policy;
+  bool lecun_activation;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;

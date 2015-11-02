@@ -260,9 +260,12 @@ class FittedNeuralACAg : public arch::AAgent<> {
     else {
       ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
       fann_set_learning_rate(ann->getNeuralNet(), alpha_a);
+      fann_set_training_algorithm(ann->getNeuralNet(), FANN_TRAIN_INCREMENTAL);
     }
     
     critic = new Critic<sample>(nb_sensors, nb_motors, learnV, hidden_unit_v, lecun_activation, ann, gamma);
+    
+    fann_set_learning_rate(ann->getNeuralNet(), alpha_a / fann_get_total_connections(ann->getNeuralNet()));
   }
 
   void start_episode(const std::vector<double>& sensors) override {
@@ -317,6 +320,8 @@ class FittedNeuralACAg : public arch::AAgent<> {
            
       for (auto sm : trajectory_q_last)
         trajectory_q.insert(sm);
+      
+//       LOG_DEBUG(ann->weightSum());
   }
   
 #ifdef DEBUG_FILE

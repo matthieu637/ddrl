@@ -23,11 +23,12 @@
 #include "kde.hpp"
 
 #define PRECISION 0.01
-#define CONVERG_PRECISION 0.0001
+#define CONVERG_PRECISION 0.00001
 
-#ifndef NDEBUG
+// #ifndef NDEBUG
+//  #define DEBUG_FILE
+// #endif
 // #define DEBUG_FILE
-#endif
 
 #define POINT_FOR_ONE_DIMENSION 30
 #define FACTOR_DIMENSION_INCREASE 0.2
@@ -424,6 +425,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
       
       uint n=0;
       KDE proba_s_explo;
+      std::vector<sample> vtraj_good_exploration;
       for(auto it = trajectory_a.begin(); it != trajectory_a.end() ; ++it) {
         sample sm = *it;
         
@@ -453,6 +455,8 @@ class FittedNeuralACAg : public arch::AAgent<> {
         if(exploration > exploitation){
             proba_s_explo.add_data(sm.s);
             
+            vtraj_good_exploration.push_back(sm);
+            
             for (uint i = 0; i < nb_sensors ; i++)
               data->input[n][i] = sm.s[i];
             for (uint i = 0; i < nb_motors; i++)
@@ -478,7 +482,9 @@ class FittedNeuralACAg : public arch::AAgent<> {
       
 //       proba_s.set_bandwidth_opt_type(2);
 //       too long to compute
-    
+//       proba_s.calc_bandwidth();
+//       LOG_DEBUG(proba_s.get_default_bandwidth_map().at(0));
+      
       for(auto it = vtraj.begin(); it != vtraj.end() ; ++it) {
         double p_s = 1 + proba_s.pdf(it->s);
         it->pfull_data = (1.f / (p_s));
@@ -497,15 +503,33 @@ class FittedNeuralACAg : public arch::AAgent<> {
         std::vector<sample> vtraj_is_state;
         generateSubData(vtraj_is_state, vtraj_local, min(max_actor_batch_size, trajectory_q.size() + trajectory_q_last.size() ));
         
+        // alternative
+        // si un des points est trop proche (< bandwidth) à ceux à apprendre => retirer
+        
         proba_s.calc_bandwidth();
-        for(auto sm : vtraj_is_state) {
-          double p_s_expl = 1 + proba_s_explo.pdf(sm.s, proba_s.get_default_bandwidth_map(), 1.5f);
-          p_s_expl = p_s_expl * p_s_expl;
-          sm.pfull_data = (1.f / (p_s_expl)) ;
+        std::vector<sample> vtraj_is;
+        
+        if(false){
+          for(auto sm : vtraj_is_state) {
+            double p_s_expl = 1 + proba_s_explo.pdf(sm.s, proba_s.get_default_bandwidth_map(), 1.5f);
+            p_s_expl = p_s_expl * p_s_expl;
+            sm.pfull_data = (1.f / (p_s_expl)) ;
+          }
+          generateSubData(vtraj_is, vtraj_is_state, vtraj_is_state.size());
+        } else {
+          for(auto sm : vtraj_is_state){
+            bool data_ok = true;
+            for(uint i=0; i < nb_sensors && data_ok; i++)
+              for(auto sm2 : vtraj_good_exploration)
+              if(fabs(sm.s[i] - sm2.s[i]) < proba_s.get_default_bandwidth_map().at(i)){
+                data_ok = false;
+                break;
+              }
+            if(data_ok)
+              vtraj_is.push_back(sm);
+          }
         }
         
-        std::vector<sample> vtraj_is;
-        generateSubData(vtraj_is, vtraj_is_state, vtraj_is_state.size());
         write_policy_addeddata("aaP" + std::to_string(episode), vtraj_is, generative_model);
          
         for(sample sm : vtraj_is) {
@@ -563,8 +587,10 @@ class FittedNeuralACAg : public arch::AAgent<> {
 //         write_policy_file("P." + std::to_string(episode));
       write_state_dis("pcs" + std::to_string(episode));
       
-      if(!online_actor_update)
-        update_actor();
+      if(!online_actor_update){
+        if(episode % 10 == 0)
+          update_actor(); 
+      }
       
       update_critic();
       
@@ -880,8 +906,8 @@ class FittedNeuralACAg : public arch::AAgent<> {
   uint max_iteration;
   bool lecun_activation, gaussian_policy, online_actor_update,
     clear_trajectory, vnn_from_scratch, 
-    importance_sampling, is_multi_drawn, encourage_absorbing,
-    importance_sampling_actor, learnV, regularize_space_distribution, 
+    importance_sampling, is_multi_drawn, encourage_absorbing, actor_update_determinist_range,
+    importance_sampling_actor, learnV, regularize_space_distribution,
     sample_update, td_sample_actor_update, regularize_p0_distribution, regularize_pol_distribution;
     
   size_t max_actor_batch_size, max_critic_batch_size;

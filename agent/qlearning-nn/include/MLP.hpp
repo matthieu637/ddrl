@@ -112,19 +112,21 @@ class MLP {
     neural_net = fann_create_shortcut(2, input, motors);
 #endif
     
-    fann_set_activation_function_hidden(neural_net, FANN_SIGMOID_SYMMETRIC);
-
-    fann_set_activation_function_output(neural_net, FANN_SIGMOID_SYMMETRIC);  // motor are normalized
     fann_set_learning_momentum(neural_net, 0.);
     fann_set_train_error_function(neural_net, FANN_ERRORFUNC_LINEAR);
     fann_set_train_stop_function(neural_net, FANN_STOPFUNC_MSE);
-    fann_set_learning_rate(neural_net, 0.);
-    fann_set_activation_steepness_hidden(neural_net, 0.5);
     fann_set_activation_steepness_output(neural_net, 1.);
+    fann_set_learning_rate(neural_net, 0.);
+    fann_set_activation_function_output(neural_net, FANN_SIGMOID_SYMMETRIC);  // motor are normalized
+    
+    fann_set_activation_function_hidden(neural_net, FANN_SIGMOID_SYMMETRIC);
+    fann_set_activation_steepness_hidden(neural_net, 0.5);
 
     if(_lecun){
       lecun(input);
       _lecun_check = true;
+      fann_set_activation_steepness_output(neural_net, atanh(1.d/sqrt(3.d)));
+      fann_set_activation_function_output(neural_net, FANN_SIGMOID_SYMMETRIC_LECUN);  // _lecun_check to normalize
     }
   }
   
@@ -285,6 +287,7 @@ class MLP {
       inputs[j] = in[j];
 
     fann_type* out = fann_run(neural_net, inputs);
+
     std::vector<double>* outputs = new std::vector<double>(fann_get_num_output(neural_net));
     if(_lecun_check){
       for(uint j=0; j < outputs->size(); j++){
@@ -300,6 +303,7 @@ class MLP {
         outputs->at(j) = out[j];
     }
     delete[] inputs;
+    
     return outputs;
   }
 
