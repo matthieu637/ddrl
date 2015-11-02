@@ -128,7 +128,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
             if (std::equal(last_action->begin(), last_action->end(), last_pure_action->begin()))//no explo
               p0 = 1 - noise;
             else
-              p0 = noise; //should be 0 but p0 > 0
+              p0 = noise * 0.5f;
         } else {
             p0 = 1.f;
             for(uint i=0;i < nb_motors;i++)
@@ -422,9 +422,9 @@ class FittedNeuralACAg : public arch::AAgent<> {
             if(regularize_pol_distribution){
               if(!gaussian_policy){
                 if (std::equal(sm.a.begin(), sm.a.end(), next_action->begin()))
-                  sm.pfull_data =  (1 - noise);
+                  sm.pfull_data =  (1.f - noise);
                 else
-                  sm.pfull_data = noise;//noise
+                  sm.pfull_data = noise * 0.5f;
               } else {
                 sm.pfull_data = 1.f;
                 for(uint i=0 ; i < nb_motors; i++)
