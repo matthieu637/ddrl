@@ -253,6 +253,11 @@ class FittedNeuralACAg : public arch::AAgent<> {
       exit(1);
     }
     
+    if(!importance_sampling && learnV && !clear_trajectory){
+      LOG_ERROR("use all the data when learning V without clearing last trajectory is a non sense");
+      exit(1);
+    }
+    
     episode=-1;
     
     if(hidden_unit_a == 0)
@@ -501,7 +506,8 @@ class FittedNeuralACAg : public arch::AAgent<> {
         else
           createBatchV(vtraj, vtraj_precompute);
       }else {
-        vtraj.reserve(trajectory_q_last.size());
+        vtraj.reserve(trajectory_q_last.size() + trajectory_q.size());
+        std::copy(trajectory_q.begin(), trajectory_q.end(), std::back_inserter(vtraj));
         std::copy(trajectory_q_last.begin(), trajectory_q_last.end(), std::back_inserter(vtraj));
       }
       //std::shuffle(vtraj.begin(), vtraj.end()); //useless due to rprop batch

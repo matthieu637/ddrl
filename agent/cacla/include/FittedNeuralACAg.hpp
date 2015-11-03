@@ -128,7 +128,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
             if (std::equal(last_action->begin(), last_action->end(), last_pure_action->begin()))//no explo
               p0 = 1 - noise;
             else
-              p0 = noise; //should be 0 but p0 > 0
+              p0 = noise * 0.5f; //should be 0 but p0 > 0
         } else {
             p0 = 1.f;
             for(uint i=0;i < nb_motors;i++)
@@ -263,6 +263,11 @@ class FittedNeuralACAg : public arch::AAgent<> {
     
     if(sample_update && learnV){
       LOG_ERROR("sample_update doesn't make sense when learning V");
+      exit(1);
+    }
+    
+    if(!importance_sampling && learnV && !clear_trajectory){
+      LOG_ERROR("use all the data when learning V without clearing last trajectory is a non sense");
       exit(1);
     }
     
@@ -743,7 +748,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
                 if (std::equal(sm.a.begin(), sm.a.end(), next_action->begin()))
                   sm.pfull_data =  (1 - noise);
                 else
-                  sm.pfull_data = noise;//noise
+                  sm.pfull_data = noise * 0.5f;//noise
               } else {
                 sm.pfull_data = 1.f;
                 for(uint i=0 ; i < nb_motors; i++)
@@ -820,7 +825,8 @@ class FittedNeuralACAg : public arch::AAgent<> {
         else
           createBatchV(vtraj, vtraj_precompute);
       }else {
-        vtraj.reserve(trajectory_q_last.size());
+        vtraj.reserve(trajectory_q_last.size() + trajectory_q.size());
+        std::copy(trajectory_q.begin(), trajectory_q.end(), std::back_inserter(vtraj));
         std::copy(trajectory_q_last.begin(), trajectory_q_last.end(), std::back_inserter(vtraj));
       }
       //std::shuffle(vtraj.begin(), vtraj.end()); //useless due to rprop batch
