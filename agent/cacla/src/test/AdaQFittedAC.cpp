@@ -5,8 +5,8 @@
 
 // #include "FittedQACAg.hpp"
 // #include "FittedQIterationAg.hpp"
-// #include "FittedNeuralACAg.hpp"
-#include "SemiFittedNeuralACAg.hpp"
+#include "FittedNeuralACAg.hpp"
+// #include "SemiFittedNeuralACAg.hpp"
 
 int main(int argc, char **argv) {
 //   arch::Simulator<AdvancedAcrobotEnv, FittedQACAg> s;

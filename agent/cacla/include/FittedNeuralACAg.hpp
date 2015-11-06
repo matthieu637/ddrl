@@ -227,7 +227,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
     LOG_DEBUG("max_actor_batch_size : " << max_actor_batch_size << " - max_critic_batch_size : " << max_critic_batch_size);
       
     if(!gaussian_policy){
-      noise = 0.15;
+      noise = 0.1;
       LOG_DEBUG("greedy policy " << noise);
     }
     
