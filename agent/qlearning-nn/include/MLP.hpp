@@ -124,9 +124,9 @@ class MLP {
 
     if(_lecun){
       lecun(input);
-      _lecun_check = true;
-      fann_set_activation_steepness_output(neural_net, atanh(1.d/sqrt(3.d)));
-      fann_set_activation_function_output(neural_net, FANN_SIGMOID_SYMMETRIC_LECUN);  // _lecun_check to normalize
+//       _lecun_check = true;
+//       fann_set_activation_steepness_output(neural_net, atanh(1.d/sqrt(3.d)));
+//       fann_set_activation_function_output(neural_net, FANN_SIGMOID_SYMMETRIC_LECUN);  // _lecun_check to normalize
     }
   }
   
