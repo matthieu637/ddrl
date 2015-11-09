@@ -263,8 +263,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
       old_vnn = new MLP(*vnn);
     }
     
-    update_critic();
-    
     if (trajectory.size() > 0) {
 
       struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
@@ -326,6 +324,8 @@ class OfflineCaclaAg : public arch::AAgent<> {
       delete old_vnn;
     }
       
+      
+    update_critic();
       
     if(!clear_trajectory){
       std::list<sample> current_trajectory;
