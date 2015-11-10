@@ -135,7 +135,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
     lecun_activation        = pt->get<bool>("agent.lecun_activation");
     determinist_vnn_update  = pt->get<bool>("agent.determinist_vnn_update");
     clear_trajectory        = pt->get<bool>("agent.clear_trajectory");
-    compare_old_policy      = pt->get<bool>("agent.compare_old_policy");
     update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
     
@@ -258,12 +257,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
 
   void end_episode() override {
 
-    MLP* old_vnn;
-    if(compare_old_policy){
-      old_vnn = new MLP(*vnn);
-    }
-    
-    update_critic();
     
     if (trajectory.size() > 0) {
 
@@ -276,21 +269,12 @@ class OfflineCaclaAg : public arch::AAgent<> {
         double target = 0.f;
         double mine = 0.f;
         
-        if(!compare_old_policy){
-          target = sm.r;
-          if (!sm.goal_reached) {
-            double nextV = vnn->computeOutVF(sm.next_s, {});
-            target += gamma * nextV;
-          }
-          mine = vnn->computeOutVF(sm.s, {});
-        } else {
-          target = sm.r;
-          if (!sm.goal_reached) {
-            double nextV = old_vnn->computeOutVF(sm.next_s, {});
-            target += gamma * nextV;
-          }
-          mine = old_vnn->computeOutVF(sm.s, {});
+        target = sm.r;
+        if (!sm.goal_reached) {
+          double nextV = vnn->computeOutVF(sm.next_s, {});
+          target += gamma * nextV;
         }
+        mine = vnn->computeOutVF(sm.s, {});
 
         if(target > mine) {
           for (uint i = 0; i < nb_sensors ; i++)
@@ -322,13 +306,8 @@ class OfflineCaclaAg : public arch::AAgent<> {
       }
       fann_destroy_train(data);
     }
-    
-    if(compare_old_policy){
-      delete old_vnn;
-    }
       
-      
-    
+    update_critic();  
       
     if(!clear_trajectory){
       std::list<sample> current_trajectory;
@@ -383,7 +362,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
   uint decision_each;
 
   double gamma, noise;
-  bool compare_old_policy, gaussian_policy, vnn_from_scratch, lecun_activation, 
+  bool gaussian_policy, vnn_from_scratch, lecun_activation, 
         determinist_vnn_update, clear_trajectory, update_delta_neg;
   uint hidden_unit_v;
   uint hidden_unit_a;
