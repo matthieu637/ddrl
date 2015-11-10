@@ -263,8 +263,6 @@ class OfflineCaclaAg : public arch::AAgent<> {
       old_vnn = new MLP(*vnn);
     }
     
-    update_critic();
-    
     if (trajectory.size() > 0) {
 
       struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
@@ -284,12 +282,11 @@ class OfflineCaclaAg : public arch::AAgent<> {
           }
           mine = vnn->computeOutVF(sm.s, {});
         } else {
-          target = sm.r;
-          if (!sm.goal_reached) {
-            double nextV = old_vnn->computeOutVF(sm.next_s, {});
-            target += gamma * nextV;
-          }
-          mine = old_vnn->computeOutVF(sm.s, {});
+          double newV = vnn->computeOutVF(sm.s, {});
+          double oldV = old_vnn->computeOutVF(sm.s, {});
+          
+          target = newV;
+          mine = oldV;
         }
 
         if(target > mine) {
@@ -328,7 +325,7 @@ class OfflineCaclaAg : public arch::AAgent<> {
     }
       
       
-    
+    update_critic();
       
     if(!clear_trajectory){
       std::list<sample> current_trajectory;
