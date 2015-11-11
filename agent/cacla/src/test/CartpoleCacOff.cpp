@@ -2,8 +2,8 @@
 #include "arch/Simulator.hpp"
 #include "arch/Example.hpp"
 #include "CartpoleEnv.hpp"
-// #include "OfflineCaclaAg.hpp"
-#include "OfflineCaclaAgIS.hpp"
+#include "OfflineCaclaAg.hpp"
+// #include "OfflineCaclaAgIS.hpp"
 
 class HardCoddedController : public arch::AAgent<> {
  public:
@@ -25,6 +25,7 @@ int main(int argc, char **argv) {
 
   arch::Simulator<CartpoleEnv, OfflineCaclaAg> s;
 //   arch::Simulator<CartpoleEnv, HardCoddedController> s;
+//   arch::Simulator<CartpoleEnv, arch::ExampleAgent> s;
   
   s.init(argc, argv);
 
