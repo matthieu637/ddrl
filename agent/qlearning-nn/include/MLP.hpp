@@ -71,6 +71,12 @@ struct ParallelOptimization {
   std::vector<double>* cost;
 };
 
+/*
+ Lecun activation function is only used for hidden layer.
+ For the last layer of approximation => useless
+ For the last layer of motors => wrong sense (out of [-1 1] )
+ */
+
 class MLP {
  public:
 
@@ -124,13 +130,10 @@ class MLP {
 
     if(_lecun){
       lecun(input);
-//       _lecun_check = true;
-//       fann_set_activation_steepness_output(neural_net, atanh(1.d/sqrt(3.d)));
-//       fann_set_activation_function_output(neural_net, FANN_SIGMOID_SYMMETRIC_LECUN);  // _lecun_check to normalize
     }
   }
   
-  MLP(const MLP& m) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors), _lecun_check(m._lecun_check) {
+  MLP(const MLP& m) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors){
       neural_net = fann_copy(m.neural_net);
   }
 
@@ -276,10 +279,10 @@ class MLP {
   }
 
   std::vector<double>* computeOut(const std::vector<double>& in) const {
-    return computeOut(neural_net, in, _lecun_check);
+    return computeOut(neural_net, in);
   }
 
-  static std::vector<double>* computeOut(NN neural_net, const std::vector<double>& in, bool _lecun_check) {
+  static std::vector<double>* computeOut(NN neural_net, const std::vector<double>& in) {
     uint m = in.size();
 
     fann_type* inputs = new fann_type[m];
@@ -289,19 +292,9 @@ class MLP {
     fann_type* out = fann_run(neural_net, inputs);
 
     std::vector<double>* outputs = new std::vector<double>(fann_get_num_output(neural_net));
-    if(_lecun_check){
-      for(uint j=0; j < outputs->size(); j++){
-        if(out[j] > 1.f)
-          outputs->at(j)= 1.f;
-        else if (out[j] < -1.f)
-          outputs->at(j) = -1.f;
-        else
-          outputs->at(j) = out[j];
-      }
-    } else {
-      for(uint j=0; j < outputs->size(); j++)
-        outputs->at(j) = out[j];
-    }
+    for(uint j=0; j < outputs->size(); j++)
+      outputs->at(j) = out[j];
+
     delete[] inputs;
     
     return outputs;
@@ -409,7 +402,6 @@ class MLP {
   unsigned int size_input_state;
   unsigned int size_sensors;
   unsigned int size_motors;
-  bool _lecun_check = false;
 };
 
 #endif  // MLP_H
