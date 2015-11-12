@@ -1,0 +1,25 @@
+Reinforcement learning (RL) \cite{Sutton1998} is a framework for solving sequential decision
+problems where an agent interacts with the environment and adapt its policy
+taking into account a numerical reward signal. RL agents can autonomously
+learn somewhat difficult tasks, like navigating a maze or playing a video game \cite{Tesauro1994}.
+While the basic setting of RL is now well established, a number of researchers have been
+studying variants where environments provides continuous spaces with more and more practical problems.
+
+% learning by demonstration of by imitation
+% Seek to be generic rather than faster.
+The purpose of this article is to design an RL algorithm following theses 3 main hypothesis :
+1) dealing with continuous states and actions space in order to respond to realistic problems.
+%2) do not require domain knowledge for the designer, the main knowledge should be the definition of the reward function.
+2) the knowledge added by the designer to the agent should be minimal.
+3) being data efficient : in many realistic tasks like robotics it is time-consuming and costly to produce data.
+The global setup is in discrete time, with stationary policies that maximize the
+discounted rewards criterion.
+
+% !!episodic means having a goal state
+
+% The non linearity is sought to be able to automatically extract representations
+% without any domain knowledge. Thus the learned model have less restrictions,
+% it is not necessary to design properly some basis functions.
+
+Firstly, the common RL background with the existing algorithms and theirs limitations are described.
+Then the main algorithm of this paper is exposed with an experimental comparison on multiple environments.

@@ -1,0 +1,58 @@
+
+Starting from the Cacla algorithm, \sout{we} are going to try to improve his data efficiency
+with the ideas coming from Q Fitted Iteration and Fitted Natural Actor Critic.
+
+
+\mytodo{?}{Cool. Il ne reste plus qu'à ``mettre en chair'' (en gros, expliquer un peu en langue naturelle) cet algorithme. Tu as bien listé tous les points à détailler :o) }
+
+\DRAFT{
+Fitted Neural Actor-Critic
+
+Learn
+\subsection{Critic}
+\begin{itemize}
+ \item Q
+ \item V
+\end{itemize}
+
+Regularization / Importance sampling
+\begin{itemize}
+ \item $\frac{1}{\hat{\mu}(s)}$ resp $\frac{1}{\hat{\mu}(s,a)}$
+ \item $\frac{1}{\pi_b(a|s)}$
+ \item $\frac{\pi(a|s)}{\pi_b(a|s)}$
+\end{itemize}
+
+rmsprop
+
+\begin{equation}
+ Q_{k+1} = \underset{Q \in \mathcal{F}}{\text{argmin}} 
+ \sum_{ (s_t, a_t,r_{t+1}, s_{t+1}) \in \mathcal{D}} 
+ \frac{1}{\hat{\mu}(s_t,a_t)}
+ \Big[ Q(s_t, a_t) - \big( r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a') \big) \Big]^2
+\end{equation}
+
+\begin{equation}
+ V_{k+1} = \underset{V \in \mathcal{F}}{\text{argmin}} 
+ \sum_{ (s_t, r_{t+1}, s_{t+1}) \in \mathcal{D}}
+ \frac{1}{\hat{\mu}(s_t)} \frac{\pi(a|s)}{\pi_b(a|s)}
+ \Big[ V(s_t) - \big( r_{t+1} + \gamma V_k(s_{t+1}) \big) \Big]^2
+\end{equation}
+
+\subsection{Actor}
+
+\begin{itemize}
+ \item Sample update (Q)
+ \item TD (V/Q)
+ \item Argmax (Q)
+\end{itemize}
+
+No momentum.
+
+
+Faut-il apprendre Q ou V ?
+Q à l'avantage de pouvoir utiliser les trajectoires de n'importe quelles politiques
+mais est plus compliqué à apprendre. Les options de mise à jour de la politique sont nombreuses.
+
+V ne peut pas utiliser n'importe quelle trajectoires, mais plus simple.
+Une seule option pour maj politique.
+}

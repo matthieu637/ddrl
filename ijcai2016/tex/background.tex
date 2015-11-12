@@ -1,0 +1,165 @@
+\subsection{Reinforcement learning}
+
+RL is a framework that models sequential decision
+problems where an agent learns to take better decisions while interacting with
+its environment. After an agent performs an action, the state changes and the
+agent receives a numerical value, which can be null, called reward, that encodes information
+about the quality of the state just reached. The goal of the agent is to maximize
+its long-term expected total reward. Because it is possible that actions associated 
+with low reward will allow the agent to reach high-reward states, the agent
+needs to estimate somehow (by trial-and-error) the value of taking an action in
+a given state.
+
+The underlying formalism of RL is that of {\em Markov Decision Processes} (MDPs).
+An MDP is formally defined as a tuple $\langle S, A, T, R \rangle$ where $S$ is a set of states, $A$ a set of actions, $T : S \times A \times S \rightarrow [0, 1]$ 
+are transition probabilities between states
+($T(s,a,s')=p(s'|a,s)$ is the probability of reaching state $s'$ from state $s$ after executing action $a$) and 
+$R : S \times A \rightarrow \mathbb{R}$ is a reward signal. A \textit{policy} $\pi : S \times A \rightarrow [0, 1]$ encodes how the agent will behave (the probability
+to take an action in a given state).
+The {\em optimal} policy $\pi^*$ is one of the policy maximizing the expected discounted reward, that is :
+\begin{equation}
+\pi^* = \underset{\pi}{\operatorname{arg\,max}}\ J(\pi) = \underset{\pi}{\operatorname{arg\,max}}\ \mathbb{E} \Big[ \sum\limits_{t=0}^{\infty} \gamma^t \times R(s_t, \pi_t(s_t)) \Big]
+\end{equation}
+where $t$ denotes a time step and $0 < \gamma < 1$ is a discount factor.
+In MDPs, since $T$ and $R$ are given, an optimal policy $\pi^*$ can be computed offline using dynamic programming (e.g., value iteration, policy                                                                  
+iteration) \cite{Howard1960} for instance.
+
+\mytodo{MZ}{Rewrite model-free/model-base : model based could/should be more data efficient}
+In RL setting, the agent however does not know the transition probabilities $T$ and the reward function $R$.
+There are two main approaches for learning an optimal policy in RL: model-based approach and model-free approach.
+While {\em model-based} methods aim at learning $T$ and $R$,
+{\em model-free methods} are computationally more viable techniques
+that perform online learning by storing an estimation of $Q : S \times A \rightarrow \mathbb{R}$, the (sequential) values of actions in each state,
+or $V : S \rightarrow \mathbb{R}$ the value of each state.
+
+\begin{equation}
+  Q^\pi(s, a) = \mathbb{E}_\pi \Big[ \sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s, a_t = a \Big]
+\end{equation}
+
+In a small and discrete environment it is possible to store Q or V as a table.
+Notice however that in many tasks, the number of states and actions are
+too large so that the agent cannot store it in a table. The problem of
+continuous states can be tackled with discretization; however the number of
+states will often explode. Even with the memory and computational power to
+handle very large tables, reinforcement learning with Q values represented in the
+tabular form suffers from the lack of generalization, meaning that what is learned
+in a state does not impact the knowledge about the value of similar states.
+A solution to these problems is to use an approximation function, that provide
+a means for both efficient computation and support for generalization.
+
+
+% \begin{equation}
+%  V^\pi(s) = \mathbb{E}_\pi \Big[ \sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \Big| s_t = s \Big]
+% \end{equation}
+% 
+
+
+
+\subsection{Critic only}
+The main feature of these methods is to derive a policy directly from the value function.
+\begin{equation}
+ \pi(s) = M(Q, s, A) = \underset{a \in A}{\operatorname{arg\,max\ }} Q(s,a)
+\end{equation}
+where the function $M$ can be the $\operatorname{arg\,max}$ operator, Boltzmann soft max, etc.
+They have been widely studied since they works well in discrete case.
+Thus the whole problem is how to learn those value functions.
+Several algorithms have been designed with different update rules : QLearning, Sarsa, LSTD, etc.
+Fitted Q Iteration \cite{Riedmiller2005} uses non-linear neural networks with a good data efficiency.
+This is why it will be more detailed here.
+It can be seen as a value iteration based on previous collected data $(s_t, a_t,r_{t+1}, s_{t+1})_{t=\{1,...,N\}}$ of one episode containing $N$ steps.
+The Q function is incrementally learned by : 
+\begin{equation}
+ Q_{k+1} = \underset{Q \in \mathcal{F}}{\text{arg min}} \sum_{t=1}^{N} \Big[ Q(s_t, a_t) - \big( r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a') \big) \Big]^2
+\end{equation}
+
+% \begin{equation}
+%  Q(s_t, a_t) =  r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a')
+% \end{equation}
+
+where $\mathcal{F}$ is a subset of multilayer perceptron with a fixed number of hidden neurons.
+Both the state and the action are inputs of the neural network and the output is a scalar value
+approximating $\hat{Q}(s,a)$. Another big advantage of Q Fitted Iteration is that it can use
+the Rprop \cite{Igel2000} backpropagation algorithm, thus it doesn't need a learning rate parameter
+to be tuned.
+
+% \begin{equation}
+%  \Delta W = - \eta \big( Q(s_t, a_t) - r_{t+1} + \gamma Q_k(s_{t+1}, \pi(s_{t+1}) \big) \frac{\partial Q(s_t, a_t)}{\partial W}
+% \end{equation}
+The main issue with critic only methods is that they are not applicable to continuous actions since
+the argmax operator needs to enumerate all possible actions ; which cannot be done in infinite space.
+
+\subsection{Actor only}
+
+On the other side, it is possible to define a parametric policy $\pi_{\theta}$ without value function \cite{Sutton1999}.
+The goal is to found the best parameters according to the cost function $J(\pi_{\theta})$. 
+It is no longer the space $S \times A$ that is explored but a finite-dimensional parameter space $\Theta$ ;
+which is mapped to the space of policies. It is also called direct policy search.
+Each parameter is updated according to his contribution to the cost function 
+$ \frac{\partial J}{\partial \theta} $ \cite{Kober2010a}.
+Genetic algorithms like CMAS-ES \cite{Hansen2001} can also enter is this category even if 
+they do not necessarily use gradient.
+
+The major drawback is the high variability of the cost J which can result in poor policies.
+
+\subsection{Actor Critic}
+
+Those algorithms \cite{Konda2003} tries to combine the advantage of both previous methods.
+The critic learns the value function to reduce the variability of the approximation of J 
+and the actor learns the policy allowing continuous actions.
+Cacla \cite{VanHasselt2007a} is capable to use neural networks for both the critic and the actor.
+The update rule uses temporal difference $\delta = r_t + \gamma V(s_{t+1}) - V(s_t)$ for the critic :
+\begin{equation}
+ V_{t+1}(s) = V_t(s) + \alpha_v \delta
+\end{equation}
+The actor is updated as
+\begin{equation}
+ \theta_{t+1} = \theta_t + \underset{\delta > 0}{\text{1}} \alpha_a (a_t - Ac(s_t))
+ \frac{\partial Ac(s_t)}{\partial \theta_t}
+\end{equation}
+
+It is a online algorithm that doesn't retains data from previous experiences except through the
+value function. On the contrary, fitted natural actor critic \cite{Melo2008} tries to exploit 
+at the maximum the data already collected by replaying them with importance sampling. 
+The critic updates is close the Q Fitted Iteration :
+\begin{equation}
+ V_{k+1} = \underset{V \in \mathcal{F}}{\text{arg min}} \sum_{t=1}^{N} 
+ \frac{1}{\hat{\mu}(s_t)} 
+ \frac{\pi(a_t|s_t)}{\pi_0(a_t|s_t)}  
+ \Big[ V(s_t) - \big( r_{t+1} + \gamma V_k(s_{t+1}) \big) \Big]^2
+\end{equation}
+where $\pi_0$ is the policy that have generated this data and $\hat{\mu}$ the empirical 
+probability distribution over $S$. The actor update follows natural gradient descent. It won't
+be discussed here as it relies on linear approximation.
+
+\subsection{Hypothesis}
+
+When the space A or S are continuous, classical solutions try to learn to approximate value function 
+using a linear combination of provided basis functions. 
+These basis function must be define by an expert ; their nature and number limits the expressivity 
+of the learned function. It also impedes the agent's capacity to develop its own representations.
+Therefore, following hypothesis 2), the use of non-linear functions (like neural networks) 
+will be explored as they have a greater expressiveness range and avoid the definition of basis functions
+{\it a priori}. Moreover no model of the environment nor prior trajectories should be provided to the algorithm.
+
+
+% Most of the current algorithms define a very small learnable function domain, usually a linear approximation
+% of provided basis functions. They must therefore be selected by an expert of the domain. It also restricts 
+% the capacity of the agent to develop its own representations. % (which could be better than a human).
+% Thus, the second hypothesis mainly implies to use non-linear model (as neural networks) to avoid the definition of basis functions and
+% making possible the emergence of internal representations in a bigger domain of learnable functions.
+% Moreover no model of the environment nor prior trajectories should be provided to the algorithm.
+
+% Thus the data produced should be well exploited and don't be forgotten just after being used.
+
+
+Several state of the art algorithms that fulfill 2 different hypothesis have been presented :
+
+\begin{tabular}{|p{3.4cm}|>{\centering\arraybackslash}p{1.2cm}|>{\centering\arraybackslash}p{3cm}|>{\centering\arraybackslash}p{1.8cm}|}
+ \hline
+ ~\mbox{Algorithms} ~ \mbox{Criterions} & Cacla, CMAES & Fitted Natural Actor-critic, Power & Fitted Q iteration \\ \hline
+ 1) Continuous Actions & $\times$ & $\times$ & \\ \hline
+ 2) Low Knowledge & $\times$ & & $\times$ \\ \hline
+ 3) Data Efficient &  & $\times$ & $\times$\\ \hline
+\end{tabular}
+
+

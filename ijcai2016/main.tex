@@ -1,0 +1,208 @@
+\documentclass{style/esannV2}
+\usepackage[dvips]{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{amssymb,amsmath,array}
+
+%%% own packages
+\usepackage{amsfonts} %\mathcal
+\usepackage[colorinlistoftodos]{todonotes} %\todo
+\usepackage{transparent}%\drawft
+\usepackage{lipsum} %generate text
+\usepackage{array} %tabular fixed column width
+
+%%% own command
+\newcommand{\mytodo}[2]{
+\todo[inline,caption={}]{To be done by \textbf{#1}. \\ #2}
+}
+
+\newcommand{\DRAFT}[1]
+{ ~\\ 
+  {\transparent{0.4}
+    \fbox{
+      \begin{minipage}[b]{0.9\linewidth}
+	{\footnotesize 
+	  #1  
+	}   
+      \end{minipage}
+    }   
+  }   
+}
+
+% ------------------ Pour correction ------------------------
+\usepackage{xcolor}
+\usepackage{xspace}
+\usepackage[normalem]{ulem} %normalem option to avoid conflicts with { \em }
+\usepackage[outerbars]{changebar} % permet de positionner les
+                                  % barres en marge externe
+\setcounter{changebargrey}{20} % permet de fixer le niveau de
+                               % gris des barres
+
+\newcommand{\myCorr}[2]{%
+  \cbstart%
+  \sout{#1}%
+  {\textcolor{red}{#2}}\xspace%
+  \cbend%
+}%
+
+\newcommand{\mySugg}[2]{%
+  \cbstart%
+  \underline{$<$#1$>$}%
+  {\textcolor{blue}{#2}}\xspace%
+  \cbend%
+}%
+
+\newcommand{\myComm}[1]{%
+  \cbstart%
+  {\textcolor{green}{$\diamondsuit$}}%
+  \marginpar{{\tiny \textcolor{green}{#1}}}\xspace%
+  \cbend%
+}%
+% -----------------------------------------------------------
+
+
+
+%***********************************************************************
+% !!!! IMPORTANT NOTICE ON TEXT MARGINS !!!!!
+%***********************************************************************
+%
+% Please avoid using DVI2PDF or PS2PDF converters: some undesired
+% shifting/scaling may occur when using these programs
+% It is strongly recommended to use the DVIPS converters, and to submit
+% PS file. You may submit a PDF file if and only if you use ADOBE ACROBAT
+% to convert your PS file to PDF.
+%
+% Check that you have set the paper size to A4 (and NOT to letter) in your
+% dvi2ps converter, in Adobe Acrobat if you use it, and in any printer driver
+% that you could use.  You also have to disable the 'scale to fit paper' option
+% of your printer driver.
+%
+% In any case, please check carefully that the final size of the top and
+% bottom margins is 5.2 cm and of the left and right margins is 4.4 cm.
+% It is your responsibility to verify this important requirement.  If these margin requirements and not fulfilled at the end of your file generation process, please use the following commands to correct them.  Otherwise, please do not modify these commands.
+%
+\voffset 0 cm \hoffset 0 cm \addtolength{\textwidth}{0cm}
+\addtolength{\textheight}{0cm}\addtolength{\leftmargin}{0cm}
+
+%***********************************************************************
+% !!!! USE OF THE esannV2 LaTeX STYLE FILE !!!!!
+%***********************************************************************
+%
+% Some commands are inserted in the following .tex example file.  Therefore to
+% set up your ESANN submission, please use this file and modify it to insert
+% your text, rather than staring from a blank .tex file.  In this way, you will
+% have the commands inserted in the right place.
+
+\begin{document}
+%style file for ESANN manuscripts
+\title{Neural Reinforcement Learning\\ in Continuous State-Action Space}
+
+%***********************************************************************
+% AUTHORS INFORMATION AREA
+%***********************************************************************
+\author{First author$^1$ and Second author$^2$
+%
+% Optional short acknowledgment: remove next line if non-needed
+\thanks{This is an optional funding source acknowledgement.}
+%
+% DO NOT MODIFY THE FOLLOWING '\vspace' ARGUMENT
+\vspace{.3cm}\\
+%
+% Addresses and institutions (remove "1- " in case of a single institution)
+1- School of First Author - Dept of First Author \\
+Address of First Author's school - Country of First Author's
+school
+%
+% Remove the next three lines in case of a single institution
+\vspace{.1cm}\\
+2- School of Second Author - Dept of Second Author \\
+Address of Second Author's school - Country of Second Author's school\\
+}
+%***********************************************************************
+% END OF AUTHORS INFORMATION AREA
+%***********************************************************************
+
+\maketitle
+
+\begin{abstract}
+Dealing with continuous actions in reinforcement learning is 
+a difficult ....
+\end{abstract}
+
+\mytodo{?}{
+$\backslash$myCorr quand je pense qu'il faut corriger \\
+$\backslash$mySugg quand je fais des suggestions \\
+$\backslash$mytodo
+}
+
+\section{Introduction}
+
+\input{tex/intro.tex}
+
+\section{Background}
+
+\input{tex/background.tex}
+
+\section{Algorithms}
+
+\input{tex/algo.tex}
+
+\section{Experimental Setup}
+
+\input{tex/exp.tex}
+
+\DRAFT{
+\begin{itemize}
+ \item \cite{Antos2008} provides an extension for continuous actions space.
+ \item This is also a first step towards deep reinforcement learning with continuous action space.
+\end{itemize}
+
+
+}
+
+% ****************************************************************************
+% BIBLIOGRAPHY AREA
+% ****************************************************************************
+
+\begin{footnotesize}
+
+% IF YOU DO NOT USE BIBTEX, USE THE FOLLOWING SAMPLE SCHEME FOR THE REFERENCES
+% ----------------------------------------------------------------------------
+% \begin{thebibliography}{99}
+% 
+% % For books
+% \bibitem{Haykin_book} S. Haykin, editor. \emph{Unsupervised Adaptive Filtering vol.1 : Blind Source Separation}, John Willey ans Sons, New York, 2000.
+% 
+% % For articles
+% \bibitem{DelfosseLoubaton_article}N. Delfosse and P. Loubaton, Adaptibe blind separation of sources: A deflation
+% approach, \emph{Signal Processing}, 45:59-83, Elsevier, 1995.
+% 
+% % For paper in proceedings published as serie books (LNCS,...)
+% \bibitem{CrucCichAmari_bookproceedings} S. Cruces, A. Cichocki and S. Amari, The minimum entropy and cumulants based contrast functions for blind source extraction. In J. Mira and A. Prieto, editors, proceedings of the 6$^{th}$ \emph{international workshop on artificial neural networks} ({IWANN} 2001), Lecture Notes in Computer Science 2085, pages 786-793,
+% Springer-Verlag, 2001.
+% 
+% % For paper in conference proceedings
+% \bibitem{VrinsArchambeau_proceedings} F. Vrins, C. Archambeau and M. Verleysen, Towards a local separation performances estimator using common ICA contrast functions? In M. Verleysen, editor, \emph{proceedings of the $12^{th}$
+% European Symposium on Artificial Neural Networks} ({ESANN} 2004),
+% d-side pub., pages 211-216, April 28-30, Bruges (Belgium), 2004.
+% 
+% % For Technical Report
+% \bibitem{Stone_TechRep} J. V. Stone and J. Porrill, Undercomplete independent component analysis for signal separation and dimension
+% reduction. Technical Report, Psychology Department, Sheffield
+% University, Sheffield, S10 2UR, England, October 1997.
+% \end{thebibliography}
+% ----------------------------------------------------------------------------
+
+% IF YOU USE BIBTEX,
+% - DELETE THE TEXT BETWEEN THE TWO ABOVE DASHED LINES
+% - UNCOMMENT THE NEXT TWO LINES AND REPLACE 'Name_Of_Your_BibFile'
+
+\bibliographystyle{unsrt}
+\bibliography{../PhD.bib}
+
+\end{footnotesize}
+
+% ****************************************************************************
+% END OF BIBLIOGRAPHY AREA
+% ****************************************************************************
+
+\end{document}

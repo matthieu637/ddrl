@@ -1,0 +1,9 @@
+rm *.toc
+rm *.log
+rm *.bbl
+rm *.blg
+rm *.out
+rm *~
+rm *.backup
+rm *.aux
+rm *.gz
