@@ -24,10 +24,9 @@ where $t$ denotes a time step and $0 < \gamma < 1$ is a discount factor.
 In MDPs, since $T$ and $R$ are given, an optimal policy $\pi^*$ can be computed offline using dynamic programming (e.g., value iteration, policy                                                                  
 iteration) \cite{Howard1960} for instance.
 
-\mytodo{MZ}{Rewrite model-free/model-base : model based could/should be more data efficient}
 In RL setting, the agent however does not know the transition probabilities $T$ and the reward function $R$.
 There are two main approaches for learning an optimal policy in RL: model-based approach and model-free approach.
-While {\em model-based} methods aim at learning $T$ and $R$,
+While {\em model-based} methods aim at learning $T$ and $R$, which is usually difficult in continuous environment,
 {\em model-free methods} are computationally more viable techniques
 that perform online learning by storing an estimation of $Q : S \times A \rightarrow \mathbb{R}$, the (sequential) values of actions in each state,
 or $V : S \rightarrow \mathbb{R}$ the value of each state.
@@ -91,8 +90,8 @@ the argmax operator needs to enumerate all possible actions ; which cannot be do
 \subsection{Actor only}
 
 On the other side, it is possible to define a parametric policy $\pi_{\theta}$ without value function \cite{Sutton1999}.
-The goal is to found the best parameters according to the cost function $J(\pi_{\theta})$. It is no longer 
-the space $S \times A$ that is explored but a finite-dimensional parameter space $\Theta$ ;
+The goal is to found the best parameters according to the cost function $J(\pi_{\theta})$. 
+It is no longer the space $S \times A$ that is explored but a finite-dimensional parameter space $\Theta$ ;
 which is mapped to the space of policies. It is also called direct policy search.
 Each parameter is updated according to his contribution to the cost function 
 $ \frac{\partial J}{\partial \theta} $ \cite{Kober2010a}.
@@ -104,33 +103,40 @@ The major drawback is the high variability of the cost J which can result in poo
 \subsection{Actor Critic}
 
 Those algorithms \cite{Konda2003} tries to combine the advantage of both previous methods.
-The critic learns the value function and the actor learns the policy.
+The critic learns the value function to reduce the variability of the approximation of J 
+and the actor learns the policy allowing continuous actions.
 Cacla \cite{VanHasselt2007a} is capable to use neural networks for both the critic and the actor.
 The update rule uses temporal difference $\delta = r_t + \gamma V(s_{t+1}) - V(s_t)$ for the critic :
 \begin{equation}
  V_{t+1}(s) = V_t(s) + \alpha_v \delta
 \end{equation}
-The actor is updated as
+The actor policy, parameterized by $\theta$ is updated as
 \begin{equation}
- \theta_{t+1} = \theta_t + \underset{\delta > 0}{\text{1}} \alpha_a (a_t - Ac(s_t))
- \frac{\partial Ac(s_t)}{\partial \theta_t}
+ \theta_{t+1} = \theta_t + 
+ \begin{cases}
+%  \underset{\delta > 0}{\text{1}} 
+ \alpha_a (\widetilde{a}_t - Ac(s_t))
+ \frac{\partial Ac(s_t)}{\partial \theta_t} , & \text{if } \delta > 0\\ \\
+ 0, & \text{otherwise}
+ \end{cases}
 \end{equation}
+where $Ac(s_t)$ is the selected action in the exploitation case and $\widetilde{a}_t$ the performed action.
+Cacla is a online algorithm that doesn't retains data from previous experiences except through the
+value function. 
+% On the contrary, fitted natural actor critic \cite{Melo2008} tries to exploit 
+% at the maximum the data already collected by replaying them with importance sampling. 
+% The critic updates is close the Q Fitted Iteration :
+% \begin{equation}
+%  V_{k+1} = \underset{V \in \mathcal{F}}{\text{arg min}} \sum_{t=1}^{N} 
+%  \frac{1}{\hat{\mu}(s_t)} 
+%  \frac{\pi(a_t|s_t)}{\pi_0(a_t|s_t)}  
+%  \Big[ V(s_t) - \big( r_{t+1} + \gamma V_k(s_{t+1}) \big) \Big]^2
+% \end{equation}
+% where $\pi_0$ is the policy that have generated this data and $\hat{\mu}$ the empirical 
+% probability distribution over $S$. The actor update follows natural gradient descent. It won't
+% be discussed here as it relies on linear approximation.
 
-It is a online algorithm that doesn't retains data from previous experiences except through the
-value function. On the contrary, fitted natural actor critic \cite{Melo2008} tries to exploit 
-at the maximum the data already collected by replaying them with importance sampling. 
-The critic updates is close the Q Fitted Iteration :
-\begin{equation}
- V_{k+1} = \underset{V \in \mathcal{F}}{\text{arg min}} \sum_{t=1}^{N} 
- \frac{1}{\hat{\mu}(s_t)} 
- \frac{\pi(a_t|s_t)}{\pi_0(a_t|s_t)}  
- \Big[ V(s_t) - \big( r_{t+1} + \gamma V_k(s_{t+1}) \big) \Big]^2
-\end{equation}
-where $\pi_0$ is the policy that have generated this data and $\hat{\mu}$ the empirical 
-probability distribution over $S$. The actor update follows natural gradient descent. It won't
-be discussed here as it relies on linear approximation.
-
-\subsection{Hypothesis}
+\subsection{Non Linear Hypothesis}
 
 When the space A or S are continuous, classical solutions try to learn to approximate value function 
 using a linear combination of provided basis functions. 
@@ -151,14 +157,14 @@ will be explored as they have a greater expressiveness range and avoid the defin
 % Thus the data produced should be well exploited and don't be forgotten just after being used.
 
 
-Several state of the art algorithms that fulfill 2 different hypothesis have been presented :
-
-\begin{tabular}{|p{3.4cm}|>{\centering\arraybackslash}p{1.2cm}|>{\centering\arraybackslash}p{3cm}|>{\centering\arraybackslash}p{1.8cm}|}
- \hline
- ~\mbox{Algorithms} ~ \mbox{Criterions} & Cacla, CMAES & Fitted Natural Actor-critic, Power & Fitted Q iteration \\ \hline
- 1) Continuous Actions & $\times$ & $\times$ & \\ \hline
- 2) Low Knowledge & $\times$ & & $\times$ \\ \hline
- 3) Data Efficient &  & $\times$ & $\times$\\ \hline
-\end{tabular}
-
+% Several state of the art algorithms that fulfill 2 different hypothesis have been presented :
+% 
+% \begin{tabular}{|p{3.4cm}|>{\centering\arraybackslash}p{1.2cm}|>{\centering\arraybackslash}p{3cm}|>{\centering\arraybackslash}p{1.8cm}|}
+%  \hline
+%  ~\mbox{Algorithms} ~ \mbox{Criterions} & Cacla, CMAES & Fitted Natural Actor-critic, Power & Fitted Q iteration \\ \hline
+%  1) Continuous Actions & $\times$ & $\times$ & \\ \hline
+%  2) Low Knowledge & $\times$ & & $\times$ \\ \hline
+%  3) Data Efficient &  & $\times$ & $\times$\\ \hline
+% \end{tabular}
+% 
 

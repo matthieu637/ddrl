@@ -1,58 +1,50 @@
+Fitted Neural Actor-Critic is an actor-critic algorithm whose roots in both Cacla and Q-Fitted Iteration.
+It performs in an offline way by following 2 steps : 1) sample and collect data $(s_t, u_t, a_t, r_{t+1}, s_{t+1})$ into $\mathcal{D}$
+from the environment given the current policy $\pi$, 2) try to improve the critic approximation and actor policy with $\mathcal{D}$.
 
-Starting from the Cacla algorithm, \sout{we} are going to try to improve his data efficiency
-with the ideas coming from Q Fitted Iteration and Fitted Natural Actor Critic.
+During the interaction phase, the actor selects the action $u_t$ which correspond to the exploitation action (the output of the neural network)
+and performs $a_t$. The policy exploration can take different forms : Gaussian $a_t \sim \mathcal{N}(u_t, \sigma)$, 
+$\epsilon$-greedy 
+$a_t = 
+\begin{dcases} u_t, & \text{if }p > \epsilon\ |\ p \sim U(0,1) \\
+      \text{random}, & \text{otherwise}
+\end{dcases}$, etc.
 
-
-\mytodo{?}{Cool. Il ne reste plus qu'à ``mettre en chair'' (en gros, expliquer un peu en langue naturelle) cet algorithme. Tu as bien listé tous les points à détailler :o) }
-
-\DRAFT{
-Fitted Neural Actor-Critic
-
-Learn
 \subsection{Critic}
-\begin{itemize}
- \item Q
- \item V
-\end{itemize}
 
-Regularization / Importance sampling
-\begin{itemize}
- \item $\frac{1}{\hat{\mu}(s)}$ resp $\frac{1}{\hat{\mu}(s,a)}$
- \item $\frac{1}{\pi_b(a|s)}$
- \item $\frac{\pi(a|s)}{\pi_b(a|s)}$
-\end{itemize}
+The critic update relies on several iterations as QFI. The goal is to learn $V$ instead
+of $Q$ as \sout{we} don't need much information since the actor performs the action selection.
+It is easier to learn $V$ than $Q$.
 
-rmsprop
 
 \begin{equation}
- Q_{k+1} = \underset{Q \in \mathcal{F}}{\text{argmin}} 
- \sum_{ (s_t, a_t,r_{t+1}, s_{t+1}) \in \mathcal{D}} 
- \frac{1}{\hat{\mu}(s_t,a_t)}
- \Big[ Q(s_t, a_t) - \big( r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a') \big) \Big]^2
-\end{equation}
-
-\begin{equation}
- V_{k+1} = \underset{V \in \mathcal{F}}{\text{argmin}} 
+ V_{k+1} = \underset{V \in \mathcal{F}_c}{\text{argmin}} 
  \sum_{ (s_t, r_{t+1}, s_{t+1}) \in \mathcal{D}}
- \frac{1}{\hat{\mu}(s_t)} \frac{\pi(a|s)}{\pi_b(a|s)}
+%  \frac{1}{\hat{\mu}(s_t)} \frac{\pi(a|s)}{\pi_b(a|s)}
  \Big[ V(s_t) - \big( r_{t+1} + \gamma V_k(s_{t+1}) \big) \Big]^2
 \end{equation}
 
+Unlike QFI, NFAC is on-policy, thus $D$ is cleared after each end of episode.
+
 \subsection{Actor}
 
-\begin{itemize}
- \item Sample update (Q)
- \item TD (V/Q)
- \item Argmax (Q)
-\end{itemize}
+As it is computionnaly unviable to try to optimize a value function, the actor update
+relies on the temporal difference error $\delta = \big( r_{t+1} + \gamma V_k(s_{t+1}) \big) - V(s_t)$.
+Rprop is still used here, but only one database is constructed : there is no incremental process
+as with the critic.
+
+\begin{equation}
+ \hat{\pi}^* = \underset{\pi \in \mathcal{F}_a}{\text{argmin}} 
+ \sum_{ (s_t,a_t, a_t) \in \mathcal{D}}
+ \begin{dcases}
+  \big( \pi(s_t) - a_t \big)^2 ,& \text{if } \delta > 0\\
+  \big( \pi(s_t) - u_t \big)^2 ,& \text{otherwise}
+ \end{dcases}
+\end{equation}
+
+Notice that an exploitation case, where $a_t$ is equals to $u_t$, could also
+result in a policy update.
+As the actor update relies on $\delta$ which depends on the approximation of $V$,
+it is accomplished before the critic update.
 
 No momentum.
-
-
-Faut-il apprendre Q ou V ?
-Q à l'avantage de pouvoir utiliser les trajectoires de n'importe quelles politiques
-mais est plus compliqué à apprendre. Les options de mise à jour de la politique sont nombreuses.
-
-V ne peut pas utiliser n'importe quelle trajectoires, mais plus simple.
-Une seule option pour maj politique.
-}

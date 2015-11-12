@@ -1,7 +1,7 @@
 \documentclass{style/esannV2}
 \usepackage[dvips]{graphicx}
 \usepackage[utf8]{inputenc}
-\usepackage{amssymb,amsmath,array}
+\usepackage{amssymb,amsmath,array, mathtools}
 
 %%% own packages
 \usepackage{amsfonts} %\mathcal
@@ -93,8 +93,9 @@
 % have the commands inserted in the right place.
 
 \begin{document}
-%style file for ESANN manuscripts
-\title{Neural Reinforcement Learning\\ in Continuous State-Action Space}
+
+\title{Neural Fitted Actor-Critic }
+%Neural Reinforcement Learning\\ in Continuous State-Action Space}
 
 %***********************************************************************
 % AUTHORS INFORMATION AREA
@@ -125,7 +126,7 @@ Address of Second Author's school - Country of Second Author's school\\
 
 \begin{abstract}
 Dealing with continuous actions in reinforcement learning is 
-a difficult ....
+a difficult ....: on-policy, model-free, discrete time, less possible prior
 \end{abstract}
 
 \mytodo{?}{
@@ -142,13 +143,20 @@ $\backslash$mytodo
 
 \input{tex/background.tex}
 
-\section{Algorithms}
+\section{Algorithm}
 
 \input{tex/algo.tex}
 
 \section{Experimental Setup}
 
 \input{tex/exp.tex}
+
+\section{Conclusions and further work}
+\DRAFT{
+\sout{We} present an algorithm that doesn't require a lot of parameters.
+Use the data previously collected via importance sampling.
+\sout{Our} advantages over cacla is the performance and the lower number of parameters.
+}
 
 \DRAFT{
 \begin{itemize}
