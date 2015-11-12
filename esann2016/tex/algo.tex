@@ -1,37 +1,43 @@
-Fitted Neural Actor-Critic is an actor-critic algorithm whose roots in both Cacla and Q-Fitted Iteration.
-It performs in an offline way by following 2 steps : 1) sample and collect data $(s_t, u_t, a_t, r_{t+1}, s_{t+1})$ into $\mathcal{D}$
-from the environment given the current policy $\pi$, 2) try to improve the critic approximation and actor policy with $\mathcal{D}$.
+Neural Fitted Actor-Critic (NFAC) is an actor-critic algorithm whose roots in both Cacla and Q-Fitted Iteration.
+It performs in an offline way by following 2 steps : 1) sample and collect data $(s_t, u_t, a_t, r_{t+1}, s_{t+1})$ into $\mathcal{D}_\pi$
+from the environment given the current policy $\pi$, 2) try to improve the critic approximation and actor policy with $\mathcal{D}_\pi$.
 
-During the interaction phase, the actor selects the action $u_t$ which correspond to the exploitation action (the output of the neural network)
-and performs $a_t$. The policy exploration can take different forms : Gaussian $a_t \sim \mathcal{N}(u_t, \sigma)$, 
+During the interaction phase, the actor selects the action $u_t \in A$  which correspond to the exploitation action (the output of the neural network)
+and performs the action $a_t$. The policy exploration can take different forms : Gaussian $a_t \sim \mathcal{N}(u_t, \sigma)$, 
 $\epsilon$-greedy 
 $a_t = 
 \begin{dcases} u_t, & \text{if }p > \epsilon\ |\ p \sim U(0,1) \\
       \text{random}, & \text{otherwise}
 \end{dcases}$, etc.
 
+Unlike FQI, NFAC is on-policy since the optimization to find the best action is not trivial 
+with continuous environment. Thus it is not necessary to learn the full action-value function $Q$
+where $V$ is enough and easier to approximate. This also implies that $\mathcal{D}_\pi$ is only
+used for one episode.
+
 \subsection{Critic}
 
-The critic update relies on several iterations as QFI. The goal is to learn $V$ instead
-of $Q$ as \sout{we} don't need much information since the actor performs the action selection.
-It is easier to learn $V$ than $Q$.
-
-
+The critic's update relies on several iterations as FQI. 
+At each iteration $k$ a new database $S \times \mathbb{R}$ is constructed knowing $V_k$ and $\mathcal{D}_\pi$.
+For each sample of $D_\pi$ the input of the model is $s_t$ and the target to approximate is $r_{t+1} + \gamma V_k(s_{t+1})$.
+If $s_{t+1}$ is a goal state or absorbing state, the target becomes only $r_{t+1}$.
 \begin{equation}
  V_{k+1} = \underset{V \in \mathcal{F}_c}{\text{argmin}} 
- \sum_{ (s_t, r_{t+1}, s_{t+1}) \in \mathcal{D}}
+ \sum_{ (s_t, r_{t+1}, s_{t+1}) \in \mathcal{D}_\pi}
 %  \frac{1}{\hat{\mu}(s_t)} \frac{\pi(a|s)}{\pi_b(a|s)}
  \Big[ V(s_t) - \big( r_{t+1} + \gamma V_k(s_{t+1}) \big) \Big]^2
 \end{equation}
-
-Unlike QFI, NFAC is on-policy, thus $D$ is cleared after each end of episode.
+$\mathcal{F}_c$ is the search space of the critic ; a subset of learnable functions
+(for instance a multi-layer percetron with a fixed number of hidden units and activation function).
 
 \subsection{Actor}
 
-As it is computionnaly unviable to try to optimize a value function, the actor update
+It is computionnaly unviable to try to optimize a non-linear value function to find
+the best action, so the actor update
 relies on the temporal difference error $\delta = \big( r_{t+1} + \gamma V_k(s_{t+1}) \big) - V(s_t)$.
-Rprop is still used here, but only one database is constructed : there is no incremental process
-as with the critic.
+Since $\delta$ depends on the approximation of $V$, the actor update is accomplished before the critic update.
+Like Cacla algorithm, the update is performed towards a direction only when $\delta > 0$.
+A unique database $ S \times A$ is enough : there is no incremental process as with the critic.
 
 \begin{equation}
  \hat{\pi}^* = \underset{\pi \in \mathcal{F}_a}{\text{argmin}} 
@@ -44,7 +50,6 @@ as with the critic.
 
 Notice that an exploitation case, where $a_t$ is equals to $u_t$, could also
 result in a policy update.
-As the actor update relies on $\delta$ which depends on the approximation of $V$,
-it is accomplished before the critic update.
 
-No momentum.
+From a technical point of view, Rprop back-propagation algorithm is used in both update.
+No momentum is defined since the value function needs to be flexible.

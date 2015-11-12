@@ -63,7 +63,7 @@ where the function $M$ can be the $\operatorname{arg\,max}$ operator, Boltzmann 
 They have been widely studied since they works well in discrete case.
 Thus the whole problem is how to learn those value functions.
 Several algorithms have been designed with different update rules : QLearning, Sarsa, LSTD, etc.
-Fitted Q Iteration \cite{Riedmiller2005} uses non-linear neural networks with a good data efficiency.
+Fitted Q Iteration (FQI) \cite{Riedmiller2005} uses non-linear neural networks with a good data efficiency.
 This is why it will be more detailed here.
 It can be seen as a value iteration based on previous collected data $(s_t, a_t,r_{t+1}, s_{t+1})_{t=\{1,...,N\}}$ of one episode containing $N$ steps.
 The Q function is incrementally learned by : 
@@ -77,7 +77,7 @@ The Q function is incrementally learned by :
 
 where $\mathcal{F}$ is a subset of multilayer perceptron with a fixed number of hidden neurons.
 Both the state and the action are inputs of the neural network and the output is a scalar value
-approximating $\hat{Q}(s,a)$. Another big advantage of Q Fitted Iteration is that it can use
+approximating $\hat{Q}(s,a)$. Another big advantage of FQI is that it can use
 the Rprop \cite{Igel2000} backpropagation algorithm, thus it doesn't need a learning rate parameter
 to be tuned.
 
@@ -106,11 +106,11 @@ Those algorithms \cite{Konda2003} tries to combine the advantage of both previou
 The critic learns the value function to reduce the variability of the approximation of J 
 and the actor learns the policy allowing continuous actions.
 Cacla \cite{VanHasselt2007a} is capable to use neural networks for both the critic and the actor.
-The update rule uses temporal difference $\delta = r_t + \gamma V(s_{t+1}) - V(s_t)$ for the critic :
+Temporal difference error $\delta = r_t + \gamma V(s_{t+1}) - V(s_t)$ is used by the critic update :
 \begin{equation}
  V_{t+1}(s) = V_t(s) + \alpha_v \delta
 \end{equation}
-The actor policy, parameterized by $\theta$ is updated as
+As for the actor policy, parameterized by $\theta$ :
 \begin{equation}
  \theta_{t+1} = \theta_t + 
  \begin{cases}
@@ -121,8 +121,8 @@ The actor policy, parameterized by $\theta$ is updated as
  \end{cases}
 \end{equation}
 where $Ac(s_t)$ is the selected action in the exploitation case and $\widetilde{a}_t$ the performed action.
-Cacla is a online algorithm that doesn't retains data from previous experiences except through the
-value function. 
+Cacla is a online algorithm that doesn't retains data from previous experiences. %except through the value function. 
+
 % On the contrary, fitted natural actor critic \cite{Melo2008} tries to exploit 
 % at the maximum the data already collected by replaying them with importance sampling. 
 % The critic updates is close the Q Fitted Iteration :
