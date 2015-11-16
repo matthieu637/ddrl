@@ -55,7 +55,8 @@ med_cma, perc_25_cma, perc_75_cma = perc(data_cma)
 fig = figure() # no frame
 ax = fig.add_subplot(111)
 
-ax.set_title('Median and quartile of different algorithm')
+#ax.set_title('Median and quartile of different algorithm')
+ax.set_title('Performances over Cartpole')
 
 # now all plot function should be applied to ax
 ax.fill_between((lx), perc_25_rand[x], perc_75_rand[x], alpha=0.35, linewidth=0, color=colors[0]) 
@@ -98,7 +99,7 @@ frame.set_edgecolor('1.0')
 ax.set_axisbelow(True)
 
 ax.set_xlabel("episode")
-ax.set_ylabel("step")
+ax.set_ylabel("step where goal preserved")
 
 fig.savefig('../result_plotting/cartpole_perf.png', dpi=200)
 

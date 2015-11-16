@@ -152,20 +152,13 @@ $\backslash$mytodo
 \input{tex/exp.tex}
 
 \section{Conclusions and further work}
-\DRAFT{
-\sout{We} present an algorithm that doesn't require a lot of parameters.
-Use the data previously collected via importance sampling.
-\sout{Our} advantages over cacla is the performance and the lower number of parameters.
-}
+An algorithm that works in both continuous state and actions spaces, 
+with non-linear model have been presented.
+The advantages over cacla is not only the performance but the lower 
+number of meta-parameters to optimize (2 learning rate removed).
+To further improve NFAC, the data previously collected in old episodes must be re-used, for instance with via importance sampling.
+This is also a first step towards deep reinforcement learning with continuous action space.
 
-\DRAFT{
-\begin{itemize}
- \item \cite{Antos2008} provides an extension for continuous actions space.
- \item This is also a first step towards deep reinforcement learning with continuous action space.
-\end{itemize}
-
-
-}
 
 % ****************************************************************************
 % BIBLIOGRAPHY AREA
