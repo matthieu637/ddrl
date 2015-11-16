@@ -31,10 +31,10 @@ def perc(data):
         perc_75[i] = np.percentile(data[:, i], 75)
     return median, perc_25, perc_75
 
-data_rand = load('../result_data/adacrobot/cl-off.perf.data')
-data_human = load('../result_data/adacrobot/cl-on.perf.data') 
-data_bootstrap = load('../result_data/adacrobot/random.perf.data')
-data_cma = load('../result_data/adacrobot/cmaes.perf.data')
+data_rand = load('../result_data/cartpole/cl-off.perf.data')
+data_human = load('../result_data/cartpole/cl-on.perf.data') 
+data_bootstrap = load('../result_data/cartpole/random.perf.data')
+data_cma = load('../result_data/cartpole/cmaes.perf.data')
 #data_power = load('power.data')
 
 
@@ -66,6 +66,7 @@ ax.fill_between(x_data_bootstrap, perc_25_bootstrap[x_data_bootstrap], perc_75_b
 #ax.fill_between((lx), perc_25_cma[x], perc_75_cma[x], alpha=0.25, linewidth=0, color=colors[3])
 
 
+
 ax.plot((lx), med_rand[lx], linewidth=2, linestyle=':', color=colors[0])
 ax.plot((lx), med_human[lx], linewidth=2, linestyle='--', color=colors[1])
 #ax.plot(lx, med_power[lx], linewidth=2, linestyle='-.', color=colors[3])
@@ -73,20 +74,21 @@ ax.plot(lx_data_bootstrap, med_bootstrap[lx_data_bootstrap], linewidth=2, linest
 
 #ax.plot((lx), med_cma[lx], linewidth=2, linestyle='-', color=colors[3])
 
+
 # change xlim to set_xlim
 
 #ax.invert_yaxis()
-ax.set_ylim(250, 502)
+ax.set_ylim(0, 502)
 #ax.set_xscale('log')
 #ax.set_yscale('log')
 #ax.set_xlim(128, 1e6)
-ax.set_xlim(0, 1000)
+ax.set_xlim(0, 3000)
 
 #change xticks to set_xticks
-ax.set_xticks(np.arange(0, 1001, 250))
+ax.set_xticks(np.arange(0, 3001, 750))
 #ax.set_yticks(np.arange(0, 25, 4))
 
-legend = ax.legend(["NFAC", "cacla" , "random"], loc=3);
+legend = ax.legend(["NFAC", "cacla" , "random"], loc=2);
 legend.set_frame_on(False)
 frame = legend.get_frame()
 frame.set_facecolor('1.0')
@@ -98,5 +100,5 @@ ax.set_axisbelow(True)
 ax.set_xlabel("episode")
 ax.set_ylabel("step")
 
-fig.savefig('../result_plotting/adacrobot-1ddl_perf.png', dpi=200)
+fig.savefig('../result_plotting/cartpole_perf.png', dpi=200)
 
