@@ -1,14 +1,14 @@
-Neural Fitted Actor-Critic (NFAC) is an actor-critic algorithm whose roots in both Cacla and Q-Fitted Iteration.
+Neural Fitted Actor-Critic (NFAC) is a novel actor-critic algorithm whose roots in both Cacla and Q-Fitted Iteration.
 It performs in an offline way by following 2 steps : 1) sample and collect data $(s_t, u_t, a_t, r_{t+1}, s_{t+1})$ into $\mathcal{D}_\pi$
 from the environment given the current policy $\pi$, 2) try to improve the critic approximation and actor policy with $\mathcal{D}_\pi$.
 
-During the interaction phase, the actor selects the action $u_t \in A$  which correspond to the exploitation action (the output of the neural network)
-and performs the action $a_t$. The policy exploration can take different forms : Gaussian $a_t \sim \mathcal{N}(u_t, \sigma)$, 
-$\epsilon$-greedy 
-$a_t = 
-\begin{dcases} u_t, & \text{if }p > \epsilon\ |\ p \sim U(0,1) \\
-      \text{random}, & \text{otherwise}
-\end{dcases}$, etc.
+% During the interaction phase, the actor selects the action $u_t \in A$  which correspond to the exploitation action (the output of the neural network)
+% and performs the action $a_t$. The policy exploration can take different forms : Gaussian $a_t \sim \mathcal{N}(u_t, \sigma)$, 
+% $\epsilon$-greedy 
+% $a_t = 
+% \begin{dcases} u_t, & \text{if }p > \epsilon\ |\ p \sim U(0,1) \\
+%       \text{random}, & \text{otherwise}
+% \end{dcases}$, etc.
 
 Unlike FQI, NFAC is on-policy since the optimization to find the best action is not trivial 
 with continuous environment. Thus it is not necessary to learn the full action-value function $Q$

@@ -79,7 +79,7 @@ ax.plot(lx_data_bootstrap, med_bootstrap[lx_data_bootstrap], linewidth=2, linest
 # change xlim to set_xlim
 
 #ax.invert_yaxis()
-ax.set_ylim(0, 502)
+ax.set_ylim(0, 520)
 #ax.set_xscale('log')
 #ax.set_yscale('log')
 #ax.set_xlim(128, 1e6)
