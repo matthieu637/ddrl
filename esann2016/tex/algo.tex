@@ -1,4 +1,4 @@
-Neural Fitted Actor-Critic (NFAC) is a novel actor-critic algorithm whose roots in both Cacla and Q-Fitted Iteration.
+Neural Fitted Actor-Critic (NFAC) is a novel actor-critic algorithm whose roots in both CACLA and Q-Fitted Iteration.
 It performs in an offline way by following 2 steps : 1) sample and collect data $(s_t, u_t, a_t, r_{t+1}, s_{t+1})$ into $\mathcal{D}_\pi$
 from the environment given the current policy $\pi$, 2) try to improve the critic approximation and actor policy with $\mathcal{D}_\pi$.
 
@@ -10,15 +10,10 @@ from the environment given the current policy $\pi$, 2) try to improve the criti
 %       \text{random}, & \text{otherwise}
 % \end{dcases}$, etc.
 
-Unlike FQI, NFAC is on-policy since the optimization to find the best action is not trivial 
-with continuous environment. Thus it is not necessary to learn the full action-value function $Q$
-where $V$ is enough and easier to approximate. This also implies that $\mathcal{D}_\pi$ is only
-used for one episode.
-
 \subsection{Critic}
 
-The critic's update relies on several iterations as FQI. 
-At each iteration $k$ a new database $S \times \mathbb{R}$ is constructed knowing $V_k$ and $\mathcal{D}_\pi$.
+The critic's update relies on several iterations as done in FQI. 
+At each iteration $k$ a database $S \times \mathbb{R}$ is constructed knowing $V_k$ and $\mathcal{D}_\pi$.
 For each sample of $D_\pi$ the input of the model is $s_t$ and the target to approximate is $r_{t+1} + \gamma V_k(s_{t+1})$.
 If $s_{t+1}$ is a goal state or absorbing state, the target becomes only $r_{t+1}$.
 \begin{equation}
@@ -29,19 +24,31 @@ If $s_{t+1}$ is a goal state or absorbing state, the target becomes only $r_{t+1
 \end{equation}
 $\mathcal{F}_c$ is the search space of the critic ; a subset of learnable functions
 (for instance a multi-layer percetron with a fixed number of hidden units and activation function).
+Multiple databases are required since the target to learn for $V_{k+1}$ is dependent on $V_k$,
+it represents an iteration of {\em value iteration}.
+
+As the best next action cannot be known easily, the next state and V depends of $\pi$ : NFAC is on-policy unlike FQI.
+% Unlike FQI, NFAC is on-policy since the optimization to find the best action is not trivial 
+% with continuous environment. 
+Thus it is not necessary to learn the full action-value function $Q$
+where $V$ is enough and easier to approximate. This also implies that $\mathcal{D}_\pi$ is only
+used for one episode as the policy $\pi$ is changing.
 
 \subsection{Actor}
 
-It is computionnaly unviable to try to optimize a non-linear value function to find
-the best action, so the actor update
+% It is computionnaly unviable to try to optimize a non-linear value function to find
+% the best action, so 
+The actor update
 relies on the temporal difference error $\delta = \big( r_{t+1} + \gamma V_k(s_{t+1}) \big) - V(s_t)$.
 Since $\delta$ depends on the approximation of $V$, the actor update is accomplished before the critic update.
-Like Cacla algorithm, the update is performed towards a direction only when $\delta > 0$.
-A unique database $ S \times A$ is enough : there is no incremental process as with the critic.
+Like CACLA algorithm, the update is performed towards a direction only when $\delta > 0$.
+However the process is not online but done according to $\mathcal{D}_\pi$.
+A unique database $ S \times A$ is enough : there is no incremental process as with the critic
+because there isn't a self-dependency in the update formula :
 
 \begin{equation}
  \hat{\pi}^* = \underset{\pi \in \mathcal{F}_a}{\text{argmin}} 
- \sum_{ (s_t,a_t, a_t) \in \mathcal{D}}
+ \sum_{ (s_t,a_t, a_t) \in \mathcal{D}_\pi}
  \begin{dcases}
   \big( \pi(s_t) - a_t \big)^2 ,& \text{if } \delta > 0\\
   \big( \pi(s_t) - u_t \big)^2 ,& \text{otherwise}
@@ -49,7 +56,9 @@ A unique database $ S \times A$ is enough : there is no incremental process as w
 \end{equation}
 
 Notice that an exploitation case, where $a_t$ is equals to $u_t$, could also
-result in a policy update.
+result in a policy update. The main difference with CACLA is when an action leads to an unexpected higher value-function,
+this action is not only reinforced, but the policy tries to reproduce it.
 
-From a technical point of view, Rprop back-propagation algorithm is used in both update.
+
+From a technical point of view, Rprop back-propagation algorithm \cite{Igel2000, Riedmiller1992} is used in both update.
 No momentum is defined since the value function needs to be flexible.

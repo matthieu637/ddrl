@@ -29,7 +29,7 @@ There are two main approaches for learning an optimal policy in RL: model-based 
 While {\em model-based} methods aim at learning $T$ and $R$, which is usually difficult in continuous environment,
 {\em model-free methods} are computationally more viable techniques.
 In the following, a categorization of {\em model-free methods} is presented.
-They can also be divided in two main families : {\em black-box optimization} and {\em value-functions} methods.
+They can also be divided in two main families : {\em black-box optimization} \cite{Jones1998} and {\em value-functions} methods.
 
 \subsection{Value-functions methods with non linear hypothesis}
 
@@ -84,7 +84,7 @@ Thus the whole problem is how to learn those value functions.
 Several algorithms have been designed with different update rules : QLearning, Sarsa, LSTD, etc.
 Fitted Q Iteration (FQI) \cite{Riedmiller2005} uses non-linear neural networks with a good data efficiency.
 This is why it will be more detailed here.
-It can be seen as a value iteration based on previous collected data $(s_t, a_t,r_{t+1}, s_{t+1})_{t=\{1,...,N\}}$ of one episode containing $N$ steps.
+It can be seen as a value iteration\cite{Howard1960} based on previous collected data $(s_t, a_t,r_{t+1}, s_{t+1})_{t=\{1,...,N\}}$ of one episode containing $N$ steps.
 The Q function is incrementally learned by : 
 \begin{equation}
  Q_{k+1} = \underset{Q \in \mathcal{F}}{\text{arg min}} \sum_{t=1}^{N} \Big[ Q(s_t, a_t) - \big( r_{t+1} + \gamma \underset{a' \in A}{\text{ max }} Q_k(s_{t+1}, a') \big) \Big]^2
@@ -97,7 +97,7 @@ The Q function is incrementally learned by :
 where $\mathcal{F}$ is a subset of multilayer perceptron with a fixed number of hidden neurons.
 Both the state and the action are inputs of the neural network and the output is a scalar value
 approximating $\hat{Q}(s,a)$. Another big advantage of FQI is that it can use
-the Rprop \cite{Igel2000} backpropagation algorithm, thus it doesn't need a learning rate parameter
+the Rprop \cite{Igel2000, Riedmiller1992} backpropagation algorithm, thus it doesn't need a learning rate parameter
 to be tuned.
 
 % \begin{equation}
@@ -116,7 +116,7 @@ which is mapped to the space of policies. It is also called direct policy search
 Each parameter is updated according to his contribution to gradient of the cost function 
 $ \frac{\partial J}{\partial \theta} $ \cite{Kober2010a}.
 Genetic algorithms like CMAS-ES \cite{Hansen2001}, that do not necessarily use gradient, can also enter is this category.
-The major drawbacks are the high variability of the cost J, the plateau effect and being trapped in local minima when using gradient which can result in poor policies.
+The major drawbacks are the high variability of the cost J, the plateau effect and being trapped in local minima when using gradient which can result in poor policies \cite{Grondman2012, Konda2003}.
 
 \subsection{Actor Critic}
 
@@ -130,7 +130,7 @@ Temporal difference (TD) error $\delta = r_t + \gamma V(s_{t+1}) - V(s_t)$ is us
 \end{equation}
 
 During the learning phase, the actor proposes the action $Ac(s_t) = u_t \in A$  which correspond to the exploitation action (the output of the neural network).
-However depending on the policy, it performs the action $a_t$ (a perturbation of $u_t$). The policy exploration can take different forms : Gaussian $a_t \sim \mathcal{N}(u_t, \sigma)$, 
+However depending on the policy, it performs the action $a_t$ (a perturbation of $u_t$). The exploration policy can take different forms : Gaussian $a_t \sim \mathcal{N}(u_t, \sigma)$, 
 $\epsilon$-greedy 
 $a_t = 
 \begin{dcases} u_t, & \text{if }p > \epsilon\ |\ p \sim U(0,1) \\
@@ -147,9 +147,10 @@ TD error is also used by the update of the actor policy $\pi_\theta$ :
  0, & \text{otherwise}
  \end{cases}
 \end{equation}
-where $Ac(s_t)$ is the proposed action by the actor in the exploitation case and $a_t$ the performed action
-by the policy.
-CACLA is an online algorithm that doesn't retains data from previous experiences. %except through the value function. 
+% where $Ac(s_t)$ is the proposed action by the actor in the exploitation case and $a_t$ the performed action
+% by the policy.
+It means that when an action leads to an unexpected higher value-function, this action is reinforced by moving $\theta$ to reproduce it in this state.
+CACLA is an online algorithm for both the actor and the critic, it doesn't retains data from previous experiences. %except through the value function. 
 
 % On the contrary, fitted natural actor critic \cite{Melo2008} tries to exploit 
 % at the maximum the data already collected by replaying them with importance sampling. 

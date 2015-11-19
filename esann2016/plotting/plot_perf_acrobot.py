@@ -87,7 +87,7 @@ ax.set_xlim(0, 1000)
 ax.set_xticks(np.arange(0, 1001, 250))
 #ax.set_yticks(np.arange(0, 25, 4))
 
-legend = ax.legend(["NFAC", "cacla" , "random"], loc=3);
+legend = ax.legend(["NFAC", "CACLA" , "random"], loc=3);
 legend.set_frame_on(False)
 frame = legend.get_frame()
 frame.set_facecolor('1.0')

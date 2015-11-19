@@ -165,12 +165,15 @@ less possible prior.
 \input{tex/exp.tex}
 
 \section{Conclusions and further work}
-An algorithm that works in both continuous state and actions spaces, 
-with non-linear model have been presented.
-The advantages over cacla is not only the performance but the lower 
-number of meta-parameters to optimize (2 learning rate removed).
-To further improve NFAC, the data previously collected in old episodes must be re-used, for instance with via importance sampling.
-This is also a first step towards deep reinforcement learning with continuous action space.
+NFAC is an actor-critic that works where both state and actions are continuous spaces, 
+with non-linear models for both the actor and the critic.
+It is inspired by CACLA and FQI.
+The advantages over CACLA is not only the performance but the lower 
+number of meta-parameters to be optimized (2 learning rate removed).
+Unlike FQI, NFAC can be used in environment with continuous actions.
+To further improve NFAC, the data previously collected in old episodes should be re-used, for instance with importance sampling.
+This algorithm is also a first step towards deep reinforcement learning with continuous action space
+as it can uses neural networks.
 
 
 % ****************************************************************************
