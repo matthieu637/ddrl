@@ -27,4 +27,5 @@ cmake_install.cmake
 .project
 eclipse
 gen-data
-*-data
+*-data-*
+octave-workspace
