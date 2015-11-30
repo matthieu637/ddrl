@@ -3,10 +3,11 @@
 function checker(){
 	program=$1
 	which $program >& /dev/null
-	if [[ $? -ne 0 && $# -eq 1 ]] ; then
+	error=$?
+	if [[ $error -ne 0 && $# -eq 1 ]] ; then
 	        echo "ERROR : Please install '$program' to run this project."
 		exit 1
-	elif [[ $? -ne 1 ]] ; then
+	elif [[ $error -ne 0 ]] ; then
 		echo "optional install : $program"
 	fi
 }
