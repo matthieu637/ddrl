@@ -6,7 +6,7 @@ function checker(){
 	if [[ $? -ne 0 && $# -eq 1 ]] ; then
 	        echo "ERROR : Please install '$program' to run this project."
 		exit 1
-	elif [[ $? -ne 0 ]] ; then
+	elif [[ $? -ne 1 ]] ; then
 		echo "optional install : $program"
 	fi
 }
