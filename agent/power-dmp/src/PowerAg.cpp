@@ -15,10 +15,10 @@ PowerAg::PowerAg(unsigned int nb_motors, unsigned int nb_sensors) : n_sensors(nb
       best_reward = 0;
   }
 
-const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, bool learning, bool goal_reached) {
+const vector<double>& PowerAg::run(double _reward, const vector<double>& sensors, bool learning, bool goal_reached) {
 
     if(pas<0){
-        vector<float> actions;
+        vector<double> actions;
         for(unsigned int i=0;i<n_motors;i++){
             actuator.push_back(0.f);
         }
@@ -26,8 +26,8 @@ const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, b
         actuator = algo->getNextActions(sensors);
     }
 
-      float theta(0);
-      float y(0);
+      double theta(0);
+      double y(0);
       for(unsigned int dim=0; dim<n_dims;dim++){
         theta +=sensors[dim*2];
         y+= -cos(theta);
@@ -53,7 +53,7 @@ const vector<float>& PowerAg::run(float _reward, const vector<float>& sensors, b
     return actuator;
   }
 
-  void PowerAg::start_episode(const std::vector<float>& sensors) {
+  void PowerAg::start_episode(const std::vector<double>& sensors) {
 
     pas=0;
     rewards.push_back(0);

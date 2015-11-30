@@ -4,7 +4,7 @@
 
 TEST(Utils, random) {
   for (uint i = 0; i < 100; i++) {
-    float f = bib::Utils::rand01();
+    double f = bib::Utils::rand01();
 
     EXPECT_GE(f, 0);
     EXPECT_LE(f, 1);
@@ -13,9 +13,9 @@ TEST(Utils, random) {
 
 TEST(Utils, transform) {
   for (uint i = 0; i < 100; i++) {
-    float f = bib::Utils::rand01();
-    float _min = bib::Utils::rand01();
-    float _max = bib::Utils::rand01();
+    double f = bib::Utils::rand01();
+    double _min = bib::Utils::rand01();
+    double _max = bib::Utils::rand01();
 
     if (_min > _max)
       _min = _max;

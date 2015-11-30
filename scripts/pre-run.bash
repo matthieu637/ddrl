@@ -33,11 +33,6 @@ if [ ! -e $2 ] ; then
 	exit 1
 fi
 
-if [ ! -e $(dirname $2)/config.ini ] ; then
-	echo "cannot found a config.ini near $2"
-	exit 1
-fi
-
 if [ ! -e $LIB/../gen-data/ ] ; then
 	mkdir $LIB/../gen-data/
 fi
@@ -50,7 +45,12 @@ else
 	exit 1
 fi
 
-cp $(dirname $2)/config.ini $LIB/../gen-data/$1/
+if [ ! -e $(dirname $2)/config.ini ] ; then
+	echo "cannot found a config.ini near $2"
+	echo "you must do it yourself"
+else
+	cp $(dirname $2)/config.ini $LIB/../gen-data/$1/
+fi
 
 RULES="$LIB/../gen-data/$1/rules.xml"
 echo "<xml>" >> $RULES

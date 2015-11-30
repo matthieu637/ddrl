@@ -30,10 +30,10 @@ class AdvancedAcrobotWorld {
 
   void resetPositions();
 
-  virtual void step(const std::vector<float> &motors, uint current_step, uint max_step_per_instance);
-  const std::vector<float> &state() const;
+  virtual void step(const std::vector<double> &motors, uint current_step, uint max_step_per_instance);
+  const std::vector<double> &state() const;
   unsigned int activated_motors() const;
-  float perf() const;
+  double perf() const;
 
  protected:
   void createWorld(const std::vector<bone_joint> &);
@@ -49,7 +49,7 @@ class AdvancedAcrobotWorld {
   std::vector<ODEObject *> bones;
   std::vector<dJointID> joints;
 
-  std::vector<float> internal_state;
+  std::vector<double> internal_state;
 
   dGeomID ground;
 
@@ -57,9 +57,10 @@ class AdvancedAcrobotWorld {
   bool goalBeenReached;
   bool goalFailed;
   unsigned int _activated_motors;
+  bool add_time_in_state;
   bool normalization;
-  
-  static const std::vector<float> NORMALIZED_VEC;
+
+  static const std::vector<double> NORMALIZED_VEC;
 };
 
 struct nearCallbackData {

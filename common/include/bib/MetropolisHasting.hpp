@@ -30,8 +30,16 @@ class Proba {
     std::vector<Real>* gauss = new std::vector<Real>(centers.size());
 
     for (uint i = 0; i < centers.size(); i++) {
-      std::normal_distribution<Real> dist(centers[i], sigma);
       Real number;
+      if(centers[i] > 1.0 && centers[i] - 1.0 > 1.5 * sigma){
+        gauss->at(i) = 1.;
+        continue;
+      } else if(centers[i] < -1.0 && centers[i] + 1.0 < - 1.5 * sigma){
+        gauss->at(i) = -1.;
+        continue;
+      }
+      
+      std::normal_distribution<Real> dist(centers[i], sigma);
       do {
         number = dist(*bib::Seed::random_engine());
       } while (number < -1. || number > 1.);

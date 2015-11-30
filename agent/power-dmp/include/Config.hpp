@@ -10,9 +10,9 @@
       unsigned int n_basis_per_dim;
       unsigned int elite;
       unsigned int elite_variance;
-      float width_kernel;
-      float d_variance;
-      float var_init;
+      double width_kernel;
+      double d_variance;
+      double var_init;
       //std::vector<unsigned int> n_kernels_per_dim;
     };
 #endif // CONFIG_HPP

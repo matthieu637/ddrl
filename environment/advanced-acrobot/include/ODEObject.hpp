@@ -4,52 +4,52 @@
 
 class ODEObject {
  public:
-  ODEObject(dBodyID bid, dMass m, dGeomID geom, float x, float y, float z,
-            float density, float massv);
+  ODEObject(dBodyID bid, dMass m, dGeomID geom, double x, double y, double z,
+            double density, double massv);
   dBodyID getID() const;
-  float getX() const;
-  float getY() const;
-  float getZ() const;
+  double getX() const;
+  double getY() const;
+  double getZ() const;
   dGeomID& getGeom();
   dMass& getMass();
-  float getDensity() const;
-  float getMassValue() const;
+  double getDensity() const;
+  double getMassValue() const;
   void setID(const dBodyID getID);
-  void setX(float nx);
-  void setY(float ny);
+  void setX(double nx);
+  void setY(double ny);
   void setZ(double nz);
-  float distSince();
-  float distSinceX();
-  float distSinceY();
-  float distSinceZ();
+  double distSince();
+  double distSinceX();
+  double distSinceY();
+  double distSinceZ();
 
  protected:
   dBodyID bid;
   dMass mass;
   dGeomID geom;
-  float x, y, z, density, massv;
+  double x, y, z, density, massv;
 };
 
 class ODEBox : public ODEObject {
  public:
-  ODEBox(dBodyID bid, dMass m, dGeomID geom, float x, float y, float z,
-         float density, float mass, float lx, float ly, float lz);
-  float getLX() const;
-  float getLY() const;
-  float getLZ() const;
+  ODEBox(dBodyID bid, dMass m, dGeomID geom, double x, double y, double z,
+         double density, double mass, double lx, double ly, double lz);
+  double getLX() const;
+  double getLY() const;
+  double getLZ() const;
 
  protected:
-  float lx, ly, lz;
+  double lx, ly, lz;
 };
 
 class ODESphere : public ODEObject {
  public:
-  ODESphere(dBodyID bid, dMass m, dGeomID geom, float x, float y, float z,
-            float density, float massv, float radius);
-  float getRadius() const;
+  ODESphere(dBodyID bid, dMass m, dGeomID geom, double x, double y, double z,
+            double density, double massv, double radius);
+  double getRadius() const;
 
  protected:
-  float radius;
+  double radius;
 };
 
 #endif  // ODEOBJECT_H

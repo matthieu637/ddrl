@@ -8,7 +8,7 @@ void init_never_call(int, ColumnVector&) {
   exit(1);
 }
 
-void init_called(int ndim, ColumnVector& x, const std::vector<float>& v) {
+void init_called(int ndim, ColumnVector& x, const std::vector<double>& v) {
   ASSERT(static_cast<uint>(ndim) == v.size(), "");
 
   for (uint i = 1; i <= (uint) ndim; i++)

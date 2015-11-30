@@ -4,7 +4,7 @@
 
 namespace bib {
 
-void Prober::probe(float m) {
+void Prober::probe(double m) {
   if (prob_init) {
     min_probe = std::min(min_probe, m);
     max_probe = std::max(max_probe, m);

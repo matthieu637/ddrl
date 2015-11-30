@@ -43,8 +43,8 @@ class Algo
 
         }
         void computeNewWeights();
-        std::vector<float> getNextActions(std::vector<float> states);
-        void addReward(float const _reward );
+        std::vector<double> getNextActions(std::vector<double> states);
+        void addReward(double const _reward );
        void setPointeurIteration(unsigned int* _iter);
        void setPointeurEpisode(unsigned int* _iter);
        void setPointeurConfig(Config* _config);
@@ -62,9 +62,9 @@ class Algo
         Param* current_param;
         Param* current_param_episode;
         unsigned int n_weights;
-        std::vector< std::pair<float,Param*>> params_episode;
-        std::vector< std::pair<float,Param*>> best_params;
-        const float PI = 3.14159265358979f;
+        std::vector< std::pair<double,Param*>> params_episode;
+        std::vector< std::pair<double,Param*>> best_params;
+        const double PI = 3.14159265358979f;
         Config* config;
 };
 

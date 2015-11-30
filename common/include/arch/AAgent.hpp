@@ -38,16 +38,18 @@ class AAgent : public ProgOptions, public CommonAE {
    * @param perceptions the current perceptions provided by the environment
    * @param learning should the agent learns during the interaction (false to test an agent)
    * @param goal_reached did the agent reached a global goal during his last action
-   * @return const std::vector< float, std::allocator< void > >&
+   * @return const std::vector< double, std::allocator< void > >&
    */
-  virtual const std::vector<float>& run(float reward, const std::vector<float>& perceptions,
-                                        bool learning, bool goal_reached) 
-  {
-    (void) reward; (void) perceptions; (void) learning; (void) goal_reached;
+  virtual const std::vector<double>& run(double reward, const std::vector<double>& perceptions,
+                                        bool learning, bool goal_reached) {
+    (void) reward;
+    (void) perceptions;
+    (void) learning;
+    (void) goal_reached;
     LOG_ERROR("not implemented");
-    return *new std::vector<float>();
+    return *new std::vector<double>();
   }
-  
+
   /**
    * @brief This is the main method to define the behavior of your agent
    *
@@ -56,11 +58,10 @@ class AAgent : public ProgOptions, public CommonAE {
    * @param learning should the agent learns during the interaction (false to test an agent)
    * @param goal_reached did the agent reached a global goal during his last action
    * @param finished is it the last step of this episode
-   * @return const std::vector< float, std::allocator< void > >&
+   * @return const std::vector< double, std::allocator< void > >&
    */
-  virtual const std::vector<float>& runf(float reward, const std::vector<float>& perceptions,
-                                        bool learning, bool goal_reached, bool finished)
-  {
+  virtual const std::vector<double>& runf(double reward, const std::vector<double>& perceptions,
+                                         bool learning, bool goal_reached, bool finished) {
     (void) finished;
     return run(reward, perceptions, learning, goal_reached);
   }
@@ -70,7 +71,7 @@ class AAgent : public ProgOptions, public CommonAE {
    * @param sensors the first perceptions from the environment
    * @return void
    */
-  virtual void start_episode(const std::vector<float>&) {}
+  virtual void start_episode(const std::vector<double>&) {}
 
   /**
    * @brief This method is called after each end of an instance

@@ -14,10 +14,10 @@ public :
     Kernel(int n_kernels_per_dims,int n_dims);
     Kernel();
     void setWeights(const Eigen::VectorXf _weights);
-    float getValue(const std::vector<float>& _state, const int& _dim);
-    float getWeight(const int& index) const;
+    double getValue(const std::vector<double>& _state, const int& _dim);
+    double getWeight(const int& index) const;
     unsigned int getSize(){return n_basis;};
-  const float PI = 3.14159265358979f;
+  const double PI = 3.14159265358979f;
 // Convert the 32-bit binary encoding into hexadecimal
 static int Binary2Hex( std::string Binary )
 {
@@ -28,7 +28,7 @@ static int Binary2Hex( std::string Binary )
 }
 
 // Convert the 32-bit binary into the decimal
-static float GetFloat32( std::string Binary )
+static double GetFloat32( std::string Binary )
 {
     int HexNumber = Binary2Hex( Binary );
 
@@ -42,32 +42,32 @@ static float GetFloat32( std::string Binary )
     // Convert the mantissa into decimal using the
     // last 23 bits
     int power = -1;
-    float total = 0.0;
+    double total = 0.0;
     for ( int i = 0; i < 23; i++ )
     {
         int c = Binary[ i + 9 ] - '0';
-        total += (float) c * (float) pow( 2.0, power );
+        total += (double) c * (double) pow( 2.0, power );
         power--;
     }
     total += 1.0;
 
-    float value = sign * (float) pow( 2.0, exponent ) * total;
+    double value = sign * (double) pow( 2.0, exponent ) * total;
 
     return value;
 }
 
 // Get 32-bit IEEE 754 format of the decimal value
-static std::string GetBinary32( float value )
+static std::string GetBinary32( double value )
 {
     union
     {
-         float input;   // assumes sizeof(float) == sizeof(int)
+         double input;   // assumes sizeof(double) == sizeof(int)
          int   output;
     }    data;
 
     data.input = value;
 
-    std::bitset<sizeof(float) * CHAR_BIT>   bits(data.output);
+    std::bitset<sizeof(double) * CHAR_BIT>   bits(data.output);
 
     std::string mystring = bits.to_string<char,
                                           std::char_traits<char>,

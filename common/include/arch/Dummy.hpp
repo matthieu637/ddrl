@@ -39,7 +39,7 @@ class EnvProgOptions {
 
 class DummyEpisodeStat {
  public:
-  virtual void dump(uint episode, const std::vector<float>& perceptions, const std::vector<float>& motors, float reward) {
+  virtual void dump(uint episode, const std::vector<double>& perceptions, const std::vector<double>& motors, double reward) {
     (void) episode;
     (void) perceptions;
     (void) motors;
@@ -52,14 +52,14 @@ class MotorEpisodeStat : public DummyEpisodeStat {
 
   MotorEpisodeStat() : step(0) { }
 
-  virtual void dump(uint episode, const std::vector<float>& perceptions, const std::vector<float>& motors, float reward) {
+  virtual void dump(uint episode, const std::vector<double>& perceptions, const std::vector<double>& motors, double reward) {
     (void) episode;
     (void) perceptions;
     (void) reward;
 
     std::string sep = std::to_string(episode);;
     LOG_FILE_NNL("motors.data." + sep, step << " ");
-    for(float m : motors)
+    for(double m : motors)
       LOG_FILE_NNL("motors.data." + sep, m << " ");
     LOG_FILE("motors.data." + sep, "");
 

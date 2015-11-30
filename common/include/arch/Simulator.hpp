@@ -84,62 +84,66 @@ class Simulator {
     env->unique_destroy();
     delete env;
 
-    LOG_FILE(DEFAULT_END_FILE, "" << (float)(time_spend.finish() / 60.f));  // in minutes
+    LOG_FILE(DEFAULT_END_FILE, "" << (double)(time_spend.finish() / 60.f));  // in minutes
   }
 
  private:
   void run_episode(bool learning, unsigned int episode) {
     env->reset_episode();
-    std::list<float> all_rewards;
+    std::list<double> all_rewards;
 
     while (env->hasInstance()) {
+      uint step = 0;
       Stat stat;
-      std::vector<float> perceptions = env->perceptions();
+      std::vector<double> perceptions = env->perceptions();
       agent->start_episode(perceptions);
 
       while (env->running()) {
         perceptions = env->perceptions();
-        float reward = env->performance();
-        const std::vector<float>& actuators = agent->runf(reward, perceptions, learning, false, false);
+        double reward = env->performance();
+        const std::vector<double>& actuators = agent->runf(reward, perceptions, learning, false, false);
         env->apply(actuators);
         stat.dump(episode, perceptions, actuators, reward);
         all_rewards.push_back(reward);
+        step++;
       }
 
       // if the environment is in a final state
       //        i.e it didn't reach the number of step but finished well
       // then we call the algorithm a last time to give him this information
       perceptions = env->perceptions();
-      float reward = env->performance();
+      double reward = env->performance();
       agent->runf(reward, perceptions, learning, env->final_state(), true);
       all_rewards.push_back(reward);
 
       env->next_instance();
       agent->end_episode();
-    }
 
-    dump_and_display(episode, all_rewards, env, agent, learning);
+      dump_and_display(episode, all_rewards, env, agent, learning, step);
+    }
+    
     if(learning)
       save_agent(agent, episode);
   }
 
-  void dump_and_display(unsigned int episode, const std::list<float>& all_rewards, Environment* env,
-                        Agent* ag, bool learning) {
+  void dump_and_display(unsigned int episode, const std::list<double>& all_rewards, Environment* env,
+                        Agent* ag, bool learning, uint step) {
     bool display = episode % display_log_each == 0;
     bool dump = episode % dump_log_each == 0;
 
     if (dump || display) {
       bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
 
-      if (display) {
+      if (display && ((display_learning && learning) || !learning)) {
         bib::Dumper<Environment, bool, bool> env_dump(env, true, false);
         bib::Dumper<Agent, bool, bool> agent_dump(ag, true, false);
         LOG_INFO((learning ? "L " : "T ")
                  << std::left << std::setw(6) << std::setfill(' ') << episode
-                 << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.mean
-                 << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.var
-                 << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.max
-                 << std::left << std::setw(6) << std::fixed << std::setprecision(3) << reward_stats.min
+                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.mean
+                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.var
+                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.max
+                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.min
+                 << std::left << std::setw(7) << std::fixed << step
                  << " " << env_dump << " " << agent_dump);
       }
 
@@ -148,7 +152,7 @@ class Simulator {
         bib::Dumper<Agent, bool, bool> agent_dump(ag, false, true);
         LOG_FILE(learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE,
                  episode << " " << reward_stats.mean << " " << reward_stats.var << " " <<
-                 reward_stats.max << " " << reward_stats.min << env_dump << agent_dump);
+                 reward_stats.max << " " << reward_stats.min << " " << step << env_dump << agent_dump);
       }
     }
   }
@@ -199,6 +203,12 @@ class Simulator {
     dump_log_each               = properties->get<unsigned int>("simulation.dump_log_each");
     display_log_each            = properties->get<unsigned int>("simulation.display_log_each");
     save_agent_each             = properties->get<unsigned int>("simulation.save_agent_each");
+    
+    try{
+      display_learning            = properties->get<bool>("simulation.display_learning");
+    } catch(boost::exception const& ) {
+      display_learning            = true;
+    }
 
 #ifndef NDEBUG
     well_init = true;
@@ -213,6 +223,8 @@ class Simulator {
   unsigned int dump_log_each;
   unsigned int display_log_each;
   unsigned int save_agent_each;
+  
+  bool display_learning;
 
   boost::property_tree::ptree* properties;
   boost::program_options::variables_map* command_args;

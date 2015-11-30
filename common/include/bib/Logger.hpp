@@ -8,6 +8,7 @@
 ///
 ///
 
+#include <sys/resource.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -60,7 +61,7 @@
 
 #define LOG_FILE(file, stream) \
   bib::Logger::getInstance()->getFile(file) << stream << std::endl;
-
+  
 #define LOG_FILE_NNL(file, stream) \
   bib::Logger::getInstance()->getFile(file) << stream;
 
@@ -77,10 +78,25 @@ class Logger : public Singleton<Logger> {
       std::ofstream *ofs = new std::ofstream;
       ofs->open(s, std::ofstream::out);
       open_files.insert(std::pair<std::string, std::ofstream *>(s, ofs));
+      
+      struct rlimit old;
+      getrlimit(RLIMIT_NOFILE, &old);
+      if(old.rlim_cur <= open_files.size())
+        LOG_ERROR("unkown behavior, limit open file reached");
     }
 
     return *open_files.find(s)->second;
   }
+  
+  void closeFile(const std::string& s){
+      auto it = open_files.find(s);
+      if(it != open_files.end()){
+        it->second->close();
+        delete it->second;
+        open_files.erase(it);
+      }
+  }
+  
   std::stringstream &registerBuffer() {
     std::stringstream *n = new std::stringstream;
 

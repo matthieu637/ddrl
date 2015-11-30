@@ -10,7 +10,7 @@ namespace bib {
 class Converger {
  public:
   template<typename Function1, typename Function2>
-  static uint determinist(Function1 && iter, Function2 && eval, uint max_epoch, float precision, uint display_each = 0) {
+  static uint determinist(Function1 && iter, Function2 && eval, uint max_epoch, double precision, uint display_each = 0) {
 
     bool converged = false;
     bool limit_reached = false;
@@ -27,7 +27,7 @@ class Converger {
 
       if (epoch > 1 && fabs(eval() - last_mse) < precision && fabs(last2_mse - last_mse) < precision) {
         converged = true;
-      } else {
+      } else if(epoch > 1) {
         converged = eval() < precision;
       }
 
@@ -44,7 +44,7 @@ class Converger {
 
   template<typename Function1, typename Function2, typename Function3>
   static uint min_stochastic(Function1 && iter, Function2 && eval, Function3 && save, uint max_epoch,
-                             float precision, uint display_each = 0, uint number_consecp = 20) {
+                             double precision, uint display_each = 0, uint number_consecp = 20) {
 
     bool converged = false;
     bool limit_reached = false;
@@ -52,8 +52,8 @@ class Converger {
 
     uint epoch = 0;
     uint consecutive_bad_movement = 0;
-    double last_mse = 0;
-    double last2_mse = 0;
+    double last_mse = std::numeric_limits<double>::max();
+    double last2_mse = std::numeric_limits<double>::max();
     double minv = std::numeric_limits<double>::max();
 
     if (display_each == 0)
@@ -74,7 +74,7 @@ class Converger {
 
       if (epoch > 1 && fabs(v - last_mse) < precision && fabs(last2_mse - last_mse) < precision) {
         converged = true;
-      } else {
+      } else if(epoch > 1) {
         converged = v < precision;
       }
 

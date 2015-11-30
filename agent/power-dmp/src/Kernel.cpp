@@ -42,7 +42,7 @@ Kernel::Kernel(int _n_basis_per_dim, int _n_dims) : widths(_n_dims), n_dims(_n_d
         } else {
             widths(i) = 2.0f/(n_basis_per_dim[i]+1);
         }
-        float decalage = 0.0f;
+        double decalage = 0.0f;
         if(i==0||i==2)
             centersSpaced.push_back(VectorXf::LinSpaced(Sequential,n_basis_per_dim[i],-1.f+decalage,1.f-decalage).transpose());
         else
@@ -68,7 +68,7 @@ Kernel::Kernel(int _n_basis_per_dim, int _n_dims) : widths(_n_dims), n_dims(_n_d
 
 }
 
-float Kernel::getValue(const std::vector<float>& sensors, const int& dim){
+double Kernel::getValue(const std::vector<double>& sensors, const int& dim){
 
     VectorXf psi(n_basis);
     VectorXf state(dim);
@@ -89,10 +89,10 @@ float Kernel::getValue(const std::vector<float>& sensors, const int& dim){
 
 for(unsigned int k=0; k<n_basis;k++){
 
-    float psi_tmp = (state.array()-centers.col(k).array()).square().matrix().dot(widths);
+    double psi_tmp = (state.array()-centers.col(k).array()).square().matrix().dot(widths);
     psi(k) = exp(-0.5f*psi_tmp);
 }
-float retour;
+double retour;
 
 retour = (weights.array()*psi.array()).sum()/(psi.sum()+0.00000000001f);
 
@@ -109,7 +109,7 @@ return retour;
 void Kernel::setWeights(const VectorXf _weights){
     weights =_weights;
 }
-float Kernel::getWeight(const int& index) const{
+double Kernel::getWeight(const int& index) const{
     return weights[index];
 }
 //unsigned int Kernel::getSize(){return n_basis}

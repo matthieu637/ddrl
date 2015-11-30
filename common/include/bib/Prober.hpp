@@ -5,11 +5,11 @@ namespace bib {
 
 class Prober {
  public:
-  void probe(float m);
+  void probe(double m);
 
  protected:
-  float min_probe;
-  float max_probe;
+  double min_probe;
+  double max_probe;
   bool prob_init = false;
   int prob_step = 0;
 };

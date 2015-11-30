@@ -18,7 +18,7 @@ class AdvancedAcrobotWorldView : public AdvancedAcrobotWorld {
                            bool normalization = false
                           );
   ~AdvancedAcrobotWorldView();
-  void step(const std::vector<float> &motors, uint current_step, uint max_step_per_instance);
+  void step(const std::vector<double> &motors, uint current_step, uint max_step_per_instance);
 
  public:
   std::list<dGeomID> geoms;
@@ -29,7 +29,7 @@ class AdvancedAcrobotWorldView : public AdvancedAcrobotWorld {
   bool requestEnd;
 
   // specific keyboard behavior
-  float speed;
+  double speed;
   bool ignoreMotor;
 };
 

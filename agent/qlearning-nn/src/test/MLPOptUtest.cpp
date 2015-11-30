@@ -2,27 +2,35 @@
 
 #include <vector>
 #include <iostream>
-#include <doublefann.h>
-#include <fann_train.h>
-#include <fann.h>
+#include <fann/doublefann.h>
+#include <fann/fann_train.h>
+#include <fann/fann.h>
 
 
 #include "MLP.hpp"
 #include <bib/Utils.hpp>
 #include <bib/MetropolisHasting.hpp>
+#include <bib/Combinaison.hpp>
 
 #define NB_SOL_OPTIMIZATION 25
 
-float OR(float x1, float x2) {
+double OR(double x1, double x2) {
   if (x1 == 1.f || x2 == 1.f)
     return 1.f;
   return -1.f;
 }
 
-float AND(float x1, float x2) {
+double AND(double x1, double x2) {
   if (x1 == 1.f && x2 == 1.f)
     return 1.f;
   return -1.f;
+}
+
+double LECUNIZATION(double x){ 
+  if(x == 1.f) 
+    return 1.5f;
+  else
+    return -1.5f;
 }
 
 double sech(double x) {
@@ -37,42 +45,42 @@ TEST(MLP, ConsistentActivationFunction) {
   fann_set_weight(nn.getNeuralNet(), 2, 4, 1.f);
   fann_set_weight(nn.getNeuralNet(), 3, 4, 0.f);
 
-  std::vector<float> sens(0);
-  std::vector<float> ac(1);
+  std::vector<double> sens(0);
+  std::vector<double> ac(1);
   ac[0] = 1;
 
   double lambda = 0.5;
   fann_set_activation_steepness_output(nn.getNeuralNet(), lambda);
   fann_set_activation_steepness(nn.getNeuralNet(), lambda, 1, 0);
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), tanh(lambda * 1.) / 2.);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), tanh(lambda * 1.) / 2.);
 
   lambda = 0.8;
   fann_set_activation_steepness(nn.getNeuralNet(), lambda, 1, 0);
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), tanh(lambda * 1.) / 2.);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), tanh(lambda * 1.) / 2.);
 
   ac[0] = -1;
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), tanh(lambda * -1.) / 2.);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), tanh(lambda * -1.) / 2.);
 
   lambda = 0.5;
   fann_set_activation_steepness(nn.getNeuralNet(), lambda, 1, 0);
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), tanh(lambda * -1.) / 2.);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), tanh(lambda * -1.) / 2.);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, 0.f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
   fann_set_weight(nn.getNeuralNet(), 2, 4, 0.f);
   fann_set_weight(nn.getNeuralNet(), 3, 4, 5.f);
 
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), 5.f / 2.f);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), 5.f / 2.f);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, 0.2f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.4f);
   fann_set_weight(nn.getNeuralNet(), 2, 4, 0.6f);
   fann_set_weight(nn.getNeuralNet(), 3, 4, 0.8f);
 
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), (tanh(lambda * (-1. * 0.2f + 0.4f)) * 0.6f + 0.8f) / 2.f);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), (tanh(lambda * (-1. * 0.2f + 0.4f)) * 0.6f + 0.8f) / 2.f);
 
   fann_set_activation_steepness_output(nn.getNeuralNet(), 1.f);
-  EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac),  tanh(lambda * (-1. * 0.2f + 0.4f)) * 0.6f + 0.8f);
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac),  tanh(lambda * (-1. * 0.2f + 0.4f)) * 0.6f + 0.8f);
 }
 
 
@@ -91,11 +99,11 @@ TEST(MLP, LearnOpposite) {
 
     double out = x1 == 1.f ? -1.f : 1.f;
 
-    std::vector<float> sens(0);
-    std::vector<float> ac(1);
+    std::vector<double> sens(0);
+    std::vector<double> ac(1);
     ac[0] = x1;
 
-    EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), out);
+    EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), out);
   }
 
   // Learn
@@ -104,8 +112,8 @@ TEST(MLP, LearnOpposite) {
 
     double out = x1 == 1.f ? -1.f : 1.f;
 
-    std::vector<float> sens(0);
-    std::vector<float> ac(1);
+    std::vector<double> sens(0);
+    std::vector<double> ac(1);
     ac[0] = x1;
 
     nn.learn(sens, ac, out);
@@ -117,11 +125,11 @@ TEST(MLP, LearnOpposite) {
 
     double out = x1 == 1.f ? -1.f : 1.f;
 
-    std::vector<float> sens(0);
-    std::vector<float> ac(1);
+    std::vector<double> sens(0);
+    std::vector<double> ac(1);
     ac[0] = x1;
 
-    EXPECT_EQ(nn.computeOut(sens, ac), out);
+    EXPECT_EQ(nn.computeOutVF(sens, ac), out);
   }
 }
 
@@ -137,10 +145,10 @@ TEST(MLP, LearnAndOr) {
 
     double out = AND(OR(x1, x2), x3);
 
-    std::vector<float> sens(2);
+    std::vector<double> sens(2);
     sens[0] = x1;
     sens[1] = x2;
-    std::vector<float> ac(1);
+    std::vector<double> ac(1);
     ac[0] = x3;
 
     nn.learn(sens, ac, out);
@@ -154,21 +162,21 @@ TEST(MLP, LearnAndOr) {
 
     double out = AND(OR(x1, x2), x3);
 
-    std::vector<float> sens(2);
+    std::vector<double> sens(2);
     sens[0] = x1;
     sens[1] = x2;
-    std::vector<float> ac(1);
+    std::vector<double> ac(1);
     ac[0] = x3;
 
-    EXPECT_GT(nn.computeOut(sens, ac), out - 0.02);
-    EXPECT_LT(nn.computeOut(sens, ac), out + 0.02);
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.02);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.02);
   }
 }
 
 
 TEST(MLP, MLPCheckOuput) {
   MLP nn(1, 1, 2, 0.5f);
-  std::vector<float> sens(0);
+  std::vector<double> sens(0);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, 1.f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
@@ -199,7 +207,7 @@ TEST(MLP, MLPCheckOuput) {
 
 TEST(MLP, MLPCheckDerivative) {
   MLP nn(1, 1, 2, 0.5f);
-  std::vector<float> sens(0);
+  std::vector<double> sens(0);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, 1.f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
@@ -250,7 +258,7 @@ TEST(MLP, MLPCheckAnalyticscFuncDerHess) {
   fann_set_weight(nn.getNeuralNet(), 3, 4, 0.f);
 
   uint ndim = 1;
-  std::vector<float> sens(0);
+  std::vector<double> sens(0);
   passdata d = {nn.getNeuralNet(), sens};
   ColumnVector ac(ndim);
   double a = -1;
@@ -282,7 +290,7 @@ TEST(MLP, MLPCheckAnalyticscFuncDerHess) {
 
 TEST(MLP, MLPCheckDerivativeHard) {
   MLP nn(4, 10, 3, 0.5f);
-  std::vector<float> sens(3);
+  std::vector<double> sens(3);
   sens[0] = bib::Utils::randin(-1, 1);
   sens[1] = bib::Utils::randin(-1, 1);
   sens[2] = bib::Utils::randin(-1, 1);
@@ -323,7 +331,7 @@ TEST(MLP, MLPCheckDerivativeHard) {
 
 TEST(MLP, MLPCheckHessian) {
   MLP nn(4, 10, 3, 0.5f);
-  std::vector<float> sens(3);
+  std::vector<double> sens(3);
   sens[0] = bib::Utils::randin(-1, 1);
   sens[1] = bib::Utils::randin(-1, 1);
   sens[2] = bib::Utils::randin(-1, 1);
@@ -368,19 +376,19 @@ TEST(MLP, OptimizeOpposite) {
   fann_set_weight(nn.getNeuralNet(), 3, 4, 0.f);
 
   // Test
-  std::vector<float> sens(0);
+  std::vector<double> sens(0);
   for (uint n = 0; n < 100 ; n++) {
     double x1 = bib::Utils::randBool() ? 1.f : -1.f;
 
     double out = x1 == 1.f ? -1.f : 1.f;
 
-    std::vector<float> ac(1);
+    std::vector<double> ac(1);
     ac[0] = x1;
 
-    EXPECT_DOUBLE_EQ(nn.computeOut(sens, ac), out);
+    EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), out);
   }
 
-  std::vector<float>* ac = nn.optimized(sens);
+  std::vector<double>* ac = nn.optimized(sens);
   EXPECT_GT(ac->at(0), -1. - 0.01);
   EXPECT_LT(ac->at(0), -1. + 0.01);
   delete ac;
@@ -397,8 +405,8 @@ TEST(MLP, OptimizeOpposite) {
 
     double out = x1 == 1.f ? -1.f : 1.f;
 
-    std::vector<float> sens(0);
-    std::vector<float> acc(1);
+    std::vector<double> sens(0);
+    std::vector<double> acc(1);
     acc[0] = x1;
 
     nn.learn(sens, acc, out);
@@ -426,10 +434,10 @@ TEST(MLP, OptimizeAndOr) {
 
     double out = AND(OR(x1, x2), x3);
 
-    std::vector<float> sens(2);
+    std::vector<double> sens(2);
     sens[0] = x1;
     sens[1] = x2;
-    std::vector<float> ac(1);
+    std::vector<double> ac(1);
     ac[0] = x3;
 
     nn.learn(sens, ac, out);
@@ -442,15 +450,15 @@ TEST(MLP, OptimizeAndOr) {
     double x1 = bib::Utils::randBool() ? 1.f : -1.f;
     double x2 = bib::Utils::randBool() ? 1.f : -1.f;
 
-    std::vector<float> sens(2);
+    std::vector<double> sens(2);
     sens[0] = x1;
     sens[1] = x2;
 
-    std::vector<float>* ac = nn.optimized(sens);
-    double his_sol = nn.computeOut(sens, *ac);
+    std::vector<double>* ac = nn.optimized(sens);
+    double his_sol = nn.computeOutVF(sens, *ac);
 
     ac->at(0) = 1.f;
-    double my_sol = nn.computeOut(sens, *ac);
+    double my_sol = nn.computeOutVF(sens, *ac);
 
     EXPECT_GE(his_sol, my_sol - 0.01);
     delete ac;
@@ -469,8 +477,8 @@ TEST(MLP, OptimizeMultiDim) {
 
     double out = AND(OR(x1, x2), x3);
 
-    std::vector<float> sens(0);
-    std::vector<float> ac(3);
+    std::vector<double> sens(0);
+    std::vector<double> ac(3);
     ac[0] = x1;
     ac[1] = x2;
     ac[2] = x3;
@@ -480,9 +488,9 @@ TEST(MLP, OptimizeMultiDim) {
 
   // Test
   for (uint n = 0; n < 100 ; n++) {
-    std::vector<float> sens(0);
-    std::vector<float>* ac = nn.optimized(sens);
-    double his_sol = nn.computeOut(sens, *ac);
+    std::vector<double> sens(0);
+    std::vector<double>* ac = nn.optimized(sens);
+    double his_sol = nn.computeOutVF(sens, *ac);
     double my_sol = 1.;
 
     EXPECT_GE(his_sol, my_sol - 0.01);
@@ -498,8 +506,8 @@ TEST(MLP, OptimizeNonExtremum) {
   double sensv = 1. ;
   for (uint n = 0; n < 1 ; n++) {
     MLP nn(1, 3, 0, 0.2f);
-    std::vector<float> sens(0);
-    std::vector<float> ac(1);
+    std::vector<double> sens(0);
+    std::vector<double> ac(1);
 
     // Learn
     for (uint n = 0; n < 100000 ; n++) {
@@ -518,14 +526,14 @@ TEST(MLP, OptimizeNonExtremum) {
       double out = x1 * x1 - x1;
       ac[0] = x1;
 
-      double myout = nn.computeOut(sens, ac);
+      double myout = nn.computeOutVF(sens, ac);
       EXPECT_GT(myout, sensv * out - 0.1);
       EXPECT_LT(myout, sensv * out + 0.1);
       LOG_FILE("OptimizeNonExtremum.data", x1 << " " << myout << " " << out);
 //     close all; X=load('OptimizeNonExtremum.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');
     }
 
-    std::vector<float>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION);
+    std::vector<double>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION);
     if (sensv == -1.) {
       EXPECT_GT(acopt->at(0), 0.46);
       EXPECT_LT(acopt->at(0), 0.48);
@@ -543,8 +551,8 @@ TEST(MLP, Optimize2LocalMaxima) {
   //learn - cos(5.*x1)/2.
 
   MLP nn(1, 10, 0, 0.1f);
-  std::vector<float> sens(0);
-  std::vector<float> ac(1);
+  std::vector<double> sens(0);
+  std::vector<double> ac(1);
 
   fann_set_training_algorithm(nn.getNeuralNet(), FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
   fann_set_train_error_function(nn.getNeuralNet(), FANN_ERRORFUNC_TANH);
@@ -572,19 +580,19 @@ TEST(MLP, Optimize2LocalMaxima) {
     double out = - cos(5.*x1) / 2.;
     ac[0] = x1;
 
-    double myout = nn.computeOut(sens, ac);
+    double myout = nn.computeOutVF(sens, ac);
     LOG_FILE("Optimize2LocalMaxima.data", x1 << " " << myout << " " << out);
 //     close all; X=load('Optimize2LocalMaxima.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');
   }
 
-  std::vector<float>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION);
+  std::vector<double>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION);
 //     ac[0] = acopt->at(0);
 //     double my_sol = nn.computeOut(sens, ac);
 //     ac[0] = M_PI/5;
 //     double best_sol = nn.computeOut(sens, ac);
 //     LOG_DEBUG("my sol : " << my_sol << " | best : " << best_sol << " (" << acopt->at(0) << " vs " << M_PI/5 << ") ");
 
-  float precision = 0.1;
+  double precision = 0.1;
   if (acopt->at(0) > 0) {
     EXPECT_GT(acopt->at(0), M_PI / 5. - precision);
     EXPECT_LT(acopt->at(0), M_PI / 5. + precision);
@@ -603,8 +611,8 @@ TEST(MLP, OptimizeTrapInEvilLocalOptimal) {
   //global max -0.7
 
   MLP nn(1, 12, 0, 0.1f);
-  std::vector<float> sens(0);
-  std::vector<float> ac(1);
+  std::vector<double> sens(0);
+  std::vector<double> ac(1);
 
   fann_set_training_algorithm(nn.getNeuralNet(), FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
   fann_set_train_error_function(nn.getNeuralNet(), FANN_ERRORFUNC_TANH);
@@ -632,20 +640,20 @@ TEST(MLP, OptimizeTrapInEvilLocalOptimal) {
     double out = sin(-3 * x1 * x1 * x1 + 2 * x1 * x1 + x1);
     ac[0] = x1;
 
-    double myout = nn.computeOut(sens, ac);
+    double myout = nn.computeOutVF(sens, ac);
     LOG_FILE("OptimizeTrapInEvilLocalOptimal.data", x1 << " " << myout << " " << out);
 //     close all; X=load('OptimizeTrapInEvilLocalOptimal.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');
   }
 
-  std::vector<float>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION);
+  std::vector<double>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION);
 //     LOG_DEBUG(acopt->at(0));
 
-  float precision = 0.1;
+  double precision = 0.1;
 
   if(acopt->at(0) < -0.7 - precision || acopt->at(0) > -0.7 + precision) {
-    LOG_DEBUG(nn.computeOut(sens, *acopt));
+    LOG_DEBUG(nn.computeOutVF(sens, *acopt));
     ac[0] = -0.7;
-    LOG_DEBUG(nn.computeOut(sens, ac));
+    LOG_DEBUG(nn.computeOutVF(sens, ac));
   }
 
   EXPECT_GT(acopt->at(0), -0.7 - precision);
@@ -662,8 +670,8 @@ TEST(MLP, OptimizePlateau) {
   //global max -0.7
 
   MLP nn(1, 2, 0, 0.1f);
-  std::vector<float> sens(0);
-  std::vector<float> ac(1);
+  std::vector<double> sens(0);
+  std::vector<double> ac(1);
 
   fann_set_training_algorithm(nn.getNeuralNet(), FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
   fann_set_train_error_function(nn.getNeuralNet(), FANN_ERRORFUNC_TANH);
@@ -691,17 +699,208 @@ TEST(MLP, OptimizePlateau) {
     double out = x1 >= 0.2 ? 1. : 0.2;
     ac[0] = x1;
 
-    double myout = nn.computeOut(sens, ac);
+    double myout = nn.computeOutVF(sens, ac);
     LOG_FILE("OptimizePlateau.data", x1 << " " << myout << " " << out);
 //     close all; X=load('OptimizePlateau.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');
   }
 
-  std::vector<float>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION);
+  std::vector<double>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION);
 //     LOG_DEBUG(acopt->at(0));
 
-  float precision = 0.01;
+  double precision = 0.01;
 
   EXPECT_GT(acopt->at(0), 0.2 - precision);
 
   delete acopt;
+}
+
+TEST(MLP, ConsistentActivationFunctionLecun) {
+  MLP nn(1, 1, 0, 0.01f, true);
+
+  fann_set_weight(nn.getNeuralNet(), 0, 2, 1.f);
+  fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
+  fann_set_weight(nn.getNeuralNet(), 2, 4, 1.f);
+  fann_set_weight(nn.getNeuralNet(), 3, 4, 0.f);
+  
+  std::vector<double> sens(0);
+  std::vector<double> ac(1);
+  ac[0] = 1.d;
+
+  double lambda = atanh(1.d/sqrt(3.d));
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), sqrt(3.d)*tanh(lambda * 1.d));
+
+  ac[0] = 1.5d;
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), sqrt(3.d)*tanh(lambda * 1.5d));//1.31
+  
+  fann_set_weight(nn.getNeuralNet(), 0, 2, 0.f);
+  fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
+  fann_set_weight(nn.getNeuralNet(), 2, 4, 0.f);
+  fann_set_weight(nn.getNeuralNet(), 3, 4, 5.f);
+
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), 5.f);
+
+  fann_set_weight(nn.getNeuralNet(), 0, 2, 0.2f);
+  fann_set_weight(nn.getNeuralNet(), 1, 2, 0.4f);
+  fann_set_weight(nn.getNeuralNet(), 2, 4, 0.6f);
+  fann_set_weight(nn.getNeuralNet(), 3, 4, 0.8f);
+
+  ac[0] = -1.d;
+  EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), (sqrt(3.d)*tanh(lambda * (-1. * 0.2f + 0.4f)) * 0.6f + 0.8f));
+}
+
+TEST(MLP, LearnAndOrLecun) {
+  MLP nn(3, 10, 2, 0.05f, true);
+
+  // Learn
+  for (uint n = 0; n < 10000 ; n++) {
+    double x1 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x2 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x3 = bib::Utils::randBool() ? 1.f : -1.f;
+
+    double out = AND(OR(x1, x2), x3);
+
+    std::vector<double> sens(2);
+    sens[0] = x1;
+    sens[1] = x2;
+    std::vector<double> ac(1);
+    ac[0] = x3;
+    
+    nn.learn(sens, ac, out);
+  }
+
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x2 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x3 = bib::Utils::randBool() ? 1.f : -1.f;
+
+    double out = AND(OR(x1, x2), x3);
+
+    std::vector<double> sens(2);
+    sens[0] = x1;
+    sens[1] = x2;
+    std::vector<double> ac(1);
+    ac[0] = x3;
+
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.02);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.02);
+  }
+}
+
+TEST(MLP, LearnAndOrLecun2) {
+  MLP nn(3, 5, 1, true);
+
+  struct fann_train_data* data = fann_create_train(2*2*2, 3, 1);
+   
+  uint n = 0;
+  auto iter = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->input[n][1]= x[1];
+    data->input[n][2]= x[2];
+    
+    double out = AND(OR(x[0], x[1]), x[2]);
+    data->output[n][0]= out;
+    n++;
+  };
+    
+  bib::Combinaison::continuous<>(iter, 3, -1, 1, 1);
+  
+  nn.learn_stoch(data, 20000, 0, 0.00000001);
+  
+  fann_destroy_train(data);
+
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x2 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x3 = bib::Utils::randBool() ? 1.f : -1.f;
+
+    double out = AND(OR(x1, x2), x3);
+
+    std::vector<double> sens(2);
+    sens[0] = x1;
+    sens[1] = x2;
+    std::vector<double> ac(1);
+    ac[0] = x3;
+
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.02);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.02);
+    
+    std::vector<double> in(3);
+    in[0] = x1;
+    in[1] = x2;
+    in[2] = x3;
+    std::vector<double>* outnn = nn.computeOut(in);
+    
+    EXPECT_GT(outnn->at(0), out - 0.05);
+    EXPECT_LT(outnn->at(0), out + 0.05);
+    
+    delete outnn;
+  }
+}
+
+TEST(MLP, LearnAndOrLecun3) {
+  MLP nn(3, 5, 1, true);
+  MLP nn_nolecun(3, 5, 1);
+
+  struct fann_train_data* data = fann_create_train(2*2*2, 3, 1);
+   
+  uint n = 0;
+  auto iter = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->input[n][1]= x[1];
+    data->input[n][2]= x[2];
+    
+    double out = LECUNIZATION(AND(OR(x[0], x[1]), x[2]));
+    data->output[n][0]= out;
+    n++;
+  };
+    
+  bib::Combinaison::continuous<>(iter, 3, -1, 1, 1);
+  
+  nn.learn_stoch(data, 20000, 0, 0.00000001);
+  nn_nolecun.learn_stoch(data, 20000, 0, 0.00000001);
+  
+  fann_destroy_train(data);
+  
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x2 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x3 = bib::Utils::randBool() ? 1.f : -1.f;
+
+    double out = LECUNIZATION(AND(OR(x1, x2), x3));
+
+    std::vector<double> sens(2);
+    sens[0] = x1;
+    sens[1] = x2;
+    std::vector<double> ac(1);
+    ac[0] = x3;
+
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.02);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.02);
+        
+    std::vector<double> in(3);
+    in[0] = x1;
+    in[1] = x2;
+    in[2] = x3;
+    std::vector<double>* outnn = nn.computeOut(in);
+    
+    EXPECT_GE(outnn->at(0), -1.f);
+    EXPECT_LE(outnn->at(0), 1.f);
+    
+    EXPECT_GE(nn_nolecun.computeOutVF(sens, ac), -1.f);
+    EXPECT_LE(nn_nolecun.computeOutVF(sens, ac), 1.f);
+    
+    if(out > 0){
+      EXPECT_DOUBLE_EQ(outnn->at(0), 1.f);
+      EXPECT_DOUBLE_EQ(nn_nolecun.computeOutVF(sens, ac), 1.f);
+    }
+    else {
+      EXPECT_DOUBLE_EQ(outnn->at(0), -1.f);
+      EXPECT_DOUBLE_EQ(nn_nolecun.computeOutVF(sens, ac), -1.f);
+    }
+    
+    delete outnn;
+  }
 }

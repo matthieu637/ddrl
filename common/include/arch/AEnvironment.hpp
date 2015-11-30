@@ -12,13 +12,13 @@ template <typename ProgOptions = EnvProgOptions>
 class AEnvironment : public ProgOptions, public CommonAE {
  public:
   virtual void unique_destroy() {}
-  virtual const std::vector<float>& perceptions() const = 0;
+  virtual const std::vector<double>& perceptions() const = 0;
 
   virtual unsigned int number_of_actuators() const = 0;
 
   virtual unsigned int number_of_sensors() const = 0;
 
-  virtual float performance() const = 0;
+  virtual double performance() const = 0;
 
   virtual ~AEnvironment() {  // pure?
   }
@@ -41,7 +41,7 @@ class AEnvironment : public ProgOptions, public CommonAE {
     _next_instance();
   }
 
-  void apply(const std::vector<float>& actuators) {
+  void apply(const std::vector<double>& actuators) {
     current_step++;
     _apply(actuators);
   }
@@ -65,7 +65,7 @@ class AEnvironment : public ProgOptions, public CommonAE {
 
   virtual void _next_instance() {}
 
-  virtual void _apply(const std::vector<float>&) = 0;
+  virtual void _apply(const std::vector<double>&) = 0;
 
   unsigned int current_step = 0;
   unsigned int current_instance = 0;

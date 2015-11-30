@@ -44,18 +44,18 @@ void Algo::setPointeurIteration(unsigned int* _iter){
 void Algo::setPointeurEpisode(unsigned int* _iter){
     episode=_iter;
 }
-void Algo::addReward(float const _reward){
+void Algo::addReward(double const _reward){
 
     if(*episode>1){
         (*current_param_episode).episode = *iter;
-        params_episode.push_back( pair<float,Param*> (_reward,current_param_episode));
+        params_episode.push_back( pair<double,Param*> (_reward,current_param_episode));
         sort(params_episode.begin(), params_episode.end());
     }
 
     if(*episode>1 && ((*iter)+1)%(*config).n_instances==0){
 
         current_param = params_episode[params_episode.size()-1].second;
-        best_params.push_back( pair<float,Param*> (params_episode[params_episode.size()-1].first,params_episode[params_episode.size()-1].second));
+        best_params.push_back( pair<double,Param*> (params_episode[params_episode.size()-1].first,params_episode[params_episode.size()-1].second));
 
         for(unsigned int i=0;i<params_episode.size()-1;i++){
             for(unsigned int j=0;j<(*params_episode[i].second).weights.size();j++){
@@ -85,7 +85,7 @@ void Algo::addReward(float const _reward){
         }
     } else if(*episode==1 && ((*iter)+1)%(*config).n_instances==0){
         (*current_param).episode = *iter;
-        best_params.push_back( pair<float,Param*> (_reward,current_param));
+        best_params.push_back( pair<double,Param*> (_reward,current_param));
     }
 
 }
@@ -111,7 +111,7 @@ void Algo::computeNewWeights(){
 
                 for(int i=0;i<n_items;i++){
                     Param* par = best_params[best_params.size()-1-i].second;
-                    float reward_j = best_params[best_params.size()-1-i].first;
+                    double reward_j = best_params[best_params.size()-1-i].first;
                     /*if(i_kernel==((*config).n_motors-1) && i<11){
                     cout << (*par).episode << endl;
                     cout << reward_j << endl;
@@ -126,11 +126,11 @@ void Algo::computeNewWeights(){
                 *new_weights = (*current_param).weights[i_kernel]->col(0).array() + param_nom.array()/(param_dnom.array()+0.0000000001f);
 
                 Eigen::VectorXf var_nom = VectorXf::Zero(n_weights).transpose();
-                float var_dnom = 0;
+                double var_dnom = 0;
                 n_items = (*episode-1<(*config).elite_variance)?*episode-1:(*config).elite_variance;
 
                 for(int i=0;i<n_items;i++){
-                    float reward_j = best_params[best_params.size()-1-i].first;
+                    double reward_j = best_params[best_params.size()-1-i].first;
                     Param* par = best_params[best_params.size()-1-i].second;
                     temp_explore = (*par).weights[i_kernel]->col(0)-(*current_param).weights[i_kernel]->col(0);
                     var_nom = var_nom.array() + temp_explore.array().square()*reward_j;
@@ -142,8 +142,8 @@ void Algo::computeNewWeights(){
 
                 /*
                 int best = s_Return[s_Return.size()-1].second;
-                float mean = param.col(best).mean();
-                float var_iance = ((param.col(best).squaredNorm()/param.col(best).rows())-pow(mean,2))*100/n_motors;
+                double mean = param.col(best).mean();
+                double var_iance = ((param.col(best).squaredNorm()/param.col(best).rows())-pow(mean,2))*100/n_motors;
                 VectorXf varVector = VectorXf::Constant(n_motors,var_iance).array().transpose();
                 cout << var_iance << endl;
                 variance.col(iter)=variance.col(iter).cwiseMin(10*varVector);
@@ -152,7 +152,7 @@ void Algo::computeNewWeights(){
                 else
                 */
 
-                float coef = pow((*config).d_variance,*episode);
+                double coef = pow((*config).d_variance,*episode);
                 if(coef*(*config).var_init<1e-16)
                     coef = 1e-16/(*config).var_init;
 
@@ -186,7 +186,7 @@ void Algo::computeNewWeights(){
 Eigen::VectorXf Algo::normalDistribution(unsigned int _size){
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine generator(seed);
-    std::normal_distribution<float> distribution(0.0,1.0);
+    std::normal_distribution<double> distribution(0.0,1.0);
     Eigen::VectorXf retour(_size);
     for(unsigned int i=0;i<_size;i++)
         retour(i) = distribution(generator);
@@ -194,14 +194,14 @@ Eigen::VectorXf Algo::normalDistribution(unsigned int _size){
     return retour;
 }
 
-vector<float> Algo::getNextActions(vector<float> sensors){
-    vector<float> actions;
+vector<double> Algo::getNextActions(vector<double> sensors){
+    vector<double> actions;
     for (unsigned int i=0;i<(*config).n_motors;i++){
-          vector<float> states;
-          //float coef = 1.0f/0.75f;
-          float theta(0);
-          float y(0);
-          float x(0);
+          vector<double> states;
+          //double coef = 1.0f/0.75f;
+          double theta(0);
+          double y(0);
+          double x(0);
 
         if(i==0){
           theta +=sensors[i*2];
@@ -318,7 +318,7 @@ return actions;
             while(getline(fichier, ligne))
             {
 
-                float temp;
+                double temp;
                 temp = Kernel::GetFloat32(ligne.c_str());
                 //temp = ::atof(ligne.c_str());
                 (*weights)(i,0)=temp;
