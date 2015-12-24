@@ -5,7 +5,7 @@
 #include <functional>
 #include <thread>
 
-#include "fann/doublefann.h"
+#include "doublefann.h"
 #include "opt++/newmat.h"
 #include "opt++/NLF.h"
 #include "opt++/BoundConstraint.h"
@@ -15,7 +15,7 @@
 #include "opt++/OptBCNewton.h"
 #include "opt++/OptBaNewton.h"
 #include "opt++/OptDHNIPS.h"
-#include <fann/fann_data.h>
+#include "fann_data.h"
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 
@@ -244,6 +244,30 @@ class MLP {
 
     auto iter = [&]() {
       fann_train_epoch(neural_net, data);
+    };
+    auto eval = [&]() {
+      return fann_get_MSE(neural_net);
+    };
+    
+    NN best_nn = nullptr;
+    auto save_best = [&]() {
+      if(best_nn != nullptr)
+        fann_destroy(best_nn);
+      best_nn = fann_copy(neural_net);
+    };
+    bib::Converger::min_stochastic<>(iter, eval, save_best, max_epoch, precision, display_each, stable_over);
+    copy(best_nn);
+    fann_destroy(best_nn); 
+  }
+  
+  void learn_stoch_lw(struct fann_train_data* data, fann_type* lweight, uint max_epoch=10000, 
+		      uint display_each = 0, double precision = 0.00001, uint stable_over=50){
+    //FANN_TRAIN_BATCH FANN_TRAIN_RPROP
+    fann_set_training_algorithm(neural_net, FANN_TRAIN_RPROP); //adaptive algorithm without learning rate
+    fann_set_train_error_function(neural_net, FANN_ERRORFUNC_TANH);
+
+    auto iter = [&]() {
+      fann_train_epoch_lw(neural_net, data, lweight);
     };
     auto eval = [&]() {
       return fann_get_MSE(neural_net);

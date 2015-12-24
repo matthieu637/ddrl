@@ -18,6 +18,7 @@ else()
       /usr/local/include
       /opt/local/include
       /sw/include
+      ~/local_build/include/fann/
   )
 
   set( _libraries fann doublefann fixedfann floatfann )
@@ -34,6 +35,7 @@ else()
         /usr/local/lib
         /opt/local/lib
         /sw/lib
+	~/local_build/lib/
       )
 
   endforeach()
