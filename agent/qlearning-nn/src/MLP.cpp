@@ -1,7 +1,7 @@
 #include "MLP.hpp"
 
 #include <vector>
-#include "fann/doublefann.h"
+#include "doublefann.h"
 #include "bib/Assert.hpp"
 #include <bib/Utils.hpp>
 

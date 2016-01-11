@@ -57,3 +57,12 @@ execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_
 #-------------------
 set(all_test_source ${all_sources} ${drawstuff_src})
 enable_utest(all_test_source ${ODE_LIBRARY} ${Boost_LIBRARIES} ${X11_LIBRARIES} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY})
+
+# ALAIN => target etags/tags
+IF (UNIX)
+  ADD_CUSTOM_TARGET(tags etags --members --declarations  `find . -name 
+*.cc -or -name *.hh -or -name *.cpp -or -name *.h -or -name *.c -or 
+-name *.f`)
+  ADD_CUSTOM_TARGET(etags DEPENDS tags)
+ENDIF (UNIX)
+

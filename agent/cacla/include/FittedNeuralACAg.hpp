@@ -608,7 +608,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
       write_state_dis("pcs" + std::to_string(episode));
       
       if(!online_actor_update){
-        if(episode % 10 == 0)
+//         if(episode % 10 == 0)
           update_actor(); 
       }
       
@@ -711,7 +711,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
   }
   
   void write_policy_file(const std::string& file){
-// #ifdef DEBUG_FILE
+#ifdef DEBUG_FILE
       std::ofstream out;
       out.open(file, std::ofstream::out);
     
@@ -727,7 +727,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
       
       bib::Combinaison::continuous<>(iter, nb_sensors, -1, 1, 100);
       out.close();
-// #endif
+#endif
   }
   
   //importance sampling + multi drawn

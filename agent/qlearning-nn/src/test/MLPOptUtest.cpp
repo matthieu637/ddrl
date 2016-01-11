@@ -2,9 +2,9 @@
 
 #include <vector>
 #include <iostream>
-#include <fann/doublefann.h>
-#include <fann/fann_train.h>
-#include <fann/fann.h>
+#include <doublefann.h>
+#include <fann_train.h>
+#include <fann.h>
 
 
 #include "MLP.hpp"
@@ -630,7 +630,7 @@ TEST(MLP, OptimizeTrapInEvilLocalOptimal) {
     data->output[n][0] = out;
   }
 
-  fann_train_on_data(nn.getNeuralNet(), data, 3000, 0, 0.0005);
+  fann_train_on_data(nn.getNeuralNet(), data, 10000, 0, 0.0005);
   fann_destroy_train(data);
 
   //Test learned
@@ -645,7 +645,7 @@ TEST(MLP, OptimizeTrapInEvilLocalOptimal) {
 //     close all; X=load('OptimizeTrapInEvilLocalOptimal.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');
   }
 
-  std::vector<double>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION);
+  std::vector<double>* acopt = nn.optimized(sens, {}, NB_SOL_OPTIMIZATION+100);
 //     LOG_DEBUG(acopt->at(0));
 
   double precision = 0.1;
@@ -839,68 +839,173 @@ TEST(MLP, LearnAndOrLecun2) {
   }
 }
 
-TEST(MLP, LearnAndOrLecun3) {
-  MLP nn(3, 5, 1, true);
-  MLP nn_nolecun(3, 5, 1);
 
-  struct fann_train_data* data = fann_create_train(2*2*2, 3, 1);
-   
+// 1 0.2
+// 3 0.3
+// 5 0.3
+// 
+// Result:  y = 0.025 x + 1.916666667·10-1
+// 
+// 2.166666667·10-1 		 1.666666667·10-2 
+// 2.666666667·10-1 		 3.333333333·10-2 
+// 3.166666667·10-1 		 1.666666667·10-2 
+TEST(MLP, LearnLabelWeight) {
+  fann* lin_nn =fann_create_standard(2, 1, 1);
+  fann_set_activation_function_output(lin_nn, FANN_LINEAR);
+  fann_set_learning_momentum(lin_nn, 0.);
+  fann_set_training_algorithm(lin_nn, FANN_TRAIN_RPROP);
+
+  struct fann_train_data* data = fann_create_train(3, 1, 1);
+  fann_type lw [3];
+  
+  uint n = 0;
+  data->input[n][0]= 1.f;
+  data->output[n][0]= 2.f/10.f;
+  lw[n] = 1.f;
+  n++;
+  data->input[n][0]= 3.f;
+  data->output[n][0]= 3.f/10.f;
+  lw[n] = 0.5f;
+  n++;
+  data->input[n][0]= 5.f;
+  data->output[n][0]= 3.f/10.;
+  lw[n] = 1.f;
+  n++;
+  
+  for(int i=0;i<1000; i++)
+    fann_train_epoch(lin_nn, data);
+  
+  fann_type out_no_lw[3];
+  fann_type * out;
+  n=0;
+  out = fann_run(lin_nn, data->input[n]);
+  EXPECT_GT(out[0], 0.216 - 0.002);
+  EXPECT_LT(out[0], 0.216 + 0.002);
+  out_no_lw[n]=out[0];
+  n++;
+
+  out = fann_run(lin_nn, data->input[n]);
+  EXPECT_GT(out[0], 0.266 - 0.002);
+  EXPECT_LT(out[0], 0.266 + 0.002);
+  out_no_lw[n]=out[0];
+  n++;
+  
+  out = fann_run(lin_nn, data->input[n]);
+  EXPECT_GT(out[0], 0.316 - 0.002);
+  EXPECT_LT(out[0], 0.316 + 0.002);
+  out_no_lw[n]=out[0];
+  
+  for(int i=0;i<1000; i++)
+    fann_train_epoch_lw(lin_nn, data, lw);
+  
+  n=0;
+  out = fann_run(lin_nn, data->input[n]);
+  EXPECT_GT(out[0], 0.2);
+  EXPECT_LT(out[0], out_no_lw[n]);
+  out_no_lw[n]=out[0];
+  n++;
+
+  out = fann_run(lin_nn, data->input[n]);
+  EXPECT_GT(out[0], 0.25);
+  EXPECT_LT(out[0], out_no_lw[n]);
+  out_no_lw[n]=out[0];
+  n++;
+  
+  out = fann_run(lin_nn, data->input[n]);
+  EXPECT_GT(out[0], 0.3);
+  EXPECT_LT(out[0], out_no_lw[n]);
+  out_no_lw[n]=out[0];
+  
+  lw[1] = 0.05;
+  for(int i=0;i<1000; i++)
+    fann_train_epoch_lw(lin_nn, data, lw);
+    
+  n=0;
+  out = fann_run(lin_nn, data->input[n]);
+  EXPECT_GT(out[0], 0.2);
+  EXPECT_LT(out[0], out_no_lw[n]);
+  n++;
+
+  out = fann_run(lin_nn, data->input[n]);
+  EXPECT_GT(out[0], 0.25);
+  EXPECT_LT(out[0], out_no_lw[n]);
+  n++;
+  
+  out = fann_run(lin_nn, data->input[n]);
+  EXPECT_GT(out[0], 0.3);
+  EXPECT_LT(out[0], out_no_lw[n]);
+  
+  fann_destroy_train(data);
+}
+
+TEST(MLP, LearnNonLinearLabelWeight) {
+  MLP nn(1, 4, 1, true);
+
+  struct fann_train_data* data = fann_create_train(11*2, 1, 1);
+  fann_type label_weight[11*2];
+  
   uint n = 0;
   auto iter = [&](const std::vector<double>& x) {
     data->input[n][0]= x[0];
-    data->input[n][1]= x[1];
-    data->input[n][2]= x[2];
-    
-    double out = LECUNIZATION(AND(OR(x[0], x[1]), x[2]));
-    data->output[n][0]= out;
+    data->output[n][0]= x[0];
+    label_weight[n] = 1.f;
     n++;
   };
-    
-  bib::Combinaison::continuous<>(iter, 3, -1, 1, 1);
+  
+  auto iter2 = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->output[n][0]= x[0]*x[0];
+    label_weight[n] = 0.2f;
+    n++;
+  };
+  
+  bib::Combinaison::continuous<>(iter, 1, 0, 1, 10);
+  bib::Combinaison::continuous<>(iter2, 1, 0, 1, 10);
   
   nn.learn_stoch(data, 20000, 0, 0.00000001);
-  nn_nolecun.learn_stoch(data, 20000, 0, 0.00000001);
-  
-  fann_destroy_train(data);
   
   // Test
   for (uint n = 0; n < 100 ; n++) {
-    double x1 = bib::Utils::randBool() ? 1.f : -1.f;
-    double x2 = bib::Utils::randBool() ? 1.f : -1.f;
-    double x3 = bib::Utils::randBool() ? 1.f : -1.f;
+    double x1 = bib::Utils::rand01();
 
-    double out = LECUNIZATION(AND(OR(x1, x2), x3));
+    double out = (x1 + x1*x1)/2.;
 
-    std::vector<double> sens(2);
+    std::vector<double> sens(1);
     sens[0] = x1;
-    sens[1] = x2;
-    std::vector<double> ac(1);
-    ac[0] = x3;
+    std::vector<double> ac(0);
+    
+    double old_out1 = x1;
+    double old_out2 = x1*x1;
 
-    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.02);
-    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.02);
-        
-    std::vector<double> in(3);
-    in[0] = x1;
-    in[1] = x2;
-    in[2] = x3;
-    std::vector<double>* outnn = nn.computeOut(in);
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.15);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.15);
     
-    EXPECT_GE(outnn->at(0), -1.f);
-    EXPECT_LE(outnn->at(0), 1.f);
-    
-    EXPECT_GE(nn_nolecun.computeOutVF(sens, ac), -1.f);
-    EXPECT_LE(nn_nolecun.computeOutVF(sens, ac), 1.f);
-    
-    if(out > 0){
-      EXPECT_DOUBLE_EQ(outnn->at(0), 1.f);
-      EXPECT_DOUBLE_EQ(nn_nolecun.computeOutVF(sens, ac), 1.f);
+    if(x1 > 0.15 && x1 < 0.85){
+      EXPECT_GE(fabs(nn.computeOutVF(sens, ac) - old_out1), fabs(nn.computeOutVF(sens, ac) - out));
+      EXPECT_GE(fabs(nn.computeOutVF(sens, ac) - old_out2), fabs(nn.computeOutVF(sens, ac) - out));
     }
-    else {
-      EXPECT_DOUBLE_EQ(outnn->at(0), -1.f);
-      EXPECT_DOUBLE_EQ(nn_nolecun.computeOutVF(sens, ac), -1.f);
-    }
-    
-    delete outnn;
+      
   }
+  
+  nn.learn_stoch_lw(data, label_weight, 20000, 0, 0.00000001);
+  
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::rand01();
+
+    double old_out = (x1 + x1*x1)/2.;
+    double out = (x1 + 0.2*x1*x1)/1.2;
+
+    std::vector<double> sens(1);
+    sens[0] = x1;
+    std::vector<double> ac(0);
+
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.1);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.1);
+    
+    if(x1 > 0.15 && x1 < 0.85)
+      EXPECT_GE(fabs(nn.computeOutVF(sens, ac) - old_out), fabs(nn.computeOutVF(sens, ac) - out));
+  }
+  
+  fann_destroy_train(data);
 }

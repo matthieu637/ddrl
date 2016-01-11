@@ -10,6 +10,7 @@
 static AdvancedAcrobotWorldView* inst = nullptr;
 
 void parseCommand(int cmd) {
+
   static float xyz[3] = {0., -3., 1};
   static float hpr[3] = {90, 0, 0};
 
@@ -53,6 +54,7 @@ void parseCommand(int cmd) {
     LOG_DEBUG("resetPositions should not be used");
     break;
   }
+
 }
 
 void threadloop(const std::string& goodpath) {

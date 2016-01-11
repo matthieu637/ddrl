@@ -21,6 +21,6 @@ void way2() {
 
 int main(int, char **) {
   way2();
-
+  
   return 0;
 }
