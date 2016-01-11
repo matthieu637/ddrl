@@ -5,8 +5,10 @@
 
 // #include "FittedQACAg.hpp"
 // #include "FittedQIterationAg.hpp"
-#include "FittedNeuralACAg.hpp"
+// #include "FittedNeuralACAg.hpp"
 // #include "SemiFittedNeuralACAg.hpp"
+#include "OfflineCaclaAgLW.hpp"
+
 
 int main(int argc, char **argv) {
 //   arch::Simulator<AdvancedAcrobotEnv, FittedQACAg> s;
@@ -15,7 +17,8 @@ int main(int argc, char **argv) {
 //   arch::Simulator<arch::SimpleEnv1D, arch::ExampleAgent> s;
 //   arch::Simulator<arch::SimpleEnv1DFixedTraj, FittedNeuralACAg> s;
 //   arch::Simulator<AdvancedAcrobotEnv, FittedNeuralACAg, arch::MotorEpisodeStat> s;
-  arch::Simulator<AdvancedAcrobotEnv, FittedNeuralACAg> s;
+//  arch::Simulator<AdvancedAcrobotEnv, FittedNeuralACAg> s;
+  arch::Simulator<AdvancedAcrobotEnv, OfflineCaclaAg> s;
 
   s.init(argc, argv);
 
