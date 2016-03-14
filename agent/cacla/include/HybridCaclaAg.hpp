@@ -179,7 +179,7 @@ class HybridCaclaAg : public arch::AAgent<> {
     
   }
 
-  void start_episode(const std::vector<double>& sensors) override {
+  void start_episode(const std::vector<double>& sensors, bool) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);

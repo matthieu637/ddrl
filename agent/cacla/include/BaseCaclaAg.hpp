@@ -170,7 +170,7 @@ class BaseCaclaAg : public arch::AAgent<> {
     fann_set_learning_rate(vnn->getNeuralNet(), alpha_v / fann_get_total_connections(vnn->getNeuralNet()));
   }
 
-  void start_episode(const std::vector<double>& sensors) override {
+  void start_episode(const std::vector<double>& sensors, bool) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -220,6 +220,8 @@ class BaseCaclaAg : public arch::AAgent<> {
     
 //      write_actionf_file("ac_func.data");
 //      write_valuef_file("v_after.data");
+    ann->print();
+    LOG_FILE("policy_exploration", ann->hash());
   }
   
    void write_actionf_file(const std::string& file){

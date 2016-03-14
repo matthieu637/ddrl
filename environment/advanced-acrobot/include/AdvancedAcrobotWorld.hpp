@@ -8,14 +8,17 @@
 #include "ODEObject.hpp"
 #include "ODEFactory.hpp"
 
-#define BONE_LENGTH 0.3
-#define BONE_LARGER 0.02
+#define BONE_LENGTH 1.f
+//sqrt(1÷1062) so mass=1
+#define BONE_LARGER 0.030685821
+//#define BONE_LARGER 0.021698152
 #define STARTING_Z 0.5
+#define INERTIA 1.f
 
 #define GRAVITY -9.81
 #define BONE_DENSITY 1062  // Average human body density
-#define MAX_TORQUE_HINGE 0.125
-#define MAX_TORQUE_SLIDER 5
+#define MAX_TORQUE_HINGE 1.5
+#define MAX_TORQUE_SLIDER 5 // not used
 #define WORLD_STEP 0.01
 
 enum bone_joint { HINGE, SLIDER };

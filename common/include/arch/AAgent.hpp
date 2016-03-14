@@ -37,15 +37,15 @@ class AAgent : public ProgOptions, public CommonAE {
    * @param reward the reward you got for your last action choose
    * @param perceptions the current perceptions provided by the environment
    * @param learning should the agent learns during the interaction (false to test an agent)
-   * @param goal_reached did the agent reached a global goal during his last action
+   * @param absorbing_state did the agent reached a global goal during his last action
    * @return const std::vector< double, std::allocator< void > >&
    */
   virtual const std::vector<double>& run(double reward, const std::vector<double>& perceptions,
-                                        bool learning, bool goal_reached) {
+                                        bool learning, bool absorbing_state) {
     (void) reward;
     (void) perceptions;
     (void) learning;
-    (void) goal_reached;
+    (void) absorbing_state;
     LOG_ERROR("not implemented");
     return *new std::vector<double>();
   }
@@ -56,14 +56,14 @@ class AAgent : public ProgOptions, public CommonAE {
    * @param reward the reward you got for your last action choose
    * @param perceptions the current perceptions provided by the environment
    * @param learning should the agent learns during the interaction (false to test an agent)
-   * @param goal_reached did the agent reached a global goal during his last action
+   * @param absorbing_state did the agent reached a global goal during his last action
    * @param finished is it the last step of this episode
    * @return const std::vector< double, std::allocator< void > >&
    */
   virtual const std::vector<double>& runf(double reward, const std::vector<double>& perceptions,
-                                         bool learning, bool goal_reached, bool finished) {
+                                         bool learning, bool absorbing_state, bool finished) {
     (void) finished;
-    return run(reward, perceptions, learning, goal_reached);
+    return run(reward, perceptions, learning, absorbing_state);
   }
 
   /**
@@ -71,8 +71,12 @@ class AAgent : public ProgOptions, public CommonAE {
    * @param sensors the first perceptions from the environment
    * @return void
    */
-  virtual void start_episode(const std::vector<double>&) {}
-
+  virtual void start_episode(const std::vector<double>&, bool) {}
+  
+  virtual void start_instance(bool) {}
+  
+  virtual void end_instance(bool) {}
+  
   /**
    * @brief This method is called after each end of an instance
    * @return void

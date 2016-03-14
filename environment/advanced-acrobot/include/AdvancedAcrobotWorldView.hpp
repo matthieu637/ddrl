@@ -24,9 +24,10 @@ class AdvancedAcrobotWorldView : public AdvancedAcrobotWorld {
   std::list<dGeomID> geoms;
   //     std::list<ODEObject*> delete_me_later;
 
-  tbb::tbb_thread *eventThread;
+  tbb::tbb_thread *eventThread = nullptr;
   dsFunctions fn;
   bool requestEnd;
+  bool changeThread;
 
   // specific keyboard behavior
   double speed;

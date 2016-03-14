@@ -1,5 +1,6 @@
-#ifndef OFFLINECACLAAG_HPP
-#define OFFLINECACLAAG_HPP
+
+#ifndef OFFPOLSETACFITTED_HPP
+#define OFFPOLSETACFITTED_HPP
 
 #include <vector>
 #include <string>
@@ -55,16 +56,16 @@ typedef struct _sample {
 
 } sample;
 
-class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
+class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
  public:
   typedef MLP PolicyImpl;
    
-  OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
+  OffPolSetACFitted(unsigned int _nb_motors, unsigned int _nb_sensors)
     : nb_motors(_nb_motors), nb_sensors(_nb_sensors), time_for_ac(1), returned_ac(nb_motors) {
 
   }
 
-  virtual ~OfflineCaclaAg() {
+  virtual ~OffPolSetACFitted() {
     delete vnn;
     delete ann;
   }
@@ -116,8 +117,8 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       }
         
       trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0});
+      last_trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0});
       proba_s.add_data(last_state);
-      trajectory_a.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0});
     }
 
     last_pure_action.reset(new vector<double>(*next_action));
@@ -154,6 +155,8 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     determinist_vnn_update  = pt->get<bool>("agent.determinist_vnn_update");
     update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
+    change_policy_each      = pt->get<uint>("agent.change_policy_each");
+    strategy_w              = pt->get<uint>("agent.strategy_w");
     
     if(!gaussian_policy)
       noise = 0.05;
@@ -169,7 +172,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
   }
 
-  void start_episode(const std::vector<double>& sensors) override {
+  void start_episode(const std::vector<double>& sensors, bool) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -184,14 +187,24 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     global_pow_gamma = 1.f;
     internal_time = 0;
     
-    trajectory_a.clear();
     //trajectory.clear();
+    last_trajectory.clear();
     
     fann_reset_MSE(vnn->getNeuralNet());
+    
+    if(episode == 0 || episode % change_policy_each == 0){
+      if (! boost::filesystem::exists( "polset."+std::to_string(current_loaded_policy) ) ){
+        LOG_ERROR("file doesn't exists "<< "polset."+std::to_string(current_loaded_policy));
+        exit(1);
+      }
+      
+      ann->load("polset."+std::to_string(current_loaded_policy));
+      current_loaded_policy++;
+    }
   }
 
   struct ParraVtoVNext {
-    ParraVtoVNext(const std::vector<sample>& _vtraj, const OfflineCaclaAg* _ptr) : vtraj(_vtraj), ptr(_ptr) {
+    ParraVtoVNext(const std::vector<sample>& _vtraj, const OffPolSetACFitted* _ptr) : vtraj(_vtraj), ptr(_ptr) {
       data = fann_create_train(vtraj.size(), ptr->nb_sensors, 1);
       for (uint n = 0; n < vtraj.size(); n++) {
         sample sm = vtraj[n];
@@ -229,7 +242,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
     struct fann_train_data* data;
     const std::vector<sample>& vtraj;
-    const OfflineCaclaAg* ptr;
+    const OffPolSetACFitted* ptr;
   };
   
   void computePTheta(vector< sample >& vtraj, double *ptheta){
@@ -260,31 +273,48 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       if (trajectory.size() > 0) {
         //remove trace of old policy
 
-        std::vector<sample> vtraj(trajectory.size());
-        std::copy(trajectory.begin(), trajectory.end(), vtraj.begin());
-	double *importance_sample = new double [trajectory.size()]; 
-	double *ptheta = new double [trajectory.size()];
-        
-        //compute 1/u(x)
-        
-        //compute p_theta(at|xt)
-        computePTheta(vtraj, ptheta);
-        
-        //compute pfull_data
-	uint i=0;
-        for(auto it = vtraj.begin(); it != vtraj.end() ; ++it) {
-//             importance_sample[i++] = (1.f / proba_s.pdf(it->s)) * (it->ptheta_data / it->p0);
-	  importance_sample[i] = ptheta[i];
-//             it->pfull_data = 1.f / (it->ptheta_data) ;
-//             it->pfull_data = (1.f / proba_s.pdf(it->s));
-//             it->pfull_data = (1.f / proba_s.pdf(it->s)) * it->ptheta_data;
-	  i++;
-	}
-        
-        ParraVtoVNext dq(vtraj, this);
+        std::vector<sample> *vtraj; 
+        double *importance_sample = nullptr; 
+        if(strategy_w == 0){
+          vtraj = new std::vector<sample>(last_trajectory.size());
+          std::copy(last_trajectory.begin(), last_trajectory.end(), vtraj->begin());
+          importance_sample = new double [last_trajectory.size()];
+          uint i = 0;
+          for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+            importance_sample[i]=1.000000000000000f;
+            i++;
+          }
+        } else if(strategy_w == 1){
+          vtraj = new std::vector<sample>(trajectory.size());
+          std::copy(trajectory.begin(), trajectory.end(), vtraj->begin());
+          importance_sample = new double [trajectory.size()];
+          
+          double *ptheta = new double [trajectory.size()];
+          //compute p_theta(at|xt)
+          computePTheta(*vtraj, ptheta);
+          
+          uint i=0;
+          for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+  //             importance_sample[i++] = (1.f / proba_s.pdf(it->s)) * (it->ptheta_data / it->p0);
+            importance_sample[i] = ptheta[i];
+  //             it->pfull_data = 1.f / (it->ptheta_data) ;
+  //             it->pfull_data = (1.f / proba_s.pdf(it->s));
+  //             it->pfull_data = (1.f / proba_s.pdf(it->s)) * it->ptheta_data;
+            i++;
+          }
+          delete[] ptheta;
+        } else if(strategy_w == 2){
+          //compute 1/u(x)
+          
+        } else {
+          LOG_ERROR("fez");
+          exit(1);
+        }
+	
+        ParraVtoVNext dq(*vtraj, this);
 
         auto iter = [&]() {
-          tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj.size()), dq);
+          tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj->size()), dq);
 
           if(vnn_from_scratch)
             fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
@@ -312,72 +342,22 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
         dq.free(); 
 	delete[] importance_sample;
-	delete[] ptheta;
+        delete vtraj;
       }
   }
 
   void end_episode() override {
-    
-    if (trajectory_a.size() > 0) {
-
-      struct fann_train_data* data = fann_create_train(trajectory_a.size(), nb_sensors, nb_motors);
-
-      uint n=0;
-      for(auto it = trajectory_a.begin(); it != trajectory_a.end() ; ++it) {
-        sample sm = *it;
-
-        double target = 0.f;
-        double mine = 0.f;
-        
-	target = sm.r;
-	if (!sm.goal_reached) {
-	  double nextV = vnn->computeOutVF(sm.next_s, {});
-	  target += gamma * nextV;
-	}
-	mine = vnn->computeOutVF(sm.s, {});
-
-        if(target > mine) {
-          for (uint i = 0; i < nb_sensors ; i++)
-            data->input[n][i] = sm.s[i];
-          if(update_pure_ac){
-            for (uint i = 0; i < nb_motors; i++)
-              data->output[n][i] = sm.pure_a[i];
-          } else {
-            for (uint i = 0; i < nb_motors; i++)
-              data->output[n][i] = sm.a[i];
-          }
-
-          n++;
-        } else if(update_delta_neg && !update_pure_ac){
-            for (uint i = 0; i < nb_sensors ; i++)
-              data->input[n][i] = sm.s[i];
-            for (uint i = 0; i < nb_motors; i++)
-              data->output[n][i] = sm.pure_a[i];
-            n++;
-        }
-      }
-
-      if(n > 0) {
-        struct fann_train_data* subdata = fann_subset_train_data(data, 0, n);
-
-//         ann->learn_stoch(subdata, 5000, 0, 0.0001);
-        ann->learn(subdata, 5000, 0, 0.0001);
-
-        fann_destroy_train(subdata);
-      }
-      fann_destroy_train(data);
-    }
-    
     update_critic();
     
+    episode++;
   }
   
   double criticEval(const std::vector<double>& perceptions) override {
       return vnn->computeOutVF(perceptions, {});
   }
   
-  arch::Policy<MLP> getCopyCurrentPolicy() override {
-        return { new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise};
+  arch::Policy<MLP>* getCopyCurrentPolicy() override {
+        return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise);
   }
 
   void save(const std::string& path) override {
@@ -394,7 +374,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
  protected:
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " " << std::setw(
-          8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << trajectory.size() << " " << trajectory_a.size();
+          8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << trajectory.size() ;
   }
 
   void _dump(std::ostream& out) const override {
@@ -418,6 +398,10 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
   uint internal_time;
   uint decision_each;
+  uint episode = 0;
+  uint current_loaded_policy = 0;
+  uint change_policy_each;
+  uint strategy_w;
 
   double gamma, noise;
   bool gaussian_policy, vnn_from_scratch, lecun_activation, 
@@ -432,7 +416,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   std::vector<double> returned_ac;
 
   std::set<sample> trajectory;
-  std::set<sample> trajectory_a;
+  std::set<sample> last_trajectory;
 //     std::list<sample> trajectory;
   KDE proba_s;
 

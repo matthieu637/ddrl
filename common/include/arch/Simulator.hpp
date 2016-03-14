@@ -34,7 +34,7 @@ class Simulator {
     dump_log_each(0), display_log_each(0), save_agent_each(0), properties(nullptr),
     command_args(nullptr), time_spend(), env(nullptr), agent(nullptr) {}
 
-  ~Simulator() {
+  virtual ~Simulator() {
     delete properties;
     delete command_args;
 
@@ -67,18 +67,18 @@ class Simulator {
     time_spend.start();
     for (unsigned int episode = 0; episode < max_episode; episode++) {
       //  learning
-      run_episode(true, episode);
+      run_episode(true, episode, 0);
 
       for (unsigned int test_episode = 0; test_episode < test_episode_per_episode; test_episode++) {
         //  testing during learning
-        run_episode(false, episode);
+        run_episode(false, episode, test_episode);
       }
     }
 
     for (unsigned int test_episode = 0; test_episode < test_episode_at_end;
          test_episode++) {
       //  testing after learning
-      run_episode(false, test_episode);
+      run_episode(false, max_episode, test_episode);
     }
 
     env->unique_destroy();
@@ -87,29 +87,31 @@ class Simulator {
     LOG_FILE(DEFAULT_END_FILE, "" << (double)(time_spend.finish() / 60.f));  // in minutes
   }
 
- private:
-  void run_episode(bool learning, unsigned int episode) {
+ protected:
+  virtual void run_episode(bool learning, unsigned int lepisode, unsigned int tepsiode) {
     env->reset_episode();
     std::list<double> all_rewards;
+    agent->start_instance(learning);
 
+    uint instance = 0;
     while (env->hasInstance()) {
       uint step = 0;
       Stat stat;
       std::vector<double> perceptions = env->perceptions();
-      agent->start_episode(perceptions);
+      agent->start_episode(perceptions, learning);
 
       while (env->running()) {
         perceptions = env->perceptions();
         double reward = env->performance();
         const std::vector<double>& actuators = agent->runf(reward, perceptions, learning, false, false);
         env->apply(actuators);
-        stat.dump(episode, perceptions, actuators, reward);
+        stat.dump(lepisode, perceptions, actuators, reward);
         all_rewards.push_back(reward);
         step++;
       }
 
       // if the environment is in a final state
-      //        i.e it didn't reach the number of step but finished well
+      //        i.e it didn't reach the number of step but finished in an absorbing state
       // then we call the algorithm a last time to give him this information
       perceptions = env->perceptions();
       double reward = env->performance();
@@ -119,14 +121,17 @@ class Simulator {
       env->next_instance();
       agent->end_episode();
 
-      dump_and_display(episode, all_rewards, env, agent, learning, step);
+      dump_and_display(lepisode, instance, tepsiode, all_rewards, env, agent, learning, step);
+      instance++;
     }
     
+    agent->end_instance(learning);
+    
     if(learning)
-      save_agent(agent, episode);
+      save_agent(agent, lepisode);
   }
-
-  void dump_and_display(unsigned int episode, const std::list<double>& all_rewards, Environment* env,
+ 
+  void dump_and_display(unsigned int episode, unsigned int instance, unsigned int tepisode, const std::list<double>& all_rewards, Environment* env,
                         Agent* ag, bool learning, uint step) {
     bool display = episode % display_log_each == 0;
     bool dump = episode % dump_log_each == 0;
@@ -150,7 +155,8 @@ class Simulator {
       if (dump) {
         bib::Dumper<Environment, bool, bool> env_dump(env, false, true);
         bib::Dumper<Agent, bool, bool> agent_dump(ag, false, true);
-        LOG_FILE(learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE,
+        LOG_FILE(learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE : 
+                  std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE,
                  episode << " " << reward_stats.mean << " " << reward_stats.var << " " <<
                  reward_stats.max << " " << reward_stats.min << " " << step << env_dump << agent_dump);
       }
@@ -165,7 +171,7 @@ class Simulator {
       agent->save(path);
     }
   }
-
+ private:
   void readCommandArgs(int argc, char** argv, string* s) {
     namespace po = boost::program_options;
 
@@ -226,6 +232,7 @@ class Simulator {
   
   bool display_learning;
 
+protected:
   boost::property_tree::ptree* properties;
   boost::program_options::variables_map* command_args;
 
@@ -235,6 +242,7 @@ class Simulator {
   Agent* agent;
 
 #ifndef NDEBUG
+private:
   bool well_init = false;
 #endif
 };

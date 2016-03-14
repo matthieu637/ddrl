@@ -74,7 +74,7 @@ class DiscretActionAg : public arch::AAgent<> {
     algo = new sml::QLearning<EnvState>(act_templ, *rlparam, nb_sensors);
   }
 
-  void start_episode(const std::vector<double>& sensors) override {
+  void start_episode(const std::vector<double>& sensors, bool) override {
     EnvState s(new std::vector<double>(sensors));
     algo->startEpisode(s, *ainit);
     weighted_reward = 0;

@@ -74,7 +74,7 @@ class ContinuousAcAg : public arch::AAgent<> {
     nn = new MLP(nb_sensors + nb_motors, hidden_unit, nb_sensors, alpha);
   }
 
-  void start_episode(const std::vector<double>& sensors) override {
+  void start_episode(const std::vector<double>& sensors, bool) override {
 //     EnvState s(new std::vector<double>(sensors));
 //     algo->startEpisode(s, *ainit);
 //     weighted_reward = 0;

@@ -40,16 +40,12 @@ CartpoleWorld::~CartpoleWorld() {
 }
 
 void CartpoleWorld::createWorld() {
-  double bone_length = BONE_LENGTH;
-  double bone_larger = BONE_LARGER;
-  double starting_z = bone_larger / 2.f;
-
   ground = ODEFactory::getInstance()->createGround(odeworld);
 // 
 //   //  Create the first fixed bone with it's joint
   ODEObject* first_bone = ODEFactory::getInstance()->createBox(
-                            odeworld, 0., 0, bone_larger / 2.f, bone_length/2.f, bone_larger, bone_larger / 2.f,
-                            BONE_DENSITY, true );                
+                            odeworld, 0., 0, CART_LARGER/2.f, CART_LARGER, CART_LARGER, CART_LARGER,
+                            BONE_DENSITY, true);                
   bones.push_back(first_bone);
 
   dJointID first_slider = dJointCreateSlider(odeworld.world_id, nullptr);
@@ -59,79 +55,68 @@ void CartpoleWorld::createWorld() {
   dJointSetSliderParam(first_slider, dParamLoStop, -MAX_SLIDER_POSITON);
   joints.push_back(first_slider);
   
+  bib::Logger::PRINT_ELEMENTS(first_bone->getMass().I, 9, "cart inertia : ");
+  
   ODEObject* second_bone = ODEFactory::getInstance()->createBox(
-                            odeworld, 0., 0, bone_larger / 2.f + bone_length / 2.f, bone_larger / 3.f, bone_larger / 3.f, bone_length,
-                            BONE_DENSITY, true );
+                            odeworld, 0., 0, POLE_LENGTH/2.f+CART_LARGER/2.f, POLE_LARGER, POLE_LARGER, POLE_LENGTH,
+                            BONE_DENSITY, true);
   bones.push_back(second_bone);
   
   dJointID first_hinge = dJointCreateHinge(odeworld.world_id, nullptr);
   dJointAttach(first_hinge, first_bone->getID(), second_bone->getID());
-//   dJointSetHingeAnchor(first_hinge, 0, 0, starting_z + bone_length / 2.);
+  //dJointSetHingeAnchor(first_hinge, 0, 0, POLE_LENGTH/2.f+CART_LARGER/2.f);
   dJointSetHingeAxis(first_hinge, 0, 1, 0);
   joints.push_back(first_hinge);
-
+  
+  bib::Logger::PRINT_ELEMENTS(second_bone->getMass().I, 9, "pole inertia : ");
 }
 
-void nearCallbackCartpole(void* data, dGeomID o1, dGeomID o2) {
-  int n;
-  nearCallbackDataCartpole* d = reinterpret_cast<nearCallbackDataCartpole*>(data);
-  CartpoleWorld* inst = d->inst;
-
-  // exit without doing anything if the two bodies are connected by a joint
-  dBodyID b1 = dGeomGetBody(o1);
-  dBodyID b2 = dGeomGetBody(o2);
-  if (b1 && b2 && dAreConnectedExcluding(b1, b2, dJointTypeContact)) 
-    return;
-
-  const int N = 10;
-  dContact contact[N];
-  n = dCollide(o1, o2, N, &contact[0].geom, sizeof(dContact));
-  if (n > 0) {
-    if( (o1 == inst->bones[1]->getGeom() && o2 == inst->ground) ||
-        (o2 == inst->bones[1]->getGeom() && o1 == inst->ground) ){
-      inst->touchGround = true;
-    }
-    
-    for (int i = 0; i < n; i++) {
-      contact[i].surface.mode = dContactSlip1 | dContactSlip2 | dContactSoftERP | dContactSoftCFM | dContactApprox1;
-      contact[i].surface.mu = dInfinity;
-      contact[i].surface.slip1 = 0.5;
-      contact[i].surface.slip2 = 0.5;
-      contact[i].surface.soft_erp = 0.95;
-      contact[i].surface.soft_cfm = 0.5;
-
-      dJointID c = dJointCreateContact(inst->odeworld.world_id, inst->odeworld.contactgroup, &contact[i]);
-      dJointAttach(c, dGeomGetBody(contact[i].geom.g1), dGeomGetBody(contact[i].geom.g2));
-    }
-  }
-}
+// void nearCallbackCartpole(void* data, dGeomID o1, dGeomID o2) {
+//   int n;
+//   nearCallbackDataCartpole* d = reinterpret_cast<nearCallbackDataCartpole*>(data);
+//   CartpoleWorld* inst = d->inst;
+// 
+//   // exit without doing anything if the two bodies are connected by a joint
+//   dBodyID b1 = dGeomGetBody(o1);
+//   dBodyID b2 = dGeomGetBody(o2);
+//   if (b1 && b2 && dAreConnectedExcluding(b1, b2, dJointTypeContact)) 
+//     return;
+// 
+//   const int N = 10;
+//   dContact contact[N];
+//   n = dCollide(o1, o2, N, &contact[0].geom, sizeof(dContact));
+//   if (n > 0) {
+//     if( (o1 == inst->bones[1]->getGeom() && o2 == inst->ground) ||
+//         (o2 == inst->bones[1]->getGeom() && o1 == inst->ground) ){
+//       //inst->touchGround = true;
+//     }
+//     
+//     for (int i = 0; i < n; i++) {
+//       contact[i].surface.mode = dContactSlip1 | dContactSlip2 | dContactSoftERP | dContactSoftCFM | dContactApprox1;
+//       contact[i].surface.mu = dInfinity;
+//       contact[i].surface.slip1 = 0.5;
+//       contact[i].surface.slip2 = 0.5;
+//       contact[i].surface.soft_erp = 0.95;
+//       contact[i].surface.soft_cfm = 0.5;
+// 
+//       dJointID c = dJointCreateContact(inst->odeworld.world_id, inst->odeworld.contactgroup, &contact[i]);
+//       dJointAttach(c, dGeomGetBody(contact[i].geom.g1), dGeomGetBody(contact[i].geom.g2));
+//     }
+//   }
+// }
 
 void CartpoleWorld::step(const vector<double>& motors, uint current_step, uint max_step_per_instance) {
   // No collision in this world
 
-  nearCallbackDataCartpole d = {this};
-  dSpaceCollide(odeworld.space_id, &d, &nearCallbackCartpole);
+  //nearCallbackDataCartpole d = {this};
+  //dSpaceCollide(odeworld.space_id, &d, &nearCallbackCartpole);
 
   unsigned int begin_index = 0;
   double force = 0.f;
   
   force = bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_SLIDER, MAX_TORQUE_SLIDER);
   dJointAddSliderForce(joints[0], force);
-
-// 
-//   for (unsigned int i = 1; i < actuators.size(); i++)
-//     if (actuators[i]) {
-//       if (types[i - 1] == HINGE)
-//         force = bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_HINGE, MAX_TORQUE_HINGE);
-//       else
-//         force = bib::Utils::transform(motors[begin_index++], -1, 1, -MAX_TORQUE_SLIDER, MAX_TORQUE_SLIDER);
-// 
-//       dJointAddHingeTorque(joints[i], force);
-//     }
-// 
-//   ASSERT(begin_index == motors.size(),
-//          "wrong number of motors " << begin_index << " " << motors.size() << " " << actuators.size());
-
+  
   Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
   dWorldStep(odeworld.world_id, WORLD_STEP);
   lock.release();
@@ -144,46 +129,12 @@ void CartpoleWorld::step(const vector<double>& motors, uint current_step, uint m
 const std::vector<double> CartpoleWorld::NORMALIZED_VEC({28,62,71});
 
 void CartpoleWorld::update_state(uint current_step, uint max_step_per_instance) {
-//   uint begin_index = 0;
-// 
-//   if(normalization)
-//     internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngle(joints[0]), -M_PI, M_PI, -1, 1);
-//   else
-//     internal_state[begin_index++] = dJointGetHingeAngle(joints[0]);
-// 
-//   if(normalization)
-//     internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngleRate(joints[0]), -NORMALIZED_VEC[0],
-//                                     NORMALIZED_VEC[0], -1, 1);
-//   else
-//     internal_state[begin_index++] = dJointGetHingeAngleRate(joints[0]);
-// 
-//   for (unsigned int i = 0; i < types.size(); i++)
-//     if (types[i] == HINGE) {
-//       if(normalization)
-//         internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngle(joints[i + 1]), -M_PI, M_PI, -1, 1);
-//       else
-//         internal_state[begin_index++] = dJointGetHingeAngle(joints[i + 1]);
-// 
-//       if(normalization && i+1 < NORMALIZED_VEC.size())
-//         internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngleRate(joints[i + 1]), -NORMALIZED_VEC[i + 1],
-//                                         NORMALIZED_VEC[i + 1], -1, 1);
-//       else
-//         internal_state[begin_index++] = dJointGetHingeAngleRate(joints[i + 1]);
-//     } else {
-//       internal_state[begin_index++] = dJointGetSliderPosition(joints[i + 1]);
-//       internal_state[begin_index++] = dJointGetSliderPositionRate(joints[i + 1]);
-//     }
-// 
-//   internal_state[begin_index] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
   uint begin_index = 0;
   
   internal_state[begin_index++] = dJointGetSliderPosition(joints[0]);
   internal_state[begin_index++] = dJointGetSliderPositionRate(joints[0]);
   internal_state[begin_index++] = dJointGetHingeAngle(joints[1]);
   internal_state[begin_index++] = dJointGetHingeAngleRate(joints[1]);
-  
-  if( fabs(dJointGetSliderPosition(joints[0])) >= MAX_SLIDER_POSITON )
-    touchGround=true;
   
   if(add_time_in_state)
     internal_state[begin_index] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
@@ -198,20 +149,28 @@ unsigned int CartpoleWorld::activated_motors() const {
 }
 
 bool CartpoleWorld::final_state() const {
-  return touchGround;
+  if( fabs(dJointGetSliderPosition(joints[0])) >= MAX_SLIDER_POSITON )
+    return true;
+  
+  if( fabs(dJointGetHingeAngle(joints[1])) >= MAX_HINGE_ANGLE)
+    return true;
+  
+  if(goal_state())
+    return true;
+  
+  return false;
+}
+
+bool CartpoleWorld::goal_state() const {
+  return fabs(dJointGetSliderPosition(joints[0])) <= 0.05 && fabs(dJointGetHingeAngle(joints[1])) <= M_PI/60.f;
 }
 
 void CartpoleWorld::resetPositions() {
-  double bone_length = BONE_LENGTH;
-  double bone_larger = BONE_LARGER;
-  double starting_z = bone_larger / 2.f + bone_length / 2.f;
-
   dJointAddSliderForce(joints[0], 0);
 
   dMatrix3 R;
   dRFromEulerAngles(R, 0, 0, 0);
 
-  unsigned int i = 0;
   for (ODEObject * o : bones) {
     dBodySetRotation(o->getID(), R);
     dBodySetForce(o->getID(), 0, 0, 0);
@@ -219,21 +178,23 @@ void CartpoleWorld::resetPositions() {
     dBodySetAngularVel(o->getID(), 0, 0, 0);
   }
   
-  dBodySetPosition(bones[0]->getID(), 0, 0, bone_larger / 2.f);
-  dBodySetPosition(bones[1]->getID(), 0, 0, starting_z);
-
-  touchGround = false;
-  
-  double r = bib::Utils::rand01();
-  r = r <= 0.5 ? r - 1.f : r;
-  r *= MAX_TORQUE_SLIDER;
-  dJointAddSliderForce(joints[0], r);
+  do {
+    dBodySetPosition(bones[0]->getID(), 0, 0, CART_LARGER/2.f);
+    dBodySetPosition(bones[1]->getID(), 0, 0, POLE_LENGTH/2.f+CART_LARGER/2.f);
     
-  for (uint n=0; n < 5; n++){    
-    Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
-    dWorldStep(odeworld.world_id, WORLD_STEP);
-    lock.release();
-  }
+    double theta = bib::Utils::transform(bib::Utils::rand01(), 0.f, 1.f, -M_PI/18.f, M_PI/18.f);
+//     theta=0;//determinist
+    dRFromEulerAngles(R, 0, theta, 0);
+    dBodySetRotation(bones[1]->getID(), R);
+    
+    double shifting = std::sin(theta)*POLE_LENGTH/2.f;
+    
+    double x = bib::Utils::transform(bib::Utils::rand01(), 0, 1.f, shifting > 0 ? -0.5f : -0.5f - shifting, shifting < 0 ? 0.5f : 0.5f - shifting );
+//     x=0.2;//determinist
+    
+    dBodySetPosition(bones[0]->getID(), x + shifting, 0, CART_LARGER/2.f);
+    dBodySetPosition(bones[1]->getID(), x, 0, POLE_LENGTH/2.f+CART_LARGER/2.f);
+  } while(goal_state()); 
   
   dJointAddSliderForce(joints[0], 0);
 

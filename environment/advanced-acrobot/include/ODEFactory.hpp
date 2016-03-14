@@ -26,7 +26,7 @@ class ODEFactory : public bib::Singleton<ODEFactory> {
  public:
   ODEObject *createBox(const ODEWorld &world, double x, double y, double z,
                        double lx, double ly, double lz, double density,
-                       bool linkBody = true);
+                       bool linkBody = true, double inertia=-1.f);
   ODEObject *createSphere(const ODEWorld &world, double x, double y, double z,
                           double radius, double density,
                           bool linkBody = true);

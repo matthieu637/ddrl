@@ -848,6 +848,7 @@ class FittedNeuralACAg : public arch::AAgent<> {
         else
           tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj.size()), *dq);
 
+
         if(is_multi_drawn)
           critic->write_critic_file(std::to_string(episode) + "." + std::to_string(iteration));
         

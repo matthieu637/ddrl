@@ -64,7 +64,7 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint>& types) {
   //  Create the first fixed bone with it's joint
   ODEObject* first_bone = ODEFactory::getInstance()->createBox(
                             odeworld, 0., 0, starting_z, bone_larger, bone_larger, bone_length,
-                            BONE_DENSITY, true);
+                            BONE_DENSITY, true, INERTIA);
 
   bones.push_back(first_bone);
 
@@ -79,7 +79,7 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint>& types) {
     double my_starting_z = starting_z - bone_length * bones.size();
     ODEObject* next = ODEFactory::getInstance()->createBox(
                         odeworld, 0., 0, my_starting_z, bone_larger, bone_larger, bone_length,
-                        BONE_DENSITY, true);
+                        BONE_DENSITY, true, INERTIA);
 
     if (type == HINGE) {
       dJointID next_hinge = dJointCreateHinge(odeworld.world_id, nullptr);
@@ -100,37 +100,37 @@ void AdvancedAcrobotWorld::createWorld(const std::vector<bone_joint>& types) {
   }
 }
 
-void nearCallback(void* data, dGeomID o1, dGeomID o2) {
-  int n;
-  nearCallbackData* d = reinterpret_cast<nearCallbackData*>(data);
-  AdvancedAcrobotWorld* inst = d->inst;
-
-  // exit without doing anything if the two bodies are connected by a joint
-  dBodyID b1 = dGeomGetBody(o1);
-  dBodyID b2 = dGeomGetBody(o2);
-  if (b1 && b2 && dAreConnectedExcluding(b1, b2, dJointTypeContact)) return;
-
-  const int N = 10;
-  dContact contact[N];
-  n = dCollide(o1, o2, N, &contact[0].geom, sizeof(dContact));
-  if (n > 0) {
-    for (int i = 0; i < n; i++) {
-      contact[i].surface.mode = dContactSlip1 | dContactSlip2 |
-                                dContactSoftERP | dContactSoftCFM |
-                                dContactApprox1;
-      contact[i].surface.mu = dInfinity;
-      contact[i].surface.slip1 = 0.5;
-      contact[i].surface.slip2 = 0.5;
-      contact[i].surface.soft_erp = 0.95;
-      contact[i].surface.soft_cfm = 0.5;
-
-      dJointID c = dJointCreateContact(
-                     inst->odeworld.world_id, inst->odeworld.contactgroup, &contact[i]);
-      dJointAttach(c, dGeomGetBody(contact[i].geom.g1),
-                   dGeomGetBody(contact[i].geom.g2));
-    }
-  }
-}
+// void nearCallback(void* data, dGeomID o1, dGeomID o2) {
+//   int n;
+//   nearCallbackData* d = reinterpret_cast<nearCallbackData*>(data);
+//   AdvancedAcrobotWorld* inst = d->inst;
+// 
+//   // exit without doing anything if the two bodies are connected by a joint
+//   dBodyID b1 = dGeomGetBody(o1);
+//   dBodyID b2 = dGeomGetBody(o2);
+//   if (b1 && b2 && dAreConnectedExcluding(b1, b2, dJointTypeContact)) return;
+// 
+//   const int N = 10;
+//   dContact contact[N];
+//   n = dCollide(o1, o2, N, &contact[0].geom, sizeof(dContact));
+//   if (n > 0) {
+//     for (int i = 0; i < n; i++) {
+//       contact[i].surface.mode = dContactSlip1 | dContactSlip2 |
+//                                 dContactSoftERP | dContactSoftCFM |
+//                                 dContactApprox1;
+//       contact[i].surface.mu = dInfinity;
+//       contact[i].surface.slip1 = 0.;
+//       contact[i].surface.slip2 = 0.;
+//       contact[i].surface.soft_erp = 1.;
+//       contact[i].surface.soft_cfm = 0.;
+// 
+//       dJointID c = dJointCreateContact(
+//                      inst->odeworld.world_id, inst->odeworld.contactgroup, &contact[i]);
+//       dJointAttach(c, dGeomGetBody(contact[i].geom.g1),
+//                    dGeomGetBody(contact[i].geom.g2));
+//     }
+//   }
+// }
 
 void AdvancedAcrobotWorld::step(const vector<double>& motors, uint current_step, uint max_step_per_instance) {
   // No collision in this world
@@ -158,9 +158,9 @@ void AdvancedAcrobotWorld::step(const vector<double>& motors, uint current_step,
   ASSERT(begin_index == motors.size(),
          "wrong number of motors " << begin_index << " " << motors.size() << " " << actuators.size());
 
-  Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
+  //Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
   dWorldStep(odeworld.world_id, WORLD_STEP);
-  lock.release();
+  //lock.release();
 
   dJointGroupEmpty(odeworld.contactgroup);
 

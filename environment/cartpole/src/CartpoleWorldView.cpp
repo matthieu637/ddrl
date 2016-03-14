@@ -22,8 +22,8 @@ void parseCommandCartpole(int cmd) {
     break;
   case 'd':
     inst->speed = inst->speed / 2.;
-    if(inst->speed < 0.5)
-      inst->speed = 0.5;
+    if(inst->speed < 0.25)
+      inst->speed = 0.25;
     LOG_DEBUG("speed : x " <<inst->speed);
     break;
   case 'a':

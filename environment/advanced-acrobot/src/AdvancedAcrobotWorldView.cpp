@@ -8,12 +8,16 @@
 #include "bib/Logger.hpp"
 
 static AdvancedAcrobotWorldView* inst = nullptr;
+static std::vector<AdvancedAcrobotWorldView*> all_inst;
+static uint current_inst_nb;
+
+void threadloop(const std::string& goodpath);
 
 void parseCommand(int cmd) {
 
   static float xyz[3] = {0., -3., 1};
   static float hpr[3] = {90, 0, 0};
-
+  
   switch (cmd) {
   case 'f':
     inst->speed = inst->speed * 2.;
@@ -53,11 +57,32 @@ void parseCommand(int cmd) {
     inst->resetPositions();
     LOG_DEBUG("resetPositions should not be used");
     break;
+  case 't':
+    LOG_DEBUG("change thread "<<current_inst_nb<<" to "<<(current_inst_nb == all_inst.size() -1 ? 0 : current_inst_nb+1));
+    current_inst_nb = (current_inst_nb == all_inst.size() -1 ? 0 : current_inst_nb+1);
+    inst->requestEnd = true;
+    inst->changeThread = true;
+    break;
+  case 'T':
+    LOG_DEBUG("change thread "<<current_inst_nb<<" to "<<(current_inst_nb == 0 ? all_inst.size() -1 : current_inst_nb-1));
+    current_inst_nb =(current_inst_nb == 0 ? all_inst.size() -1 : current_inst_nb-1);
+    inst->requestEnd = true;
+    inst->changeThread = true;
+    break;
   }
 
 }
 
 void threadloop(const std::string& goodpath) {
+  //destroy old graphical thread if exists
+  for(auto it : all_inst){
+    if(it->eventThread != nullptr && it != inst ){
+        it->eventThread->join();
+        delete it->eventThread;
+        it->eventThread = nullptr;
+    }
+  }
+  
   ASSERT(inst != nullptr, "not instantiated " << goodpath);
   inst->fn.version = DS_VERSION;
   inst->fn.start = 0;
@@ -79,13 +104,22 @@ void threadloop(const std::string& goodpath) {
     //wait time between frame draw
     usleep(1 * 1000);
   }
+  
+  HACKclose();
+  
+  if(inst->changeThread){
+    inst = all_inst[current_inst_nb];
+    inst->requestEnd = false;
+    inst->changeThread = false;
+    inst->eventThread = new tbb::tbb_thread(threadloop, goodpath);
+  }
 }
 
 AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
   const std::string& path, const std::vector<bone_joint>& types,
   const std::vector<bool>& actuators, bool _add_time_in_state, bool normalization)
   : AdvancedAcrobotWorld(types, actuators, _add_time_in_state, normalization),
-    requestEnd(false),
+    requestEnd(false), changeThread(false),
     speed(1),
     ignoreMotor(false) {
   std::string goodpath = path;
@@ -103,8 +137,7 @@ AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
     LOG_ERROR("cannot found " << path);
     exit(1);
   }
-  inst = this;
-
+  
   for (ODEObject * b : bones)
     geoms.push_back(b->getGeom());
 
@@ -121,7 +154,14 @@ AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
 //     geoms.push_back(debug1->getGeom());
 //     geoms.push_back(debug2->getGeom());
 
-  eventThread = new tbb::tbb_thread(threadloop, goodpath);
+  //only the first view is displayed
+  if(inst == nullptr){
+    inst = this;
+    eventThread = new tbb::tbb_thread(threadloop, goodpath);
+    current_inst_nb = all_inst.size();
+  }
+  
+  all_inst.push_back(this);
 }
 
 AdvancedAcrobotWorldView::~AdvancedAcrobotWorldView() {
@@ -132,9 +172,10 @@ AdvancedAcrobotWorldView::~AdvancedAcrobotWorldView() {
   //     }
 
   requestEnd = true;
-  eventThread->join();
-  delete eventThread;
-  HACKclose();
+  if(eventThread != nullptr){
+    eventThread->join();
+    delete eventThread;
+  }
 }
 
 void AdvancedAcrobotWorldView::step(const std::vector<double>& motors, uint current_step, uint max_step_per_instance) {
@@ -149,5 +190,6 @@ void AdvancedAcrobotWorldView::step(const std::vector<double>& motors, uint curr
   // approximative human vision smooth
   // usleep(25 * 1000);
 
-  usleep((25 / speed)  * 1000);  // needed to don't be faster than the view
+  if(!requestEnd)
+    usleep((25 / speed)  * 1000);  // needed to don't be faster than the view
 }

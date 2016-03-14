@@ -17,6 +17,7 @@ find_package(Cartpole)
 find_package(TBB)
 find_package(FANN)
 find_package(OPTPP)
+find_package(Threads REQUIRED)
 # find_package(FLANN)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ../qlearning-nn/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${FANN_INCLUDE_DIRS} ${OPTPP_INCLUDE_DIRS} )#  ${FLANN_INCLUDE_DIRS}
@@ -38,7 +39,7 @@ add_executable(cp-cacla-off src/test/CartpoleCacOff.cpp ${all_include} ${all_sou
 target_link_libraries(cp-cacla-off ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
 
 add_executable(ada-fitqac src/test/AdaQFittedAC.cpp ${all_include} ${all_sources} )
-target_link_libraries(ada-fitqac ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
+target_link_libraries(ada-fitqac ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(ada-hybrid src/test/HybridCacla.cpp ${all_include} ${all_sources} )
 target_link_libraries(ada-hybrid ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )

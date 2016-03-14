@@ -46,12 +46,17 @@ ODEFactory::~ODEFactory() {
 
 ODEObject *ODEFactory::createBox(const ODEWorld &world, double x, double y,
                                  double z, double lx, double ly, double lz,
-                                 double density, bool linkBody) {
+                                 double density, bool linkBody, double inertia) {
   dGeomID boxgeom = dCreateBox(world.space_id, lx, ly, lz);
 
   dMass m;
   dMassSetBox(&m, density, lx, ly, lz);
-
+  if(inertia >= 0.f){
+    for(uint i=0;i<9;i++)
+      if(m.I[i] != 0)
+        m.I[i] = inertia;
+  }
+  
   dBodyID box_id;
   if (linkBody) {
     box_id = dBodyCreate(world.world_id);

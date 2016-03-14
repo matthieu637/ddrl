@@ -8,13 +8,19 @@
 #include "ODEObject.hpp"
 #include "ODEFactory.hpp"
 
-#define BONE_LENGTH 0.2
-#define BONE_LARGER 0.04
+#define POLE_LENGTH 0.5
+//sqrt(0,1÷(0,5×1062)) so mass = 0.1
+#define POLE_LARGER 0.013723116
 
-#define MAX_SLIDER_POSITON 0.5
+#define CART_LARGER 0.098014838
+//((1÷1062)^(1÷3)) so mass = 1
+
+#define MAX_SLIDER_POSITON 2.4
+#define MAX_HINGE_ANGLE 0.523598776 //PI/6
+
 #define GRAVITY -9.81
 #define BONE_DENSITY 1062  // Average human body density
-#define MAX_TORQUE_SLIDER 5
+#define MAX_TORQUE_SLIDER 10
 #define WORLD_STEP 0.01
 
 class CartpoleWorld {
@@ -25,6 +31,8 @@ class CartpoleWorld {
   void resetPositions();
   
   bool final_state() const;
+  
+  bool goal_state() const;
 
   virtual void step(const std::vector<double> &motors, uint current_step, uint max_step_per_instance);
   const std::vector<double> &state() const;
@@ -38,7 +46,6 @@ class CartpoleWorld {
   ODEWorld odeworld;
   std::vector<ODEObject *> bones;
   dGeomID ground;
-  bool touchGround;
   
  protected:
   std::vector<dJointID> joints;

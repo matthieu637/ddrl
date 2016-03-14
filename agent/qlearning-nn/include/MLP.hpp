@@ -23,6 +23,7 @@
 #include "bib/Logger.hpp"
 #include <bib/Converger.hpp>
 #include <bib/Seed.hpp>
+#include <bib/Utils.hpp>
 
 using OPTPP::Constraint;
 using OPTPP::CompoundConstraint;
@@ -379,6 +380,53 @@ class MLP {
     return outputs;
     
   }
+  
+  void print(){
+      struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(neural_net), sizeof(struct fann_connection));
+
+      for(uint j=0; j<fann_get_total_connections(neural_net); j++)
+          connections[j].weight=0;
+
+      fann_get_connection_array(neural_net, connections);
+
+      for(uint j=0; j<fann_get_total_connections(neural_net); j++)
+          std::cout << connections[j].weight << " ";
+      std::cout << std::endl;
+
+      free(connections);
+  }
+  
+  static unsigned long long GetHashForDouble(double x, int discretization)
+  {
+    x = bib::Utils::transform(x, -2,2,0, discretization);
+    unsigned long long y = x;
+    return y;
+  }
+  
+  double hash(){
+      struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(neural_net), sizeof(struct fann_connection));
+
+      for(uint j=0; j<fann_get_total_connections(neural_net); j++)
+          connections[j].weight=0;
+
+      fann_get_connection_array(neural_net, connections);
+
+      int discretization = exp(log(std::numeric_limits<unsigned long long>::max())/(fann_get_total_connections(neural_net)+1));
+      
+//       LOG_DEBUG(discretization);
+      unsigned long long ret = 0;
+      unsigned long long max = 0;
+      for(uint j=0; j<fann_get_total_connections(neural_net); j++){
+        ret += pow(discretization, j)*(GetHashForDouble(connections[j].weight, discretization));
+        max += pow(discretization, j)*discretization;
+      }
+
+      free(connections);
+      
+      double f = ret;
+      f = f / ((double)max);
+      return f;
+  }
 
   void copy(NN new_nn) {
     fann_destroy(neural_net);
@@ -390,6 +438,7 @@ class MLP {
   }
 
   void load(const std::string& path) {
+    fann_destroy(neural_net);
     neural_net = fann_create_from_file(path.c_str());
   }
 

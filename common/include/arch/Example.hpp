@@ -46,7 +46,7 @@ class ExampleAgent : public arch::AAgent<> {
     return actuator;
   }
   
-  void start_episode(const std::vector<double>&) override {
+  void start_episode(const std::vector<double>&, bool) override {
     time_for_ac = 1;
   }
 
