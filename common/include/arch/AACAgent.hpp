@@ -5,7 +5,7 @@
 #include <string>
 
 #include "bib/MetropolisHasting.hpp"
-#include "AAgent.hpp"
+#include "ARLAgent.hpp"
 
 /**
  * @brief architecture
@@ -57,47 +57,19 @@ private:
 };
 
 template <typename Pol_Impl, typename ProgOptions = AgentProgOptions >
-class AACAgent : public AAgent<ProgOptions> {
+class AACAgent : public ARLAgent<ProgOptions> {
  public:
-
-  void unique_invoke(boost::property_tree::ptree* inifile,
-                     boost::program_options::variables_map* command_args) override {
-    _unique_invoke(inifile, command_args);
-    if (command_args->count("load"))
-      load((*command_args)["load"].as<std::string>());
+  AACAgent(uint _nb_motors):ARLAgent<ProgOptions>(_nb_motors){
     
-    _gamma                   = inifile->get<double>("agent.gamma");
   }
-  
+
   double getGamma(){
-      return _gamma;
+      return this->gamma;
   }
   
   virtual double criticEval(const std::vector<double>& perceptions) = 0;
   
   virtual Policy<Pol_Impl>* getCopyCurrentPolicy() = 0;
-
-   protected:
-  /**
-  * @brief Called only at the creation of the agent.
-  * You have to overload this method if you want to get parameters from ini file or from command line.
-  *
-  * @param inifile
-  * @param command_args
-  * @return void
-  */
-  virtual void _unique_invoke(boost::property_tree::ptree* , boost::program_options::variables_map*) {}
-
-  /**
-  * @brief To load your previous agent saved to a file.
-  * @param filepath the file to load
-  *
-  * @return void
-  */
-  virtual void load(const std::string&) {}
-
-private:
-  double _gamma;
 };
 }  // namespace arch
 

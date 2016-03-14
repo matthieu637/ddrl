@@ -2,10 +2,10 @@
 #include "arch/Simulator.hpp"
 #include "arch/Example.hpp"
 #include "AdvancedAcrobotEnv.hpp"
-#include "HybridCaclaAg.hpp"
+#include "OffPolSetACFitted.hpp"
 
 int main(int argc, char **argv) {
-  arch::Simulator<AdvancedAcrobotEnv, HybridCaclaAg> s;
+  arch::Simulator<AdvancedAcrobotEnv, OffPolSetACFitted> s;
 
   s.init(argc, argv);
 

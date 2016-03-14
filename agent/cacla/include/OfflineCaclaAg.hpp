@@ -59,7 +59,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   typedef MLP PolicyImpl; 
    
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : nb_motors(_nb_motors), nb_sensors(_nb_sensors), time_for_ac(1), returned_ac(nb_motors) {
+    : arch::AACAgent<MLP, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors){
 
   }
 
@@ -68,36 +68,8 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     delete ann;
   }
 
-  const std::vector<double>& run(double r, const std::vector<double>& sensors,
-                                bool learning, bool goal_reached) override {
-
-    double reward = r;
-    internal_time ++;
-
-    weighted_reward += reward * pow_gamma;
-    pow_gamma *= gamma;
-
-    sum_weighted_reward += reward * global_pow_gamma;
-    global_pow_gamma *= gamma;
-
-    time_for_ac--;
-    if (time_for_ac == 0 || goal_reached) {
-      const std::vector<double>& next_action = _run(weighted_reward, sensors, learning, goal_reached);
-      time_for_ac = decision_each;
-
-      for (uint i = 0; i < nb_motors; i++)
-        returned_ac[i] = next_action[i];
-
-      weighted_reward = 0;
-      pow_gamma = 1.f;
-    }
-
-    return returned_ac;
-  }
-
-
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                 bool learning, bool goal_reached) {
+                                 bool learning, bool goal_reached, bool) {
 
     vector<double>* next_action = ann->computeOut(sensors);
 
@@ -127,11 +99,9 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
-    gamma                   = pt->get<double>("agent.gamma");
     hidden_unit_v           = pt->get<int>("agent.hidden_unit_v");
     hidden_unit_a           = pt->get<int>("agent.hidden_unit_a");
     noise                   = pt->get<double>("agent.noise");
-    decision_each           = pt->get<int>("agent.decision_each");
     update_pure_ac          = pt->get<bool>("agent.update_pure_ac");
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
     lecun_activation        = pt->get<bool>("agent.lecun_activation");
@@ -154,20 +124,13 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
   }
 
-  void start_episode(const std::vector<double>& sensors, bool) override {
+  void _start_episode(const std::vector<double>& sensors, bool) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
     last_action = nullptr;
     last_pure_action = nullptr;
-
-    weighted_reward = 0;
-    pow_gamma = 1.d;
-    time_for_ac = 1;
-    sum_weighted_reward = 0;
-    global_pow_gamma = 1.f;
-    internal_time = 0;
     
     if(clear_trajectory)
       trajectory.clear();
@@ -357,21 +320,11 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
 
  private:
-  uint nb_motors;
   uint nb_sensors;
-  uint time_for_ac;
-
-  double weighted_reward;
-  double pow_gamma;
-  double global_pow_gamma;
-  double sum_weighted_reward;
   
   bool update_pure_ac;
 
-  uint internal_time;
-  uint decision_each;
-
-  double gamma, noise;
+  double noise;
   bool gaussian_policy, vnn_from_scratch, lecun_activation, 
         determinist_vnn_update, clear_trajectory, update_delta_neg;
   uint hidden_unit_v;
@@ -380,8 +333,6 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
   std::vector<double> last_state;
-
-  std::vector<double> returned_ac;
 
   std::set<sample> trajectory;
 //     std::list<sample> trajectory;
