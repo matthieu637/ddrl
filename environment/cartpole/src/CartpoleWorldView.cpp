@@ -12,6 +12,7 @@ static CartpoleWorldView* inst = nullptr;
 void parseCommandCartpole(int cmd) {
   static float xyz[3] = {-0.03, -0.97, 0.2};
   static float hpr[3] = {90, 0, 0};
+  std::vector<double> qq;
 
   switch (cmd) {
   case 'f':
@@ -48,7 +49,7 @@ void parseCommandCartpole(int cmd) {
               << vhpr[2]);
     break;
   case 'r':
-    inst->resetPositions();
+    inst->resetPositions(qq, qq);
     LOG_DEBUG("resetPositions should not be used");
     break;
   case 'x':

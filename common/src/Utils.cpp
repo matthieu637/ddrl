@@ -29,6 +29,13 @@ double Utils::randin(double a, double b) {
   return a + r;
 }
 
+bool Utils::equals(const std::vector<double>& v1, const std::vector<double>& v2, double precision){
+  for (uint i = 0; i < v1.size(); i++)
+    if (fabs(v1[i] - v2[i]) >= precision)
+      return false;
+  return true;
+}
+
 bool Utils::randBool() {
   return Utils::rand01() < 0.5;
 }

@@ -36,6 +36,8 @@ class Utils {
   static double transform(double x, double a, double b, double c, double d);
 
   static double *genNrand(int N, double max);
+  
+  static bool equals(const std::vector<double>& v1, const std::vector<double>& v2, double precision=1e-5);
 
   typedef struct {
     double var;

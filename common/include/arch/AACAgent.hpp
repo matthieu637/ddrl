@@ -23,16 +23,39 @@ enum policy_type {
 template <typename Pol_Impl>
 class Policy{
 public:
-    Policy(Pol_Impl* _impl, policy_type _type, double _theta):impl(_impl), type(_type), theta(_theta){
+    Policy(Pol_Impl* _impl, policy_type _type, double _theta, uint _decision_each):impl(_impl), type(_type), theta(_theta), decision_each(_decision_each), time_for_ac(1){
       
     }
         
-    Policy(Policy& p) : impl(new Pol_Impl(*p.impl)), type(p.type), theta(p.theta){
+    Policy(Policy& p) : impl(new Pol_Impl(*p.impl)), type(p.type), theta(p.theta), decision_each(p.decision_each), time_for_ac(1){
       
     }
     
     ~Policy(){
       delete impl;
+    }
+    
+    std::vector<double>& run_td(std::vector<double>& perceptions){
+      time_for_ac--;
+      if (time_for_ac == 0){
+          const std::vector<double>* next_action = run(perceptions);
+          time_for_ac = decision_each;
+          
+          returned_ac.resize(next_action->size());
+          for (uint i = 0; i < next_action->size(); i++)
+            returned_ac[i] = next_action->at(i);
+          delete next_action;
+      }
+      
+      return returned_ac;
+    }
+    
+    bool did_decision() {
+      return time_for_ac == decision_each;
+    }
+    
+    void reset_decision_interval(){
+      time_for_ac = 1;
     }
     
     std::vector<double>* run(std::vector<double>& perceptions){
@@ -54,6 +77,10 @@ private:
     Pol_Impl* impl;
     policy_type type;
     double theta;
+    uint decision_each;
+    
+    uint time_for_ac;
+    std::vector<double> returned_ac;
 };
 
 template <typename Pol_Impl, typename ProgOptions = AgentProgOptions >

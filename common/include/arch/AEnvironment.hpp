@@ -34,6 +34,12 @@ class AEnvironment : public ProgOptions, public CommonAE {
     current_step = 0;
     _reset_episode();
   }
+  
+  void reset_episode_choose(const std::vector<double>& stochasticity){
+    current_instance = 0;
+    current_step = 0;
+    _reset_episode_choose(stochasticity);
+  }
 
   void next_instance() {
     current_step = 0;
@@ -41,6 +47,12 @@ class AEnvironment : public ProgOptions, public CommonAE {
     _next_instance();
   }
 
+  void next_instance_choose(const std::vector<double>& stochasticity) {
+    current_step = 0;
+    current_instance++;
+    _next_instance_choose(stochasticity);
+  }
+  
   void apply(const std::vector<double>& actuators) {
     current_step++;
     _apply(actuators);
@@ -57,13 +69,25 @@ class AEnvironment : public ProgOptions, public CommonAE {
   bool hasInstance() const {
     return current_instance < instance_per_episode;
   }
+  
+  const std::vector<double> get_first_state_stoch(){
+    return first_state_stochasticity;
+  }
 
  protected:
   virtual void _unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) {}
 
   virtual void _reset_episode() {}
+  
+  virtual void _reset_episode_choose(const std::vector<double>&) {
+    _reset_episode();
+  }
 
   virtual void _next_instance() {}
+  
+  virtual void _next_instance_choose(const std::vector<double>&) {
+    _next_instance();
+  }
 
   virtual void _apply(const std::vector<double>&) = 0;
 
@@ -72,6 +96,8 @@ class AEnvironment : public ProgOptions, public CommonAE {
 
   unsigned int max_step_per_instance;
   unsigned int instance_per_episode;
+  
+  std::vector<double> first_state_stochasticity;
 };
 }  // namespace arch
 

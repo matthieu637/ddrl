@@ -119,17 +119,13 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     hidden_unit_v           = pt->get<int>("agent.hidden_unit_v");
     hidden_unit_a           = pt->get<int>("agent.hidden_unit_a");
     noise                   = pt->get<double>("agent.noise");
-    update_pure_ac          = pt->get<bool>("agent.update_pure_ac");
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
     lecun_activation        = pt->get<bool>("agent.lecun_activation");
     determinist_vnn_update  = pt->get<bool>("agent.determinist_vnn_update");
-    update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
     change_policy_each      = pt->get<uint>("agent.change_policy_each");
     strategy_w              = pt->get<uint>("agent.strategy_w");
-    
-    if(!gaussian_policy)
-      noise = 0.05;
+    current_loaded_policy   = pt->get<uint>("agent.index_starting_loaded_policy");
 
     if(hidden_unit_v == 0)
       vnn = new LinMLP(nb_sensors , 1, 0.0, lecun_activation);
@@ -149,8 +145,6 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
     last_action = nullptr;
     last_pure_action = nullptr;
-
-    internal_time = 0;
     
     //trajectory.clear();
     last_trajectory.clear();
@@ -322,7 +316,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
   
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
-        return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise);
+        return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
   }
 
   void save(const std::string& path) override {
@@ -352,9 +346,6 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
  private:
   uint nb_sensors;
   
-  bool update_pure_ac;
-
-  uint internal_time;
   uint episode = 0;
   uint current_loaded_policy = 0;
   uint change_policy_each;
@@ -362,7 +353,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
   double noise;
   bool gaussian_policy, vnn_from_scratch, lecun_activation, 
-        determinist_vnn_update, update_delta_neg;
+        determinist_vnn_update;
   uint hidden_unit_v;
   uint hidden_unit_a;
 

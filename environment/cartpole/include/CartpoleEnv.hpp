@@ -73,8 +73,22 @@ class CartpoleEnv : public arch::AEnvironment<> {
     instance->step(actuators, current_step, max_step_per_instance);
   }
 
-  void _next_instance() {
-    instance->resetPositions();
+  void _reset_episode() override {
+    std::vector<double> given_stoch;
+    instance->resetPositions(first_state_stochasticity, given_stoch);
+  }
+  
+  void _reset_episode_choose(const std::vector<double>& given_stoch) override {
+    instance->resetPositions(first_state_stochasticity, given_stoch);
+  }
+  
+  void _next_instance() override {
+    std::vector<double> given_stoch;
+    instance->resetPositions(first_state_stochasticity, given_stoch);
+  }
+  
+  void _next_instance_choose(const std::vector<double>& given_stoch) override {
+    instance->resetPositions(first_state_stochasticity, given_stoch);
   }
 
  private:

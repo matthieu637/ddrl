@@ -28,7 +28,7 @@ class CartpoleWorld {
   CartpoleWorld(bool add_time_in_state=false, bool normalization=false);
   virtual ~CartpoleWorld();
 
-  void resetPositions();
+  void resetPositions(std::vector<double> &, const std::vector<double>& given_stoch);
   
   bool final_state() const;
   

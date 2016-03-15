@@ -304,7 +304,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
   
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
-        return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise);
+        return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
   }
 
  protected:

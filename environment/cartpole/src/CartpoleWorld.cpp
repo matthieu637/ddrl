@@ -23,8 +23,6 @@ CartpoleWorld::CartpoleWorld(bool _add_time_in_state, bool _normalization)
 
   if(add_time_in_state)
     internal_state.push_back(0.);
-  
-  resetPositions();
 }
 
 CartpoleWorld::~CartpoleWorld() {
@@ -55,7 +53,7 @@ void CartpoleWorld::createWorld() {
   dJointSetSliderParam(first_slider, dParamLoStop, -MAX_SLIDER_POSITON);
   joints.push_back(first_slider);
   
-  bib::Logger::PRINT_ELEMENTS(first_bone->getMass().I, 9, "cart inertia : ");
+//   bib::Logger::PRINT_ELEMENTS(first_bone->getMass().I, 9, "cart inertia : ");
   
   ODEObject* second_bone = ODEFactory::getInstance()->createBox(
                             odeworld, 0., 0, POLE_LENGTH/2.f+CART_LARGER/2.f, POLE_LARGER, POLE_LARGER, POLE_LENGTH,
@@ -68,7 +66,7 @@ void CartpoleWorld::createWorld() {
   dJointSetHingeAxis(first_hinge, 0, 1, 0);
   joints.push_back(first_hinge);
   
-  bib::Logger::PRINT_ELEMENTS(second_bone->getMass().I, 9, "pole inertia : ");
+//   bib::Logger::PRINT_ELEMENTS(second_bone->getMass().I, 9, "pole inertia : ");
 }
 
 // void nearCallbackCartpole(void* data, dGeomID o1, dGeomID o2) {
@@ -165,7 +163,7 @@ bool CartpoleWorld::goal_state() const {
   return fabs(dJointGetSliderPosition(joints[0])) <= 0.05 && fabs(dJointGetHingeAngle(joints[1])) <= M_PI/60.f;
 }
 
-void CartpoleWorld::resetPositions() {
+void CartpoleWorld::resetPositions(std::vector<double>& stochasticity, const std::vector<double>& given_stoch) {
   dJointAddSliderForce(joints[0], 0);
 
   dMatrix3 R;
@@ -178,18 +176,26 @@ void CartpoleWorld::resetPositions() {
     dBodySetAngularVel(o->getID(), 0, 0, 0);
   }
   
+  double theta, x;
+  
   do {
     dBodySetPosition(bones[0]->getID(), 0, 0, CART_LARGER/2.f);
     dBodySetPosition(bones[1]->getID(), 0, 0, POLE_LENGTH/2.f+CART_LARGER/2.f);
     
-    double theta = bib::Utils::transform(bib::Utils::rand01(), 0.f, 1.f, -M_PI/18.f, M_PI/18.f);
+    if(given_stoch.size() == 0)
+      theta = bib::Utils::transform(bib::Utils::rand01(), 0.f, 1.f, -M_PI/18.f, M_PI/18.f);
+    else
+      theta = given_stoch[0];
 //     theta=0;//determinist
     dRFromEulerAngles(R, 0, theta, 0);
     dBodySetRotation(bones[1]->getID(), R);
     
     double shifting = std::sin(theta)*POLE_LENGTH/2.f;
     
-    double x = bib::Utils::transform(bib::Utils::rand01(), 0, 1.f, shifting > 0 ? -0.5f : -0.5f - shifting, shifting < 0 ? 0.5f : 0.5f - shifting );
+    if(given_stoch.size() == 0)
+      x = bib::Utils::transform(bib::Utils::rand01(), 0, 1.f, shifting > 0 ? -0.5f : -0.5f - shifting, shifting < 0 ? 0.5f : 0.5f - shifting );
+    else
+      x = given_stoch[1];
 //     x=0.2;//determinist
     
     dBodySetPosition(bones[0]->getID(), x + shifting, 0, CART_LARGER/2.f);
@@ -201,4 +207,7 @@ void CartpoleWorld::resetPositions() {
   dJointGroupEmpty(odeworld.contactgroup);
 
   update_state(0, 1);
+  stochasticity.resize(2);
+  stochasticity[0]= theta;
+  stochasticity[1]= x;
 }

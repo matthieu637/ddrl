@@ -59,6 +59,18 @@ class ARLAgent : public AAgent<AgentProgOptions> {
 
     return returned_ac;
   }
+  
+  bool did_decision() {
+      return time_for_ac == decision_each;
+  }
+  
+  uint get_decision_each(){
+      return decision_each;
+  }
+  
+  double sum_weighted_rewards(){
+      return sum_weighted_reward;
+  }
 
   /**
    * @brief This method is called after each beginning of a new instance of episode
@@ -117,7 +129,6 @@ private:
   std::list<double> inter_rewards;
   double global_pow_gamma;
   uint time_for_ac;
-  uint decision_each;
   
   std::vector<double> returned_ac;
   
@@ -125,6 +136,7 @@ protected:
   double sum_weighted_reward;
   double gamma;
   uint nb_motors;
+  uint decision_each;
 };
 }  // namespace arch
 
