@@ -19,6 +19,7 @@
 #include "MLP.hpp"
 #include "LinMLP.hpp"
 #include "kde.hpp"
+#include "kdtree++/kdtree.hpp"
 
 typedef struct _sample {
   std::vector<double> s;
@@ -46,14 +47,20 @@ typedef struct _sample {
         return s[i] < b.s[i];
     }
     
-    for (uint i = 0; i < a.size(); i++) {
-      if(a[i] != b.a[i])
-        return a[i] < b.a[i];
-    }
+//     for (uint i = 0; i < a.size(); i++) {
+//       if(a[i] != b.a[i])
+//         return a[i] < b.a[i];
+//     }
 
     return false;
   }
+  
+  typedef double value_type;
 
+  inline double operator[](size_t const N) const{
+        return s[N];
+  }
+  
 } sample;
 
 class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
@@ -66,6 +73,8 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
 
   virtual ~OffPolSetACFitted() {
+    delete kdtree_s;
+    
     delete vnn;
     delete ann;
   }
@@ -87,10 +96,21 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 	  for(uint i=0;i < nb_motors;i++)
 	    p0 *= exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_action->at(i))/(2.f*noise*noise));
       }
-        
-      trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0});
+      
+      trajectory.insert({last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0});
       last_trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0});
       proba_s.add_data(last_state);
+      
+      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0};
+      for (auto it = kdtree_s->begin() ; it != kdtree_s->end() ; ++it){
+        double dist = 0;
+        for(uint k=0;k<nb_sensors;k++)
+          dist += kdtree_s->value_distance().operator()(it->operator[](k),sa[k],0);
+        if(dist >= kdtree_snorm)
+          kdtree_snorm = dist;
+      }
+      
+      kdtree_s->insert(sa);
     }
 
     last_pure_action.reset(new vector<double>(*next_action));
@@ -136,6 +156,8 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       ann = new LinMLP(nb_sensors , nb_motors, 0.0, lecun_activation);
     else
       ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
+    
+    kdtree_s = new kdtree_sample(nb_sensors);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool) override {
@@ -243,7 +265,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             importance_sample[i]=1.000000000000000f;
             i++;
           }
-        } else if(strategy_w == 1){
+        } else if(strategy_w >= 1 && strategy_w <= 5){
           vtraj = new std::vector<sample>(trajectory.size());
           std::copy(trajectory.begin(), trajectory.end(), vtraj->begin());
           importance_sample = new double [trajectory.size()];
@@ -252,21 +274,41 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
           //compute p_theta(at|xt)
           computePTheta(*vtraj, ptheta);
           
-          uint i=0;
-          for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-  //             importance_sample[i++] = (1.f / proba_s.pdf(it->s)) * (it->ptheta_data / it->p0);
-            importance_sample[i] = ptheta[i];
-  //             it->pfull_data = 1.f / (it->ptheta_data) ;
-  //             it->pfull_data = (1.f / proba_s.pdf(it->s));
-  //             it->pfull_data = (1.f / proba_s.pdf(it->s)) * it->ptheta_data;
-            i++;
+          if(strategy_w == 1){
+            uint i=0;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              importance_sample[i] = ptheta[i];
+              i++;
+            }
+          } else if(strategy_w == 2){
+            uint i=0;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              importance_sample[i] = ptheta[i] / it->p0;
+              i++;
+            }
+          } else if(strategy_w == 3) {
+            uint i=0;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              importance_sample[i] = ptheta[i] / proba_s.pdf(it->s);
+              i++;
+            }
+          } else if(strategy_w == 4) {
+            uint i=0;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              importance_sample[i] = (ptheta[i] / it->p0) * (1.f / proba_s.pdf(it->s));
+              i++;
+            }
+          } else if(strategy_w == 5) {            
+            uint i=0;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              importance_sample[i] = ptheta[i] * (kdtree_s->find_nearest(*it).second/kdtree_snorm);
+              i++;
+            }
           }
-          delete[] ptheta;
-        } else if(strategy_w == 2){
-          //compute 1/u(x)
           
+          delete[] ptheta;
         } else {
-          LOG_ERROR("fez");
+          LOG_ERROR("to be implemented");
           exit(1);
         }
 	
@@ -365,6 +407,20 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   std::set<sample> last_trajectory;
 //     std::list<sample> trajectory;
   KDE proba_s;
+  
+  struct L1_distance
+  {
+    typedef double distance_type;
+    
+    double operator() (const double& __a, const double& __b, const size_t) const
+    {
+      double d = fabs(__a - __b);
+      return d;
+    }
+  };
+  typedef KDTree::KDTree<sample, KDTree::_Bracket_accessor<sample>, L1_distance> kdtree_sample;
+  kdtree_sample* kdtree_s;
+  double kdtree_snorm = 0;
 
   MLP* ann;
   MLP* vnn;
