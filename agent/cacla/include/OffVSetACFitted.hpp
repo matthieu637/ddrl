@@ -1,6 +1,6 @@
 
-#ifndef OFFPOLSETACFITTED_HPP
-#define OFFPOLSETACFITTED_HPP
+#ifndef OFFVSETACFITTED_HPP
+#define OFFVSETACFITTED_HPP
 
 #include <vector>
 #include <string>
@@ -63,16 +63,16 @@ typedef struct _sample {
   
 } sample;
 
-class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
+class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
  public:
   typedef MLP PolicyImpl;
    
-  OffPolSetACFitted(unsigned int _nb_motors, unsigned int _nb_sensors)
+  OffVSetACFitted(unsigned int _nb_motors, unsigned int _nb_sensors)
     : arch::AACAgent<MLP, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors) {
 
   }
 
-  virtual ~OffPolSetACFitted() {
+  virtual ~OffVSetACFitted() {
     delete kdtree_s;
     
     delete vnn;
@@ -141,11 +141,9 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     noise                   = pt->get<double>("agent.noise");
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
     lecun_activation        = pt->get<bool>("agent.lecun_activation");
-    determinist_vnn_update  = pt->get<bool>("agent.determinist_vnn_update");
-    vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
-    change_policy_each      = pt->get<uint>("agent.change_policy_each");
-    strategy_w              = pt->get<uint>("agent.strategy_w");
-    current_loaded_policy   = pt->get<uint>("agent.index_starting_loaded_policy");
+    change_v_each           = pt->get<uint>("agent.change_v_each");
+    strategy_u              = pt->get<uint>("agent.strategy_u");
+    current_loaded_v        = pt->get<uint>("agent.index_starting_loaded_v");
 
     if(hidden_unit_v == 0)
       vnn = new LinMLP(nb_sensors , 1, 0.0, lecun_activation);
@@ -173,58 +171,16 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     
     fann_reset_MSE(vnn->getNeuralNet());
     
-    if(episode == 0 || episode % change_policy_each == 0){
-      if (! boost::filesystem::exists( "polset."+std::to_string(current_loaded_policy) ) ){
-        LOG_ERROR("file doesn't exists "<< "polset."+std::to_string(current_loaded_policy));
+    if(episode == 0 || episode % change_v_each == 0){
+      if (! boost::filesystem::exists( "vset."+std::to_string(current_loaded_v) ) ){
+        LOG_ERROR("file doesn't exists "<< "vset."+std::to_string(current_loaded_v));
         exit(1);
       }
       
-      ann->load("polset."+std::to_string(current_loaded_policy));
-      current_loaded_policy++;
+      vnn->load("vset."+std::to_string(current_loaded_v));
+      current_loaded_v++;
     }
   }
-
-  struct ParraVtoVNext {
-    ParraVtoVNext(const std::vector<sample>& _vtraj, const OffPolSetACFitted* _ptr) : vtraj(_vtraj), ptr(_ptr) {
-      data = fann_create_train(vtraj.size(), ptr->nb_sensors, 1);
-      for (uint n = 0; n < vtraj.size(); n++) {
-        sample sm = vtraj[n];
-        for (uint i = 0; i < ptr->nb_sensors ; i++)
-          data->input[n][i] = sm.s[i];
-      }
-    }
-
-    ~ParraVtoVNext() { //must be empty cause of tbb
-
-    }
-
-    void free() {
-      fann_destroy_train(data);
-    }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const {
-
-      struct fann* local_nn = fann_copy(ptr->vnn->getNeuralNet());
-
-      for (size_t n = range.begin(); n < range.end(); n++) {
-        sample sm = vtraj[n];
-
-        double delta = sm.r;
-        if (!sm.goal_reached) {
-          double nextV = MLP::computeOutVF(local_nn, sm.next_s, {});
-          delta += ptr->gamma * nextV;
-        }
-
-        data->output[n][0] = delta;
-      }
-
-      fann_destroy(local_nn);
-    }
-
-    struct fann_train_data* data;
-    const std::vector<sample>& vtraj;
-    const OffPolSetACFitted* ptr;
-  };
   
   void computePTheta(vector< sample >& vtraj, double *ptheta){
     uint i=0;
@@ -249,112 +205,151 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       delete next_action;
     }
   }
-  
-  void update_critic(){
-      if (trajectory.size() > 0) {
-        //remove trace of old policy
 
-        std::vector<sample> *vtraj; 
-        double *importance_sample = nullptr; 
-        if(strategy_w == 0){
-          vtraj = new std::vector<sample>(last_trajectory.size());
-          std::copy(last_trajectory.begin(), last_trajectory.end(), vtraj->begin());
-          importance_sample = new double [last_trajectory.size()];
-          uint i = 0;
-          for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-            importance_sample[i]=1.000000000000000f;
-            i++;
-          }
-        } else if(strategy_w >= 1 && strategy_w <= 6){
-          vtraj = new std::vector<sample>(trajectory.size());
-          std::copy(trajectory.begin(), trajectory.end(), vtraj->begin());
-          importance_sample = new double [trajectory.size()];
-          
-          double *ptheta = new double [trajectory.size()];
-          //compute p_theta(at|xt)
-          computePTheta(*vtraj, ptheta);
-          
-          if(strategy_w == 1){
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = ptheta[i];
-              i++;
-            }
-          } else if(strategy_w == 2){
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = ptheta[i] / it->p0;
-              i++;
-            }
-          } else if(strategy_w == 3) {
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = ptheta[i] / proba_s.pdf(it->s);
-              i++;
-            }
-          } else if(strategy_w == 4) {
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = (ptheta[i] / it->p0) * (1.f / proba_s.pdf(it->s));
-              i++;
-            }
-          } else if(strategy_w == 5) {            
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = ptheta[i] * (kdtree_s->find_nearest(*it).second/kdtree_snorm);
-              i++;
-            }
-          } else if(strategy_w == 6) {
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = (ptheta[i] / it->p0) * (kdtree_s->find_nearest(*it).second/kdtree_snorm);
-              i++;
-            }
-          }
-          
-          delete[] ptheta;
-        } else {
-          LOG_ERROR("to be implemented");
-          exit(1);
-        }
-	
-        ParraVtoVNext dq(*vtraj, this);
-
-        auto iter = [&]() {
-          tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj->size()), dq);
-
-          if(vnn_from_scratch)
-            fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
-          vnn->learn_stoch_lw(dq.data, importance_sample, 10000, 0, 0.0001);
-        };
-
-        auto eval = [&]() {
-          return fann_get_MSE(vnn->getNeuralNet());
-        };
-
-        if(determinist_vnn_update)
-              bib::Converger::determinist<>(iter, eval, 30, 0.0001, 0);
-        else {
-          NN best_nn = nullptr;
-          auto save_best = [&]() {
-            if(best_nn != nullptr)
-              fann_destroy(best_nn);
-            best_nn = fann_copy(vnn->getNeuralNet());
-          };
-
-          bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10);
-          vnn->copy(best_nn);
-          fann_destroy(best_nn);
-        }
-
-        dq.free(); 
-	delete[] importance_sample;
-        delete vtraj;
+  void update_actor_old(){
+     if (last_trajectory.size() > 0) {
+      bool update_delta_neg;
+      bool update_pure_ac;
+      
+      switch(strategy_u){
+        case 0:
+          update_pure_ac=false;
+          update_delta_neg=false;
+          break;
+        case 1:
+          update_pure_ac=true;
+          update_delta_neg=false;
+          break;
+        case 2:
+          update_pure_ac=false;
+          update_delta_neg=true;
+          break;
       }
-  }
 
+      struct fann_train_data* data = fann_create_train(last_trajectory.size(), nb_sensors, nb_motors);
+
+      uint n=0;
+      for(auto it = last_trajectory.begin(); it != last_trajectory.end() ; ++it) {
+        sample sm = *it;
+
+        double target = 0.f;
+        double mine = 0.f;
+        
+	target = sm.r;
+	if (!sm.goal_reached) {
+	  double nextV = vnn->computeOutVF(sm.next_s, {});
+	  target += gamma * nextV;
+	}
+	mine = vnn->computeOutVF(sm.s, {});
+
+        if(target > mine) {
+          for (uint i = 0; i < nb_sensors ; i++)
+            data->input[n][i] = sm.s[i];
+          if(update_pure_ac){
+            for (uint i = 0; i < nb_motors; i++)
+              data->output[n][i] = sm.pure_a[i];
+          } else {
+            for (uint i = 0; i < nb_motors; i++)
+              data->output[n][i] = sm.a[i];
+          }
+
+          n++;
+        } else if(update_delta_neg && !update_pure_ac){
+            for (uint i = 0; i < nb_sensors ; i++)
+              data->input[n][i] = sm.s[i];
+            for (uint i = 0; i < nb_motors; i++)
+              data->output[n][i] = sm.pure_a[i];
+            n++;
+        }
+      }
+
+      if(n > 0) {
+        struct fann_train_data* subdata = fann_subset_train_data(data, 0, n);
+
+        ann->learn_stoch(subdata, 5000, 0, 0.0001);
+
+        fann_destroy_train(subdata);
+      }
+      fann_destroy_train(data);
+    }
+  }
+  
+  double Mx(const double* delta, const std::vector<double>& x){
+    double max_gauss = std::numeric_limits<double>::min();
+    uint i=0;
+    for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+      const std::vector<double>& s = it->s;
+      double v = delta[i];
+      double toexp = 0;
+      for(uint j=0;j< x.size(); j++)
+        toexp += ((s[j] - x[j])*(s[j] - x[j]))/(sigmaa*sigmaa);
+      toexp *= -0.5f;
+      v = v * exp(toexp);
+      
+      if(v>=max_gauss)
+        max_gauss = v;
+    }
+    
+    return max_gauss;
+  }
+  
+  void update_actor_new(){
+    if (trajectory.size() > 0) {
+    bool update_pure_ac = strategy_u == 4;
+    
+    struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
+    double *importance_sample = new double [trajectory.size()];
+    double *delta = new double [trajectory.size()];
+    
+    uint n=0;
+    for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+      sample sm = *it;
+
+      for (uint i = 0; i < nb_sensors ; i++)
+        data->input[n][i] = sm.s[i];
+      if(update_pure_ac){
+        for (uint i = 0; i < nb_motors; i++)
+          data->output[n][i] = sm.pure_a[i];
+      } else {
+        for (uint i = 0; i < nb_motors; i++)
+          data->output[n][i] = sm.a[i];
+      }
+      
+      delta[n] = sm.r;
+      if (!sm.goal_reached) {
+        double nextV = vnn->computeOutVF(sm.next_s, {});
+        delta[n] += gamma * nextV;
+      }
+
+      n++;
+    }
+    
+    n=0;
+    std::vector<double> Mxs(trajectory.size());
+    for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+      Mxs[n] = Mx(delta, it->s);
+      n++;
+    }
+    
+    double norm_term = *std::max_element(Mxs.begin(), Mxs.end());
+    n=0;
+    for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+      importance_sample[n] = 1.f - (Mxs[n] - delta[n])/norm_term;
+    }
+
+    ann->learn_stoch_lw(data, importance_sample, 5000, 0, 0.0001);
+    fann_destroy_train(data);
+    
+    delete delta;
+    delete importance_sample;
+  }
+}
+  
   void end_episode() override {
-    update_critic();
+    if(strategy_u <= 2)
+      update_actor_old();
+    else
+      update_actor_new();
   }
   
   void end_instance(bool) override {
@@ -397,19 +392,19 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   uint nb_sensors;
   
   uint episode = 0;
-  uint current_loaded_policy = 0;
-  uint change_policy_each;
-  uint strategy_w;
+  uint current_loaded_v = 0;
+  uint change_v_each;
+  uint strategy_u;
 
   double noise;
-  bool gaussian_policy, vnn_from_scratch, lecun_activation, 
-        determinist_vnn_update;
+  bool gaussian_policy, lecun_activation;
   uint hidden_unit_v;
   uint hidden_unit_a;
-
+  
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
   std::vector<double> last_state;
+  double sigmaa;
 
   std::set<sample> trajectory;
   std::set<sample> last_trajectory;

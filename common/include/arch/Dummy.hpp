@@ -70,6 +70,29 @@ class MotorEpisodeStat : public DummyEpisodeStat {
   uint step;
 };
 
+class PerceptionEpisodeStat : public DummyEpisodeStat {
+ public:
+
+  PerceptionEpisodeStat() : step(0) { }
+
+  virtual void dump(uint episode, const std::vector<double>& perceptions, const std::vector<double>& motors, double reward) {
+    (void) episode;
+    (void) motors;
+    (void) reward;
+
+    std::string sep = std::to_string(episode);;
+    LOG_FILE_NNL("perceptions.data." + sep, step << " ");
+    for(double m : perceptions)
+      LOG_FILE_NNL("perceptions.data." + sep, m << " ");
+    LOG_FILE("perceptions.data." + sep, "");
+
+    step++;
+  }
+
+ private :
+  uint step;
+};
+
 }  // namespace arch
 
 #endif  // DUMMY_H

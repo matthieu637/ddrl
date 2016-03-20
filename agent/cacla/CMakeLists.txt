@@ -47,6 +47,9 @@ target_link_libraries(ada-polset ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} 
 add_executable(cp-polset src/test/CartpolePolset.cpp ${all_include} ${all_sources} )
 target_link_libraries(cp-polset ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
 
+add_executable(ada-vset src/test/AdaVset.cpp ${all_include} ${all_sources} )
+target_link_libraries(ada-vset ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
+
 
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

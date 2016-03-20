@@ -58,6 +58,11 @@ public:
       time_for_ac = 1;
     }
     
+    void disable_stochasticity(){
+       type = policy_type::GREEDY;
+       theta = 0.00000000000000000f;
+    }
+    
     std::vector<double>* run(std::vector<double>& perceptions){
       vector<double>* next_action = impl->computeOut(perceptions);
       
