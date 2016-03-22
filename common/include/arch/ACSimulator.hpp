@@ -58,10 +58,24 @@ class ACSimulator : public Simulator<Environment, Agent, Stat> {
       precision = p->get<unsigned int>("simulation.pbest_precision");
   }
 
+  void enable_generate_bestV(){
+      if(this->properties == nullptr){
+        LOG_ERROR("call enable_analyse_distance_bestPol after init");
+        exit(1);
+      }
+      
+      generate_bestV = true;
+      shm_id = (uint) (bib::Utils::rand01()*5000);
+      
+      boost::property_tree::ptree* p = this->properties;
+      precision = p->get<unsigned int>("simulation.vbest_precision");
+  }
+  
 protected:
     void run_episode(bool learning, unsigned int lepisode, unsigned int tepisode) override {
     this->env->reset_episode();
     std::list<double> all_rewards;
+    std::map<std::vector<double>, double> s_BVS;
     this->agent->start_instance(learning);
     
     uint instance = 0;
@@ -118,6 +132,12 @@ protected:
 #endif
         LOG_FILE(std::to_string(instance)+".distanceBestPol.data", std::setprecision(12) << diff);
       }
+      
+      if(generate_bestV){
+        generateBestValueFonction(s_BVS, all_perceptions, all_actions, policy, this->agent->getGamma(), 
+                                               all_perceptions_decision, this->agent->sum_weighted_rewards(), this->env->get_first_state_stoch());
+        this->agent->learn_V(s_BVS);
+      }
 
       this->env->next_instance();
       this->agent->end_episode();
@@ -133,8 +153,101 @@ protected:
       this->save_agent(this->agent, lepisode);
   }
   
-  double compareBestValueFonction(std::list< std::vector<double> > all_perceptions, 
-                                          std::list< std::vector<double> > all_actions, _Policy* policy, double gamma,
+  void generateBestValueFonction(std::map<std::vector<double>, double>& s_BVS, const std::list< std::vector<double> >& all_perceptions, 
+                                          const std::list< std::vector<double> >& all_actions, _Policy* policy, double gamma,
+                                          const std::list< std::vector<double> > all_perceptions_decision, double swr, const std::vector<double>& stochasticity
+                                 ){
+    
+    using namespace boost::interprocess;
+    typedef allocator<double, managed_shared_memory::segment_manager>  ShmemAllocator;
+    typedef boost::interprocess::vector<double, ShmemAllocator> MyVector;
+    
+    std::string sshm_filename ="ac_sim_forked_";
+    sshm_filename += std::to_string(shm_id);
+    const char* shm_filename = sshm_filename.c_str();
+    
+    shared_memory_object::remove(shm_filename);
+    
+    managed_shared_memory shm_obj(create_only, shm_filename, 65536 );
+    const ShmemAllocator alloc_inst (shm_obj.get_segment_manager());
+    
+    MyVector *myvector = shm_obj.construct<MyVector>("result")(alloc_inst);
+    
+    for(uint i = 0; i < all_perceptions_decision.size(); ++i)
+      myvector->push_back(0);
+   
+    std::vector<int> childs_pid;
+    
+    uint threads = bib::ThreadTBB::getInstance()->get_number_thread();
+    
+#if defined(DEBUG_WITH_DETERMINIST_POLICY) || defined(VALGRIND)
+    threads=1;
+#endif
+    
+    uint work_per_process = all_perceptions_decision.size() / threads;
+    uint additional_work = all_perceptions_decision.size() - (work_per_process * threads);
+    
+    for (uint i = 0; i < threads; i++){
+#ifdef VALGRIND
+      int pid = 0;
+#else
+      int pid = fork();
+#endif
+      if(pid ==0){
+        //Open the managed segment
+        managed_shared_memory segment2(open_only, shm_filename);
+
+        //Find the vector using the c-string name
+        MyVector *myvector2 = segment2.find<MyVector>("result").first;
+        
+        Environment *lenv = new Environment;
+        lenv->unique_invoke(this->properties, this->command_args);
+        
+        _Policy* lpol =  new _Policy(*policy);
+        for(uint j=0;j < work_per_process; j++){
+          uint z = (i*work_per_process) + j;
+          myvector2->at(z) = evalBestValueFonction(all_actions, lpol, lenv, gamma, z, all_perceptions, swr, stochasticity);
+        }
+        
+        if(i == 0){
+          for(uint j=0;j < additional_work; j++){
+            uint z = (threads*work_per_process) + j;
+            myvector2->at(z) = evalBestValueFonction(all_actions, lpol, lenv, gamma, z, all_perceptions, swr, stochasticity);
+          }
+        }
+        
+        delete lpol;
+        delete lenv;
+
+#ifndef VALGRIND 
+        exit(0);
+#endif
+      } else {
+       childs_pid.push_back(pid);
+      }
+    }
+    
+    int status = 0;
+    for(auto it : childs_pid){
+      waitpid(it, &status, 0);
+      if(!WIFEXITED(status) || WEXITSTATUS(status) != 0){
+        LOG_ERROR("ERROR in sub process");
+        exit(1);
+      }
+    }
+
+    int i=0;
+    for(auto it_s : all_perceptions_decision){
+      s_BVS.insert(std::pair<std::vector<double>, double>(it_s, myvector->at(i)));
+      i++;
+    }
+    
+    shared_memory_object::remove(shm_filename);
+    
+  }
+  
+  double compareBestValueFonction(const std::list< std::vector<double> >& all_perceptions, 
+                                          const std::list< std::vector<double> >& all_actions, _Policy* policy, double gamma,
                                           const std::list< double > all_Vs, double swr, const std::vector<double>& stochasticity
                                  ){
     
@@ -229,8 +342,8 @@ protected:
     return diff / all_Vs.size();
   }
   
-  double compareBestPolicy(std::list< std::vector<double> > all_perceptions, 
-                                          std::list< std::vector<double> > all_actions, _Policy* policy, double gamma,
+  double compareBestPolicy(const std::list< std::vector<double> >& all_perceptions, 
+                                          const std::list< std::vector<double> >& all_actions, _Policy* policy, double gamma,
                                           const std::vector<double>& stochasticity,
                                           const std::list< std::vector<double> >& all_perceptions_decision
                                  ){
@@ -348,8 +461,8 @@ protected:
     return diff / all_perceptions_decision.size();
   }
   
-  double evalBestValueFonction(std::list< std::vector<double> > all_actions, _Policy* lpol, Environment* lenv, 
-                               double gamma, uint begin, std::list< std::vector<double> > all_perceptions, double swr, const std::vector<double>& stochasticity){
+  double evalBestValueFonction(const std::list< std::vector<double> >& all_actions, _Policy* lpol, Environment* lenv, 
+                               double gamma, uint begin, const std::list< std::vector<double> >& all_perceptions, double swr, const std::vector<double>& stochasticity){
 
 #ifndef DEBUG_WITH_DETERMINIST_POLICY
     (void) all_perceptions;
@@ -438,8 +551,8 @@ protected:
   }
   
 
-  void evalBestPolicy(std::vector<double>& ac_result, const std::list< std::vector<double> > all_actions, Environment* lenv, 
-                               double gamma, uint begin, std::list< std::vector<double> > all_perceptions, const std::vector<double>& stochasticity){
+  void evalBestPolicy(std::vector<double>& ac_result, const std::list< std::vector<double> >& all_actions, Environment* lenv, 
+                               double gamma, uint begin, const std::list< std::vector<double> >& all_perceptions, const std::vector<double>& stochasticity){
 
 #ifndef NDEBUG
     (void) all_perceptions;
@@ -521,6 +634,7 @@ protected:
  private:
     bool analyse_distance_bestVF = false;
     bool analyse_distance_bestPol = false;
+    bool generate_bestV = false;
     uint precision = 0;
     uint shm_id;
 

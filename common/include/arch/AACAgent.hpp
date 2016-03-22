@@ -102,6 +102,8 @@ class AACAgent : public ARLAgent<ProgOptions> {
   virtual double criticEval(const std::vector<double>& perceptions) = 0;
   
   virtual Policy<Pol_Impl>* getCopyCurrentPolicy() = 0;
+  
+  virtual void learn_V(std::map<std::vector<double>, double>&){}
 };
 }  // namespace arch
 

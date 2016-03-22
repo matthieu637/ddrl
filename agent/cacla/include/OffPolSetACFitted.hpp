@@ -160,7 +160,9 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     kdtree_s = new kdtree_sample(nb_sensors);
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool) override {
+  bool learning;
+  void _start_episode(const std::vector<double>& sensors, bool _learning) override {
+    learning = _learning;
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -265,7 +267,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             importance_sample[i]=1.000000000000000f;
             i++;
           }
-        } else if(strategy_w >= 1 && strategy_w <= 6){
+        } else if(strategy_w >= 1 && strategy_w <= 7){
           vtraj = new std::vector<sample>(trajectory.size());
           std::copy(trajectory.begin(), trajectory.end(), vtraj->begin());
           importance_sample = new double [trajectory.size()];
@@ -280,7 +282,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               importance_sample[i] = ptheta[i];
               i++;
             }
-          } else if(strategy_w == 2){
+          } else if(strategy_w == 2 || strategy_w == 7){
             uint i=0;
             for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
               importance_sample[i] = ptheta[i] / it->p0;
@@ -325,7 +327,16 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
           if(vnn_from_scratch)
             fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
-          vnn->learn_stoch_lw(dq.data, importance_sample, 10000, 0, 0.0001);
+          
+          if(strategy_w == 7){
+            uint i=0;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              dq.data->output[i][0] = importance_sample[i] * dq.data->output[i][0];
+              i++;
+            }
+            vnn->learn_stoch(dq.data, 10000, 0, 0.0001);
+          } else
+            vnn->learn_stoch_lw(dq.data, importance_sample, 10000, 0, 0.0001);
         };
 
         auto eval = [&]() {
@@ -354,7 +365,33 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
 
   void end_episode() override {
-    update_critic();
+    if(learning)
+      update_critic();
+  }
+  
+  void learn_V(std::map<std::vector<double>, double>& bvf) override {
+    if((episode+1) % change_policy_each == 0){
+    
+      struct fann_train_data* data = fann_create_train(bvf.size(), nb_sensors, 1);
+      
+      auto it = bvf.cbegin();
+      for (uint n = 0; n < bvf.size(); n++) {
+        
+        for (uint i = 0; i < nb_sensors ; i++)
+            data->input[n][i] = it->first[i];
+        
+        data->output[n][0] = it->second;
+        
+        ++it;
+      }
+        
+      fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
+      vnn->learn_stoch(data, 10000, 0, 0.0001);
+        
+      fann_destroy_train(data);
+      
+      vnn->save("vset."+std::to_string(current_loaded_policy));
+    }
   }
   
   void end_instance(bool) override {
