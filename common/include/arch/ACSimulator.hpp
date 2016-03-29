@@ -69,13 +69,16 @@ class ACSimulator : public Simulator<Environment, Agent, Stat> {
       
       boost::property_tree::ptree* p = this->properties;
       precision = p->get<unsigned int>("simulation.vbest_precision");
+      LOG_INFO("learning disabled (except to generate stochasticity in policy)");
   }
   
 protected:
     void run_episode(bool learning, unsigned int lepisode, unsigned int tepisode) override {
+    if(generate_bestV)
+      learning = false;
+      
     this->env->reset_episode();
     std::list<double> all_rewards;
-    std::map<std::vector<double>, double> s_BVS;
     this->agent->start_instance(learning);
     
     uint instance = 0;
@@ -97,7 +100,7 @@ protected:
         if(this->agent->did_decision())
           all_Vs.push_back(this->agent->criticEval(perceptions));
         double reward = this->env->performance();
-        const std::vector<double>& actuators = this->agent->runf(reward, perceptions, learning, false, false);
+        const std::vector<double>& actuators = this->agent->runf(reward, perceptions, generate_bestV ? true : learning, false, false);
         if(this->agent->did_decision())
           all_perceptions_decision.push_back(perceptions);
         all_actions.push_back(actuators);
@@ -114,6 +117,10 @@ protected:
       double reward = this->env->performance();
       this->agent->runf(reward, perceptions, learning, this->env->final_state(), true);
       all_rewards.push_back(reward);
+      
+      all_perceptions.push_back(perceptions);
+      all_perceptions_decision.push_back(perceptions);
+      all_Vs.push_back(this->agent->criticEval(perceptions));
 
       if(analyse_distance_bestVF){
         double diff = compareBestValueFonction(all_perceptions, all_actions, policy, this->agent->getGamma(), 
@@ -448,10 +455,12 @@ protected:
     _Policy* lpol =  new _Policy(*policy);
     lpol->disable_stochasticity();
     for(auto it_vs : all_perceptions_decision){
+      double ldiff = 0;
       std::vector<double>* ac = lpol->run(it_vs);
       for(uint j = 0; j < action_dimension ; j++)
-        diff += (myvectors[j]->at(i)-ac->at(j))*(myvectors[j]->at(i)-ac->at(j));
+        ldiff += (myvectors[j]->at(i)-ac->at(j))*(myvectors[j]->at(i)-ac->at(j));
       delete ac;
+      diff += sqrt(ldiff);
       i++;
     }
     delete lpol;
@@ -634,7 +643,10 @@ protected:
  private:
     bool analyse_distance_bestVF = false;
     bool analyse_distance_bestPol = false;
+    
     bool generate_bestV = false;
+    std::map<std::vector<double>, double> s_BVS;
+    
     uint precision = 0;
     uint shm_id;
 

@@ -282,7 +282,7 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       double v = delta[i];
       double toexp = 0;
       for(uint j=0;j< x.size(); j++)
-        toexp += ((s[j] - x[j])*(s[j] - x[j]))/(sigmaa*sigmaa);
+        toexp += ((s[j] - x[j])*(s[j] - x[j]))/(sigma[j]*sigma[j]);
       toexp *= -0.5f;
       v = v * exp(toexp);
       
@@ -301,12 +301,19 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     double *importance_sample = new double [trajectory.size()];
     double *delta = new double [trajectory.size()];
     
+    std::vector<double> sum(nb_sensors);
+    std::vector<double> square_sum(nb_sensors);
+    
     uint n=0;
     for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
       sample sm = *it;
 
-      for (uint i = 0; i < nb_sensors ; i++)
+      for (uint i = 0; i < nb_sensors ; i++){
         data->input[n][i] = sm.s[i];
+        sum[i] += sm.s[i];
+        square_sum[i] += sm.s[i]*sm.s[i];
+      }
+      
       if(update_pure_ac){
         for (uint i = 0; i < nb_motors; i++)
           data->output[n][i] = sm.pure_a[i];
@@ -324,6 +331,11 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       n++;
     }
     
+    sigma.resize(nb_sensors);
+    for (uint i = 0; i < nb_sensors ; i++){
+      sigma[i] = (square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size())))/((double)trajectory.size()) ;
+    }
+    
     n=0;
     std::vector<double> Mxs(trajectory.size());
     for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
@@ -335,13 +347,14 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     n=0;
     for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
       importance_sample[n] = 1.f - (Mxs[n] - delta[n])/norm_term;
+      n++;
     }
 
     ann->learn_stoch_lw(data, importance_sample, 5000, 0, 0.0001);
     fann_destroy_train(data);
     
-    delete delta;
-    delete importance_sample;
+    delete[] delta;
+    delete[] importance_sample;
   }
 }
   
@@ -404,7 +417,7 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
   std::vector<double> last_state;
-  double sigmaa;
+  std::vector<double> sigma;
 
   std::set<sample> trajectory;
   std::set<sample> last_trajectory;

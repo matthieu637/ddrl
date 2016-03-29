@@ -102,13 +102,6 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       proba_s.add_data(last_state);
       
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0};
-      for (auto it = kdtree_s->begin() ; it != kdtree_s->end() ; ++it){
-        double dist = 0;
-        for(uint k=0;k<nb_sensors;k++)
-          dist += kdtree_s->value_distance().operator()(it->operator[](k),sa[k],0);
-        if(dist >= kdtree_snorm)
-          kdtree_snorm = dist;
-      }
       
       kdtree_s->insert(sa);
     }
@@ -252,6 +245,28 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     }
   }
   
+  double approx_surface(const sample& sa){
+    auto it = kdtree_s->find_nearest(sa);
+    const sample& sa2 = *it.first;
+    double dist1 = it.second;
+    
+    struct UniqTest
+    {
+      const sample& _sa;
+      
+      bool operator()(const sample& t ) const
+      {
+          return t < _sa || _sa < t;
+      }
+      
+    };
+    
+    UniqTest predicate = {sa2};
+    auto it2 = kdtree_s->find_nearest_if(sa, std::numeric_limits<double>::max(), predicate);
+    
+    return dist1 + it2.second;
+  }
+  
   void update_critic(){
       if (trajectory.size() > 0) {
         //remove trace of old policy
@@ -300,17 +315,31 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               importance_sample[i] = (ptheta[i] / it->p0) * (1.f / proba_s.pdf(it->s));
               i++;
             }
-          } else if(strategy_w == 5) {            
+          } else if(strategy_w >= 5 && strategy_w <= 6) {
+            double kdtree_snorm = 0;
+            double *surface = new double [trajectory.size()];
             uint i=0;
             for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = ptheta[i] * (kdtree_s->find_nearest(*it).second/kdtree_snorm);
+              surface[i] = approx_surface(*it);
+              kdtree_snorm+=surface[i];
               i++;
             }
-          } else if(strategy_w == 6) {
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = (ptheta[i] / it->p0) * (kdtree_s->find_nearest(*it).second/kdtree_snorm);
-              i++;
+            
+            if(strategy_w == 5) {
+              i=0;
+              for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+                importance_sample[i] = ptheta[i] * (surface[i]/kdtree_snorm);
+                i++;
+              }
+            } else if(strategy_w == 6) {
+              i=0;
+              for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+                importance_sample[i] = (ptheta[i] / it->p0) * (surface[i]/kdtree_snorm);
+                i++;
+              }
+            } else {
+              LOG_ERROR("to be implemented");
+              exit(1);
             }
           }
           
@@ -371,26 +400,36 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   
   void learn_V(std::map<std::vector<double>, double>& bvf) override {
     if((episode+1) % change_policy_each == 0){
+      trajectory.clear();
+      last_trajectory.clear();
+      
     
       struct fann_train_data* data = fann_create_train(bvf.size(), nb_sensors, 1);
       
       auto it = bvf.cbegin();
       for (uint n = 0; n < bvf.size(); n++) {
         
-        for (uint i = 0; i < nb_sensors ; i++)
+        for (uint i = 0; i < nb_sensors ; i++){
             data->input[n][i] = it->first[i];
+            LOG_FILE_NNL("vset.data."+std::to_string(current_loaded_policy-1), it->first[i] << " ");
+        }
         
         data->output[n][0] = it->second;
+        LOG_FILE_NNL("vset.data."+std::to_string(current_loaded_policy-1), it->second << "\n");
         
         ++it;
       }
-        
+      
+      bib::Logger::getInstance()->closeFile("vset.data."+std::to_string(current_loaded_policy-1));
+      
       fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
-      vnn->learn_stoch(data, 10000, 0, 0.0001);
-        
+      vnn->learn_stoch(data, 50000, 0, 0.00001);
+      
       fann_destroy_train(data);
       
-      vnn->save("vset."+std::to_string(current_loaded_policy));
+      vnn->save("vset."+std::to_string(current_loaded_policy-1));
+      LOG_DEBUG("vset."+std::to_string(current_loaded_policy-1) << " saved " << bvf.size() );
+      bvf.clear();
     }
   }
   
@@ -465,7 +504,6 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   };
   typedef KDTree::KDTree<sample, KDTree::_Bracket_accessor<sample>, L1_distance> kdtree_sample;
   kdtree_sample* kdtree_s;
-  double kdtree_snorm = 0;
 
   MLP* ann;
   MLP* vnn;
