@@ -56,6 +56,8 @@ target_link_libraries(cp-polset-genvf ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBR
 add_executable(ada-vset src/test/AdaVset.cpp ${all_include} ${all_sources} )
 target_link_libraries(ada-vset ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
 
+add_executable(cp-vset src/test/CartpoleVset.cpp ${all_include} ${all_sources} )
+target_link_libraries(cp-vset ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
 
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
@@ -74,6 +76,9 @@ execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_
 execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/cartpole.ini data/env-cartpole.ini)
 execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/env-acrobot.ini data/ada-polset.ini ada-polset.ini)
 execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/env-cartpole.ini data/cp-polset.ini cp-polset.ini)
+
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/env-acrobot.ini data/ada-vset.ini ada-vset.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/env-cartpole.ini data/cp-vset.ini cp-vset.ini)
 
 # -------------------
 # Unit Test

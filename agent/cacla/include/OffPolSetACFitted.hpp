@@ -419,7 +419,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         
         ++it;
       }
-      
+      //clear all; close all ;X=load('vset.data.904');[xx,yy] = meshgrid (linspace (-pi,pi,300));griddata(X(:,1),X(:,3),X(:,end),xx,yy);
       bib::Logger::getInstance()->closeFile("vset.data."+std::to_string(current_loaded_policy-1));
       
       fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);

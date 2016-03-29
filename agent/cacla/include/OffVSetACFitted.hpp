@@ -274,7 +274,7 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     }
   }
   
-  double Mx(const double* delta, const std::vector<double>& x){
+  double Mx(const double* delta, const std::vector<double>& x, const std::vector<double>& sigma){
     double max_gauss = std::numeric_limits<double>::min();
     uint i=0;
     for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
@@ -288,18 +288,20 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       
       if(v>=max_gauss)
         max_gauss = v;
+      i++;
     }
     
     return max_gauss;
   }
   
   void update_actor_new(){
-    if (trajectory.size() > 0) {
+    if (trajectory.size() > 1) {
     bool update_pure_ac = strategy_u == 4;
     
     struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
     double *importance_sample = new double [trajectory.size()];
     double *delta = new double [trajectory.size()];
+    double min_delta = std::numeric_limits<double>::max();
     
     std::vector<double> sum(nb_sensors);
     std::vector<double> square_sum(nb_sensors);
@@ -327,26 +329,43 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         double nextV = vnn->computeOutVF(sm.next_s, {});
         delta[n] += gamma * nextV;
       }
+      
+      if(delta[n] <= min_delta)
+        min_delta = delta[n];
 
       n++;
     }
+    if(min_delta < 0)
+      min_delta = -min_delta;
+    else 
+      min_delta = 0;
     
-    sigma.resize(nb_sensors);
+    std::vector<double> sigma(nb_sensors);
     for (uint i = 0; i < nb_sensors ; i++){
-      sigma[i] = (square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size())))/((double)trajectory.size()) ;
+      sigma[i] = sqrt(square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size())))/((double)trajectory.size()) ;
+      //sigma[i] = (square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size())))/((double)trajectory.size()) ;
+    }
+    
+    n=0;
+    for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+      delta[n]= delta[n] + min_delta;
+      n++;
     }
     
     n=0;
     std::vector<double> Mxs(trajectory.size());
+    std::vector<double> Mxs_fornorm(trajectory.size());
     for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-      Mxs[n] = Mx(delta, it->s);
+      Mxs[n] = Mx(delta, it->s, sigma);
+      Mxs_fornorm[n] = Mxs[n] - (delta[n]);
       n++;
     }
     
-    double norm_term = *std::max_element(Mxs.begin(), Mxs.end());
+    double norm_term = *std::max_element(Mxs_fornorm.begin(), Mxs_fornorm.end());
     n=0;
     for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-      importance_sample[n] = 1.f - (Mxs[n] - delta[n])/norm_term;
+      importance_sample[n] = 1.f - Mxs_fornorm[n]/norm_term;
+      //LOG_DEBUG(importance_sample[n]<< " " << Mxs[n]<<" "<< Mxs_fornorm[n] << " " << delta[n] <<" " <<norm_term <<" "<< sigma[0] << " " << min_delta<< " " << sigma[2]);
       n++;
     }
 
@@ -417,7 +436,6 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
   std::vector<double> last_state;
-  std::vector<double> sigma;
 
   std::set<sample> trajectory;
   std::set<sample> last_trajectory;
