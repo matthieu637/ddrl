@@ -47,12 +47,36 @@ typedef struct _sample {
         return s[i] < b.s[i];
     }
     
-//     for (uint i = 0; i < a.size(); i++) {
-//       if(a[i] != b.a[i])
-//         return a[i] < b.a[i];
-//     }
+    for (uint i = 0; i < a.size(); i++) {
+      if(a[i] != b.a[i])
+        return a[i] < b.a[i];
+    }
 
     return false;
+  }
+  
+  bool operator!=(const _sample& b) const {
+    for (uint i = 0; i < s.size(); i++) {
+      if(fabs(s[i] - b.s[i])>=0.000001f)
+        return true;
+    }
+    
+    for (uint i = 0; i < a.size(); i++) {
+      if(fabs(a[i] - b.a[i])>=0.000001f)
+        return true;
+    }
+    
+    for (uint i = 0; i < pure_a.size(); i++) {
+      if(fabs(pure_a[i] - b.pure_a[i])>=0.000001f)
+        return true;
+    }
+    
+    for (uint i = 0; i < next_s.size(); i++) {
+      if(fabs(next_s[i] - b.next_s[i])>=0.000001f)
+        return true;
+    }
+    //LOG_DEBUG(s[0] << " " << b.s[0]);
+    return fabs(r - b.r)>=0.000001f || goal_reached != b.goal_reached ;
   }
   
   typedef double value_type;
@@ -102,14 +126,6 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       proba_s.add_data(last_state);
       
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0};
-      for (auto it = kdtree_s->begin() ; it != kdtree_s->end() ; ++it){
-        double dist = 0;
-        for(uint k=0;k<nb_sensors;k++)
-          dist += kdtree_s->value_distance().operator()(it->operator[](k),sa[k],0);
-        if(dist >= kdtree_snorm)
-          kdtree_snorm = dist;
-      }
-      
       kdtree_s->insert(sa);
     }
 
@@ -204,6 +220,57 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       i++;
       delete next_action;
     }
+  }
+  
+  void update_actor_old_lw(){
+    if (last_trajectory.size() > 0) {
+      struct fann_train_data* data = fann_create_train(last_trajectory.size(), nb_sensors, nb_motors);
+
+      uint n=0;
+      std::vector<double> deltas;
+      for(auto it = last_trajectory.begin(); it != last_trajectory.end() ; ++it) {
+        sample sm = *it;
+
+        double target = 0.f;
+        double mine = 0.f;
+        
+	target = sm.r;
+	if (!sm.goal_reached) {
+	  double nextV = vnn->computeOutVF(sm.next_s, {});
+	  target += gamma * nextV;
+	}
+	mine = vnn->computeOutVF(sm.s, {});
+
+        if(target > mine) {
+          for (uint i = 0; i < nb_sensors ; i++)
+            data->input[n][i] = sm.s[i];
+          for (uint i = 0; i < nb_motors; i++)
+            data->output[n][i] = sm.a[i];
+        
+          deltas.push_back(target - mine);
+          n++;
+        }
+      }
+          
+
+      if(n > 0) {
+        double* importance = new double[n];
+        double norm = *std::max_element(deltas.begin(), deltas.end());
+        for (uint i =0 ; i < n; i++){
+            importance[i] = deltas[i] / norm;
+        }    
+        
+        struct fann_train_data* subdata = fann_subset_train_data(data, 0, n);
+
+        ann->learn_stoch_lw(subdata, importance, 5000, 0, 0.0001);
+
+        fann_destroy_train(subdata);
+        
+        delete[] importance;
+      }
+      fann_destroy_train(data);
+      
+    } 
   }
 
   void update_actor_old(){
@@ -302,6 +369,7 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     double *importance_sample = new double [trajectory.size()];
     double *delta = new double [trajectory.size()];
     double min_delta = std::numeric_limits<double>::max();
+    double max_delta = std::numeric_limits<double>::min();
     
     std::vector<double> sum(nb_sensors);
     std::vector<double> square_sum(nb_sensors);
@@ -332,24 +400,100 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       
       if(delta[n] <= min_delta)
         min_delta = delta[n];
+      if(delta[n] >= max_delta)
+        max_delta = delta[n];
 
       n++;
     }
-    if(min_delta < 0)
-      min_delta = -min_delta;
-    else 
-      min_delta = 0;
-    
-    std::vector<double> sigma(nb_sensors);
-    for (uint i = 0; i < nb_sensors ; i++){
-      sigma[i] = sqrt(square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size())))/((double)trajectory.size()) ;
-      //sigma[i] = (square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size())))/((double)trajectory.size()) ;
-    }
-    
+       
     n=0;
     for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-      delta[n]= delta[n] + min_delta;
+      delta[n] = bib::Utils::transform(delta[n], min_delta, max_delta, 0, 1);
       n++;
+    }
+    
+    std::vector<double> sigma(nb_sensors);
+    if(strategy_u <=5){
+      for (uint i = 0; i < nb_sensors ; i++){
+        sigma[i] = sqrt(square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size())))/((double)trajectory.size()) ;
+      }
+    } else {
+      n=0;
+      double sum_w = 0;
+      std::vector<double> all_w(trajectory.size());
+      
+      std::vector<double>* all_sigma = new std::vector<double>[nb_sensors];
+      
+      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        struct UniqTest
+        {
+          const sample& _sa;
+          
+          bool operator()(const sample& t ) const
+          {
+              return t != _sa;
+          }
+        };
+        UniqTest t={*it};
+        //auto closest = kdtree_s->find_nearest(*it, std::numeric_limits<double>::max());
+        auto closest = kdtree_s->find_nearest_if(*it, std::numeric_limits<double>::max(), t);
+ 
+        //ASSERT(closest.second > 0.00000001f, "cannot find elem " << closest.second << " "<<kdtree_s->size());
+        const sample& ns = *closest.first;
+        
+        double dpis = bib::Utils::euclidien_dist(it->a, ns.a, 1.f);
+        double delta_ns= ns.r;
+        if(!ns.goal_reached){
+          double nextV = vnn->computeOutVF(ns.next_s, {});
+          delta_ns += gamma * nextV;
+        }
+        delta_ns = bib::Utils::transform(delta_ns, min_delta, max_delta, 0.f, 1.f);
+        
+        double dvis = sqrt((delta[n] - delta_ns)*(delta[n] - delta_ns));
+        if(strategy_u <=6){
+          dvis = 1.f; 
+          dpis = 1.f;
+        } else if(strategy_u <=7){
+          dvis = 1.f; 
+        } else if(strategy_u <=8){
+          dpis = 1.f;
+        }
+        double w = dvis*dpis;
+        sum_w += w;
+        all_w[n] = w;
+        
+        if(fabs(delta_ns - delta[n]) < 0.000000000001f){
+          LOG_DEBUG("error");
+          exit(1);
+        }
+        
+        double ln = delta_ns > delta[n] ? log(delta_ns / delta[n]) : log(delta[n] / delta_ns);
+        ln = 2.f * ln;
+          
+        for(uint dim = 0;dim < nb_sensors ; dim++){
+          double sq = (it->s[dim] - ns.s[dim])*(it->s[dim] - ns.s[dim]);
+          
+          double wanted_sigma = sqrt(sq/ln);
+          all_sigma[dim].push_back(wanted_sigma);
+        }
+        n++;
+      }
+      
+      
+      for(uint dim = 0;dim < nb_sensors ; dim++){
+          sigma[dim] = 0;
+          
+          n=0;
+          for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+            sigma[dim] = sigma[dim] + (all_w[n] * all_sigma[dim][n]);
+            n++;
+          }
+          
+          sigma[dim] /= sum_w;
+      }
+      //bib::Logger::PRINT_ELEMENTS(sigma);
+      
+      delete[] all_sigma;
     }
     
     n=0;
@@ -380,8 +524,15 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   void end_episode() override {
     if(strategy_u <= 2)
       update_actor_old();
-    else
+    else if(strategy_u <= 3)
+      update_actor_old_lw();
+    else if(strategy_u <= 9)
       update_actor_new();
+    else {
+      LOG_ERROR("not implemented");
+      exit(1); 
+    }
+    
   }
   
   void end_instance(bool) override {
@@ -454,7 +605,6 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   };
   typedef KDTree::KDTree<sample, KDTree::_Bracket_accessor<sample>, L1_distance> kdtree_sample;
   kdtree_sample* kdtree_s;
-  double kdtree_snorm = 0;
 
   MLP* ann;
   MLP* vnn;

@@ -47,12 +47,36 @@ typedef struct _sample {
         return s[i] < b.s[i];
     }
     
-//     for (uint i = 0; i < a.size(); i++) {
-//       if(a[i] != b.a[i])
-//         return a[i] < b.a[i];
-//     }
+    for (uint i = 0; i < a.size(); i++) {
+      if(a[i] != b.a[i])
+        return a[i] < b.a[i];
+    }
 
     return false;
+  }
+  
+  bool operator!=(const _sample& b) const {
+    for (uint i = 0; i < s.size(); i++) {
+      if(fabs(s[i] - b.s[i])>=0.000001f)
+        return true;
+    }
+    
+    for (uint i = 0; i < a.size(); i++) {
+      if(fabs(a[i] - b.a[i])>=0.000001f)
+        return true;
+    }
+    
+    for (uint i = 0; i < pure_a.size(); i++) {
+      if(fabs(pure_a[i] - b.pure_a[i])>=0.000001f)
+        return true;
+    }
+    
+    for (uint i = 0; i < next_s.size(); i++) {
+      if(fabs(next_s[i] - b.next_s[i])>=0.000001f)
+        return true;
+    }
+    
+    return fabs(r - b.r)>=0.000001f || goal_reached != b.goal_reached ;
   }
   
   typedef double value_type;
@@ -246,23 +270,35 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
   
   double approx_surface(const sample& sa){
-    auto it = kdtree_s->find_nearest(sa);
-    const sample& sa2 = *it.first;
-    double dist1 = it.second;
-    
     struct UniqTest
     {
       const sample& _sa;
       
       bool operator()(const sample& t ) const
       {
-          return t < _sa || _sa < t;
+          return t != _sa;
+      }
+    };
+    UniqTest predicate = {sa};
+    
+    auto it = kdtree_s->find_nearest_if(sa, std::numeric_limits<double>::max(), predicate);
+    const sample& sa2 = *it.first;
+    double dist1 = it.second;
+    
+    struct UniqTest2
+    {
+      const sample& _sa;
+      const sample& _sa2;
+      
+      bool operator()(const sample& t ) const
+      {
+          return t != _sa && t != _sa2;
       }
       
     };
     
-    UniqTest predicate = {sa2};
-    auto it2 = kdtree_s->find_nearest_if(sa, std::numeric_limits<double>::max(), predicate);
+    UniqTest2 predicate2 = {sa, sa2};
+    auto it2 = kdtree_s->find_nearest_if(sa, std::numeric_limits<double>::max(), predicate2);
     
     return dist1 + it2.second;
   }
