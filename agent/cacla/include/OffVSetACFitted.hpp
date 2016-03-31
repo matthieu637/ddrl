@@ -462,19 +462,23 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         sum_w += w;
         all_w[n] = w;
         
-        if(fabs(delta_ns - delta[n]) < 0.000000000001f){
-          LOG_DEBUG("error");
-          exit(1);
-        }
-        
-        double ln = delta_ns > delta[n] ? log(delta_ns / delta[n]) : log(delta[n] / delta_ns);
-        ln = 2.f * ln;
+        if(fabs(delta_ns - delta[n]) < 0.0000000001f){
+          sum_w -= w;
+          all_w[n] = 0.000000000000000f;
           
-        for(uint dim = 0;dim < nb_sensors ; dim++){
-          double sq = (it->s[dim] - ns.s[dim])*(it->s[dim] - ns.s[dim]);
+          for(uint dim = 0;dim < nb_sensors ; dim++)
+            all_sigma[dim].push_back(0.000000000000000f);
           
-          double wanted_sigma = sqrt(sq/ln);
-          all_sigma[dim].push_back(wanted_sigma);
+        } else {
+          double ln = delta_ns > delta[n] ? log(delta_ns / delta[n]) : log(delta[n] / delta_ns);
+          ln = 2.f * ln;
+            
+          for(uint dim = 0;dim < nb_sensors ; dim++){
+            double sq = (it->s[dim] - ns.s[dim])*(it->s[dim] - ns.s[dim]);
+            
+            double wanted_sigma = sqrt(sq/ln);
+            all_sigma[dim].push_back(wanted_sigma);
+          }
         }
         n++;
       }
