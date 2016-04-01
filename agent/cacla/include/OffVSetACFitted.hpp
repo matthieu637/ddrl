@@ -341,6 +341,29 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     }
   }
   
+  bool dominatedMx(const double* delta, const std::vector<double>& x, const std::vector<double>& sigma, uint n){
+    double max_gauss = std::numeric_limits<double>::min();
+    uint i=0;
+    for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+      const std::vector<double>& s = it->s;
+      double v = delta[i];
+      double toexp = 0;
+      for(uint j=0;j< x.size(); j++)
+        toexp += ((s[j] - x[j])*(s[j] - x[j]))/(sigma[j]*sigma[j]);
+      toexp *= -0.5f;
+      v = v * exp(toexp);
+      
+      if(v>=max_gauss){
+        max_gauss = v;
+        if(max_gauss > delta[n])
+          return true;
+      }
+      i++;
+    }
+    
+    return false;
+  }
+  
   double Mx(const double* delta, const std::vector<double>& x, const std::vector<double>& sigma){
     double max_gauss = std::numeric_limits<double>::min();
     uint i=0;
@@ -462,7 +485,7 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         sum_w += w;
         all_w[n] = w;
         
-        if(fabs(delta_ns - delta[n]) < 0.0000000001f){
+        if(fabs(delta_ns - delta[n]) < 0.0000001f){
           sum_w -= w;
           all_w[n] = 0.000000000000000f;
           
@@ -477,7 +500,12 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             double sq = (it->s[dim] - ns.s[dim])*(it->s[dim] - ns.s[dim]);
             
             double wanted_sigma = sqrt(sq/ln);
-            all_sigma[dim].push_back(wanted_sigma);
+            if(wanted_sigma >= sqrt(square_sum[dim]/((double)trajectory.size()) - (sum[dim]/((double)trajectory.size()))*(sum[dim]/((double)trajectory.size())))){
+              sum_w -= w;
+              all_sigma[dim].push_back(0.000000000000000f);
+              all_w[n] = 0.000000000000000f;
+            } else 
+              all_sigma[dim].push_back(wanted_sigma);
           }
         }
         n++;
@@ -487,34 +515,76 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       for(uint dim = 0;dim < nb_sensors ; dim++){
           sigma[dim] = 0;
           
+          if (strategy_u <= 9){
+            n=0;
+            for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+              sigma[dim] = sigma[dim] + (all_w[n] * all_sigma[dim][n]);
+              n++;
+            }
+          
+            sigma[dim] /= sum_w;
+          } else {
+             //sigma[dim] = *std::max_element(all_sigma[dim].begin(), all_sigma[dim].end());
+             sigma[dim] = (square_sum[dim]/((double)trajectory.size()) - (sum[dim]/((double)trajectory.size()))*(sum[dim]/((double)trajectory.size())))*10;
+          }
+      }
+      
+      bib::Logger::PRINT_ELEMENTS(sigma);
+      
+      if (strategy_u == 10){
+        uint dominated = trajectory.size();
+        while(((float)dominated)/((float)trajectory.size()) >= 0.7){
+          for(uint dim = 0;dim < nb_sensors ; dim++)
+            sigma[dim] *= 0.999;
+          dominated = 0;
           n=0;
-          for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-            sigma[dim] = sigma[dim] + (all_w[n] * all_sigma[dim][n]);
+          for(auto it = trajectory.begin(); it != trajectory.end() ; ++it){
+            if(dominatedMx(delta, it->s, sigma, n))
+              dominated++;
             n++;
           }
-          
-          sigma[dim] /= sum_w;
+          //LOG_DEBUG(((float)dominated)/((float)trajectory.size()) << " " << dominated << " dominated over " << trajectory.size());
+        }
+        n=0;
+        dominated=0;
+        for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+          if(Mx(delta, it->s, sigma) > delta[n])
+            dominated++;
+          n++;
+        }
+        LOG_DEBUG(((float)dominated)/((float)trajectory.size()) << " " << dominated << " dominated over " << trajectory.size());
       }
-      //bib::Logger::PRINT_ELEMENTS(sigma);
+      
+      bib::Logger::PRINT_ELEMENTS(sigma);
       
       delete[] all_sigma;
     }
     
-    n=0;
-    std::vector<double> Mxs(trajectory.size());
-    std::vector<double> Mxs_fornorm(trajectory.size());
-    for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-      Mxs[n] = Mx(delta, it->s, sigma);
-      Mxs_fornorm[n] = Mxs[n] - (delta[n]);
-      n++;
-    }
-    
-    double norm_term = *std::max_element(Mxs_fornorm.begin(), Mxs_fornorm.end());
-    n=0;
-    for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-      importance_sample[n] = 1.f - Mxs_fornorm[n]/norm_term;
-      //LOG_DEBUG(importance_sample[n]<< " " << Mxs[n]<<" "<< Mxs_fornorm[n] << " " << delta[n] <<" " <<norm_term <<" "<< sigma[0] << " " << min_delta<< " " << sigma[2]);
-      n++;
+    if(strategy_u != 10){
+      n=0;
+      std::vector<double> Mxs(trajectory.size());
+      std::vector<double> Mxs_fornorm(trajectory.size());
+      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        Mxs[n] = Mx(delta, it->s, sigma);
+        Mxs_fornorm[n] = Mxs[n] - (delta[n]);
+        n++;
+      }
+      
+      double norm_term = *std::max_element(Mxs_fornorm.begin(), Mxs_fornorm.end());
+      n=0;
+      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        importance_sample[n] = 1.f - Mxs_fornorm[n]/norm_term;
+        //LOG_DEBUG(importance_sample[n]<< " " << Mxs[n]<<" "<< Mxs_fornorm[n] << " " << delta[n] <<" " <<norm_term <<" "<< sigma[0] << " " << min_delta<< " " << sigma[2]);
+        n++;
+      }
+    } else {
+      n=0;
+      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        
+        importance_sample[n] = Mx(delta, it->s, sigma) > delta[n] ? 0.f :  1.f;
+        //LOG_DEBUG(importance_sample[n]<< " " << Mxs[n]<<" "<< Mxs_fornorm[n] << " " << delta[n] <<" " <<norm_term <<" "<< sigma[0] << " " << min_delta<< " " << sigma[2]);
+        n++;
+      }
     }
 
     ann->learn_stoch_lw(data, importance_sample, 5000, 0, 0.0001);
@@ -530,7 +600,7 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       update_actor_old();
     else if(strategy_u <= 3)
       update_actor_old_lw();
-    else if(strategy_u <= 9)
+    else if(strategy_u <= 10)
       update_actor_new();
     else {
       LOG_ERROR("not implemented");
