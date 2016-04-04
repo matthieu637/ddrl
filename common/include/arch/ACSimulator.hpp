@@ -567,7 +567,7 @@ protected:
     (void) all_perceptions;
 #endif
     
-    double max_rvs = std::numeric_limits<double>::min();
+    double max_rvs = std::numeric_limits<double>::lowest();
     
     auto iter = [&](const std::vector<double>& ac) {
       lenv->reset_episode_choose(stochasticity);
@@ -628,7 +628,7 @@ protected:
         else
           rvs = *std::max_element(inter_rewards.begin(), inter_rewards.end());
         rvs += gamma * this->agent->criticEval(lenv->perceptions());
-        if(max_rvs < rvs){
+        if(max_rvs <= rvs){
           max_rvs = rvs;
           std::copy(ac.begin(), ac.end(), ac_result.begin());
         }

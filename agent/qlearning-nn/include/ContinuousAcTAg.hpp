@@ -80,8 +80,6 @@ class ContinuousAcTAg : public arch::AAgent<> {
     delete nn;
   }
 
-  double max_reward = std::numeric_limits<double>::min();
-
   const std::vector<double>& runf(double r, const std::vector<double>& sensors,
                                  bool learning, bool goal_reached, bool) override {
 
@@ -238,7 +236,6 @@ class ContinuousAcTAg : public arch::AAgent<> {
     internal_time = 0;
     trajectory.clear();
     current_trajectory.clear();
-    max_reward = std::numeric_limits<double>::min();
   }
 
   struct ParrallelLearnFromScratch {

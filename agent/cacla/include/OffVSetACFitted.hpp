@@ -342,14 +342,16 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
   
   bool dominatedMx(const double* delta, const std::vector<double>& x, const std::vector<double>& sigma, uint n){
-    double max_gauss = std::numeric_limits<double>::min();
+    double max_gauss = std::numeric_limits<double>::lowest();
     uint i=0;
     for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
       const std::vector<double>& s = it->s;
       double v = delta[i];
       double toexp = 0;
-      for(uint j=0;j< x.size(); j++)
+      for(uint j=0;j< x.size(); j++){
+        ASSERT(sigma[j] > 0.000000000f, "wrong sigma " << sigma[j]);
         toexp += ((s[j] - x[j])*(s[j] - x[j]))/(sigma[j]*sigma[j]);
+      }
       toexp *= -0.5f;
       v = v * exp(toexp);
       
@@ -365,14 +367,16 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
   
   double Mx(const double* delta, const std::vector<double>& x, const std::vector<double>& sigma){
-    double max_gauss = std::numeric_limits<double>::min();
+    double max_gauss = std::numeric_limits<double>::lowest();
     uint i=0;
     for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
       const std::vector<double>& s = it->s;
       double v = delta[i];
       double toexp = 0;
-      for(uint j=0;j< x.size(); j++)
+      for(uint j=0;j< x.size(); j++){
+        ASSERT(sigma[j] > 0.000000000f, "wrong sigma " << sigma[j]);
         toexp += ((s[j] - x[j])*(s[j] - x[j]))/(sigma[j]*sigma[j]);
+      }
       toexp *= -0.5f;
       v = v * exp(toexp);
       
@@ -385,14 +389,14 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
   
   void update_actor_new(){
-    if (trajectory.size() > 1) {
+    if (trajectory.size() > 4) {
     bool update_pure_ac = strategy_u == 4;
     
     struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
     double *importance_sample = new double [trajectory.size()];
     double *delta = new double [trajectory.size()];
     double min_delta = std::numeric_limits<double>::max();
-    double max_delta = std::numeric_limits<double>::min();
+    double max_delta = std::numeric_limits<double>::lowest();
     
     std::vector<double> sum(nb_sensors);
     std::vector<double> square_sum(nb_sensors);
@@ -440,7 +444,7 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       for (uint i = 0; i < nb_sensors ; i++){
         sigma[i] = sqrt(square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size())))/((double)trajectory.size()) ;
       }
-    } else {
+    } else if(strategy_u <=9) {
       n=0;
       double sum_w = 0;
       std::vector<double> all_w(trajectory.size());
@@ -448,16 +452,36 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       std::vector<double>* all_sigma = new std::vector<double>[nb_sensors];
       
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        if(delta[n] <= 0.000000000000f){
+          for(uint dim = 0;dim < nb_sensors ; dim++)
+            all_sigma[dim].push_back(0.000000000000000f);
+          all_w[n] = 0.000000000000000f; 
+          continue;
+        }
+        
         struct UniqTest
         {
           const sample& _sa;
+          OffVSetACFitted* ptr;
           
           bool operator()(const sample& t ) const
           {
-              return t != _sa;
+              if( !( t != _sa))
+                return false;
+              
+              double delta_ns= t.r;
+              if(!t.goal_reached){
+                double nextV = ptr->vnn->computeOutVF(t.next_s, {});
+                delta_ns += ptr->gamma * nextV;
+              }
+              
+              if(delta_ns <= 0.000000000f)
+                return false;
+              
+              return true;
           }
         };
-        UniqTest t={*it};
+        UniqTest t={*it, this};
         //auto closest = kdtree_s->find_nearest(*it, std::numeric_limits<double>::max());
         auto closest = kdtree_s->find_nearest_if(*it, std::numeric_limits<double>::max(), t);
  
@@ -514,24 +538,23 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       
       for(uint dim = 0;dim < nb_sensors ; dim++){
           sigma[dim] = 0;
-          
-          if (strategy_u <= 9){
-            n=0;
-            for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-              sigma[dim] = sigma[dim] + (all_w[n] * all_sigma[dim][n]);
-              n++;
-            }
-          
-            sigma[dim] /= sum_w;
-          } else {
-             //sigma[dim] = *std::max_element(all_sigma[dim].begin(), all_sigma[dim].end());
-             sigma[dim] = (square_sum[dim]/((double)trajectory.size()) - (sum[dim]/((double)trajectory.size()))*(sum[dim]/((double)trajectory.size())))*10;
+
+          n=0;
+          for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+            sigma[dim] = sigma[dim] + (all_w[n] * all_sigma[dim][n]);
+            n++;
           }
+        
+          sigma[dim] /= sum_w;
       }
       
-      bib::Logger::PRINT_ELEMENTS(sigma);
+      //bib::Logger::PRINT_ELEMENTS(sigma);      
+      delete[] all_sigma;
+    } else if (strategy_u == 10){
+        for (uint i = 0; i < nb_sensors ; i++){
+          sigma[i] = 10*sqrt(square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size())))/((double)trajectory.size()) ;
+        }
       
-      if (strategy_u == 10){
         uint dominated = trajectory.size();
         while(((float)dominated)/((float)trajectory.size()) >= 0.7){
           for(uint dim = 0;dim < nb_sensors ; dim++)
@@ -554,11 +577,8 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         }
         LOG_DEBUG(((float)dominated)/((float)trajectory.size()) << " " << dominated << " dominated over " << trajectory.size());
       }
-      
-      bib::Logger::PRINT_ELEMENTS(sigma);
-      
-      delete[] all_sigma;
-    }
+    
+    
     
     if(strategy_u != 10){
       n=0;
