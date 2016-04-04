@@ -539,7 +539,7 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
           }
         
           sigma[dim] /= sum_w;
-	  if(sigma[dim] <= 0.00000000000001f)
+	  if(sigma[dim] <= 0.00000000000001f || std::isnan(sigma[dim]))
 	  	sigma[dim] = sqrt(square_sum[dim]/((double)trajectory.size()) - (sum[dim]/((double)trajectory.size()))*(sum[dim]/((double)trajectory.size())));
       }
       
