@@ -452,10 +452,11 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       std::vector<double>* all_sigma = new std::vector<double>[nb_sensors];
       
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-        if(delta[n] <= 0.000000000000f){
+        if(delta[n] <= 0.000000000000000000001f ){
           for(uint dim = 0;dim < nb_sensors ; dim++)
             all_sigma[dim].push_back(0.000000000000000f);
           all_w[n] = 0.000000000000000f; 
+	  n++;
           continue;
         }
         
@@ -463,7 +464,8 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         {
           const sample& _sa;
           OffVSetACFitted* ptr;
-          
+          double _min_delta;
+
           bool operator()(const sample& t ) const
           {
               if( !( t != _sa))
@@ -475,17 +477,17 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
                 delta_ns += ptr->gamma * nextV;
               }
               
-              if(delta_ns <= 0.000000000f)
+              if(delta_ns <= _min_delta)
                 return false;
               
               return true;
           }
         };
-        UniqTest t={*it, this};
+        UniqTest t={*it, this, min_delta};
         //auto closest = kdtree_s->find_nearest(*it, std::numeric_limits<double>::max());
         auto closest = kdtree_s->find_nearest_if(*it, std::numeric_limits<double>::max(), t);
  
-        //ASSERT(closest.second > 0.00000001f, "cannot find elem " << closest.second << " "<<kdtree_s->size());
+        ASSERT(closest.second < std::numeric_limits<double>::max(), "cannot find elem " << closest.second << " "<<kdtree_s->size());
         const sample& ns = *closest.first;
         
         double dpis = bib::Utils::euclidien_dist(it->a, ns.a, 1.f);
@@ -509,29 +511,20 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         sum_w += w;
         all_w[n] = w;
         
-        if(fabs(delta_ns - delta[n]) < 0.0000001f){
-          sum_w -= w;
-          all_w[n] = 0.000000000000000f;
+        double ln = delta_ns > delta[n] ? log(delta_ns / delta[n]) : log(delta[n] / delta_ns);
+        ln = 2.f * ln;
           
-          for(uint dim = 0;dim < nb_sensors ; dim++)
-            all_sigma[dim].push_back(0.000000000000000f);
+        for(uint dim = 0;dim < nb_sensors ; dim++){
+          double sq = (it->s[dim] - ns.s[dim])*(it->s[dim] - ns.s[dim]);
           
-        } else {
-          double ln = delta_ns > delta[n] ? log(delta_ns / delta[n]) : log(delta[n] / delta_ns);
-          ln = 2.f * ln;
-            
-          for(uint dim = 0;dim < nb_sensors ; dim++){
-            double sq = (it->s[dim] - ns.s[dim])*(it->s[dim] - ns.s[dim]);
-            
-            double wanted_sigma = sqrt(sq/ln);
-            if(wanted_sigma >= sqrt(square_sum[dim]/((double)trajectory.size()) - (sum[dim]/((double)trajectory.size()))*(sum[dim]/((double)trajectory.size())))){
-              sum_w -= w;
-              all_sigma[dim].push_back(0.000000000000000f);
-              all_w[n] = 0.000000000000000f;
-            } else 
-              all_sigma[dim].push_back(wanted_sigma);
+          double wanted_sigma = sqrt(sq/ln);
+          if(wanted_sigma >= sqrt(square_sum[dim]/((double)trajectory.size()) - (sum[dim]/((double)trajectory.size()))*(sum[dim]/((double)trajectory.size())))){
+            all_sigma[dim].push_back( sqrt(square_sum[dim]/((double)trajectory.size()) - (sum[dim]/((double)trajectory.size()))*(sum[dim]/((double)trajectory.size()))) );
+          } else  {
+            all_sigma[dim].push_back(wanted_sigma);
           }
         }
+      
         n++;
       }
       
@@ -546,9 +539,10 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
           }
         
           sigma[dim] /= sum_w;
+	  if(sigma[dim] <= 0.00000000000001f)
+	  	sigma[dim] = sqrt(square_sum[dim]/((double)trajectory.size()) - (sum[dim]/((double)trajectory.size()))*(sum[dim]/((double)trajectory.size())));
       }
       
-      //bib::Logger::PRINT_ELEMENTS(sigma);      
       delete[] all_sigma;
     } else if (strategy_u == 10){
         for (uint i = 0; i < nb_sensors ; i++){
@@ -594,7 +588,7 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       n=0;
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
         importance_sample[n] = 1.f - Mxs_fornorm[n]/norm_term;
-        //LOG_DEBUG(importance_sample[n]<< " " << Mxs[n]<<" "<< Mxs_fornorm[n] << " " << delta[n] <<" " <<norm_term <<" "<< sigma[0] << " " << min_delta<< " " << sigma[2]);
+        //LOG_DEBUG(importance_sample[n]<< " " << Mxs[n]<<" "<< Mxs_fornorm[n] << " " << delta[n] <<" " <<norm_term );
         n++;
       }
     } else {
