@@ -377,6 +377,23 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               LOG_ERROR("to be implemented");
               exit(1);
             }
+          } else if(strategy_w >= 8) {
+            uint i=0;
+            double sum_ps = 0.00f;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              if(strategy_w ==8)
+                importance_sample[i] = ptheta[i]; 
+              else
+                importance_sample[i] = (ptheta[i] / it->p0); 
+              sum_ps += 1.f / proba_s.pdf(it->s);
+              i++;
+            }
+            
+            i=0;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              importance_sample[i] = importance_sample[i] * (1.f / proba_s.pdf(it->s)) / sum_ps;
+              i++;
+            }            
           }
           
           delete[] ptheta;
