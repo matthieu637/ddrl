@@ -318,7 +318,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             importance_sample[i]=1.000000000000000f;
             i++;
           }
-        } else if(strategy_w >= 1 && strategy_w <= 7){
+        } else if(strategy_w >= 1 && strategy_w <= 9){
           vtraj = new std::vector<sample>(trajectory.size());
           std::copy(trajectory.begin(), trajectory.end(), vtraj->begin());
           importance_sample = new double [trajectory.size()];
