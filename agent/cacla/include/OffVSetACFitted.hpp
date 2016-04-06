@@ -272,6 +272,57 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       
     } 
   }
+  
+  void update_actor_old_lw_all(){
+    if (trajectory.size() > 0) {
+      struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
+
+      uint n=0;
+      std::vector<double> deltas;
+      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        sample sm = *it;
+
+        double target = 0.f;
+        double mine = 0.f;
+        
+	target = sm.r;
+	if (!sm.goal_reached) {
+	  double nextV = vnn->computeOutVF(sm.next_s, {});
+	  target += gamma * nextV;
+	}
+	mine = vnn->computeOutVF(sm.s, {});
+
+        if(target > mine) {
+          for (uint i = 0; i < nb_sensors ; i++)
+            data->input[n][i] = sm.s[i];
+          for (uint i = 0; i < nb_motors; i++)
+            data->output[n][i] = sm.a[i];
+        
+          deltas.push_back(target - mine);
+          n++;
+        }
+      }
+          
+
+      if(n > 0) {
+        double* importance = new double[n];
+        double norm = *std::max_element(deltas.begin(), deltas.end());
+        for (uint i =0 ; i < n; i++){
+            importance[i] = deltas[i] / norm;
+        }    
+        
+        struct fann_train_data* subdata = fann_subset_train_data(data, 0, n);
+
+        ann->learn_stoch_lw(subdata, importance, 5000, 0, 0.0001);
+
+        fann_destroy_train(subdata);
+        
+        delete[] importance;
+      }
+      fann_destroy_train(data);
+      
+    } 
+  }
 
   void update_actor_old(){
      if (last_trajectory.size() > 0) {
@@ -616,6 +667,8 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       update_actor_old_lw();
     else if(strategy_u <= 10)
       update_actor_new();
+    else if(strategy_u == 15)
+      update_actor_old_lw_all();
     else {
       LOG_ERROR("not implemented");
       exit(1); 
