@@ -98,7 +98,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
   virtual ~OffPolSetACFitted() {
     delete kdtree_s;
-    
+
     delete vnn;
     delete ann;
   }
@@ -128,6 +128,14 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0};
       
       kdtree_s->insert(sa);
+      
+      std::vector<double> psa;
+      std::vector<double> psas;
+      mergeSA(psa, last_state, *last_action);
+      mergeSAS(psas, last_state, *last_action, sensors);
+      
+      proba_sa.add_data(psa);
+      proba_sas.add_data(psas);
     }
 
     last_pure_action.reset(new vector<double>(*next_action));
@@ -318,7 +326,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             importance_sample[i]=1.000000000000000f;
             i++;
           }
-        } else if(strategy_w >= 1 && strategy_w <= 9){
+        } else if(strategy_w >= 1 && strategy_w <= 13){
           vtraj = new std::vector<sample>(trajectory.size());
           std::copy(trajectory.begin(), trajectory.end(), vtraj->begin());
           importance_sample = new double [trajectory.size()];
@@ -377,7 +385,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               LOG_ERROR("to be implemented");
               exit(1);
             }
-          } else if(strategy_w >= 8) {
+          } else if(strategy_w >= 8 && strategy_w <= 9) {
             uint i=0;
             double sum_ps = 0.00f;
             for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
@@ -394,6 +402,63 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               importance_sample[i] = importance_sample[i] * (1.f / proba_s.pdf(it->s)) / sum_ps;
               i++;
             }            
+          } else if(strategy_w >= 10 && strategy_w <= 11) {
+            uint i=0;
+            double sum_ps = 0.00f;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              std::vector<double> psa;
+              std::vector<double> psas;
+              mergeSA(psa, it->s, it->a);
+              mergeSAS(psas, it->s, it->a, it->next_s);
+              
+              if(strategy_w ==10)
+                importance_sample[i] = ptheta[i]; 
+              else
+                importance_sample[i] = (ptheta[i] / it->p0); 
+              sum_ps += (proba_sas.pdf(psas)/proba_sa.pdf(psa));
+              i++;
+            }
+            
+            i=0;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              std::vector<double> psa;
+              std::vector<double> psas;
+              mergeSA(psa, it->s, it->a);
+              mergeSAS(psas, it->s, it->a, it->next_s);
+              
+              importance_sample[i] = importance_sample[i] * (proba_sas.pdf(psas)/proba_sa.pdf(psa)) / sum_ps;
+              i++;
+            }  
+          } else if(strategy_w >= 11 && strategy_w <= 12) {
+            uint i=0;
+            double sum_ps = 0.00f;
+            double sum_ps_real = 0.00f;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              std::vector<double> psa;
+              std::vector<double> psas;
+              mergeSA(psa, it->s, it->a);
+              mergeSAS(psas, it->s, it->a, it->next_s);
+              
+              if(strategy_w ==11)
+                importance_sample[i] = ptheta[i]; 
+              else
+                importance_sample[i] = (ptheta[i] / it->p0); 
+              sum_ps += (proba_sas.pdf(psas)/proba_sa.pdf(psa));
+              
+              sum_ps_real += 1.f / proba_s.pdf(it->s);
+              i++;
+            }
+            
+            i=0;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              std::vector<double> psa;
+              std::vector<double> psas;
+              mergeSA(psa, it->s, it->a);
+              mergeSAS(psas, it->s, it->a, it->next_s);
+              
+              importance_sample[i] = importance_sample[i] * ((proba_sas.pdf(psas)/proba_sa.pdf(psa)) / sum_ps) * (1.f / proba_s.pdf(it->s)) / sum_ps_real;
+              i++;
+            }  
           }
           
           delete[] ptheta;
@@ -444,6 +509,19 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 	delete[] importance_sample;
         delete vtraj;
       }
+  }
+  
+  inline void mergeSA(std::vector<double>& AB, const std::vector<double>& A, const std::vector<double>& B) {
+    AB.reserve( A.size() + B.size() ); // preallocate memory
+    AB.insert( AB.end(), A.begin(), A.end() );
+    AB.insert( AB.end(), B.begin(), B.end() );
+  }
+  
+  inline void mergeSAS(std::vector<double>& AB, const std::vector<double>& A, const std::vector<double>& B, const std::vector<double>& C) {
+    AB.reserve( A.size() + B.size() + C.size() ); // preallocate memory
+    AB.insert( AB.end(), A.begin(), A.end() );
+    AB.insert( AB.end(), B.begin(), B.end() );
+    AB.insert( AB.end(), C.begin(), C.end() );
   }
 
   void end_episode() override {
@@ -544,6 +622,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   std::set<sample> last_trajectory;
 //     std::list<sample> trajectory;
   KDE proba_s;
+  KDE proba_sa, proba_sas;
   
   struct L1_distance
   {

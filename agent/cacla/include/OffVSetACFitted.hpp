@@ -392,6 +392,59 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     }
   }
   
+  void update_actor_old_all(){
+     if (trajectory.size() > 0) {
+      bool update_pure_ac=false;
+      bool update_delta_neg=false;
+
+      struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
+
+      uint n=0;
+      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        sample sm = *it;
+
+        double target = 0.f;
+        double mine = 0.f;
+        
+	target = sm.r;
+	if (!sm.goal_reached) {
+	  double nextV = vnn->computeOutVF(sm.next_s, {});
+	  target += gamma * nextV;
+	}
+	mine = vnn->computeOutVF(sm.s, {});
+
+        if(target > mine) {
+          for (uint i = 0; i < nb_sensors ; i++)
+            data->input[n][i] = sm.s[i];
+          if(update_pure_ac){
+            for (uint i = 0; i < nb_motors; i++)
+              data->output[n][i] = sm.pure_a[i];
+          } else {
+            for (uint i = 0; i < nb_motors; i++)
+              data->output[n][i] = sm.a[i];
+          }
+
+          n++;
+        } else if(update_delta_neg && !update_pure_ac){
+            for (uint i = 0; i < nb_sensors ; i++)
+              data->input[n][i] = sm.s[i];
+            for (uint i = 0; i < nb_motors; i++)
+              data->output[n][i] = sm.pure_a[i];
+            n++;
+        }
+      }
+
+      if(n > 0) {
+        struct fann_train_data* subdata = fann_subset_train_data(data, 0, n);
+
+        ann->learn_stoch(subdata, 5000, 0, 0.0001);
+
+        fann_destroy_train(subdata);
+      }
+      fann_destroy_train(data);
+    }
+  }
+  
   bool dominatedMx(const double* delta, const std::vector<double>& x, const std::vector<double>& sigma, uint n){
     double max_gauss = std::numeric_limits<double>::lowest();
     uint i=0;
@@ -669,6 +722,8 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       update_actor_new();
     else if(strategy_u == 15)
       update_actor_old_lw_all();
+    else if(strategy_u == 20)
+      update_actor_old_all();
     else {
       LOG_ERROR("not implemented");
       exit(1); 
