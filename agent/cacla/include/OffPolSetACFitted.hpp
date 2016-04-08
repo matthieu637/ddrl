@@ -429,7 +429,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               importance_sample[i] = importance_sample[i] * (proba_sas.pdf(psas)/proba_sa.pdf(psa)) / sum_ps;
               i++;
             }  
-          } else if(strategy_w >= 11 && strategy_w <= 12) {
+          } else if(strategy_w >= 12 && strategy_w <= 13) {
             uint i=0;
             double sum_ps = 0.00f;
             double sum_ps_real = 0.00f;
@@ -439,7 +439,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               mergeSA(psa, it->s, it->a);
               mergeSAS(psas, it->s, it->a, it->next_s);
               
-              if(strategy_w ==11)
+              if(strategy_w ==13)
                 importance_sample[i] = ptheta[i]; 
               else
                 importance_sample[i] = (ptheta[i] / it->p0); 
@@ -459,6 +459,9 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               importance_sample[i] = importance_sample[i] * ((proba_sas.pdf(psas)/proba_sa.pdf(psa)) / sum_ps) * (1.f / proba_s.pdf(it->s)) / sum_ps_real;
               i++;
             }  
+          } else {
+              LOG_ERROR("to be implemented");
+              exit(1);
           }
           
           delete[] ptheta;
