@@ -326,7 +326,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             importance_sample[i]=1.000000000000000f;
             i++;
           }
-        } else if(strategy_w >= 1 && strategy_w <= 13){
+        } else if(strategy_w >= 1 && strategy_w <= 15){
           vtraj = new std::vector<sample>(trajectory.size());
           std::copy(trajectory.begin(), trajectory.end(), vtraj->begin());
           importance_sample = new double [trajectory.size()];
@@ -459,6 +459,30 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               importance_sample[i] = importance_sample[i] * ((proba_sas.pdf(psas)/proba_sa.pdf(psa)) / sum_ps) * (1.f / proba_s.pdf(it->s)) / sum_ps_real;
               i++;
             }  
+          } else if(strategy_w >= 14 && strategy_w <= 15) {
+            uint i=0;
+            double sum_ps = 0.00f;
+            double sum_pa = 0.00f;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              sum_ps += 1.f / proba_s.pdf(it->s);
+              if(strategy_w ==14)
+                sum_pa += ptheta[i]; 
+              else
+                sum_pa += (ptheta[i] / it->p0); 
+              
+              i++;
+            }
+            
+            i=0;
+            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+              if(strategy_w ==14)
+                importance_sample[i] = ptheta[i] / sum_pa; 
+              else
+                importance_sample[i] = (ptheta[i] / it->p0) / sum_pa; 
+              
+              importance_sample[i] = importance_sample[i] * (1.f / proba_s.pdf(it->s)) / sum_ps;
+              i++;
+            }
           } else {
               LOG_ERROR("to be implemented");
               exit(1);
