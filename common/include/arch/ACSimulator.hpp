@@ -625,9 +625,10 @@ protected:
       
         if(lenv->final_state())
           rvs = lenv->performance();
-        else
+        else {
           rvs = *std::max_element(inter_rewards.begin(), inter_rewards.end());
-        rvs += gamma * this->agent->criticEval(lenv->perceptions());
+          rvs += gamma * this->agent->criticEval(lenv->perceptions());
+	}
         if(max_rvs <= rvs){
           max_rvs = rvs;
           std::copy(ac.begin(), ac.end(), ac_result.begin());
