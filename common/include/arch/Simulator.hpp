@@ -127,8 +127,7 @@ class Simulator {
     
     agent->end_instance(learning);
     
-    if(learning)
-      save_agent(agent, lepisode);
+    save_agent(agent, lepisode, learning);
   }
  
   void dump_and_display(unsigned int episode, unsigned int instance, unsigned int tepisode, const std::list<double>& all_rewards, Environment* env,
@@ -163,9 +162,9 @@ class Simulator {
     }
   }
 
-  void save_agent(Agent* agent, unsigned int episode) {
+  void save_agent(Agent* agent, unsigned int episode, bool learning) {
     if (episode % save_agent_each == 0 && episode != 0) {
-      std::string filename(DEFAULT_AGENT_SAVE_FILE);
+      std::string filename = learning ? DEFAULT_AGENT_SAVE_FILE : DEFAULT_AGENT_TEST_SAVE_FILE;
       std::string filename2 = std::to_string(episode);
       std::string path = filename + filename2;
       agent->save(path);

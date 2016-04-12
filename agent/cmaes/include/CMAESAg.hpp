@@ -128,28 +128,29 @@ class CMAESAg : public arch::ARLAgent<> {
   void start_instance(bool learning) override {
     last_action = nullptr;
     scores.clear();
-
-    //put individual into NN
-    const double* parameters = nullptr;
-    if(learning)
-      parameters = pop[current_individual];
-    else
-      parameters = cmaes_GetPtr(evo, "xbestever");
-    const uint dimension = (uint) cmaes_Get(evo, "dim");
     
-    struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(ann->getNeuralNet()), sizeof(struct fann_connection));
-    fann_get_connection_array(ann->getNeuralNet(), connections);
-    
-//     LOG_DEBUG("DIM: " <<dimension << " " << fann_get_total_connections(ann->getNeuralNet()));
-    ASSERT(dimension == fann_get_total_connections(ann->getNeuralNet()), "dimension mismatch");
-    for(uint j=0; j< dimension; j++)
-      connections[j].weight=parameters[j];
-    
-    fann_set_weight_array(ann->getNeuralNet(), connections, dimension);
-    free(connections);
-    
-    //bib::Logger::PRINT_ELEMENTS(parameters, dimension);
-    
+    if(!justLoaded){
+      //put individual into NN
+      const double* parameters = nullptr;
+      if(learning)
+	parameters = pop[current_individual];
+      else
+	parameters = cmaes_GetPtr(evo, "xbestever");
+      const uint dimension = (uint) cmaes_Get(evo, "dim");
+      
+      struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(ann->getNeuralNet()), sizeof(struct fann_connection));
+      fann_get_connection_array(ann->getNeuralNet(), connections);
+      
+  //     LOG_DEBUG("DIM: " <<dimension << " " << fann_get_total_connections(ann->getNeuralNet()));
+      ASSERT(dimension == fann_get_total_connections(ann->getNeuralNet()), "dimension mismatch");
+      for(uint j=0; j< dimension; j++)
+	connections[j].weight=parameters[j];
+      
+      fann_set_weight_array(ann->getNeuralNet(), connections, dimension);
+      free(connections);
+      
+      //bib::Logger::PRINT_ELEMENTS(parameters, dimension);
+    }
     //LOG_FILE("policy_exploration", ann->hash());
   }
 
@@ -167,6 +168,7 @@ class CMAESAg : public arch::ARLAgent<> {
         new_population();
       }
     }
+    justLoaded = false;
   }
   
    void write_actionf_file(const std::string& file){
@@ -202,6 +204,7 @@ class CMAESAg : public arch::ARLAgent<> {
   }
 
   void load(const std::string& path) override {
+    justLoaded = true;
     ann->load(path+".actor");
   }
 
@@ -230,6 +233,7 @@ class CMAESAg : public arch::ARLAgent<> {
   cmaes_t* evo;
   double *const *pop;
   double *arFunvals;
+  bool justLoaded = false;
   uint current_individual;
 };
 

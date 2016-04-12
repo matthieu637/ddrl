@@ -6,5 +6,6 @@
 #define DEFAULT_DUMP_LEARNING_FILE ".learning.data"
 #define DEFAULT_DUMP_TESTING_FILE ".testing.data"
 #define DEFAULT_AGENT_SAVE_FILE "agent."
+#define DEFAULT_AGENT_TEST_SAVE_FILE "agent.test."
 
 #endif  // DEFAULTPARAM_H

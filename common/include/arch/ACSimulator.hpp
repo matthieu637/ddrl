@@ -156,8 +156,8 @@ protected:
     
     this->agent->end_instance(learning);
     
-    if(learning)
-      this->save_agent(this->agent, lepisode);
+    
+    this->save_agent(this->agent, lepisode, learning);
   }
   
   void generateBestValueFonction(std::map<std::vector<double>, double>& s_BVS, const std::list< std::vector<double> >& all_perceptions, 
