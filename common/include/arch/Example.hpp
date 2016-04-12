@@ -74,11 +74,17 @@ class SimpleEnv1D : public arch::AEnvironment<> {
  public:
   SimpleEnv1D() : s(1) {
 //       s[0] = -0.7;
-    s[0] = bib::Utils::randin(-1, 1);
+//    s[0] = bib::Utils::randin(-1, 1);
   }
   
   void _reset_episode() {
     s[0] = bib::Utils::randin(-1, 1);
+    first_state_stochasticity.resize(1);
+    first_state_stochasticity[0] = s[0];
+  }
+  
+  void _reset_episode_choose(const std::vector<double>& stochasticity) {
+    s[0] = stochasticity[0];
   }
   
   const std::vector<double>& perceptions() const {
