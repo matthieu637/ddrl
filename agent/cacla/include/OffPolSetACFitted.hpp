@@ -312,7 +312,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
   
   void update_critic(){
-      if (trajectory.size() > 0) {
+      if (trajectory.size() > 2) {
         //remove trace of old policy
 
         std::vector<sample> *vtraj; 
