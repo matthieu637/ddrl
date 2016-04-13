@@ -91,6 +91,13 @@ class ARLAgent : public AAgent<AgentProgOptions> {
     gamma                 = inifile->get<double>("agent.gamma");
     decision_each         = inifile->get<int>("agent.decision_each");
     
+    if(inifile->count("environment.max_step_per_instance") != 0 ){
+      if(inifile->get<int>("environment.max_step_per_instance") % decision_each != 0){
+          LOG_ERROR("please synchronize environment.max_step_per_instance with agent.decision_each");
+          exit(1);
+      }
+    }
+    
     _unique_invoke(inifile, command_args);
     if (command_args->count("load"))
       load((*command_args)["load"].as<std::string>());

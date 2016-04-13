@@ -58,6 +58,10 @@ public:
       time_for_ac = 1;
     }
     
+    bool last_step_before_decision(){
+      return time_for_ac == 1;
+    }
+    
     void disable_stochasticity(){
        type = policy_type::GREEDY;
        theta = 0.00000000000000000f;

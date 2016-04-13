@@ -523,10 +523,13 @@ protected:
             std::vector<double>& ac = lpol->run_td(st);
 //             bib::Logger::PRINT_ELEMENTS(ac, "DEBmac ");
 //             LOG_DEBUG((lpol->did_decision() ? "true" : "false"));
-            inter_rewards.push_back(lenv->performance());
             lenv->apply(ac);
-            if(lpol->did_decision()){
-              rsum += (local_gamma * (*std::max_element(inter_rewards.begin(), inter_rewards.end())));
+            inter_rewards.push_back(lenv->performance());
+            if(lpol->last_step_before_decision()){
+              if(lenv->final_state())
+		rsum += (local_gamma * lenv->performance());
+	      else
+		rsum += (local_gamma * (*std::max_element(inter_rewards.begin(), inter_rewards.end())));
               local_gamma *= gamma;
               inter_rewards.clear();
             }
@@ -538,7 +541,12 @@ protected:
           i++;
         }
         
-        rsum += local_gamma * lenv->performance();
+        if(inter_rewards.size() != 0){//didn't did a decision on the last timestep, only applying the last one
+          if(lenv->final_state())
+              rsum += (local_gamma * lenv->performance());
+          else
+              rsum += (local_gamma * (*std::max_element(inter_rewards.begin(), inter_rewards.end())));
+	}
         mmean->at(mean) = rsum;
         
 #ifdef DEBUG_WITH_DETERMINIST_POLICY
