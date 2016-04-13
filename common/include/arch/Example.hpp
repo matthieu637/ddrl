@@ -85,6 +85,9 @@ class SimpleEnv1D : public arch::AEnvironment<> {
   
   void _reset_episode() override {
     s[0] = bib::Utils::randin(-1, 1);
+    while(final_state())
+	s[0] = bib::Utils::randin(-1, 1);
+
     first_state_stochasticity.resize(1);
     first_state_stochasticity[0] = s[0];
   }
@@ -117,7 +120,7 @@ class SimpleEnv1D : public arch::AEnvironment<> {
   }
   
   void _apply(const std::vector<double>& a) {
-    s[0] = s[0] + (a[0]*2 - 1) / 2.f; 
+    s[0] = s[0] + a[0]/ 2.f; 
     if( s[0] > 1.f)
       s[0] = 1.f;
     else if( s[0] < -1.f)
@@ -125,8 +128,8 @@ class SimpleEnv1D : public arch::AEnvironment<> {
   }
   
   void unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) {
-    instance_per_episode    = 30;
-    max_step_per_instance   = 5;
+    instance_per_episode    = 1;
+    max_step_per_instance   = 10;
   }
 
   std::vector<double> s;
