@@ -118,9 +118,10 @@ protected:
       this->agent->runf(reward, perceptions, learning, this->env->final_state(), true);
       all_rewards.push_back(reward);
       
-      all_perceptions.push_back(perceptions);
-      all_perceptions_decision.push_back(perceptions);
-      all_Vs.push_back(this->agent->criticEval(perceptions));
+//       last V(absorbing_state) is useless
+//       all_perceptions.push_back(perceptions);
+//       all_perceptions_decision.push_back(perceptions);
+//       all_Vs.push_back(this->agent->criticEval(perceptions));
 
       if(analyse_distance_bestVF){
         double diff = compareBestValueFonction(all_perceptions, all_actions, policy, this->agent->getGamma(), 
@@ -340,7 +341,7 @@ protected:
 
     int i=0;
     for(auto it_vs : all_Vs){
-      diff += (myvector->at(i)-it_vs)*(myvector->at(i)-it_vs);
+      diff += fabs(myvector->at(i)-it_vs);
       i++;
     }
     
