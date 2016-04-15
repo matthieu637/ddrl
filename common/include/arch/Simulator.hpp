@@ -135,6 +135,11 @@ class Simulator {
     bool display = episode % display_log_each == 0;
     bool dump = episode % dump_log_each == 0;
 
+    if(!learning){
+      display = tepisode % display_log_each == 0;
+      dump = tepisode % dump_log_each == 0;
+    }
+    
     if (dump || display) {
       bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
 

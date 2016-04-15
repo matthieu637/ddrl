@@ -617,14 +617,15 @@ protected:
           ASSERT(bib::Utils::equals(all_perceptions.front(),lenv->perceptions()), "state discordance " << i << " " << begin);
           all_perceptions.pop_front();
 #endif
-          if(i >= begin * this->agent->get_decision_each()){
+          if (inter_rewards.size() >= this->agent->get_decision_each())
+            break;
+          else if(i >= begin * this->agent->get_decision_each()){
             std::vector<double> st = lenv->perceptions();
 //             bib::Logger::PRINT_ELEMENTS(ac, "DEBmac ");
 //             LOG_DEBUG((lpol->did_decision() ? "true" : "false"));
-            inter_rewards.push_back(lenv->performance());
             lenv->apply(ac);
-          } else if (i >= (begin + 1) * this->agent->get_decision_each())
-            break;
+            inter_rewards.push_back(lenv->performance());
+          } 
           else
             lenv->apply(*it);
           
