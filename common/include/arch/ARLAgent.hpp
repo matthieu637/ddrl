@@ -45,7 +45,8 @@ class ARLAgent : public AAgent<AgentProgOptions> {
       if(absorbing_state){
         reward = r;
       }
-        
+ 
+      _last_receive_reward = reward;
       const std::vector<double>& next_action = _run(reward, perceptions, learning, absorbing_state, finished);
       time_for_ac = decision_each;
 
@@ -60,6 +61,10 @@ class ARLAgent : public AAgent<AgentProgOptions> {
     return returned_ac;
   }
   
+  double last_receive_reward(){
+      return _last_receive_reward;
+  }
+
   bool did_decision() {
       return time_for_ac == decision_each;
   }
@@ -138,6 +143,7 @@ private:
   uint time_for_ac;
   
   std::vector<double> returned_ac;
+  double _last_receive_reward;
   
 protected:
   double sum_weighted_reward;
