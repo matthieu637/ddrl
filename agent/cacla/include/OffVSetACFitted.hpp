@@ -546,7 +546,7 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     std::vector<double> sigma(nb_sensors);
     if(strategy_u <=5){
       for (uint i = 0; i < nb_sensors ; i++){
-        sigma[i] = sqrt(square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size())))/((double)trajectory.size()) ;
+        sigma[i] = sqrt(square_sum[i]/((double)trajectory.size()) - (sum[i]/((double)trajectory.size()))*(sum[i]/((double)trajectory.size()))) ;
       }
     } else if(strategy_u <=9) {
       n=0;
@@ -590,6 +590,13 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         UniqTest t={*it, this, min_delta};
         //auto closest = kdtree_s->find_nearest(*it, std::numeric_limits<double>::max());
         auto closest = kdtree_s->find_nearest_if(*it, std::numeric_limits<double>::max(), t);
+        if(!(closest.second < std::numeric_limits<double>::max())){
+	  all_w[n] = 0;
+	  for(uint dim = 0;dim < nb_sensors ; dim++)
+	    all_sigma[dim].push_back(0);
+	  n++;
+	  continue;
+	}
  
         ASSERT(closest.second < std::numeric_limits<double>::max(), "cannot find elem " << closest.second << " "<<kdtree_s->size());
         const sample& ns = *closest.first;
