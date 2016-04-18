@@ -581,7 +581,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       bib::Logger::getInstance()->closeFile("vset.data."+std::to_string(current_loaded_policy-1));
       
       fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
-      vnn->learn_stoch(data, 50000, 0, 0.00001);
+      vnn->learn_stoch(data, 100000, 0, 0.000001, 100);
       
       fann_destroy_train(data);
       
