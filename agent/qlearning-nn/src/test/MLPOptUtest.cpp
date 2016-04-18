@@ -1009,3 +1009,48 @@ TEST(MLP, LearnNonLinearLabelWeight) {
   
   fann_destroy_train(data);
 }
+
+
+TEST(MLP, LearnNonLinearLabelWeightWithNullImportance) {
+  MLP nn(1, 4, 1, true);
+
+  struct fann_train_data* data = fann_create_train(11*2, 1, 1);
+  fann_type label_weight[11*2];
+  
+  uint n = 0;
+  auto iter = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->output[n][0]= x[0];
+    label_weight[n] = 0.0f;
+    n++;
+  };
+  
+  auto iter2 = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->output[n][0]= -x[0];
+    label_weight[n] = 0.8f;
+    n++;
+  };
+  
+  bib::Combinaison::continuous<>(iter, 1, 0, 1, 10);
+  bib::Combinaison::continuous<>(iter2, 1, 0, 1, 10);
+  
+  nn.learn_stoch_lw(data, label_weight, 20000, 0, 0.00000001);
+  
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::rand01();
+
+    double out = (0.0*x1 - 0.8*x1)/(0.0+0.8);
+
+    std::vector<double> sens(1);
+    sens[0] = x1;
+    std::vector<double> ac(0);
+
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.15);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.15);
+  }
+  
+  fann_destroy_train(data);
+}
+
