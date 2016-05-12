@@ -477,5 +477,16 @@ class MLP {
   unsigned int size_motors;
 };
 
+
+struct datann_derivative {
+  MLP* nn;
+  int n; //number of s
+  int m; //number of a
+};
+
+double derivative_nn_easy(double*, double *, int, void*);
+
+double derivative_nn(double* input, double *neuron_value, int a_dim, void* data);
+
 #endif  // MLP_H
 

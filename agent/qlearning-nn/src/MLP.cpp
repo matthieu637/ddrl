@@ -317,3 +317,30 @@ void hs65(int mode, int ndim, const ColumnVector& x, double& fx,
     }
   }
 }
+
+double derivative_nn_easy(double*, double *, int, void*){
+    return -1;
+}
+
+double derivative_nn(double* input, double *neuron_value, int a_dim, void* data){
+    datann_derivative* d = (datann_derivative*)data;    
+    int il = fann_get_num_input(d->nn->getNeuralNet());
+    
+    fann_type* in = new fann_type[il];
+    for(int i=0;i < d->n ; i++)
+      in[i]=input[i]; 
+    
+    for(int i=0;i < d->m ; i++)
+      in[d->n+i]=neuron_value[i];
+    
+    fann_run(d->nn->getNeuralNet(), in);
+    fann_compute_MSE_gradient(d->nn->getNeuralNet(), in, derivative_nn_easy, nullptr);
+    fann_backpropagate_MSE_firstlayer(d->nn->getNeuralNet());
+
+    fann_type *error_begin = d->nn->getNeuralNet()->train_errors;
+    
+//     bib::Logger::PRINT_ELEMENTS(error_begin, d->nn->getNeuralNet()->total_neurons);
+    delete[] in;
+
+    return error_begin[d->n + a_dim];
+}

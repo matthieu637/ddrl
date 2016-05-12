@@ -77,7 +77,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, 0});
 
     last_pure_action.reset(new vector<double>(*next_action));
-    //if(learning) {
+    if(learning) {
       if(gaussian_policy){
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
         delete next_action;
@@ -86,7 +86,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         for (uint i = 0; i < next_action->size(); i++)
           next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
       }
-    //}
+    }
     last_action.reset(next_action);
 
 

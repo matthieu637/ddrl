@@ -1054,3 +1054,277 @@ TEST(MLP, LearnNonLinearLabelWeightWithNullImportance) {
   fann_destroy_train(data);
 }
 
+
+double derivative(double* s, double* a, int, void*){
+    return -(2*a[0] -s[0]*s[0]);
+}
+
+// try to learn a function pi that maximize another one : f(s, pi(a)) = a^2-(s^2)*a
+TEST(MLP, OptimizeNNTroughGradient) {
+  MLP nn(1, 4, 1, 0.0, true);
+
+  struct fann_train_data* data = fann_create_train(200, 1, 1);
+  
+  uint n = 0;
+  auto iter = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+//     data->output[n][0]= -x[0]*x[0];
+    data->output[n][0]= x[0];//don't care
+    n++;
+  };
+  
+  bib::Combinaison::continuous<>(iter, 1, -1, 1, 200);
+  
+  for(int i=0;i<10000; i++)
+    fann_train_epoch_irpropm_gradient(nn.getNeuralNet(), data, derivative, nullptr);
+  
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::rand01()*2 -1;
+
+    double out = (x1 * x1)/2;
+
+    std::vector<double> sens(1);
+    sens[0] = x1;
+    std::vector<double> ac(0);
+
+    EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.1);
+    EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.1);
+    
+    LOG_FILE("OptimizeNNTroughGradient.data", x1 << " " << nn.computeOutVF(sens, ac) << " " << out);
+  }
+  
+  fann_destroy_train(data);
+}
+
+
+class my_weights {
+  typedef struct fann_connection sfn;
+
+ public:
+  my_weights(NN neural_net, const double* sensors, const double* x, uint _m, uint _n) : m(_m), n(_n) {
+    _lambda = fann_get_activation_steepness(neural_net, 1, 0);
+
+    unsigned int number_connection = fann_get_total_connections(neural_net);
+    connections = reinterpret_cast<sfn*>(calloc(number_connection, sizeof(sfn)));
+
+    fann_get_connection_array(neural_net, connections);
+
+    uint number_layer = fann_get_num_layers(neural_net);
+    layers = reinterpret_cast<uint*>(calloc(number_layer, sizeof(sfn)));
+
+    fann_get_layer_array(neural_net, layers);
+    ASSERT(number_layer == 3, number_layer);
+
+    for (uint i = 0; i < h() * (m + n + 1); i++) {
+      _ASSERT_EQ(connections[i].from_neuron, i % (m + n + 1));
+      _ASSERT_EQ(connections[i].to_neuron, (m + n + 1) + i / (m + n + 1));
+    }
+
+    Ci.clear();
+    Ci.resize(h());
+    for (uint i = 0; i < h(); i++) {
+      Ci[i] = 0;
+      for (uint j = 0; j < m; j++)
+        Ci[i] += sensors[j] * w(j, i);
+
+      Ci[i] += connections[ i * (m + n + 1) + m + n].weight;
+      _ASSERT_EQ(connections[ i * (m + n + 1) + m + n].from_neuron, m + n);
+      _ASSERT_EQ(connections[ i * (m + n + 1) + m + n].to_neuron, m + n + 1 + i);
+    }
+
+    Di.clear();
+    Di.resize(h());
+    for (uint i = 0; i < h(); i++) {
+      Di[i] = Ci[i];
+      for (uint j = 0; j < n; j++)
+        Di[i] += x[j] * w(m + j, i);
+    }
+
+    ASSERT(number_connection == h() * (m + n + 1) + (h() + 1), "");
+  }
+
+  ~my_weights() {
+    free(connections);
+    free(layers);
+  }
+
+  double v(uint i) const {
+    sfn conn = connections[ h() * (m + n + 1) + i];
+
+    _ASSERT_EQS(conn.from_neuron, (m + n + 1) + i, " i: " << i  << " m " << m << " n " << n << " h " << h());
+    _ASSERT_EQS(conn.to_neuron, (m + n + 1) + (h() + 1), " i: " << i  << " m " << m << " n " << n << " h " << h());
+    return conn.weight;
+  }
+
+  double w(uint j, uint i) const {
+    sfn conn = connections[ i * (m + n + 1) + j];
+
+    _ASSERT_EQS(conn.from_neuron, j, " i: " << i << " j : " << j  << " m " << m << " n " << n << " h " << h());
+    _ASSERT_EQS(conn.to_neuron, (m + n + 1) + i, " i: " << i << " j : " << j  << " m " << m << " n " << n << " h " << h());
+    return conn.weight;
+  }
+
+  uint h() const {
+    return layers[1];
+  }
+
+  double C(uint i) const {
+    return Ci[i];
+  }
+
+  double D(uint i) const {
+    return Di[i];
+  }
+
+  double lambda() const {
+    return _lambda;
+  }
+
+ private :
+  sfn* connections;
+  uint* layers;
+  std::vector<double> Ci;
+  std::vector<double> Di;
+  uint m, n;
+  double _lambda;
+};
+
+#define activation_function(x, lambda) tanh(lambda * x)
+
+double derivative2(double* input, double *neuron_value, int, void* data){
+    MLP* nn = (MLP*)data;
+    my_weights _w(nn->getNeuralNet(), input, neuron_value, 1, 1);
+    
+    std::vector<double> gx(1);
+    for (uint j = 0; j < 1; j++) {
+      gx[j] = 0;
+      for (uint i = 0; i < _w.h() ; i++) {
+        double der = activation_function(_w.D(i), _w.lambda());
+        gx[j] = gx[j] - _w.v(i) * _w.w(1 + j, i) * _w.lambda() * (1.0 - der * der);
+      }
+    }
+
+//     LOG_DEBUG((-(2*neuron_value[0] -input[0]*input[0])) << " " << gx[0]);
+    return gx[0];
+}
+
+TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
+  MLP nn(2, 50, 1, 0.0);
+  MLP actor(1, 4, 1);
+
+  struct fann_train_data* data = fann_create_train(200*200, 2, 1);
+  
+  uint n = 0;
+  auto iter = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->input[n][1]= x[1];
+
+    data->output[n][0]= x[1]*x[1]-(x[0]*x[0])*x[1];
+    n++;
+  };
+  
+  bib::Combinaison::continuous<>(iter, 2, -1, 1, 200);
+  
+  nn.learn_stoch(data, 500, 100, 0.0000001,200);
+  fann_destroy_train(data);
+  
+  data = fann_create_train(2000, 1, 1);
+  n = 0;
+  auto iter2 = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->output[n][0]= x[0];//don't care
+    n++;
+  };
+  bib::Combinaison::continuous<>(iter2, 1, -1, 1, 2000);
+  
+  //fann_type *error_begin = nn.getNeuralNet()->train_errors;
+  
+  for(int i=0;i<1000; i++)
+     fann_train_epoch_irpropm_gradient(actor.getNeuralNet(), data, derivative2, &nn);
+  
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::rand01()*2 -1;
+
+    double out = (x1 * x1)/2;
+    double qout = out*out-(x1*x1)*out;
+
+    std::vector<double> sens(1);
+    sens[0] = x1;
+    std::vector<double> ac(1);
+    std::vector<double> ac_empty(0);
+    ac[0]= out;
+    
+    EXPECT_GT(nn.computeOutVF(sens, ac), qout - 0.1);
+    EXPECT_LT(nn.computeOutVF(sens, ac), qout + 0.1);
+
+    EXPECT_GT(actor.computeOutVF(sens, ac_empty), out - 0.2);
+    EXPECT_LT(actor.computeOutVF(sens, ac_empty), out + 0.2);
+    
+    LOG_FILE("OptimizeNNTroughGradientOfAnotherNN.data", x1 << " " << actor.computeOutVF(sens, ac_empty) << " " << out);
+  }
+  
+  fann_destroy_train(data);
+}
+
+TEST(MLP, OptimizeNNTroughGradientOfAnotherNNFann) {
+  MLP nn(2, 50, 1, 0.0, true);
+//   MLP nn(2, 1, 1, 0.0);
+  MLP actor(1, 4, 1);
+
+  struct fann_train_data* data = fann_create_train(200*200, 2, 1);
+  
+  uint n = 0;
+  auto iter = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->input[n][1]= x[1];
+
+    data->output[n][0]= x[1]*x[1]-(x[0]*x[0])*x[1];
+    n++;
+  };
+  
+  bib::Combinaison::continuous<>(iter, 2, -1, 1, 200);
+  
+  nn.learn_stoch(data, 600, 100, 0.0000001,200);
+  //nn.learn(data, 300, 0);
+  fann_destroy_train(data);
+  
+  data = fann_create_train(2000, 1, 1);
+  n = 0;
+  auto iter2 = [&](const std::vector<double>& x) {
+    data->input[n][0]= x[0];
+    data->output[n][0]= x[0];//don't care
+    n++;
+  };
+  bib::Combinaison::continuous<>(iter2, 1, -1, 1, 2000);
+  
+  datann_derivative d = {&nn, 1, 1};
+  
+  for(int i=0;i<2000; i++)
+     fann_train_epoch_irpropm_gradient(actor.getNeuralNet(), data, derivative_nn, &d);
+  
+  // Test
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::rand01()*2 -1;
+
+    double out = (x1 * x1)/2;
+    double qout = out*out-(x1*x1)*out;
+
+    std::vector<double> sens(1);
+    sens[0] = x1;
+    std::vector<double> ac(1);
+    std::vector<double> ac_empty(0);
+    ac[0]= out;
+    
+    EXPECT_GT(nn.computeOutVF(sens, ac), qout - 0.1);
+    EXPECT_LT(nn.computeOutVF(sens, ac), qout + 0.1);
+
+    EXPECT_GT(actor.computeOutVF(sens, ac_empty), out - 0.2);
+    EXPECT_LT(actor.computeOutVF(sens, ac_empty), out + 0.2);
+    
+    LOG_FILE("OptimizeNNTroughGradientOfAnotherNNFann.data", x1 << " " << actor.computeOutVF(sens, ac_empty) << " " << out);
+  }
+  
+  fann_destroy_train(data);
+}
