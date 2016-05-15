@@ -450,23 +450,15 @@ class MLP {
     return fann_get_MSE(neural_net);
   }
   
+  double weight_l1_norm(){
+    return fann_get_l1_norm(neural_net);
+  }
+  
   double weightSum(){
 #ifndef NDEBUG
-        double sum = 0.f;
-        struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(neural_net), sizeof(struct fann_connection));
-
-        for(uint j=0; j<fann_get_total_connections(neural_net); j++)
-            connections[j].weight=0;
-
-        fann_get_connection_array(neural_net, connections);
-
-        for(uint j=0; j<fann_get_total_connections(neural_net); j++)
-            sum += std::fabs(connections[j].weight);
-
-        free(connections);
-        return sum;
+    return fann_get_l1_norm(neural_net);
 #else
-        return 0;
+    return 0;
 #endif
   }
 
