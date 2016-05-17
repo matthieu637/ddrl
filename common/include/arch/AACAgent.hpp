@@ -103,7 +103,7 @@ class AACAgent : public ARLAgent<ProgOptions> {
       return this->gamma;
   }
   
-  virtual double criticEval(const std::vector<double>& perceptions) = 0;
+  virtual double criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions) = 0;
   
   virtual Policy<Pol_Impl>* getCopyCurrentPolicy() = 0;
   

@@ -91,6 +91,7 @@ protected:
       std::list< std::vector<double> > all_perceptions;
       std::list< std::vector<double> > all_actions;
       std::list< std::vector<double> > all_perceptions_decision;
+      std::list< std::vector<double> > all_actions_decision;
       std::list< double > all_Vs;
       std::list< double > all_RVs;
       _Policy* policy = this->agent->getCopyCurrentPolicy();
@@ -98,15 +99,15 @@ protected:
       while (this->env->running()) {
         perceptions = this->env->perceptions();
         all_perceptions.push_back(perceptions);
-        if(this->agent->did_decision()){
-          double vs = this->agent->criticEval(perceptions);
+        if(this->agent->did_decision() && all_perceptions.size() > 1){
+          double vs = this->agent->criticEval(perceptions, all_actions.back());
           all_Vs.push_back(vs);
           all_RVs.push_back(this->agent->last_receive_reward() + this->agent->getGamma() * vs);
+          all_perceptions_decision.push_back(perceptions);
+          all_actions_decision.push_back(all_actions.back());
         }
         double reward = this->env->performance();
         const std::vector<double>& actuators = this->agent->runf(reward, perceptions, generate_bestV ? true : learning, false, false);
-        if(this->agent->did_decision())
-          all_perceptions_decision.push_back(perceptions);
         all_actions.push_back(actuators);
         this->env->apply(actuators);
         stat.dump(lepisode, perceptions, actuators, reward);
@@ -139,8 +140,7 @@ protected:
       }
       
       if(analyse_distance_bestPol){
-        double diff = compareBestPolicy(all_perceptions, all_actions, this->agent->getGamma(), 
-                                        this->env->get_first_state_stoch(), all_RVs);
+        double diff = compareBestPolicy(all_perceptions_decision, all_RVs);
 #ifndef NDEBUG
         LOG_DEBUG("diff (higher bad) " << diff);
 #endif
@@ -148,8 +148,10 @@ protected:
       }
       
       if(generate_bestV){
+        std::map<std::vector<double>, double> s_BVS;
         generateBestValueFonction(s_BVS, all_perceptions, all_actions, policy, this->agent->getGamma(), 
-                                               all_perceptions_decision, this->agent->sum_weighted_rewards(), this->env->get_first_state_stoch());
+                                               all_perceptions_decision, this->agent->sum_weighted_rewards(), 
+                                                  all_actions_decision, this->env->get_first_state_stoch());
         this->agent->learn_V(s_BVS);
       }
 
@@ -169,7 +171,8 @@ protected:
   
   void generateBestValueFonction(std::map<std::vector<double>, double>& s_BVS, const std::list< std::vector<double> >& all_perceptions, 
                                           const std::list< std::vector<double> >& all_actions, _Policy* policy, double gamma,
-                                          const std::list< std::vector<double> > all_perceptions_decision, double swr, const std::vector<double>& stochasticity
+                                          const std::list< std::vector<double> > all_perceptions_decision, double swr, 
+                                          std::list< std::vector<double> > all_actions_decision, const std::vector<double>& stochasticity
                                  ){
     
     using namespace boost::interprocess;
@@ -251,13 +254,23 @@ protected:
     }
 
     int i=0;
+    auto it_a = all_actions_decision.cbegin();
     for(auto it_s : all_perceptions_decision){
-      s_BVS.insert(std::pair<std::vector<double>, double>(it_s, myvector->at(i)));
+      std::vector<double> sa;
+      mergeSA(sa, it_s, *it_a);
+      s_BVS.insert(std::pair<std::vector<double>, double>(sa, myvector->at(i)));
+      it_a++;
       i++;
     }
     
     shared_memory_object::remove(shm_filename);
     
+  }
+  
+  inline void mergeSA(std::vector<double>& AB, const std::vector<double>& A, const std::vector<double>& B) {
+    AB.reserve( A.size() + B.size() ); // preallocate memory
+    AB.insert( AB.end(), A.begin(), A.end() );
+    AB.insert( AB.end(), B.begin(), B.end() );
   }
   
   double compareBestValueFonction(const std::list< std::vector<double> >& all_perceptions, 
@@ -358,15 +371,16 @@ protected:
   
   //don't compare best action with method action because there is may be multiple best action
   //compare them by scoring
-  double compareBestPolicy(const std::list< std::vector<double> >& all_perceptions, 
-                                          const std::list< std::vector<double> >& all_actions, double gamma,
-                                          const std::vector<double>& stochasticity,
+  double compareBestPolicy(const std::list< std::vector<double> >& all_perceptions_decision,
                                           const std::list< double >& all_RVs
                                  ){    
     
     using namespace boost::interprocess;
     typedef allocator<double, managed_shared_memory::segment_manager>  ShmemAllocator;
     typedef boost::interprocess::vector<double, ShmemAllocator> MyVector;
+    
+    std::vector<std::vector<double>> _all_perceptions_decision(all_perceptions_decision.size());
+    std::copy(all_perceptions_decision.begin(), all_perceptions_decision.end(), _all_perceptions_decision.begin());
     
     std::string sshm_filename ="ac_sim_forked_";
     sshm_filename += std::to_string(shm_id);
@@ -405,21 +419,17 @@ protected:
 
         MyVector *myvector2 = segment2.find<MyVector>("result.ac").first;
         
-        Environment *lenv = new Environment;
-        lenv->unique_invoke(this->properties, this->command_args);
-        
         for(uint j=0;j < work_per_process; j++){
           uint z = (i*work_per_process) + j;
-          myvector2->at(z) = evalBestPolicy(all_actions, lenv, gamma, z, all_perceptions, stochasticity);
+          myvector2->at(z) = evalBestPolicy(_all_perceptions_decision[z]);
         }
         
         if(i == 0){
           for(uint j=0;j < additional_work; j++){
             uint z = (threads*work_per_process) + j;
-            myvector2->at(z) = evalBestPolicy(all_actions, lenv, gamma, z, all_perceptions, stochasticity);
+            myvector2->at(z) = evalBestPolicy(_all_perceptions_decision[z]);
           }
         }
-        delete lenv;
 
 #ifndef VALGRIND 
         exit(0);
@@ -551,84 +561,18 @@ protected:
   }
   
 
-  double evalBestPolicy(const std::list< std::vector<double> >& all_actions, Environment* lenv, 
-                               double gamma, uint begin, const std::list< std::vector<double> >& all_perceptions, const std::vector<double>& stochasticity){
+  double evalBestPolicy(const std::vector<double>& perceptions){
 
-#ifndef NDEBUG
-    (void) all_perceptions;
-#endif
-    
     double max_rvs = std::numeric_limits<double>::lowest();
     
     auto iter = [&](const std::vector<double>& ac) {
-      lenv->reset_episode_choose(stochasticity);
-          
-      auto it = all_actions.cbegin();
-      uint i = 0;
-      double rvs;
-      std::list<double> inter_rewards;
-      
-#ifdef DEBUG_WITH_DETERMINIST_POLICY
-      LOG_DEBUG("#########################################"<<mean);
-      LOG_DEBUG("#########################################"<<begin);
-      LOG_DEBUG("#########################################");
-#endif
-      
-      while (lenv->running()) {
-#ifdef DEBUG_WITH_DETERMINIST_POLICY
-          if(! bib::Utils::equals(all_perceptions.front(),lenv->perceptions())){
-            bib::Logger::PRINT_ELEMENTS(all_perceptions.front(), "allper");
-            bib::Logger::PRINT_ELEMENTS(lenv->perceptions(), "curren pert");
-          
-            LOG_DEBUG("state discordance " << i << " " << this->agent->get_decision_each()*begin << " " << all_perceptions.size());
-            all_perceptions.pop_front();
-            
-            bib::Logger::PRINT_ELEMENTS(all_perceptions.front(), "next allper");
-          
-            exit(1);
-          }
-          ASSERT(bib::Utils::equals(all_perceptions.front(),lenv->perceptions()), "state discordance " << i << " " << begin);
-        
-          LOG_DEBUG(all_perceptions.size());
-          bib::Logger::PRINT_ELEMENTS(all_perceptions.front(), "DEBallper");
-          bib::Logger::PRINT_ELEMENTS(lenv->perceptions(), "DEBcurren pert");
-          bib::Logger::PRINT_ELEMENTS(*it, "DEBac");
-        
-          all_perceptions.pop_front();
-#elseif ! defined(NDEBUG)
-          ASSERT(bib::Utils::equals(all_perceptions.front(),lenv->perceptions()), "state discordance " << i << " " << begin);
-          all_perceptions.pop_front();
-#endif
-          if (inter_rewards.size() >= this->agent->get_decision_each())
-            break;
-          else if(i >= begin * this->agent->get_decision_each()){
-            std::vector<double> st = lenv->perceptions();
-//             bib::Logger::PRINT_ELEMENTS(ac, "DEBmac ");
-//             LOG_DEBUG((lpol->did_decision() ? "true" : "false"));
-            lenv->apply(ac);
-            inter_rewards.push_back(lenv->performance());
-          } 
-          else
-            lenv->apply(*it);
-          
-          ++it;
-          i++;
-        }
-      
-        if(lenv->final_state())
-          rvs = lenv->performance();
-        else {
-          rvs = *std::max_element(inter_rewards.begin(), inter_rewards.end());
-          rvs += gamma * this->agent->criticEval(lenv->perceptions());
-	}
+        double rvs = this->agent->criticEval(perceptions, ac);
         if(max_rvs <= rvs){
           max_rvs = rvs;
         }
-        
-        lenv->next_instance_choose(stochasticity);
     };
       
-    bib::Combinaison::continuous<>(iter, all_actions.front().size(), -1.f, 1.f, precision);
+    bib::Combinaison::continuous<>(iter, this->agent->get_number_motors(), -1.f, 1.f, precision);
     
     return max_rvs;
   }
@@ -638,7 +582,6 @@ protected:
     bool analyse_distance_bestPol = false;
     
     bool generate_bestV = false;
-    std::map<std::vector<double>, double> s_BVS;
     
     uint precision = 0;
     uint shm_id;

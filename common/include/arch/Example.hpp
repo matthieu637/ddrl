@@ -129,7 +129,7 @@ class SimpleEnv1D : public arch::AEnvironment<> {
   
   void unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) {
     instance_per_episode    = 1;
-    max_step_per_instance   = 10;
+    max_step_per_instance   = 50;
   }
 
   std::vector<double> s;

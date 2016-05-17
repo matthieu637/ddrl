@@ -1301,8 +1301,10 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNNFann) {
   
   datann_derivative d = {&nn, 1, 1};
   
-  for(int i=0;i<2000; i++)
+  for(int i=0;i<2000; i++){
      fann_train_epoch_irpropm_gradient(actor.getNeuralNet(), data, derivative_nn, &d);
+     LOG_DEBUG(actor.weight_l1_norm());
+  }
   
   // Test
   for (uint n = 0; n < 100 ; n++) {

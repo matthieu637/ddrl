@@ -23,7 +23,7 @@ class Converger {
       iter();
 
       if (epoch > 0 && epoch % display_each == 0)
-        LOG_DEBUG(epoch << " " << eval());
+        LOG_DEBUG(debug_str << ":" <<epoch << " " << eval());
 
       if (epoch > 1 && fabs(eval() - last_mse) < precision && fabs(last2_mse - last_mse) < precision) {
         converged = true;
@@ -70,7 +70,7 @@ class Converger {
         consecutive_bad_movement++;
 
       if (epoch > 0 && epoch % display_each == 0)
-        LOG_DEBUG(epoch << " " << minv << " " << v);
+        LOG_DEBUG(debug_str << ":" <<epoch << " " << minv << " " << v);
 
       if (epoch > 1 && fabs(v - last_mse) < precision && fabs(last2_mse - last_mse) < precision) {
         converged = true;

@@ -21,6 +21,8 @@
 #include "kde.hpp"
 #include "kdtree++/kdtree.hpp"
 
+#define DOUBLE_COMPARE_PRECISION 1e-9
+
 typedef struct _sample {
   std::vector<double> s;
   std::vector<double> pure_a;
@@ -28,7 +30,6 @@ typedef struct _sample {
   std::vector<double> next_s;
   double r;
   bool goal_reached;
-  double p0;
 
   friend class boost::serialization::access;
   template <typename Archive>
@@ -41,42 +42,28 @@ typedef struct _sample {
     ar& BOOST_SERIALIZATION_NVP(goal_reached);
   }
 
+  //Used to store all sample into a tree, might be stochastic
+  //only pure_a is negligate
   bool operator< (const _sample& b) const {
     for (uint i = 0; i < s.size(); i++) {
-      if(s[i] != b.s[i])
+      if(fabs(s[i] - b.s[i])>=DOUBLE_COMPARE_PRECISION)
         return s[i] < b.s[i];
     }
     
     for (uint i = 0; i < a.size(); i++) {
-      if(a[i] != b.a[i])
+      if(fabs(a[i] - b.a[i])>=DOUBLE_COMPARE_PRECISION)
         return a[i] < b.a[i];
-    }
-
-    return false;
-  }
-  
-  bool operator!=(const _sample& b) const {
-    for (uint i = 0; i < s.size(); i++) {
-      if(fabs(s[i] - b.s[i])>=0.000001f)
-        return true;
-    }
-    
-    for (uint i = 0; i < a.size(); i++) {
-      if(fabs(a[i] - b.a[i])>=0.000001f)
-        return true;
-    }
-    
-    for (uint i = 0; i < pure_a.size(); i++) {
-      if(fabs(pure_a[i] - b.pure_a[i])>=0.000001f)
-        return true;
     }
     
     for (uint i = 0; i < next_s.size(); i++) {
-      if(fabs(next_s[i] - b.next_s[i])>=0.000001f)
-        return true;
+      if(fabs(next_s[i] - b.next_s[i])>=DOUBLE_COMPARE_PRECISION)
+        return next_s[i] < b.next_s[i];
     }
     
-    return fabs(r - b.r)>=0.000001f || goal_reached != b.goal_reached ;
+    if(fabs(r - b.r)>=DOUBLE_COMPARE_PRECISION)
+        return r < b.r;
+
+    return goal_reached < b.goal_reached;
   }
   
   typedef double value_type;
@@ -85,7 +72,17 @@ typedef struct _sample {
         return s[N];
   }
   
+  bool same_state(const _sample& b) const{
+    for (uint i = 0; i < s.size(); i++) {
+      if(fabs(s[i] - b.s[i])>=DOUBLE_COMPARE_PRECISION)
+        return false;
+    }
+    
+    return true;
+  }
+
 } sample;
+
 
 class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
  public:
@@ -109,23 +106,12 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     vector<double>* next_action = ann->computeOut(sensors);
     
     if (last_action.get() != nullptr && learning){
-      double p0 = 1.f;
-      if(!gaussian_policy){
-	  if (std::equal(last_action->begin(), last_action->end(), last_pure_action->begin()))//no explo
-	    p0 = 1 - noise;
-	  else
-	    p0 = noise * 0.5f; //should be 0 but p0 > 0
-      } else {
-	  p0 = 1.f;
-	  for(uint i=0;i < nb_motors;i++)
-	    p0 *= exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_action->at(i))/(2.f*noise*noise));
-      }
-      
-      trajectory.insert({last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0});
-      last_trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0});
+
+      trajectory.insert({last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
+      last_trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
       proba_s.add_data(last_state);
       
-      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0};
+      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached};
       
       kdtree_s->insert(sa);
       
@@ -173,9 +159,9 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     current_loaded_policy   = pt->get<uint>("agent.index_starting_loaded_policy");
 
     if(hidden_unit_v == 0)
-      vnn = new LinMLP(nb_sensors , 1, 0.0, lecun_activation);
+      vnn = new LinMLP(nb_sensors + nb_motors , 1, 0.0, lecun_activation);
     else
-      vnn = new MLP(nb_sensors, hidden_unit_v, nb_sensors, 0.0, lecun_activation);
+      vnn = new MLP(nb_sensors + nb_motors, hidden_unit_v, nb_sensors, 0.0, lecun_activation);
 
     if(hidden_unit_a == 0)
       ann = new LinMLP(nb_sensors , nb_motors, 0.0, lecun_activation);
@@ -213,11 +199,13 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
   struct ParraVtoVNext {
     ParraVtoVNext(const std::vector<sample>& _vtraj, const OffPolSetACFitted* _ptr) : vtraj(_vtraj), ptr(_ptr) {
-      data = fann_create_train(vtraj.size(), ptr->nb_sensors, 1);
+      data = fann_create_train(vtraj.size(), ptr->nb_sensors + ptr->nb_motors, 1);
       for (uint n = 0; n < vtraj.size(); n++) {
         sample sm = vtraj[n];
         for (uint i = 0; i < ptr->nb_sensors ; i++)
           data->input[n][i] = sm.s[i];
+        for (uint i= ptr->nb_sensors ; i < ptr->nb_sensors + ptr->nb_motors; i++)
+          data->input[n][i] = sm.a[i - ptr->nb_sensors];
       }
     }
 
@@ -232,20 +220,24 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
       struct fann* local_nn = fann_copy(ptr->vnn->getNeuralNet());
+      struct fann* local_pol = fann_copy(ptr->ann->getNeuralNet());
 
       for (size_t n = range.begin(); n < range.end(); n++) {
         sample sm = vtraj[n];
 
         double delta = sm.r;
         if (!sm.goal_reached) {
-          double nextV = MLP::computeOutVF(local_nn, sm.next_s, {});
-          delta += ptr->gamma * nextV;
+          std::vector<double> * next_action = MLP::computeOut(local_pol, sm.next_s);
+          double nextQA = MLP::computeOutVF(local_nn, sm.next_s, *next_action);
+          delta += ptr->gamma * nextQA;
+          delete next_action;
         }
 
         data->output[n][0] = delta;
       }
 
       fann_destroy(local_nn);
+      fann_destroy(local_pol);
     }
 
     struct fann_train_data* data;
@@ -253,242 +245,41 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     const OffPolSetACFitted* ptr;
   };
   
-  void computePTheta(vector< sample >& vtraj, double *ptheta){
-    uint i=0;
-    for(auto it = vtraj.begin(); it != vtraj.end() ; ++it) {
-      sample sm = *it;
-      double p0 = 1.f;
-      vector<double>* next_action = ann->computeOut(sm.s);
-      
-      if(!gaussian_policy){
-	  if (std::equal(last_action->begin(), last_action->end(), last_pure_action->begin()))//no explo
-	    p0 = 1 - noise;
-	  else
-	    p0 = noise * 0.5f; //should be 0 but p0 > 0
-      } else {
-	  p0 = 1.f;
-	  for(uint i=0;i < nb_motors;i++)
-	    p0 *= exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_action->at(i))/(2.f*noise*noise));
-      }
-	
-      ptheta[i] = p0;
-      i++;
-      delete next_action;
-    }
-  }
-  
-  double approx_surface(const sample& sa){
-    struct UniqTest
-    {
-      const sample& _sa;
-      
-      bool operator()(const sample& t ) const
-      {
-          return t != _sa;
-      }
-    };
-    UniqTest predicate = {sa};
-    
-    auto it = kdtree_s->find_nearest_if(sa, std::numeric_limits<double>::max(), predicate);
-    const sample& sa2 = *it.first;
-    double dist1 = it.second;
-    
-    struct UniqTest2
-    {
-      const sample& _sa;
-      const sample& _sa2;
-      
-      bool operator()(const sample& t ) const
-      {
-          return t != _sa && t != _sa2;
-      }
-      
-    };
-    
-    UniqTest2 predicate2 = {sa, sa2};
-    auto it2 = kdtree_s->find_nearest_if(sa, std::numeric_limits<double>::max(), predicate2);
-    
-    return dist1 + it2.second;
-  }
-  
   void update_critic(){
       if (trajectory.size() > 2) {
         //remove trace of old policy
 
         std::vector<sample> *vtraj; 
         double *importance_sample = nullptr; 
-        if(strategy_w == 0){
-          vtraj = new std::vector<sample>(last_trajectory.size());
-          std::copy(last_trajectory.begin(), last_trajectory.end(), vtraj->begin());
-          importance_sample = new double [last_trajectory.size()];
-          uint i = 0;
-          for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-            importance_sample[i]=1.000000000000000f;
-            i++;
-          }
-        } else if(strategy_w >= 1 && strategy_w <= 15){
+        if(strategy_w >= 1 && strategy_w <= 2){
           vtraj = new std::vector<sample>(trajectory.size());
           std::copy(trajectory.begin(), trajectory.end(), vtraj->begin());
           importance_sample = new double [trajectory.size()];
           
-          double *ptheta = new double [trajectory.size()];
-          //compute p_theta(at|xt)
-          computePTheta(*vtraj, ptheta);
-          
-          if(strategy_w == 1){
+          if(strategy_w == 1) {
             uint i=0;
             for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = ptheta[i];
+              importance_sample[i] = 1.f / proba_s.pdf(it->s);
               i++;
             }
-          } else if(strategy_w == 2 || strategy_w == 7){
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = ptheta[i] / it->p0;
-              i++;
-            }
-          } else if(strategy_w == 3) {
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = ptheta[i] / proba_s.pdf(it->s);
-              i++;
-            }
-          } else if(strategy_w == 4) {
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = (ptheta[i] / it->p0) * (1.f / proba_s.pdf(it->s));
-              i++;
-            }
-          } else if(strategy_w >= 5 && strategy_w <= 6) {
-            double kdtree_snorm = 0;
-            double *surface = new double [trajectory.size()];
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              surface[i] = approx_surface(*it);
-              kdtree_snorm+=surface[i];
-              i++;
-            }
-            
-            if(strategy_w == 5) {
-              i=0;
-              for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-                importance_sample[i] = ptheta[i] * (surface[i]/kdtree_snorm);
-                i++;
-              }
-            } else if(strategy_w == 6) {
-              i=0;
-              for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-                importance_sample[i] = (ptheta[i] / it->p0) * (surface[i]/kdtree_snorm);
-                i++;
-              }
-            } else {
-              LOG_ERROR("to be implemented");
-              exit(1);
-            }
-          } else if(strategy_w >= 8 && strategy_w <= 9) {
+          } else if(strategy_w == 2) {
             uint i=0;
             double sum_ps = 0.00f;
             for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              if(strategy_w ==8)
-                importance_sample[i] = ptheta[i]; 
-              else
-                importance_sample[i] = (ptheta[i] / it->p0); 
               sum_ps += 1.f / proba_s.pdf(it->s);
               i++;
             }
             
             i=0;
             for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              importance_sample[i] = importance_sample[i] * (1.f / proba_s.pdf(it->s)) / sum_ps;
+              importance_sample[i] =  (1.f / proba_s.pdf(it->s)) / sum_ps;
               i++;
             }            
-          } else if(strategy_w >= 10 && strategy_w <= 11) {
-            uint i=0;
-            double sum_ps = 0.00f;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              std::vector<double> psa;
-              std::vector<double> psas;
-              mergeSA(psa, it->s, it->a);
-              mergeSAS(psas, it->s, it->a, it->next_s);
-              
-              if(strategy_w ==10)
-                importance_sample[i] = ptheta[i]; 
-              else
-                importance_sample[i] = (ptheta[i] / it->p0); 
-              sum_ps += (proba_sas.pdf(psas)/proba_sa.pdf(psa));
-              i++;
-            }
-            
-            i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              std::vector<double> psa;
-              std::vector<double> psas;
-              mergeSA(psa, it->s, it->a);
-              mergeSAS(psas, it->s, it->a, it->next_s);
-              
-              importance_sample[i] = importance_sample[i] * (proba_sas.pdf(psas)/proba_sa.pdf(psa)) / sum_ps;
-              i++;
-            }  
-          } else if(strategy_w >= 12 && strategy_w <= 13) {
-            uint i=0;
-            double sum_ps = 0.00f;
-            double sum_ps_real = 0.00f;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              std::vector<double> psa;
-              std::vector<double> psas;
-              mergeSA(psa, it->s, it->a);
-              mergeSAS(psas, it->s, it->a, it->next_s);
-              
-              if(strategy_w ==13)
-                importance_sample[i] = ptheta[i]; 
-              else
-                importance_sample[i] = (ptheta[i] / it->p0); 
-              sum_ps += (proba_sas.pdf(psas)/proba_sa.pdf(psa));
-              
-              sum_ps_real += 1.f / proba_s.pdf(it->s);
-              i++;
-            }
-            
-            i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              std::vector<double> psa;
-              std::vector<double> psas;
-              mergeSA(psa, it->s, it->a);
-              mergeSAS(psas, it->s, it->a, it->next_s);
-              
-              importance_sample[i] = importance_sample[i] * ((proba_sas.pdf(psas)/proba_sa.pdf(psa)) / sum_ps) * (1.f / proba_s.pdf(it->s)) / sum_ps_real;
-              i++;
-            }  
-          } else if(strategy_w >= 14 && strategy_w <= 15) {
-            uint i=0;
-            double sum_ps = 0.00f;
-            double sum_pa = 0.00f;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              sum_ps += 1.f / proba_s.pdf(it->s);
-              if(strategy_w ==14)
-                sum_pa += ptheta[i]; 
-              else
-                sum_pa += (ptheta[i] / it->p0); 
-              
-              i++;
-            }
-            
-            i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              if(strategy_w ==14)
-                importance_sample[i] = ptheta[i] / sum_pa; 
-              else
-                importance_sample[i] = (ptheta[i] / it->p0) / sum_pa; 
-              
-              importance_sample[i] = importance_sample[i] * (1.f / proba_s.pdf(it->s)) / sum_ps;
-              i++;
-            }
           } else {
               LOG_ERROR("to be implemented");
               exit(1);
           }
           
-          delete[] ptheta;
         } else {
           LOG_ERROR("to be implemented");
           exit(1);
@@ -502,14 +293,9 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
           if(vnn_from_scratch)
             fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
           
-          if(strategy_w == 7){
-            uint i=0;
-            for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
-              dq.data->output[i][0] = importance_sample[i] * dq.data->output[i][0];
-              i++;
-            }
+          if(strategy_w == 0)
             vnn->learn_stoch(dq.data, 10000, 0, 0.0001);
-          } else
+          else
             vnn->learn_stoch_lw(dq.data, importance_sample, 10000, 0, 0.0001);
         };
 
@@ -533,7 +319,8 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         }
 
         dq.free(); 
-	delete[] importance_sample;
+        if(strategy_w != 0)
+          delete[] importance_sample;
         delete vtraj;
       }
   }
@@ -567,7 +354,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       auto it = bvf.cbegin();
       for (uint n = 0; n < bvf.size(); n++) {
         
-        for (uint i = 0; i < nb_sensors ; i++){
+        for (uint i = 0; i < nb_sensors + nb_motors ; i++){
             data->input[n][i] = it->first[i];
             LOG_FILE_NNL("vset.data."+std::to_string(current_loaded_policy-1), it->first[i] << " ");
         }
@@ -595,12 +382,12 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     episode++;
   }
   
-  double criticEval(const std::vector<double>& perceptions) override {
-      return vnn->computeOutVF(perceptions, {});
+  double criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions) override {
+    return vnn->computeOutVF(perceptions, actions);
   }
   
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
-        return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
+    return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
   }
 
   void save(const std::string& path) override {

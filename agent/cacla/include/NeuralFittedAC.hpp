@@ -1,3 +1,4 @@
+
 #ifndef NEURALFITTEDAC_HPP
 #define NEURALFITTEDAC_HPP
 
@@ -190,7 +191,7 @@ class NeuralFittedAC : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
     
-    if(trajectory.size() % 10 == 0)
+    if(trajectory.size() % 5 == 0)
       end_episode();
 
     return *next_action;
@@ -321,7 +322,7 @@ class NeuralFittedAC : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         };
 
         if(determinist_vnn_update)
-              bib::Converger::determinist<>(iter, eval, 30, 0.00001, 0);
+              bib::Converger::determinist<>(iter, eval, 30, 0.00001, 0, "deter_critic");
         else {
           NN best_nn = nullptr;
           auto save_best = [&]() {
@@ -330,13 +331,14 @@ class NeuralFittedAC : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             best_nn = fann_copy(vnn->getNeuralNet());
           };
 
-          bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10);
+          bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10, "stoch_crtic");
           vnn->copy(best_nn);
           fann_destroy(best_nn);
         }
 
         dq.free(); 
 // 	delete[] importance_sample;
+//         LOG_DEBUG("critic updated");
       }
   }
   
@@ -524,7 +526,7 @@ class NeuralFittedAC : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       if(database_size > 0){
         struct fann_train_data* subdata = fann_subset_train_data(data, 0, database_size);
 
-        ann->learn_stoch(subdata, 10000, 1, 0.00001);
+        ann->learn_stoch(subdata, 10000, 0, 0.00001);
 
         fann_destroy_train(subdata);
       }
@@ -537,35 +539,38 @@ class NeuralFittedAC : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
 
   void update_actor_nfqca(){
-    struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
-    
-    uint n=0;
-    for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-      sample sm = *it;
+    if(trajectory.size() > 0) {
+      struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
       
-      for (uint i = 0; i < nb_sensors ; i++)
-        data->input[n][i] = sm.s[i];
-      
-      for (uint i = 0; i < nb_motors; i++)
-        data->output[n][i] = sm.a[i];
+      uint n=0;
+      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        sample sm = *it;
+        
+        for (uint i = 0; i < nb_sensors ; i++)
+          data->input[n][i] = sm.s[i];
+        
+        for (uint i = 0; i < nb_motors; i++)
+          data->output[n][i] = 0.f;//sm.a[i]; //don't care
 
-      n++;
-    }
+        n++;
+      }
+      
+      datann_derivative d = {vnn, (int)nb_sensors, (int)nb_motors};
     
-    datann_derivative d = {vnn, nb_sensors, nb_motors};
-  
-    auto iter = [&]() {
+//       auto iter = [&]() {
+//         fann_train_epoch_irpropm_gradient(ann->getNeuralNet(), data, derivative_nn, &d);
+//       };
+// 
+//       auto eval = [&]() {
+//         //compute weight sum
+//         return ann->weight_l1_norm();
+//       };
+// 
+//       bib::Converger::determinist<>(iter, eval, 1, 0.0001, 25, "actor");
       fann_train_epoch_irpropm_gradient(ann->getNeuralNet(), data, derivative_nn, &d);
-    };
-
-    auto eval = [&]() {
-      //compute weight sum
-      return vnn->weight_l1_norm();
-    };
-
-    bib::Converger::determinist<>(iter, eval, 5000, 0.00001, 100, "actor");
-    
-    fann_destroy_train(data);
+      
+      fann_destroy_train(data);
+    }
   }
   
   void end_episode() override {
@@ -578,12 +583,12 @@ class NeuralFittedAC : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 //     LOG_DEBUG("critic updated");
     
 //     update_actor();
-    
+//     if(trajectory.size()%10==0)
     update_actor_nfqca();
   }
   
-  double criticEval(const std::vector<double>& perceptions) override {
-      return vnn->computeOutVF(perceptions, {});
+  double criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions) override {
+      return vnn->computeOutVF(perceptions, actions);
   }
   
   arch::Policy<MLP>* getCopyCurrentPolicy() override {

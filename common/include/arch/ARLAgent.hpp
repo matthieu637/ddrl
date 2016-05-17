@@ -76,6 +76,10 @@ class ARLAgent : public AAgent<AgentProgOptions> {
   double sum_weighted_rewards(){
       return sum_weighted_reward;
   }
+  
+  uint get_number_motors(){
+      return nb_motors;
+  }
 
   /**
    * @brief This method is called after each beginning of a new instance of episode
