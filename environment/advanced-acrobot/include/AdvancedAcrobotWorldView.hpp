@@ -15,7 +15,8 @@ class AdvancedAcrobotWorldView : public AdvancedAcrobotWorld {
                            const std::vector<bone_joint> &types = {HINGE, HINGE},
                            const std::vector<bool> &actuators = {false, false, true},
                            bool add_time_in_state = false,
-                           bool normalization = false
+                           bool normalization = false,
+                           const std::vector<double>& normalized_vector = {}
                           );
   ~AdvancedAcrobotWorldView();
   void step(const std::vector<double> &motors, uint current_step, uint max_step_per_instance);

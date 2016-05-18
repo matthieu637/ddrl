@@ -63,22 +63,23 @@ class Simulator {
 
     agent = new Agent(env->number_of_actuators(), env->number_of_sensors());
     agent->unique_invoke(properties, command_args);
+    
+    Stat stat;
 
     time_spend.start();
     for (unsigned int episode = 0; episode < max_episode; episode++) {
       //  learning
-      run_episode(true, episode, 0);
+      run_episode(true, episode, 0, stat);
 
       for (unsigned int test_episode = 0; test_episode < test_episode_per_episode; test_episode++) {
         //  testing during learning
-        run_episode(false, episode, test_episode);
+        run_episode(false, episode, test_episode, stat);
       }
     }
 
-    for (unsigned int test_episode = 0; test_episode < test_episode_at_end;
-         test_episode++) {
+    for (unsigned int test_episode = 0; test_episode < test_episode_at_end; test_episode++) {
       //  testing after learning
-      run_episode(false, max_episode, test_episode);
+      run_episode(false, max_episode, test_episode, stat);
     }
 
     env->unique_destroy();
@@ -88,15 +89,14 @@ class Simulator {
   }
 
  protected:
-  virtual void run_episode(bool learning, unsigned int lepisode, unsigned int tepsiode) {
+  virtual void run_episode(bool learning, unsigned int lepisode, unsigned int tepsiode, Stat& stat) {
     env->reset_episode();
     std::list<double> all_rewards;
     agent->start_instance(learning);
-
+    
     uint instance = 0;
     while (env->hasInstance()) {
       uint step = 0;
-      Stat stat;
       std::vector<double> perceptions = env->perceptions();
       agent->start_episode(perceptions, learning);
 

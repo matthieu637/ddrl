@@ -106,15 +106,18 @@ ProblemDefinition* str2prob(const std::string& s);
 
 class AdvancedAcrobotEnv : public arch::AEnvironment<> {
  public:
-  AdvancedAcrobotEnv() {
+  AdvancedAcrobotEnv() : normalization(false) {
     ODEFactory::getInstance();
     bones = nullptr;
     actuators = nullptr;
     instance = nullptr;
     problem = nullptr;
+    normalized_vector = nullptr;
   }
 
   ~AdvancedAcrobotEnv() {
+    if(normalization)
+      delete normalized_vector;
     delete bones;
     delete actuators;
     delete problem;
@@ -159,17 +162,19 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
       LOG_INFO("doest not add time in state");
     }
 
-    bool normalization = false;
     try {
       normalization = properties->get<bool>("environment.normalization");
+      if(normalization)
+        normalized_vector = bib::to_array<double>(properties->get<std::string>("environment.normalized_vector"));
+        
     } catch(boost::exception const& ) {
       LOG_INFO("doest not normalize");
     }
 
     if (visible)
-      instance = new AdvancedAcrobotWorldView("data/textures", *bones, *actuators, add_time_in_state, normalization);
+      instance = new AdvancedAcrobotWorldView("data/textures", *bones, *actuators, add_time_in_state, normalization, *normalized_vector);
     else
-      instance = new AdvancedAcrobotWorld(*bones, *actuators, add_time_in_state, normalization);
+      instance = new AdvancedAcrobotWorld(*bones, *actuators, add_time_in_state, normalization, *normalized_vector);
   }
 
   void _apply(const std::vector<double>& actuators) {
@@ -185,8 +190,10 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
   bool visible = false;
   std::vector<bone_joint>* bones;
   std::vector<bool>* actuators;
+  std::vector<double>* normalized_vector;
   AdvancedAcrobotWorld* instance;
   ProblemDefinition* problem;
+  bool normalization;
 
   std::vector<double> internal_state;
 };

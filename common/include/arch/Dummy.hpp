@@ -5,6 +5,7 @@
 #include "boost/program_options.hpp"
 
 #include "bib/Logger.hpp"
+#include "bib/Prober.hpp"
 
 namespace arch {
 
@@ -90,6 +91,42 @@ class PerceptionEpisodeStat : public DummyEpisodeStat {
   }
 
  private :
+  uint step;
+};
+
+class PerceptionProbStat : public DummyEpisodeStat {
+ public:
+
+  PerceptionProbStat() : first(true), probes(0), step(0)  { }
+
+  virtual void dump(uint episode, const std::vector<double>& perceptions, const std::vector<double>& motors, double reward) {
+    (void) episode;
+    (void) motors;
+    (void) reward;
+    
+    if(first){
+      probes.resize(perceptions.size()); 
+      first = false;
+    }
+    
+    auto si = perceptions.begin();
+    for(auto p = probes.begin() ; p != probes.end() ;++p){
+      p->probe(*si);
+      si++;
+    }
+    
+    step++;
+    if(step % 10000 == 0){
+      for(auto p : probes){
+        LOG_FILE_NNL("perceptions_probe.data", p.min_probe << " " << p.max_probe << " ");
+      }
+      LOG_FILE("perceptions_probe.data", "");
+    }
+  }
+
+ private :
+  bool first;
+  std::vector<bib::Prober> probes;
   uint step;
 };
 

@@ -7,11 +7,12 @@ class Prober {
  public:
   void probe(double m);
 
- protected:
+ public:
   double min_probe;
   double max_probe;
+ protected:
   bool prob_init = false;
-  int prob_step = 0;
+  long int prob_step = 0;
 };
 }  // namespace bib
 #endif  // PROBER_H

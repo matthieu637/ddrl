@@ -16,8 +16,9 @@ void Prober::probe(double m) {
 
   prob_step++;
 
-  if (prob_step % 100 == 0) {
-    LOG_DEBUG("min : " << min_probe << " max : " << max_probe);
-  }
+//   if (prob_step % 5 == 0) {
+//     LOG_DEBUG("min : " << min_probe << " max : " << max_probe << " " << prob_step);
+//   }
 }
+
 }  // namespace bib

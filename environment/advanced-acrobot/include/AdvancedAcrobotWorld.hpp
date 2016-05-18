@@ -27,7 +27,8 @@ class AdvancedAcrobotWorld {
  public:
   AdvancedAcrobotWorld(const std::vector<bone_joint> &types = {HINGE, HINGE},
                        const std::vector<bool> &actuators = {false, false, true},
-                       bool add_time_in_state=false, bool normalization=false
+                       bool add_time_in_state=false, bool normalization=false, 
+                       const std::vector<double>& normalized_vector = {}
                       );
   virtual ~AdvancedAcrobotWorld();
 
@@ -63,7 +64,7 @@ class AdvancedAcrobotWorld {
   bool add_time_in_state;
   bool normalization;
 
-  static const std::vector<double> NORMALIZED_VEC;
+  std::vector<double> normalized_vector;
 };
 
 struct nearCallbackData {

@@ -117,8 +117,9 @@ void threadloop(const std::string& goodpath) {
 
 AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
   const std::string& path, const std::vector<bone_joint>& types,
-  const std::vector<bool>& actuators, bool _add_time_in_state, bool normalization)
-  : AdvancedAcrobotWorld(types, actuators, _add_time_in_state, normalization),
+  const std::vector<bool>& actuators, bool _add_time_in_state, bool normalization,
+  const std::vector<double>& normalized_vector)
+  : AdvancedAcrobotWorld(types, actuators, _add_time_in_state, normalization, normalized_vector),
     requestEnd(false), changeThread(false),
     speed(1),
     ignoreMotor(false) {

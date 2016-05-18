@@ -5,6 +5,7 @@
 #include "CMAESAg.hpp"
 
 int main(int argc, char **argv) {
+//   arch::Simulator<AdvancedAcrobotEnv, CMAESAg, arch::PerceptionProbStat> s;
   arch::Simulator<AdvancedAcrobotEnv, CMAESAg> s;
 
   s.init(argc, argv);

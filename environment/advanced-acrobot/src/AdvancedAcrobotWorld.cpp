@@ -11,9 +11,10 @@
 
 AdvancedAcrobotWorld::AdvancedAcrobotWorld(
   const std::vector<bone_joint>& _types, const std::vector<bool>& _actuators,
-  bool _add_time_in_state, bool _normalization)
+  bool _add_time_in_state, bool _normalization, const std::vector<double>& _normalized_vector)
   : odeworld(ODEFactory::getInstance()->createWorld()),
-    types(_types), actuators(_actuators), add_time_in_state(_add_time_in_state), normalization(_normalization) {
+    types(_types), actuators(_actuators), add_time_in_state(_add_time_in_state), 
+    normalization(_normalization), normalized_vector(_normalized_vector) {
   ASSERT(_types.size() == (_actuators.size() - 1),
          "actuators " << _actuators.size() << " not compatible with types "
          << _types.size());
@@ -167,8 +168,6 @@ void AdvancedAcrobotWorld::step(const vector<double>& motors, uint current_step,
   update_state(current_step, max_step_per_instance);
 }
 
-const std::vector<double> AdvancedAcrobotWorld::NORMALIZED_VEC({28,62,71});
-
 void AdvancedAcrobotWorld::update_state(uint current_step, uint max_step_per_instance) {
   uint begin_index = 0;
 
@@ -178,8 +177,8 @@ void AdvancedAcrobotWorld::update_state(uint current_step, uint max_step_per_ins
     internal_state[begin_index++] = dJointGetHingeAngle(joints[0]);
 
   if(normalization)
-    internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngleRate(joints[0]), -NORMALIZED_VEC[0],
-                                    NORMALIZED_VEC[0], -1, 1);
+    internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngleRate(joints[0]), -normalized_vector[0],
+                                    normalized_vector[0], -1, 1);
   else
     internal_state[begin_index++] = dJointGetHingeAngleRate(joints[0]);
 
@@ -190,9 +189,9 @@ void AdvancedAcrobotWorld::update_state(uint current_step, uint max_step_per_ins
       else
         internal_state[begin_index++] = dJointGetHingeAngle(joints[i + 1]);
 
-      if(normalization && i+1 < NORMALIZED_VEC.size())
-        internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngleRate(joints[i + 1]), -NORMALIZED_VEC[i + 1],
-                                        NORMALIZED_VEC[i + 1], -1, 1);
+      if(normalization && i+1 < normalized_vector.size())
+        internal_state[begin_index++] = bib::Utils::transform(dJointGetHingeAngleRate(joints[i + 1]), -normalized_vector[i + 1],
+                                        normalized_vector[i + 1], -1, 1);
       else
         internal_state[begin_index++] = dJointGetHingeAngleRate(joints[i + 1]);
     } else {

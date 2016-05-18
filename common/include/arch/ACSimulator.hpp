@@ -73,7 +73,7 @@ class ACSimulator : public Simulator<Environment, Agent, Stat> {
   }
   
 protected:
-    void run_episode(bool learning, unsigned int lepisode, unsigned int tepisode) override {
+    void run_episode(bool learning, unsigned int lepisode, unsigned int tepisode, Stat& stat) override {
     if(generate_bestV)
       learning = false;
       
@@ -84,7 +84,6 @@ protected:
     uint instance = 0;
     while (this->env->hasInstance()) {
       uint step = 0;
-      Stat stat;
       std::vector<double> perceptions = this->env->perceptions();
       this->agent->start_episode(perceptions, learning);
       
