@@ -742,9 +742,8 @@ class OffVSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     episode++;
   }
   
-  double criticEval(const std::vector<double>&, const std::vector<double>&) override {
-    LOG_INFO("not implemented");
-    return 0;
+  double criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions) override {
+    return vnn->computeOutVF(perceptions, actions);
   }
   
   arch::Policy<MLP>* getCopyCurrentPolicy() override {

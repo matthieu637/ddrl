@@ -72,7 +72,7 @@ T gaussian(T x, T m, T s)
 
 class SimpleEnv1D : public arch::AEnvironment<> {
  public:
-  SimpleEnv1D() : s(1) {
+  SimpleEnv1D() : s(1), add_time_in_state(false) {
 //       s[0] = -0.7;
 //    s[0] = bib::Utils::randin(-1, 1);
   }
@@ -87,6 +87,9 @@ class SimpleEnv1D : public arch::AEnvironment<> {
     s[0] = bib::Utils::randin(-1, 1);
     while(final_state())
 	s[0] = bib::Utils::randin(-1, 1);
+    
+    if(add_time_in_state)
+      s[1] = -1.f;
 
     first_state_stochasticity.resize(1);
     first_state_stochasticity[0] = s[0];
@@ -94,6 +97,8 @@ class SimpleEnv1D : public arch::AEnvironment<> {
   
   void _reset_episode_choose(const std::vector<double>& stochasticity) override {
     s[0] = stochasticity[0];
+    if(add_time_in_state)
+      s[1] = -1.f;
   }
   
   const std::vector<double>& perceptions() const {
@@ -125,14 +130,24 @@ class SimpleEnv1D : public arch::AEnvironment<> {
       s[0] = 1.f;
     else if( s[0] < -1.f)
       s[0] = -1.f;
+    
+    if(add_time_in_state)
+      s[1] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
   }
   
-  void unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) {
+  void unique_invoke(boost::property_tree::ptree* inifile, boost::program_options::variables_map*) {
     instance_per_episode    = 1;
     max_step_per_instance   = 50;
+    
+    if(inifile->count("environment.add_time_in_state") != 0 )
+      if(inifile->get<bool>("environment.add_time_in_state")){
+          s.resize(2);
+          add_time_in_state = true;
+      }
   }
 
   std::vector<double> s;
+  bool add_time_in_state;
 };
 
 // -1 -0.5(-1) 1(-1) 0(-1)
