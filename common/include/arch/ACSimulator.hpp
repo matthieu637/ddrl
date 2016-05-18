@@ -506,12 +506,26 @@ protected:
         
           all_perceptions.pop_front();
 #endif
-          if(i >= begin * this->agent->get_decision_each()){
+          if(i >= (begin+1) * this->agent->get_decision_each()){ //applying \pi
             std::vector<double> st = lenv->perceptions();
             std::vector<double>& ac = lpol->run_td(st);
 //             bib::Logger::PRINT_ELEMENTS(ac, "DEBmac ");
 //             LOG_DEBUG((lpol->did_decision() ? "true" : "false"));
             lenv->apply(ac);
+            inter_rewards.push_back(lenv->performance());
+            if(lpol->last_step_before_decision()){
+              if(lenv->final_state())
+		rsum += (local_gamma * lenv->performance());
+	      else
+		rsum += (local_gamma * (*std::max_element(inter_rewards.begin(), inter_rewards.end())));
+              local_gamma *= gamma;
+              inter_rewards.clear();
+            }
+          }
+          else if(i >= begin * this->agent->get_decision_each()){ //applying last a
+            std::vector<double> st = lenv->perceptions();
+            lpol->run_td(st);
+            lenv->apply(*it);
             inter_rewards.push_back(lenv->performance());
             if(lpol->last_step_before_decision()){
               if(lenv->final_state())
