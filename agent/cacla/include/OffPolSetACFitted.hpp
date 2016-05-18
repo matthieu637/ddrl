@@ -245,24 +245,28 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     const OffPolSetACFitted* ptr;
   };
   
-  void update_critic(){
+    void update_critic(){
       if (trajectory.size() > 2) {
-        //remove trace of old policy
 
         std::vector<sample> *vtraj; 
-        double *importance_sample = nullptr; 
-        if(strategy_w >= 1 && strategy_w <= 2){
+        double *importance_sample = nullptr;
+        if(strategy_w == 0){//only on the last data
+          vtraj = new std::vector<sample>(last_trajectory.size());
+          std::copy(last_trajectory.begin(), last_trajectory.end(), vtraj->begin());
+        } else if(strategy_w >= 1 && strategy_w <= 3){
           vtraj = new std::vector<sample>(trajectory.size());
           std::copy(trajectory.begin(), trajectory.end(), vtraj->begin());
-          importance_sample = new double [trajectory.size()];
           
-          if(strategy_w == 1) {
+          if(strategy_w > 1)//on every data
+            importance_sample = new double [trajectory.size()];
+          
+          if(strategy_w == 2) {//on every data 1/p(s)
             uint i=0;
             for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
               importance_sample[i] = 1.f / proba_s.pdf(it->s);
               i++;
             }
-          } else if(strategy_w == 2) {
+          } else if(strategy_w == 3) {//on every data 1/p(s) normalized
             uint i=0;
             double sum_ps = 0.00f;
             for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
@@ -275,12 +279,12 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               importance_sample[i] =  (1.f / proba_s.pdf(it->s)) / sum_ps;
               i++;
             }            
-          } else {
+          } else if(strategy_w != 1) {
               LOG_ERROR("to be implemented");
               exit(1);
           }
           
-        } else {
+        } else if(strategy_w != 0) {
           LOG_ERROR("to be implemented");
           exit(1);
         }
@@ -293,7 +297,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
           if(vnn_from_scratch)
             fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
           
-          if(strategy_w == 0)
+          if(strategy_w <= 1)
             vnn->learn_stoch(dq.data, 10000, 0, 0.0001);
           else
             vnn->learn_stoch_lw(dq.data, importance_sample, 10000, 0, 0.0001);
@@ -324,7 +328,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         delete vtraj;
       }
   }
-  
+
   inline void mergeSA(std::vector<double>& AB, const std::vector<double>& A, const std::vector<double>& B) {
     AB.reserve( A.size() + B.size() ); // preallocate memory
     AB.insert( AB.end(), A.begin(), A.end() );
