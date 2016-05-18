@@ -93,22 +93,20 @@ protected:
       std::list< std::vector<double> > all_perceptions_decision;
       std::list< std::vector<double> > all_actions_decision;
       std::list< double > all_Vs;
-      std::list< double > all_RVs;
       _Policy* policy = this->agent->getCopyCurrentPolicy();
 
       while (this->env->running()) {
         perceptions = this->env->perceptions();
         all_perceptions.push_back(perceptions);
-        if(this->agent->did_decision() && all_perceptions.size() > 1){
-          double vs = this->agent->criticEval(perceptions, all_actions.back());
-          all_Vs.push_back(vs);
-          all_RVs.push_back(this->agent->last_receive_reward() + this->agent->getGamma() * vs);
-          all_perceptions_decision.push_back(perceptions);
-          all_actions_decision.push_back(all_actions.back());
-        }
         double reward = this->env->performance();
         const std::vector<double>& actuators = this->agent->runf(reward, perceptions, generate_bestV ? true : learning, false, false);
         all_actions.push_back(actuators);
+        if(this->agent->did_decision()){
+          double vs = this->agent->criticEval(perceptions, actuators);
+          all_Vs.push_back(vs);
+          all_perceptions_decision.push_back(perceptions);
+          all_actions_decision.push_back(actuators);
+        }
         this->env->apply(actuators);
         stat.dump(lepisode, perceptions, actuators, reward);
         all_rewards.push_back(reward);
@@ -123,12 +121,9 @@ protected:
       this->agent->runf(reward, perceptions, learning, this->env->final_state(), true);
       all_rewards.push_back(reward);
       
-      
-      all_RVs.push_back(this->agent->last_receive_reward());
 //       last V(absorbing_state) is useless
 //       all_perceptions.push_back(perceptions);
 //       all_perceptions_decision.push_back(perceptions);
-//       all_Vs.push_back(this->agent->criticEval(perceptions));
 
       if(analyse_distance_bestVF){
         double diff = compareBestValueFonction(all_perceptions, all_actions, policy, this->agent->getGamma(), 
@@ -140,7 +135,7 @@ protected:
       }
       
       if(analyse_distance_bestPol){
-        double diff = compareBestPolicy(all_perceptions_decision, all_RVs);
+        double diff = compareBestPolicy(all_perceptions_decision, all_Vs);
 #ifndef NDEBUG
         LOG_DEBUG("diff (higher bad) " << diff);
 #endif
@@ -372,7 +367,7 @@ protected:
   //don't compare best action with method action because there is may be multiple best action
   //compare them by scoring
   double compareBestPolicy(const std::list< std::vector<double> >& all_perceptions_decision,
-                                          const std::list< double >& all_RVs
+                                          const std::list< double >& all_Vs
                                  ){    
     
     using namespace boost::interprocess;
@@ -393,7 +388,7 @@ protected:
     
     MyVector *myvector = shm_obj.construct<MyVector>("result.ac")(alloc_inst);
     
-    for(uint i = 0; i < all_RVs.size(); ++i)
+    for(uint i = 0; i < all_Vs.size(); ++i)
       myvector->push_back(0);
    
     std::vector<int> childs_pid;
@@ -404,8 +399,8 @@ protected:
     threads=1;
 #endif
     
-    uint work_per_process = all_RVs.size() / threads;
-    uint additional_work = all_RVs.size() - (work_per_process * threads);
+    uint work_per_process = all_Vs.size() / threads;
+    uint additional_work = all_Vs.size() - (work_per_process * threads);
     
     for (uint i = 0; i < threads; i++){
 #ifdef VALGRIND
@@ -450,7 +445,7 @@ protected:
 
     double diff = 0;
     int i=0;
-    for(auto it_rvs : all_RVs){
+    for(auto it_rvs : all_Vs){
       double my_rvs = it_rvs;
       if( myvector->at(i) >= my_rvs){
         diff += (myvector->at(i) - my_rvs);
@@ -460,7 +455,7 @@ protected:
     
     shared_memory_object::remove(shm_filename);
     
-    return diff / all_RVs.size();
+    return diff / all_Vs.size();
   }
   
   double evalBestValueFonction(const std::list< std::vector<double> >& all_actions, _Policy* lpol, Environment* lenv, 
