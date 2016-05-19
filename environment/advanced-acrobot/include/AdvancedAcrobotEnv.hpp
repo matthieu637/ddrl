@@ -116,8 +116,7 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
   }
 
   ~AdvancedAcrobotEnv() {
-    if(normalization)
-      delete normalized_vector;
+    delete normalized_vector;
     delete bones;
     delete actuators;
     delete problem;
@@ -170,6 +169,9 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
     } catch(boost::exception const& ) {
       LOG_INFO("doest not normalize");
     }
+    
+    if(!normalization)
+      normalized_vector = new std::vector<double>;
 
     if (visible)
       instance = new AdvancedAcrobotWorldView("data/textures", *bones, *actuators, add_time_in_state, normalization, *normalized_vector);
