@@ -25,7 +25,7 @@
 
 class CartpoleWorld {
  public:
-  CartpoleWorld(bool add_time_in_state=false, bool normalization=false);
+  CartpoleWorld(bool add_time_in_state=false, bool normalization=false, const std::vector<double>& normalized_vector = {});
   virtual ~CartpoleWorld();
 
   void resetPositions(std::vector<double> &, const std::vector<double>& given_stoch);
@@ -56,7 +56,7 @@ class CartpoleWorld {
   bool add_time_in_state;
   bool normalization;
 
-  static const std::vector<double> NORMALIZED_VEC;
+  const std::vector<double>& normalized_vector;
 };
 
 struct nearCallbackDataCartpole {

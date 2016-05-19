@@ -13,7 +13,8 @@ class CartpoleWorldView : public CartpoleWorld {
  public:
   CartpoleWorldView(const std::string &,
                            bool add_time_in_state = false,
-                           bool normalization = false
+                           bool normalization = false,
+                           const std::vector<double>& normalized_vector = {}
                           );
   ~CartpoleWorldView();
   void step(const std::vector<double> &motors, uint current_step, uint max_step_per_instance);

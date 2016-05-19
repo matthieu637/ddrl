@@ -17,6 +17,7 @@ class CartpoleEnv : public arch::AEnvironment<> {
   }
 
   ~CartpoleEnv() {
+    delete normalized_vector;
     delete instance;
   }
 
@@ -55,18 +56,22 @@ class CartpoleEnv : public arch::AEnvironment<> {
     } catch(boost::exception const& ) {
       LOG_INFO("doest not add time in state");
     }
-
-    bool normalization = false;
+    
     try {
       normalization = properties->get<bool>("environment.normalization");
     } catch(boost::exception const& ) {
       LOG_INFO("doest not normalize");
     }
+    
+    if(normalization)
+      normalized_vector = bib::to_array<double>(properties->get<std::string>("environment.normalized_vector"));
+    else
+      normalized_vector = new std::vector<double>;
 
     if (visible)
-      instance = new CartpoleWorldView("data/textures", add_time_in_state, normalization);
+      instance = new CartpoleWorldView("data/textures", add_time_in_state, normalization, *normalized_vector);
     else
-      instance = new CartpoleWorld(add_time_in_state, normalization);
+      instance = new CartpoleWorld(add_time_in_state, normalization, *normalized_vector);
   }
 
   void _apply(const std::vector<double>& actuators) {
@@ -93,7 +98,9 @@ class CartpoleEnv : public arch::AEnvironment<> {
 
  private:
   bool visible = false;
+  bool normalization = false;
   CartpoleWorld* instance;
+  std::vector<double>* normalized_vector;
 
   std::vector<double> internal_state;
 };

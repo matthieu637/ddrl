@@ -163,14 +163,13 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
 
     try {
       normalization = properties->get<bool>("environment.normalization");
-      if(normalization)
-        normalized_vector = bib::to_array<double>(properties->get<std::string>("environment.normalized_vector"));
-        
     } catch(boost::exception const& ) {
       LOG_INFO("doest not normalize");
     }
     
-    if(!normalization)
+    if(normalization)
+        normalized_vector = bib::to_array<double>(properties->get<std::string>("environment.normalized_vector"));
+    else
       normalized_vector = new std::vector<double>;
 
     if (visible)

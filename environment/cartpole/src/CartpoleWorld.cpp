@@ -9,8 +9,9 @@
 #include "ODEFactory.hpp"
 
 
-CartpoleWorld::CartpoleWorld(bool _add_time_in_state, bool _normalization)
-  : odeworld(ODEFactory::getInstance()->createWorld()), add_time_in_state(_add_time_in_state), normalization(_normalization) {
+CartpoleWorld::CartpoleWorld(bool _add_time_in_state, bool _normalization, const std::vector<double>& _normalized_vector)
+  : odeworld(ODEFactory::getInstance()->createWorld()), add_time_in_state(_add_time_in_state), 
+  normalization(_normalization), normalized_vector(_normalized_vector) {
 
   dWorldSetGravity(odeworld.world_id, 0, 0.0, GRAVITY);
 
@@ -124,8 +125,6 @@ void CartpoleWorld::step(const vector<double>& motors, uint current_step, uint m
   update_state(current_step, max_step_per_instance);
 }
 
-const std::vector<double> CartpoleWorld::NORMALIZED_VEC({28,62,71});
-
 void CartpoleWorld::update_state(uint current_step, uint max_step_per_instance) {
   uint begin_index = 0;
   
@@ -133,9 +132,16 @@ void CartpoleWorld::update_state(uint current_step, uint max_step_per_instance) 
   internal_state[begin_index++] = dJointGetSliderPositionRate(joints[0]);
   internal_state[begin_index++] = dJointGetHingeAngle(joints[1]);
   internal_state[begin_index++] = dJointGetHingeAngleRate(joints[1]);
-  
+    
   if(add_time_in_state)
     internal_state[begin_index] = bib::Utils::transform(current_step, 0, max_step_per_instance, -1.f, 1.f);
+  
+  if(normalization){
+    internal_state[0] = bib::Utils::transform(internal_state[0], -MAX_SLIDER_POSITON, MAX_SLIDER_POSITON, -1.f, 1.f);
+    internal_state[1] = bib::Utils::transform(internal_state[1], -normalized_vector[0], normalized_vector[0], -1.f, 1.f);
+    internal_state[2] = bib::Utils::transform(internal_state[2], -MAX_HINGE_ANGLE, MAX_HINGE_ANGLE, -1.f, 1.f);
+    internal_state[3] = bib::Utils::transform(internal_state[3], -normalized_vector[1], normalized_vector[1], -1.f, 1.f);
+  }
 }
 
 const std::vector<double>& CartpoleWorld::state() const {

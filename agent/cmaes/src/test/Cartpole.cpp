@@ -23,6 +23,7 @@ class HardCoddedController : public arch::AAgent<> {
 int main(int argc, char **argv) {
 
   arch::Simulator<CartpoleEnv, CMAESAg> s;
+//   arch::Simulator<CartpoleEnv, CMAESAg, arch::PerceptionProbStat> s;
 //   arch::Simulator<CartpoleEnv, HardCoddedController> s;
 //   arch::Simulator<CartpoleEnv, arch::ExampleAgent> s;
   

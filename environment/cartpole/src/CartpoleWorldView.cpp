@@ -87,8 +87,9 @@ void threadloopCartpole(const std::string& goodpath) {
   }
 }
 
-CartpoleWorldView::CartpoleWorldView(const std::string& path, bool _add_time_in_state, bool normalization)
-  : CartpoleWorld(_add_time_in_state, normalization),
+CartpoleWorldView::CartpoleWorldView(const std::string& path, bool _add_time_in_state, 
+                                     bool normalization, const std::vector<double>& normalized_vector)
+  : CartpoleWorld(_add_time_in_state, normalization, normalized_vector),
     requestEnd(false),
     speed(1),
     ignoreMotor(false) {
