@@ -157,6 +157,8 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     change_policy_each      = pt->get<uint>("agent.change_policy_each");
     strategy_w              = pt->get<uint>("agent.strategy_w");
     current_loaded_policy   = pt->get<uint>("agent.index_starting_loaded_policy");
+    converge_precision      = pt->get<double>("agent.converge_precision");
+    number_fitted_iteration = pt->get<uint>("agent.number_fitted_iteration");
 
     if(hidden_unit_v == 0)
       vnn = new LinMLP(nb_sensors + nb_motors , 1, 0.0, lecun_activation);
@@ -194,6 +196,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       
       ann->load("polset."+std::to_string(current_loaded_policy));
       current_loaded_policy++;
+      end_episode();
     }
   }
 
@@ -298,9 +301,9 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
           
           if(strategy_w <= 1)
-            vnn->learn_stoch(dq.data, 10000, 0, 0.0001);
+            vnn->learn_stoch(dq.data, 30000, 0, converge_precision);
           else
-            vnn->learn_stoch_lw(dq.data, importance_sample, 10000, 0, 0.0001);
+            vnn->learn_stoch_lw(dq.data, importance_sample, 30000, 0, converge_precision);
         };
 
         auto eval = [&]() {
@@ -308,7 +311,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         };
 
         if(determinist_vnn_update)
-              bib::Converger::determinist<>(iter, eval, 30, 0.0001, 0);
+              bib::Converger::determinist<>(iter, eval, number_fitted_iteration, converge_precision, 0);
         else {
           NN best_nn = nullptr;
           auto save_best = [&]() {
@@ -317,7 +320,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             best_nn = fann_copy(vnn->getNeuralNet());
           };
 
-          bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10);
+          bib::Converger::min_stochastic<>(iter, eval, save_best, 30, converge_precision, 0, 10);
           vnn->copy(best_nn);
           fann_destroy(best_nn);
         }
@@ -426,11 +429,12 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   uint change_policy_each;
   uint strategy_w;
 
-  double noise;
+  double noise, converge_precision;
   bool gaussian_policy, vnn_from_scratch, lecun_activation, 
         determinist_vnn_update;
   uint hidden_unit_v;
   uint hidden_unit_a;
+  uint number_fitted_iteration;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

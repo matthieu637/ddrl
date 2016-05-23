@@ -127,6 +127,8 @@ protected:
       if(analyse_distance_bestVF){
         double diff = compareBestValueFonction(all_perceptions, all_actions, policy, this->agent->getGamma(), 
                                                all_Vs, this->agent->sum_weighted_rewards(), this->env->get_first_state_stoch());
+        if(lepisode == 0)
+          diff = 0;
 #ifndef NDEBUG
         LOG_DEBUG("diff (higher bad) " << diff);
 #endif

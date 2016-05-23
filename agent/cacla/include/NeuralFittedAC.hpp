@@ -314,7 +314,7 @@ class NeuralFittedAC : public arch::AACAgent<MLP, arch::AgentProgOptions> {
           if(vnn_from_scratch)
             fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
 //           vnn->learn_stoch_lw(dq.data, importance_sample, 10000, 0, 0.0001);
-          vnn->learn_stoch(dq.data, 10000, 0, 0.00001);
+          vnn->learn_stoch(dq.data, 10000, 0, 0.000001);
         };
 
         auto eval = [&]() {
@@ -322,7 +322,7 @@ class NeuralFittedAC : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         };
 
         if(determinist_vnn_update)
-              bib::Converger::determinist<>(iter, eval, 30, 0.00001, 0, "deter_critic");
+              bib::Converger::determinist<>(iter, eval, 30, 0.000001, 0, "deter_critic");
         else {
           NN best_nn = nullptr;
           auto save_best = [&]() {
@@ -331,7 +331,7 @@ class NeuralFittedAC : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             best_nn = fann_copy(vnn->getNeuralNet());
           };
 
-          bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10, "stoch_crtic");
+          bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.00001, 0, 10, "stoch_crtic");
           vnn->copy(best_nn);
           fann_destroy(best_nn);
         }
@@ -583,7 +583,8 @@ class NeuralFittedAC : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 //     LOG_DEBUG("critic updated");
     
 //     update_actor();
-//     if(trajectory.size()%10==0)
+    if(trajectory.size()%50==0)
+      LOG_DEBUG(ann->weight_l1_norm());
     update_actor_nfqca();
   }
   
