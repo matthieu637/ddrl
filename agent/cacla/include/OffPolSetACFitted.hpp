@@ -356,7 +356,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       last_trajectory.clear();
       
     
-      struct fann_train_data* data = fann_create_train(bvf.size(), nb_sensors, 1);
+      struct fann_train_data* data = fann_create_train(bvf.size(), nb_sensors + nb_motors, 1);
       
       auto it = bvf.cbegin();
       for (uint n = 0; n < bvf.size(); n++) {
@@ -375,7 +375,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       bib::Logger::getInstance()->closeFile("vset.data."+std::to_string(current_loaded_policy-1));
       
       fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
-      vnn->learn_stoch(data, 100000, 0, 0.000001, 100);
+      vnn->learn_stoch(data, 10000, 200, 0.0000001, 200);
       
       fann_destroy_train(data);
       
@@ -411,13 +411,13 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
  protected:
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " " << std::setw(
-          8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << trajectory.size() ;
+          8) << std::fixed << std::setprecision(8) << vnn->error() << " " << noise << " " << trajectory.size() ;
   }
 
   void _dump(std::ostream& out) const override {
     out <<" " << std::setw(25) << std::fixed << std::setprecision(22) <<
         sum_weighted_reward << " " << std::setw(8) << std::fixed <<
-        std::setprecision(5) << vnn->error() << " " << trajectory.size() ;
+        std::setprecision(8) << vnn->error() << " " << trajectory.size() ;
   }
   
 

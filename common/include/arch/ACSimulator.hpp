@@ -117,7 +117,7 @@ protected:
       // then we call the algorithm a last time to give him this information
       perceptions = this->env->perceptions();
       double reward = this->env->performance();
-      this->agent->runf(reward, perceptions, learning, this->env->final_state(), true);
+      this->agent->runf(reward, perceptions, generate_bestV ? true : learning, this->env->final_state(), true);
       all_rewards.push_back(reward);
       
 //       last V(absorbing_state) is useless
@@ -144,7 +144,6 @@ protected:
       }
       
       if(generate_bestV){
-        std::map<std::vector<double>, double> s_BVS;
         generateBestValueFonction(s_BVS, all_perceptions, all_actions, policy, this->agent->getGamma(), 
                                                all_perceptions_decision, this->agent->sum_weighted_rewards(), 
                                                   all_actions_decision, this->env->get_first_state_stoch());
@@ -592,6 +591,7 @@ protected:
     bool analyse_distance_bestPol = false;
     
     bool generate_bestV = false;
+    std::map<std::vector<double>, double> s_BVS; //for generate_bestV
     
     uint precision = 0;
     uint shm_id;
