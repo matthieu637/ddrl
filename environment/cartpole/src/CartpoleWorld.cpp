@@ -44,7 +44,7 @@ void CartpoleWorld::createWorld() {
 //   //  Create the first fixed bone with it's joint
   ODEObject* first_bone = ODEFactory::getInstance()->createBox(
                             odeworld, 0., 0, CART_LARGER/2.f, CART_LARGER, CART_LARGER, CART_LARGER,
-                            BONE_DENSITY, true);                
+                            BONE_DENSITY, true, INERTIA);                
   bones.push_back(first_bone);
 
   dJointID first_slider = dJointCreateSlider(odeworld.world_id, nullptr);
@@ -58,7 +58,7 @@ void CartpoleWorld::createWorld() {
   
   ODEObject* second_bone = ODEFactory::getInstance()->createBox(
                             odeworld, 0., 0, POLE_LENGTH/2.f+CART_LARGER/2.f, POLE_LARGER, POLE_LARGER, POLE_LENGTH,
-                            BONE_DENSITY, true);
+                            BONE_DENSITY, true, INERTIA);
   bones.push_back(second_bone);
   
   dJointID first_hinge = dJointCreateHinge(odeworld.world_id, nullptr);

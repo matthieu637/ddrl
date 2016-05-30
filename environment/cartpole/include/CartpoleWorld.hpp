@@ -19,6 +19,7 @@
 #define MAX_HINGE_ANGLE 0.523598776 //PI/6
 
 #define GRAVITY -9.81
+#define INERTIA 0.5f
 #define BONE_DENSITY 1062  // Average human body density
 #define MAX_TORQUE_SLIDER 10
 #define WORLD_STEP 0.01
