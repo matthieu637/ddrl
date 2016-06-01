@@ -30,6 +30,7 @@ typedef struct _sample {
   std::vector<double> next_s;
   double r;
   bool goal_reached;
+  double p0;
 
   friend class boost::serialization::access;
   template <typename Archive>
@@ -106,12 +107,15 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     vector<double>* next_action = ann->computeOut(sensors);
     
     if (last_action.get() != nullptr && learning){
-
-      trajectory.insert({last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
-      last_trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
+      double p0 = 1.f;
+      for(uint i=0;i < nb_motors;i++)
+        p0 *= exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_action->at(i))/(2.f*noise*noise));
+      
+      trajectory.insert({last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0});
+      last_trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0});
       proba_s.add_data(last_state);
       
-      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached};
+      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0};
       
       kdtree_s->insert(sa);
       
@@ -199,6 +203,22 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       end_episode();
     }
   }
+  
+  void computePTheta(vector< sample >& vtraj, double *ptheta){
+    uint i=0;
+    for(auto it = vtraj.begin(); it != vtraj.end() ; ++it) {
+      sample sm = *it;
+      vector<double>* next_action = ann->computeOut(sm.s);
+      
+      double p0 = 1.f;
+      for(uint i=0;i < nb_motors;i++)
+        p0 *= exp(-(next_action->at(i)-sm.a[i])*(next_action->at(i)-sm.a[i])/(2.f*noise*noise));
+
+      ptheta[i] = p0;
+      i++;
+      delete next_action;
+    }
+  }
 
   struct ParraVtoVNext {
     ParraVtoVNext(const std::vector<sample>& _vtraj, const OffPolSetACFitted* _ptr) : vtraj(_vtraj), ptr(_ptr) {
@@ -282,6 +302,27 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
               importance_sample[i] =  (1.f / proba_s.pdf(it->s)) / sum_ps;
               i++;
             }            
+          } else if(strategy_w >= 4 && strategy_w <= 5) {
+            
+            double * ptheta = new double [trajectory.size()];
+            computePTheta(*vtraj, ptheta);
+            
+            if(strategy_w == 4){
+              uint i=0;
+              for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+                importance_sample[i] = ptheta[i];
+                i++;
+              }
+            } else {
+              uint i=0;
+              for(auto it = vtraj->begin(); it != vtraj->end() ; ++it) {
+                importance_sample[i] = ptheta[i] / it->p0;
+                i++;
+              }
+            }
+            
+            delete[] ptheta;
+          
           } else if(strategy_w != 1) {
               LOG_ERROR("to be implemented");
               exit(1);
