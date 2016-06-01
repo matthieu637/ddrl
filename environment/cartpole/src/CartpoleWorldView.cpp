@@ -72,7 +72,7 @@ void threadloopCartpole(const std::string& goodpath) {
   inst->fn.stop = 0;
   inst->fn.path_to_textures = goodpath.c_str();
 
-  Draw::geoms = &inst->geoms;
+  Draw::geoms = &inst->bones;
 
   HACKinitDs(1280, 720, &inst->fn);
 
@@ -110,8 +110,8 @@ CartpoleWorldView::CartpoleWorldView(const std::string& path, bool _add_time_in_
   }
   inst = this;
 
-  for (ODEObject * b : bones)
-    geoms.push_back(b->getGeom());
+//   for (ODEObject * b : bones)
+//     geoms.push_back(b->getGeom());
 
 //     ODEObject* debug1= ODEFactory::getInstance()->createBox(
 //                         odeworld, 0.5, 0, 0.5/2.f, BONE_LARGER, BONE_LARGER, 0.5,
