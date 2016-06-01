@@ -22,12 +22,15 @@ class ODEObject {
   double distSinceX();
   double distSinceY();
   double distSinceZ();
+  uint getColorMode() const;
+  void setColorMode(uint);
 
  protected:
   dBodyID bid;
   dMass mass;
   dGeomID geom;
   double x, y, z, density, massv;
+  uint color_mode=0;
 };
 
 class ODEBox : public ODEObject {

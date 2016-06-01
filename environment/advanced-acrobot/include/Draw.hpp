@@ -1,7 +1,7 @@
 #ifndef DRAW_HPP
 #define DRAW_HPP
 
-#include <list>
+#include <vector>
 #include "ode/ode.h"
 
 #include "drawstuff.h"
@@ -18,7 +18,8 @@
 
 class Draw {
  public:
-  static std::list<dGeomID> *geoms;
+//   static std::list<dGeomID> *geoms;
+  static std::vector<ODEObject *>* geoms;
 
   static void drawGeom(dGeomID g, const dReal *pos, const dReal *R);
 

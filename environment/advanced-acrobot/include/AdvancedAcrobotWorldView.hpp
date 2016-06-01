@@ -22,8 +22,8 @@ class AdvancedAcrobotWorldView : public AdvancedAcrobotWorld {
   void step(const std::vector<double> &motors, uint current_step, uint max_step_per_instance);
 
  public:
-  std::list<dGeomID> geoms;
-  //     std::list<ODEObject*> delete_me_later;
+  //   std::list<dGeomID> geoms;
+  //   std::list<ODEObject*> delete_me_later;
 
   tbb::tbb_thread *eventThread = nullptr;
   dsFunctions fn;

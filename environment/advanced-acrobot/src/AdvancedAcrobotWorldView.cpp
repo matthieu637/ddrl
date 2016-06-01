@@ -91,11 +91,12 @@ void threadloop(const std::string& goodpath) {
   inst->fn.stop = 0;
   inst->fn.path_to_textures = goodpath.c_str();
 
-  Draw::geoms = &inst->geoms;
+  Draw::geoms = &inst->bones;
 
   HACKinitDs(1280, 720, &inst->fn);
 
   static float xyz[3] = {0., -3., 1};
+//   static float xyz[3] = {0.11, -6.5, 3.3};
   static float hpr[3] = {90, 0, 0};
   dsSetViewpoint(xyz, hpr);
 
@@ -139,8 +140,16 @@ AdvancedAcrobotWorldView::AdvancedAcrobotWorldView(
     exit(1);
   }
   
-  for (ODEObject * b : bones)
-    geoms.push_back(b->getGeom());
+  auto it_actuators = actuators.cbegin();
+  for (ODEObject * b : bones){
+    if(*it_actuators)
+      b->setColorMode(1);
+    
+    ++it_actuators;
+  }
+    
+//   for (ODEObject * b : bones)
+//     geoms.push_back(b->getGeom());
 
 //     ODEObject* debug1= ODEFactory::getInstance()->createBox(
 //                         odeworld, 0.5, 0, 0.5/2.f, BONE_LARGER, BONE_LARGER, 0.5,

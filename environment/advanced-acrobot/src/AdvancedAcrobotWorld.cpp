@@ -234,6 +234,9 @@ void AdvancedAcrobotWorld::resetPositions() {
     dBodySetLinearVel(o->getID(), 0, 0, 0);
     dBodySetAngularVel(o->getID(), 0, 0, 0);
     dBodySetPosition(o->getID(), 0, 0, starting_z - BONE_LENGTH * i++);
+    
+//     if(*dBodyGetForce(o->getID()) > 0.0000000001 || *dBodyGetTorque(o->getID()) > 0.0000000001 )
+//       exit(5);
   }
 
   Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());

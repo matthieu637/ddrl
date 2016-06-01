@@ -60,6 +60,14 @@ void ODEObject::setZ(double nz) {
   z = nz;
 }
 
+uint ODEObject::getColorMode() const{
+  return color_mode;
+}
+
+void ODEObject::setColorMode(uint i){
+  color_mode = i;
+}
+
 double ODEObject::distSince() {
   const dReal *pos = dGeomGetPosition(geom);
   return bib::Utils::euclidien_dist3D(x, pos[0], y, pos[1], z, pos[2]);

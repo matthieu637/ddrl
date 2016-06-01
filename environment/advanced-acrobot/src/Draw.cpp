@@ -3,7 +3,7 @@
 #include <string>
 #include <list>
 
-std::list<dGeomID> *Draw::geoms = nullptr;
+std::vector<ODEObject *> *Draw::geoms = nullptr;
 
 void Draw::drawGeom(dGeomID g, const dReal *pos, const dReal *R) {
   if (!g) return;
@@ -54,23 +54,18 @@ void Draw::drawGeom(dGeomID g, const dReal *pos, const dReal *R) {
 
 void Draw::drawLoop(int) {
   // draw world trimesh
-  dsSetColor(0.7, 0.7, 0.4);
-  dsSetTexture(DS_WOOD);
 
   if (Draw::geoms != nullptr) {
     auto list = Draw::geoms;
-    int i = 0;
-    for (auto it = list->cbegin(); it != list->cend(); ++it) {
-      drawGeom(*it, 0, 0);
-      i++;
-
-      if (i == 1 + 4) {
-        dsSetTexture(DS_SKY);
-        dsSetColor(0.8, 0.8, 0.8);
-      } else if (i > 5 + 4 + 1) {
+    for (auto it = list->begin(); it != list->end(); ++it) {
+      if ((*it)->getColorMode() == 1) {
         dsSetTexture(DS_CHECKERED);
-        dsSetColor(0.9, 0.2, 0.8);
+        dsSetColor(255, 0., 0.);
+      } else {
+        dsSetColor(0.7, 0.7, 0.4);
+        dsSetTexture(DS_WOOD);
       }
+      drawGeom((*it)->getGeom(), 0, 0);
     }
   }
 }

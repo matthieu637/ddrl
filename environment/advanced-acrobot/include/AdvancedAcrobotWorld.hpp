@@ -45,12 +45,12 @@ class AdvancedAcrobotWorld {
 
  public:
   ODEWorld odeworld;
+  std::vector<ODEObject *> bones;
 
  protected:
   std::vector<bone_joint> types;
   std::vector<bool> actuators;
 
-  std::vector<ODEObject *> bones;
   std::vector<dJointID> joints;
 
   std::vector<double> internal_state;
