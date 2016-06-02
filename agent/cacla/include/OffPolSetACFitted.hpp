@@ -276,7 +276,7 @@ class OffPolSetACFitted : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         if(strategy_w == 0){//only on the last data
           vtraj = new std::vector<sample>(last_trajectory.size());
           std::copy(last_trajectory.begin(), last_trajectory.end(), vtraj->begin());
-        } else if(strategy_w >= 1 && strategy_w <= 3){
+        } else if(strategy_w >= 1 && strategy_w <= 5){
           vtraj = new std::vector<sample>(trajectory.size());
           std::copy(trajectory.begin(), trajectory.end(), vtraj->begin());
           
