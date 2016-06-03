@@ -13,7 +13,7 @@
 
 using std::string;
 
-//#define VALGRIND
+#define VALGRIND
 
 namespace arch {
 
