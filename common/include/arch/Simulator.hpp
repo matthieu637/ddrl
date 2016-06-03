@@ -136,8 +136,8 @@ class Simulator {
     bool dump = episode % dump_log_each == 0;
 
     if(!learning){
-      display = tepisode % display_log_each == 0;
-      dump = tepisode % dump_log_each == 0;
+      display = (episode+tepisode) % display_log_each == 0;
+      dump = (episode+tepisode) % dump_log_each == 0;
     }
     
     if (dump || display) {
