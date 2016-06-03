@@ -132,7 +132,7 @@ class CMAESAg : public arch::ARLAgent<> {
     if(!justLoaded){
       //put individual into NN
       const double* parameters = nullptr;
-      if(learning)
+      if(learning || !cmaes_UpdateDistribution_done_once)
 	parameters = pop[current_individual];
       else
 	parameters = cmaes_GetPtr(evo, "xbestever");
@@ -165,6 +165,7 @@ class CMAESAg : public arch::ARLAgent<> {
       current_individual++;
       if(current_individual >= cmaes_Get(evo, "lambda")){
         cmaes_UpdateDistribution(evo, arFunvals);
+        cmaes_UpdateDistribution_done_once=true;
         new_population();
       }
     }
@@ -234,6 +235,7 @@ class CMAESAg : public arch::ARLAgent<> {
   double *const *pop;
   double *arFunvals;
   bool justLoaded = false;
+  bool cmaes_UpdateDistribution_done_once = false;
   uint current_individual;
 };
 
