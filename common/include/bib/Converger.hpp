@@ -21,18 +21,19 @@ class Converger {
       display_each = max_epoch + 1;
     while (!converged && !limit_reached) {
       iter();
+      double v = eval();
 
       if (epoch > 0 && epoch % display_each == 0)
-        LOG_DEBUG(debug_str << ":" <<epoch << " " << eval());
+        LOG_DEBUG(debug_str << ":" <<epoch << " " << v);
 
-      if (epoch > 1 && fabs(eval() - last_mse) < precision && fabs(last2_mse - last_mse) < precision) {
+      if (epoch > 1 && fabs(v - last_mse) < precision && fabs(last2_mse - last_mse) < precision) {
         converged = true;
       } else if(epoch > 1) {
-        converged = eval() < precision;
+        converged = v < precision;
       }
 
       last2_mse = last_mse;
-      last_mse = eval();
+      last_mse = v;
       limit_reached = epoch >= max_epoch;
       epoch++;
     }
