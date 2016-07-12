@@ -479,6 +479,7 @@ struct datann_derivative {
 double derivative_nn_easy(double*, double *, int, void*);
 
 double derivative_nn(double* input, double *neuron_value, int a_dim, void* data);
+double derivative_nn_inverting(double* input, double *neuron_value, int a_dim, void* data);
 
 #endif  // MLP_H
 

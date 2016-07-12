@@ -5,7 +5,7 @@
 #include <doublefann.h>
 #include <fann_train.h>
 #include <fann.h>
-
+#include <boost/filesystem.hpp>
 
 #include "MLP.hpp"
 #include <bib/Utils.hpp>
@@ -1201,7 +1201,7 @@ double derivative2(double* input, double *neuron_value, int, void* data){
       gx[j] = 0;
       for (uint i = 0; i < _w.h() ; i++) {
         double der = activation_function(_w.D(i), _w.lambda());
-        gx[j] = gx[j] - _w.v(i) * _w.w(1 + j, i) * _w.lambda() * (1.0 - der * der);
+        gx[j] = gx[j] + _w.v(i) * _w.w(1 + j, i) * _w.lambda() * (1.0 - der * der);
       }
     }
 
@@ -1220,7 +1220,7 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
     data->input[n][0]= x[0];
     data->input[n][1]= x[1];
 
-    data->output[n][0]= x[1]*x[1]-(x[0]*x[0])*x[1];
+    data->output[n][0]= -(x[1]*x[1]-(x[0]*x[0])*x[1]);
     n++;
   };
   
@@ -1248,7 +1248,7 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
     double x1 = bib::Utils::rand01()*2 -1;
 
     double out = (x1 * x1)/2;
-    double qout = out*out-(x1*x1)*out;
+    double qout = -(out*out-(x1*x1)*out);
 
     std::vector<double> sens(1);
     sens[0] = x1;
@@ -1256,8 +1256,8 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
     std::vector<double> ac_empty(0);
     ac[0]= out;
     
-    EXPECT_GT(nn.computeOutVF(sens, ac), qout - 0.1);
-    EXPECT_LT(nn.computeOutVF(sens, ac), qout + 0.1);
+    EXPECT_GT(nn.computeOutVF(sens, ac), qout - 0.15);
+    EXPECT_LT(nn.computeOutVF(sens, ac), qout + 0.15);
 
     EXPECT_GT(actor.computeOutVF(sens, ac_empty), out - 0.2);
     EXPECT_LT(actor.computeOutVF(sens, ac_empty), out + 0.2);
@@ -1271,46 +1271,162 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
 TEST(MLP, OptimizeNNTroughGradientOfAnotherNNFann) {
   MLP nn(2, 50, 1, 0.0, true);
 //   MLP nn(2, 1, 1, 0.0);
-  MLP actor(1, 4, 1);
+  MLP actor(1, 8, 1);
+  
+  MLP actor2(actor);
+  fann_set_activation_function_output(actor.getNeuralNet(), FANN_SIGMOID_SYMMETRIC);
+  fann_set_activation_function_output(actor2.getNeuralNet(), FANN_LINEAR);
 
-  struct fann_train_data* data = fann_create_train(200*200, 2, 1);
-  
-  uint n = 0;
-  auto iter = [&](const std::vector<double>& x) {
-    data->input[n][0]= x[0];
-    data->input[n][1]= x[1];
+  struct fann_train_data* data;
+  if ( !boost::filesystem::exists( "OptimizeNNTroughGradientOfAnotherNNFann.cache.data" ) ){
+    data = fann_create_train(200*200, 2, 1);
+    
+    uint n = 0;
+    auto iter = [&](const std::vector<double>& x) {
+      data->input[n][0]= x[0];
+      data->input[n][1]= x[1];
 
-    data->output[n][0]= x[1]*x[1]-(x[0]*x[0])*x[1];
-    n++;
-  };
+      data->output[n][0]= -(x[1]*x[1]-(x[0]*x[0])*x[1]);
+      n++;
+    };
+    
+    bib::Combinaison::continuous<>(iter, 2, -1, 1, 200);
+    
+    
+    nn.learn_stoch(data, 5800, 100, 0.0000001,500);
+    //nn.learn(data, 300, 0);
+    
+    fann_destroy_train(data);
+    nn.save("OptimizeNNTroughGradientOfAnotherNNFann.cache.data");
+  } else 
+    nn.load("OptimizeNNTroughGradientOfAnotherNNFann.cache.data");
   
-  bib::Combinaison::continuous<>(iter, 2, -1, 1, 200);
-  
-  nn.learn_stoch(data, 600, 100, 0.0000001,200);
-  //nn.learn(data, 300, 0);
-  fann_destroy_train(data);
-  
-  data = fann_create_train(2000, 1, 1);
-  n = 0;
-  auto iter2 = [&](const std::vector<double>& x) {
-    data->input[n][0]= x[0];
-    data->output[n][0]= x[0];//don't care
-    n++;
-  };
-  bib::Combinaison::continuous<>(iter2, 1, -1, 1, 2000);
+
   
   datann_derivative d = {&nn, 1, 1};
   
-  for(int i=0;i<2000; i++){
+  for(int i=0;i<5000; i++){
+     data = fann_create_train(4000, 1, 1);
+     for (uint n = 0; n < 4000 ; n++){
+       data->input[n][0]= bib::Utils::rand01()*2-1.;
+       data->output[n][0]= 0;
+     }
+    
+    
      fann_train_epoch_irpropm_gradient(actor.getNeuralNet(), data, derivative_nn, &d);
-     LOG_DEBUG(actor.weight_l1_norm());
+
+     fann_train_epoch_irpropm_gradient(actor2.getNeuralNet(), data, derivative_nn_inverting, &d);
+     if(i%200 == 0)
+      LOG_DEBUG(actor.weight_l1_norm() << " " << actor2.weight_l1_norm());
+     
+     fann_destroy_train(data);
   }
   
   // Test
+  double ac1_error = 0;
+  double ac2_error = 0;
   for (uint n = 0; n < 100 ; n++) {
     double x1 = bib::Utils::rand01()*2 -1;
 
     double out = (x1 * x1)/2;
+    //out = x1 > 0 ? 0 : -1.f;
+    double qout = out*out-(x1*x1)*out;
+    qout = - qout;
+
+    std::vector<double> sens(1);
+    sens[0] = x1;
+    std::vector<double> ac(1);
+    std::vector<double> ac_empty(0);
+    ac[0]= out;
+    
+    EXPECT_GT(nn.computeOutVF(sens, ac), qout - 0.2);
+    EXPECT_LT(nn.computeOutVF(sens, ac), qout + 0.2);
+
+    EXPECT_GT(actor.computeOutVF(sens, ac_empty), out - 0.25);
+    EXPECT_LT(actor.computeOutVF(sens, ac_empty), out + 0.25);
+    
+    EXPECT_GT(actor2.computeOutVF(sens, ac_empty), out - 0.25);
+    EXPECT_LT(actor2.computeOutVF(sens, ac_empty), out + 0.25);
+    
+    LOG_FILE("OptimizeNNTroughGradientOfAnotherNNFann.data", x1 << " " << actor.computeOutVF(sens, ac_empty) << " " <<
+                                                              actor2.computeOutVF(sens, ac_empty)<< " " << out);
+    //clear all; close all; X=load('OptimizeNNTroughGradientOfAnotherNNFann.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');plot(X(:,1),X(:,4), 'go');
+    ac1_error += fabs(out - actor.computeOutVF(sens, ac_empty));
+    ac2_error += fabs(out - actor2.computeOutVF(sens, ac_empty));
+  }
+  
+  ac1_error /= 100;
+  ac2_error /= 100;
+  
+  LOG_DEBUG(ac1_error << " " << ac2_error);
+}
+
+TEST(MLP, OptimizeNNTroughGradientOfAnotherNNFannMinDerivative) {
+  MLP nn(2, 50, 1, 0.0, true);
+  MLP actor(1, 8, 1);
+  
+  MLP actor2(actor);
+  fann_set_activation_function_output(actor.getNeuralNet(), FANN_SIGMOID_SYMMETRIC);
+  fann_set_activation_function_output(actor2.getNeuralNet(), FANN_LINEAR);
+
+  struct fann_train_data* data;
+  if ( !boost::filesystem::exists( "OptimizeNNTroughGradientOfAnotherNNFannMinDerivative.cache.data" ) ){
+    data = fann_create_train(200*200, 2, 1);
+    
+    
+    for(uint n = 0; n < 200*200 ;n++){
+      double x0 = bib::Utils::rand01()*2 -1;
+      double x1 = bib::Utils::rand01()*2 -1;
+      data->input[n][0]= x0;
+      data->input[n][1]= x1;
+
+      data->output[n][0]= x1*x1-(x0*x0)*x1;
+    }
+    
+    
+    nn.learn_stoch(data, 5800, 100, 0.0000001,1000);
+    //nn.learn(data, 300, 0);
+    
+    fann_destroy_train(data);
+    nn.save("OptimizeNNTroughGradientOfAnotherNNFannMinDerivative.cache.data");
+  } else 
+    nn.load("OptimizeNNTroughGradientOfAnotherNNFannMinDerivative.cache.data");
+  
+
+  
+  datann_derivative d = {&nn, 1, 1};
+  
+  for(int i=0;i<1000; i++){
+     data = fann_create_train(400, 1, 1);
+//      uint n = 0;
+//      auto iter2 = [&](const std::vector<double>& x) {
+//         data->input[n][0]= x[0];
+//         data->output[n][0]= x[0];//don't care
+//        n++;
+//      };
+//      bib::Combinaison::continuous<>(iter2, 1, -1, 1, 200);
+     for (uint n = 0; n < 400 ; n++){
+       data->input[n][0]= bib::Utils::rand01()*2-1.;
+       data->output[n][0]= 0;
+     }
+    
+    
+     fann_train_epoch_irpropm_gradient(actor.getNeuralNet(), data, derivative_nn, &d);
+
+     fann_train_epoch_irpropm_gradient(actor2.getNeuralNet(), data, derivative_nn_inverting, &d);
+     if(i%100 == 0)
+      LOG_DEBUG(actor.weight_l1_norm() << " " << actor2.weight_l1_norm());
+     
+     fann_destroy_train(data);
+  }
+  
+  // Test
+  double ac1_error = 0;
+  double ac2_error = 0;
+  for (uint n = 0; n < 100 ; n++) {
+    double x1 = bib::Utils::rand01()*2 -1;
+
+    double out = -1.f; //not about derivative but constraints in [-1; 1]
     double qout = out*out-(x1*x1)*out;
 
     std::vector<double> sens(1);
@@ -1319,14 +1435,24 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNNFann) {
     std::vector<double> ac_empty(0);
     ac[0]= out;
     
-    EXPECT_GT(nn.computeOutVF(sens, ac), qout - 0.1);
-    EXPECT_LT(nn.computeOutVF(sens, ac), qout + 0.1);
+    EXPECT_GT(nn.computeOutVF(sens, ac), qout - 0.25);
+    EXPECT_LT(nn.computeOutVF(sens, ac), qout + 0.25);
 
     EXPECT_GT(actor.computeOutVF(sens, ac_empty), out - 0.2);
     EXPECT_LT(actor.computeOutVF(sens, ac_empty), out + 0.2);
     
-    LOG_FILE("OptimizeNNTroughGradientOfAnotherNNFann.data", x1 << " " << actor.computeOutVF(sens, ac_empty) << " " << out);
+    EXPECT_GT(actor2.computeOutVF(sens, ac_empty), out - 0.2);
+    EXPECT_LT(actor2.computeOutVF(sens, ac_empty), out + 0.2);
+    
+    LOG_FILE("OptimizeNNTroughGradientOfAnotherNNFannMinDerivative.data", x1 << " " << actor.computeOutVF(sens, ac_empty) << " " <<
+                                                              actor2.computeOutVF(sens, ac_empty)<< " " << out);
+    //clear all; close all; X=load('OptimizeNNTroughGradientOfAnotherNNFannMinDerivative.data'); plot(X(:,1),X(:,2), '.'); hold on; plot(X(:,1),X(:,3), 'r.');plot(X(:,1),X(:,4), 'go');
+    ac1_error += fabs(out - actor.computeOutVF(sens, ac_empty));
+    ac2_error += fabs(out - actor2.computeOutVF(sens, ac_empty));
   }
   
-  fann_destroy_train(data);
+  ac1_error /= 100;
+  ac2_error /= 100;
+  
+  LOG_DEBUG(ac1_error << " " << ac2_error);
 }

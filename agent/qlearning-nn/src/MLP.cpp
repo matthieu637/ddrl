@@ -319,7 +319,7 @@ void hs65(int mode, int ndim, const ColumnVector& x, double& fx,
 }
 
 double derivative_nn_easy(double*, double *, int, void*){
-    return -1;
+    return 1.0f;
 }
 
 double derivative_nn(double* input, double *neuron_value, int a_dim, void* data){
@@ -343,4 +343,39 @@ double derivative_nn(double* input, double *neuron_value, int a_dim, void* data)
     delete[] in;
 
     return error_begin[d->n + a_dim];
+}
+
+double derivative_nn_inverting(double* input, double *neuron_value, int a_dim, void* data){
+    datann_derivative* d = (datann_derivative*)data;
+    int il = fann_get_num_input(d->nn->getNeuralNet());
+    
+    fann_type* in = new fann_type[il];
+    for(int i=0;i < d->n ; i++)
+      in[i]=input[i]; 
+    
+    for(int i=0;i < d->m ; i++)
+      in[d->n+i]=neuron_value[i];
+    
+    //TODO:do not compute all vnn for each a_dim
+    fann_run(d->nn->getNeuralNet(), in);
+    fann_compute_MSE_gradient(d->nn->getNeuralNet(), in, derivative_nn_easy, nullptr);
+    fann_backpropagate_MSE_firstlayer(d->nn->getNeuralNet());
+
+    fann_type *error_begin = d->nn->getNeuralNet()->train_errors;
+    
+    delete[] in;
+
+    double diff = error_begin[d->n + a_dim];
+    double output = neuron_value[a_dim];
+    
+    double min = -1.f;
+    double max = 1.f;
+    
+    if (diff > 0) {
+      diff *= (max - output) / (max - min);
+    } else if (diff < 0){
+      diff *= (output - min) / (max - min);
+    }
+
+    return diff ;
 }
