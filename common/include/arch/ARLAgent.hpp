@@ -17,7 +17,7 @@
 namespace arch {
 
 template <typename ProgOptions = AgentProgOptions>
-class ARLAgent : public AAgent<AgentProgOptions> {
+class ARLAgent : public AAgent<ProgOptions> {
  public:
   ARLAgent(uint _nb_motors):returned_ac(_nb_motors), nb_motors(_nb_motors){
     
@@ -109,7 +109,7 @@ class ARLAgent : public AAgent<AgentProgOptions> {
     
     _unique_invoke(inifile, command_args);
     if (command_args->count("load"))
-      load((*command_args)["load"].as<std::string>());
+      this->load((*command_args)["load"].as<std::string>());
   }
   
 protected:
