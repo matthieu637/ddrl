@@ -1,0 +1,36 @@
+# Maintainer: Micah Chambers <micahc.vt@gmail.com>
+
+pkgname=caffe
+pkgver=git
+pkgrel=1
+pkgdesc="Neural network toolkit"
+arch=('x86_64')
+url="https://github.com/BVLC/caffe"
+license=('BSD')
+groups=('base-devel')
+depends=('openblas-lapack' 'hdf5' 'boost' 'protobuf' 'google-glog'
+		 'gflags' 'leveldb' 'snappy' 'lmdb' 'xz>=5' 'gcc5' 'cuda')
+makedepends=('git' 'cmake')
+source=("git+https://github.com/BVLC/caffe.git" "https://matthieu-zimmer.net/~matthieu/patches/caffe-git.patch")
+sha256sums=('SKIP' 'SKIP')
+
+prepare(){
+ cd "${srcdir}"
+ patch -Np0 -i ${pkgname}-${pkgver}.patch
+}
+
+build() {
+    cd "$srcdir/$pkgname"
+    rm -fr build
+    mkdir build
+    cd build
+    cmake ../ -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCMAKE_C_COMPILER=gcc-5 \
+                -DCMAKE_INSTALL_PREFIX=$pkgdir/usr/
+
+    make all -j4
+}
+
+package() {
+        cd "$srcdir/$pkgname/build"
+        make install
+}
