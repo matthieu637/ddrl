@@ -24,7 +24,7 @@ find_package(Caffe REQUIRED)
 find_package(GLOG)
 
 if(${Caffe_CPU_ONLY})
-  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -DCAFFE_CPU_ONLY)
+  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} " -DCAFFE_CPU_ONLY ")
 else()
   find_package(CUDA)
 endif()
