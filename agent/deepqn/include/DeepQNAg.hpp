@@ -117,12 +117,8 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
     vector<double>* next_action = ann->computeOut(sensors);
 
-#warning inverting
-      for(uint i=0;i < nb_motors ; i++)
-        if(next_action->at(i) > 1.f)
-          next_action->at(i)=1.f;
-        else if(next_action->at(i) < -1.f)
-          next_action->at(i)=-1.f;
+    if(shrink_greater_action)
+      shrink_actions(next_action);
     
     if (last_action.get() != nullptr && learning){
       double p0 = 1.f;
@@ -174,8 +170,15 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     noise                   = pt->get<double>("agent.noise");
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
     kMinibatchSize          = pt->get<uint>("agent.mini_batch_size");
-    pure_online             = true;
-    replay_memory           = 50000;
+    pure_online             = pt->get<bool>("agent.pure_online");
+    replay_memory           = pt->get<uint>("agent.replay_memory");
+    inverting_grad          = pt->get<bool>("agent.inverting_grad");
+    shrink_greater_action   = pt->get<bool>("agent.shrink_greater_action");
+    force_more_update       = pt->get<uint>("agent.force_more_update");
+    tau_soft_update         = pt->get<double>("agent.tau_soft_update");
+    alpha_a                 = pt->get<double>("agent.alpha_a");
+    alpha_v                 = pt->get<double>("agent.alpha_v");
+    decay_v                 = pt->get<double>("agent.alpha_v");
     
     if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
@@ -184,10 +187,10 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       caffe::Caffe::SetDevice(0);
     }
     
-    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, 0.0001, kMinibatchSize);
+    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v);
     qnn_target = new MLP(*qnn);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, 0.001, kMinibatchSize);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, !inverting_grad);
     ann_target = new MLP(*ann);
   }
 
@@ -207,6 +210,8 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     for(auto it = vtraj.begin(); it != vtraj.end() ; ++it) {
       sample sm = *it;
       vector<double>* next_action = ann->computeOut(sm.s);
+      if(shrink_greater_action)
+        shrink_actions(next_action);
       
       double p0 = 1.f;
       for(uint i=0;i < nb_motors;i++)
@@ -224,6 +229,8 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       sample sm = *it;
       
       vector<double>* next_action = ann->computeOut(sm.s);
+      if(shrink_greater_action)
+        shrink_actions(next_action);
       
       sum += qnn->computeOutVF(sm.s, *next_action);
       delete next_action;
@@ -252,6 +259,14 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     }
 
   }
+  
+  void shrink_actions(vector<double>* next_action){
+    for(uint i=0;i < nb_motors ; i++)
+      if(next_action->at(i) > 1.f)
+        next_action->at(i)=1.f;
+      else if(next_action->at(i) < -1.f)
+        next_action->at(i)=-1.f;
+  }
 
   void end_episode() override {
     
@@ -268,96 +283,102 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     if(!learning || trajectory.size() < 250)
       return;
     
-    for(uint P=0;P<4;P++)
+    for(uint fupd=0;fupd<1+force_more_update;fupd++)
     {
     
-    std::vector<sample> traj(kMinibatchSize);
-    sample_transition(traj);
-    
-    //compute \pi(s_{t+1})
-    std::vector<double> all_next_states(traj.size() * nb_sensors);
-    std::vector<double> all_states(traj.size() * nb_sensors);
-    std::vector<double> all_actions(traj.size() * nb_motors);
-    uint i=0;
-    for (auto it : traj){
-      std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
-      std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
-      std::copy(it.a.begin(), it.a.end(), all_actions.begin() + i * nb_motors);
-      i++;
-    }
-
-    auto all_next_actions = ann_target->computeOutBatch(all_next_states);
-    //compute next q
-    auto q_targets = qnn_target->computeOutVFBatch(all_next_states, *all_next_actions);
-    delete all_next_actions;
-    
-    //adjust q_targets
-    i=0;
-    for (auto it : traj){
-      if(it.goal_reached)
-        q_targets->at(i) = it.r;
-      else 
-        q_targets->at(i) = it.r + gamma * q_targets->at(i);
+      std::vector<sample> traj(kMinibatchSize);
+      sample_transition(traj);
       
-      if(!pure_online)
-        q_targets->at(i) = 0.5f * q_targets->at(i) + 0.5f*it.onpolicy_target;
-      
-      i++;
-    }
-    
-    //Update critic
-    qnn->InputDataIntoLayers(*qnn->getNN(), all_states.data(), all_actions.data(), q_targets->data(), NULL);
-    qnn->getSolver()->Step(1);
-    
-    //Update actor
-    qnn->ZeroGradParameters();
-    ann->ZeroGradParameters();
-    
-    auto all_actions_outputs = ann->computeOutBatch(all_states);
-//     for(auto a : *all_actions_outputs)
-//       if(a > 1.f || a < -1.f)
-//         LOG_ERROR("aie");
-    delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
-    
-    const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
-    double* q_values_diff = q_values_blob->mutable_cpu_diff();
-    i=0;
-    for (auto it : traj)
-      q_values_diff[q_values_blob->offset(i++,0,0,0)] = -1.0f;
-    qnn->getNN()->BackwardFrom(qnn->GetLayerIndex(MLP::q_values_layer_name));
-    const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
-    double* action_diff = critic_action_blob->mutable_cpu_diff();
-    
-    for (uint n = 0; n < traj.size(); ++n) {
-      for (uint h = 0; h < nb_motors; ++h) {
-        int offset = critic_action_blob->offset(n,0,h,0);
-        double diff = action_diff[offset];
-        double output = all_actions_outputs->at(offset);
-        double min = -1.0; 
-        double max = 1.0;
-        if (diff < 0) {
-          diff *= (max - output) / (max - min);
-        } else if (diff > 0) {
-          diff *= (output - min) / (max - min);
-        }
-        action_diff[offset] = diff;
+      //compute \pi(s_{t+1})
+      std::vector<double> all_next_states(traj.size() * nb_sensors);
+      std::vector<double> all_states(traj.size() * nb_sensors);
+      std::vector<double> all_actions(traj.size() * nb_motors);
+      uint i=0;
+      for (auto it : traj){
+        std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
+        std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
+        std::copy(it.a.begin(), it.a.end(), all_actions.begin() + i * nb_motors);
+        i++;
       }
+
+      auto all_next_actions = ann_target->computeOutBatch(all_next_states);
+      if(shrink_greater_action)
+        shrink_actions(all_next_actions);
+        
+      //compute next q
+      auto q_targets = qnn_target->computeOutVFBatch(all_next_states, *all_next_actions);
+      delete all_next_actions;
+      
+      //adjust q_targets
+      i=0;
+      for (auto it : traj){
+        if(it.goal_reached)
+          q_targets->at(i) = it.r;
+        else 
+          q_targets->at(i) = it.r + gamma * q_targets->at(i);
+        
+        if(!pure_online)
+          q_targets->at(i) = 0.5f * q_targets->at(i) + 0.5f*it.onpolicy_target;
+        
+        i++;
+      }
+      
+      //Update critic
+      qnn->InputDataIntoLayers(*qnn->getNN(), all_states.data(), all_actions.data(), q_targets->data(), NULL);
+      qnn->getSolver()->Step(1);
+      
+      //Update actor
+      qnn->ZeroGradParameters();
+      ann->ZeroGradParameters();
+      
+      auto all_actions_outputs = ann->computeOutBatch(all_states);
+      if(shrink_greater_action)
+        shrink_actions(all_actions_outputs);
+
+      delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
+      
+      const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
+      double* q_values_diff = q_values_blob->mutable_cpu_diff();
+      i=0;
+      for (auto it : traj)
+        q_values_diff[q_values_blob->offset(i++,0,0,0)] = -1.0f;
+      qnn->getNN()->BackwardFrom(qnn->GetLayerIndex(MLP::q_values_layer_name));
+      const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
+      
+      if(inverting_grad){
+        double* action_diff = critic_action_blob->mutable_cpu_diff();
+        
+        for (uint n = 0; n < traj.size(); ++n) {
+          for (uint h = 0; h < nb_motors; ++h) {
+            int offset = critic_action_blob->offset(n,0,h,0);
+            double diff = action_diff[offset];
+            double output = all_actions_outputs->at(offset);
+            double min = -1.0; 
+            double max = 1.0;
+            if (diff < 0) {
+              diff *= (max - output) / (max - min);
+            } else if (diff > 0) {
+              diff *= (output - min) / (max - min);
+            }
+            action_diff[offset] = diff;
+          }
+        }
+      }
+      
+      // Transfer input-level diffs from Critic to Actor
+      const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
+      actor_actions_blob->ShareDiff(*critic_action_blob);
+      ann->getNN()->BackwardFrom(ann->GetLayerIndex("action_layer"));
+      ann->getSolver()->ApplyUpdate();
+      ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+      
+      // Soft update of targets networks
+      qnn_target->soft_update(*qnn, tau_soft_update);
+      ann_target->soft_update(*ann, tau_soft_update);
+      
+      delete q_targets;
+      delete all_actions_outputs;
     }
-    
-    // Transfer input-level diffs from Critic to Actor
-    const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
-    actor_actions_blob->ShareDiff(*critic_action_blob);
-    ann->getNN()->BackwardFrom(ann->GetLayerIndex("action_layer"));
-    ann->getSolver()->ApplyUpdate();
-    ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
-    
-    // Soft update of targets networks
-    qnn_target->soft_update(*qnn, 0.001);
-    ann_target->soft_update(*ann, 0.001);
-    
-    delete q_targets;
-    delete all_actions_outputs;
-  }
   
   }
   
@@ -397,13 +418,19 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   uint nb_sensors;
 
   double noise;
+  double tau_soft_update;
+  double alpha_a; 
+  double alpha_v;
+  double decay_v;
+  
   bool gaussian_policy;
   std::vector<uint>* hidden_unit_q;
   std::vector<uint>* hidden_unit_a;
   uint kMinibatchSize;
   uint replay_memory;
+  uint force_more_update;
   
-  bool learning, pure_online;
+  bool learning, pure_online, inverting_grad, shrink_greater_action;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

@@ -21,8 +21,8 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
   
-//   arch::Simulator<AdvancedAcrobotEnv, DeepQNAg> s;
-  arch::Simulator<AdvancedAcrobotEnv, NeuralFittedACAg> s;
+  arch::Simulator<AdvancedAcrobotEnv, DeepQNAg> s;
+//   arch::Simulator<AdvancedAcrobotEnv, NeuralFittedACAg> s;
 
   s.init(argc, argv);
 

@@ -111,9 +111,9 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       LOG_INFO("GPU mode");
     }
     
-    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, 0.0001, kMinibatchSize);
+    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, 0.0001, kMinibatchSize, -1);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, 0.0001, kMinibatchSize);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, 0.001, kMinibatchSize, false);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool _learning) override {
@@ -210,12 +210,16 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       i++;
     }
     
+#warning reset critic
+    delete qnn;
+    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, 0.0001, kMinibatchSize, -1);
+    
     //Update critic
     qnn->InputDataIntoLayers(*qnn->getNN(), all_states.data(), all_actions.data(), q_targets->data(), NULL);
 //     LOG_DEBUG("begin");
 //     for(uint t=0;t<100;t++){
 //       LOG_DEBUG(qnn->error());
-    qnn->getSolver()->Step(1);
+    qnn->getSolver()->Step(50);
     
 //     }
     
@@ -336,7 +340,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " " << std::setw(8) <<
     std::fixed << std::setprecision(5) << noise << " " << trajectory.size() << " " << ann->weight_l1_norm() << " " 
-    << std::fixed << std::setprecision(7) << qnn->error();
+    << std::fixed << std::setprecision(7) << qnn->error() << " " << qnn->weight_l1_norm();
   }
 
   void _dump(std::ostream& out) const override {

@@ -34,7 +34,7 @@ class MLP {
 
   constexpr static auto kStateInputCount = 1;
    
-  MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha, uint _kMinibatchSize) : size_input_state(input),
+  MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha, uint _kMinibatchSize, double decay_v) : size_input_state(input),
     size_sensors(sensors), size_motors(size_input_state - sensors), kMinibatchSize(_kMinibatchSize) {
 
       caffe::SolverParameter solver_param;
@@ -62,8 +62,10 @@ class MLP {
       solver_param.set_max_iter(10000000);
       solver_param.set_base_lr(alpha);
       solver_param.set_lr_policy("fixed");
-      solver_param.set_momentum(0.95);
-      solver_param.set_momentum2(0.999);
+//       solver_param.set_momentum(0.95);
+//       solver_param.set_momentum2(0.999);
+      if(!(decay_v < 0)) //-1
+        solver_param.set_weight_decay(decay_v);
       solver_param.set_clip_gradients(10);
       
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
@@ -72,7 +74,8 @@ class MLP {
 //       LOG_DEBUG("param critic : " <<  neural_net->params().size());
   }
   
-  MLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize) : size_input_state(sensors),
+  MLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize, 
+      bool add_last_RELU_layer) : size_input_state(sensors),
     size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize) {
 
       caffe::SolverParameter solver_param;
@@ -85,7 +88,12 @@ class MLP {
                   boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
       SilenceLayer(net_param_init, "silence", {"dummy1"}, {}, boost::none);
       std::string tower_top = Tower(net_param_init, "", states_blob_name, hiddens);
-      IPLayer(net_param_init, "action_layer", {tower_top}, {actions_blob_name}, boost::none, motors);
+      if(!add_last_RELU_layer)
+        IPLayer(net_param_init, "action_layer", {tower_top}, {actions_blob_name}, boost::none, motors);
+      else {
+        IPLayer(net_param_init, "action_layer_ip", {tower_top}, {"last_relu"}, boost::none, motors);
+        ReluLayer(net_param_init, "action_layer", {"last_relu"}, {actions_blob_name}, boost::none);
+      }
       
       net_param->CopyFrom(net_param_init);
       
@@ -93,8 +101,8 @@ class MLP {
       solver_param.set_max_iter(10000000);
       solver_param.set_base_lr(alpha);
       solver_param.set_lr_policy("fixed");
-      solver_param.set_momentum(0.95);
-      solver_param.set_momentum2(0.999);
+//       solver_param.set_momentum(0.95);
+//       solver_param.set_momentum2(0.999);
       solver_param.set_clip_gradients(10);
       
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
