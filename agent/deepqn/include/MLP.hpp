@@ -13,8 +13,7 @@
 #include <caffe/caffe.hpp>
 #include <caffe/layers/memory_data_layer.hpp>
 
-// #warning CPU_ONLY
-// #define CPU_ONLY
+//depends on CAFFE_CPU_ONLY
 
 class MLP {
  public:
@@ -35,7 +34,7 @@ class MLP {
 
   constexpr static auto kStateInputCount = 1;
    
-  MLP(unsigned int input, unsigned int sensors, std::vector<uint> hiddens, double alpha, uint _kMinibatchSize) : size_input_state(input),
+  MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha, uint _kMinibatchSize) : size_input_state(input),
     size_sensors(sensors), size_motors(size_input_state - sensors), kMinibatchSize(_kMinibatchSize) {
 
       caffe::SolverParameter solver_param;
@@ -70,10 +69,10 @@ class MLP {
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
       neural_net = solver->net();
       
-      LOG_DEBUG("param critic : " <<  neural_net->params().size());
+//       LOG_DEBUG("param critic : " <<  neural_net->params().size());
   }
   
-  MLP(unsigned int sensors, std::vector<uint> hiddens, unsigned int motors, double alpha, uint _kMinibatchSize) : size_input_state(sensors),
+  MLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize) : size_input_state(sensors),
     size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize) {
 
       caffe::SolverParameter solver_param;
@@ -101,7 +100,7 @@ class MLP {
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
       neural_net = solver->net();
       
-      LOG_DEBUG("actor critic : " <<  neural_net->params().size());
+//       LOG_DEBUG("actor critic : " <<  neural_net->params().size());
   }
   
   MLP(const MLP& m) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors), kMinibatchSize(m.kMinibatchSize){
@@ -117,6 +116,31 @@ class MLP {
   virtual ~MLP() {
     delete solver;
   }
+  
+  
+//   void randomizeWeights(const std::vector<uint>& hiddens){
+//     //TODO: better
+//     caffe::NetParameter net_param_init;
+//     net_param_init.set_name("Critic");
+//     net_param_init.set_force_backward(true);
+//     MemoryDataLayer(net_param_init, state_input_layer_name, {states_blob_name,"dummy1"},
+//                 boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
+//     MemoryDataLayer(net_param_init, action_input_layer_name, {actions_blob_name,"dummy2"},
+//                 boost::none, {kMinibatchSize, kStateInputCount, size_motors, 1});
+//     MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy3"},
+//                 boost::none, {kMinibatchSize, 1, 1, 1});
+//     SilenceLayer(net_param_init, "silence", {"dummy1","dummy2","dummy3"}, {}, boost::none);
+//     ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {"state_actions"}, boost::none, 2);
+//     std::string tower_top = Tower(net_param_init, "", "state_actions", hiddens);
+//     IPLayer(net_param_init, q_values_layer_name, {tower_top}, {q_values_blob_name}, boost::none, 1);
+//     EuclideanLossLayer(net_param_init, "loss", {q_values_blob_name, targets_blob_name},
+//                       {loss_blob_name}, boost::none);
+//     
+//     caffe::NetParameter* net_param = solver_param.mutable_net_param();
+//     neural_net.reset(new caffe::Net<double>(net_param));
+// //     neural_net->Init(net_param_init);
+//     
+//   }
   
   void increase_batchsize(uint new_batch_size){
     kMinibatchSize = new_batch_size;
@@ -228,7 +252,7 @@ class MLP {
           weights = blob->cpu_data();
           break;
         case caffe::Caffe::GPU:
-#ifndef CPU_ONLY
+#ifndef CAFFE_CPU_ONLY
           weights = blob->gpu_data();
 #else
           LOG_ERROR("cannot be called");
@@ -505,7 +529,7 @@ class MLP {
           break;
 
         case caffe::Caffe::GPU:
-#ifndef CPU_ONLY
+#ifndef CAFFE_CPU_ONLY
           caffe::caffe_gpu_set(blob->count(), static_cast<double>(0),
                               blob->mutable_gpu_diff());
 #else

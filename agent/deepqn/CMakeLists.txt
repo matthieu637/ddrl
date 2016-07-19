@@ -19,13 +19,18 @@ find_package(Boost COMPONENTS serialization filesystem system program_options th
 find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(Cartpole)
-find_package(CUDA)
-find_package(GLOG)
 find_package(Protobuf REQUIRED)
-find_package(Caffe)
+find_package(Caffe REQUIRED)
+find_package(GLOG)
+
+if(${Caffe_CPU_ONLY})
+  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -DCAFFE_CPU_ONLY)
+else()
+  find_package(CUDA)
+endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include 
-  ${Boost_INCLUDE_DIRS} ${FANN_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${GLOG_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS} ${Caffe_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${GLOG_INCLUDE_DIRS}
   ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} )
 
 
@@ -35,7 +40,7 @@ file ( GLOB all_sources src/*.cpp src/*.c)
 add_executable(adacrobot src/test/Adacrobot.cpp ${all_include} ${all_sources} )
 target_link_libraries(adacrobot 
   ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} 
-  ${Boost_LIBRARIES} ${CUDA_LIBRARIES} ${PROTOBUF_LIBRARIES} ${GLOG_LIBRARIES} ${CAFFE_LIBRARY} )
+  ${Boost_LIBRARIES} ${CUDA_LIBRARIES} ${PROTOBUF_LIBRARIES} ${GLOG_LIBRARIES} ${Caffe_LIBRARIES} )
 
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 #file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
