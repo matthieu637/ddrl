@@ -25,7 +25,7 @@ find_package(GLOG)
 find_package(CUDA)
 
 if(${Caffe_CPU_ONLY})
-  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} " -DCAFFE_CPU_ONLY ")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCAFFE_CPU_ONLY ")
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include 
