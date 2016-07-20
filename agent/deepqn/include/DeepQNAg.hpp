@@ -182,9 +182,11 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     
     if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
+      LOG_INFO("CPU mode");
     } else {
       caffe::Caffe::set_mode(caffe::Caffe::Brew::GPU);
       caffe::Caffe::SetDevice(0);
+      LOG_INFO("GPU mode");
     }
     
     qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v);
