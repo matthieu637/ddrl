@@ -187,13 +187,15 @@ class MLP {
   }
 
   double computeOutVF(const std::vector<double>& sensors, const std::vector<double>& motors) {
-    std::vector<double> states_input(size_sensors, 0.0f);
+    std::vector<double> states_input(size_sensors * kMinibatchSize, 0.0f);
     std::copy(sensors.begin(), sensors.end(),states_input.begin());
     
-    std::vector<double> actions_input(size_motors, 0.0f);
+    std::vector<double> actions_input(size_motors * kMinibatchSize, 0.0f);
     std::copy(motors.begin(), motors.end(),actions_input.begin());
+    
+    std::vector<double> target_input(kMinibatchSize, 0.0f);
 
-    InputDataIntoLayers(*neural_net, states_input.data(), actions_input.data(), NULL, NULL);
+    InputDataIntoLayers(*neural_net, states_input.data(), actions_input.data(), target_input.data(), NULL);
     neural_net->Forward(nullptr);
     
     const auto actions_blob = neural_net->blob_by_name(actions_blob_name);
@@ -202,7 +204,7 @@ class MLP {
   }
   
   std::vector<double>* computeOutVFBatch(std::vector<double>& sensors, std::vector<double>& motors) {
-    std::vector<double> target_input(kMinibatchSize * size_motors, 0.0f);
+    std::vector<double> target_input(kMinibatchSize, 0.0f);
     
     InputDataIntoLayers(*neural_net, sensors.data(), motors.data(), target_input.data(), NULL);
     neural_net->Forward(nullptr);
@@ -218,7 +220,7 @@ class MLP {
   }
   
   std::vector<double>* computeOut(const std::vector<double>& states_batch) {
-    std::vector<double> states_input(size_input_state, 0.0f);
+    std::vector<double> states_input(size_input_state * kMinibatchSize, 0.0f);
     std::copy(states_batch.begin(), states_batch.end(),states_input.begin());
 
     InputDataIntoLayers(*neural_net, states_input.data(), NULL, NULL, NULL);
