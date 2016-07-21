@@ -30,8 +30,8 @@ class Simulator {
   //     a base of AAgent.");
 
  public:
-  Simulator() : max_episode(0), test_episode_per_episode(0), test_episode_at_end(0),
-    dump_log_each(0), display_log_each(0), save_agent_each(0), properties(nullptr),
+  Simulator(uint _config_file_index=0) : max_episode(0), test_episode_per_episode(0), test_episode_at_end(0),
+    dump_log_each(0), display_log_each(0), save_agent_each(0), config_file_index(_config_file_index), properties(nullptr),
     command_args(nullptr), time_spend(), env(nullptr), agent(nullptr) {}
 
   virtual ~Simulator() {
@@ -51,11 +51,13 @@ class Simulator {
 
   void init(int argc, char** argv) {
     string config_file = DEFAULT_CONFIG_FILE;
+    if(config_file_index != 0)
+      config_file = DEFAULT_CONFIG_FILE_BEGIN + std::to_string(config_file_index) + DEFAULT_CONFIG_FILE_END;
     readCommandArgs(argc, argv, &config_file);
     readConfig(config_file);
   }
 
-  void run() {
+  void run(Agent* early_stage=nullptr) {
     ASSERT(well_init, "Please call init() first on Simulator");
 
     env = new Environment;
@@ -63,6 +65,9 @@ class Simulator {
 
     agent = new Agent(env->number_of_actuators(), env->number_of_sensors());
     agent->unique_invoke(properties, command_args);
+    if(early_stage != nullptr){
+      agent->provide_early_development(early_stage);
+    }
     
     Stat stat;
 
@@ -86,6 +91,10 @@ class Simulator {
     delete env;
 
     LOG_FILE(DEFAULT_END_FILE, "" << (double)(time_spend.finish() / 60.f));  // in minutes
+  }
+  
+  Agent* getAgent(){
+    return agent;
   }
 
  protected:
@@ -183,7 +192,7 @@ class Simulator {
     desc.add(Environment::program_options());
     desc.add(Agent::program_options());
     desc.add_options()
-    ("config", po::value<string>(), "set the config file to load [default : config.ini]")
+    ("config", po::value<std::vector<string>>(), "set the config file to load [default : config.ini]")
     ("help", "produce help message");
 
     command_args = new po::variables_map;
@@ -198,11 +207,11 @@ class Simulator {
     }
 
     if (command_args->count("config")) {
-      *s = (*command_args)["config"].as<string>();
+      *s = (*command_args)["config"].as<std::vector<string>>()[config_file_index];
     }
   }
 
-  void readConfig(string config_file = DEFAULT_CONFIG_FILE) {
+  void readConfig(const string& config_file) {
     properties = new boost::property_tree::ptree;
     boost::property_tree::ini_parser::read_ini(config_file, *properties);
 
@@ -237,6 +246,7 @@ class Simulator {
   bool display_learning;
 
 protected:
+  uint config_file_index;
   boost::property_tree::ptree* properties;
   boost::program_options::variables_map* command_args;
 

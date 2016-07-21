@@ -32,6 +32,10 @@ target_link_libraries(${LIBRARY_NAME} ${Boost_LIBRARIES})
 #-------------------
 add_executable(dummy-simulator src/test/DummySimulator.cpp ${all_include} ${all_sources})
 target_link_libraries(dummy-simulator ${Boost_LIBRARIES})
+
+add_executable(dpmt-dummy-simulator src/test/DpmtDummySimulator.cpp ${all_include} ${all_sources})
+target_link_libraries(dpmt-dummy-simulator ${Boost_LIBRARIES})
+
 file(COPY data/minimal_config.ini DESTINATION . ) 
 file(RENAME ${CMAKE_CURRENT_BINARY_DIR}/minimal_config.ini ${CMAKE_CURRENT_BINARY_DIR}/config.ini)
 

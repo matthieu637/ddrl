@@ -107,6 +107,8 @@ class AAgent : public ProgOptions, public CommonAE {
     if (command_args->count("load"))
       load((*command_args)["load"].as<std::string>());
   }
+  
+  virtual void provide_early_development(AAgent* ){}
 
  protected:
   /**
