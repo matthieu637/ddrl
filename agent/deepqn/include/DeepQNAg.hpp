@@ -178,7 +178,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     tau_soft_update         = pt->get<double>("agent.tau_soft_update");
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
-    decay_v                 = pt->get<double>("agent.alpha_v");
+    decay_v                 = pt->get<double>("agent.decay_v");
     
     if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
