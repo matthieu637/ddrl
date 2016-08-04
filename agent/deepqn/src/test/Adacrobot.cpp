@@ -18,11 +18,11 @@ int main(int argc, char **argv) {
 //   gflags::SetVersionString("0.1");
 //   gflags::ParseCommandLineFlags(&argc, &argv, true);
   
+  FLAGS_minloglevel = 2;
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
   
   arch::Simulator<AdvancedAcrobotEnv, DeepQNAg> s;
-//   arch::Simulator<AdvancedAcrobotEnv, NeuralFittedACAg> s;
 
   s.init(argc, argv);
 
