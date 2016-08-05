@@ -30,6 +30,10 @@ target_link_libraries(adacrobot ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} $
 add_executable(cartpole src/test/Cartpole.cpp ${all_include} ${all_sources} )
 target_link_libraries(cartpole ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
 
+add_executable(dpmt-adacrobot src/test/DpmtAdacrobot.cpp ${all_include} ${all_sources} )
+target_link_libraries(dpmt-adacrobot ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
+
+
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

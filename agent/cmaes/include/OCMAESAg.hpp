@@ -1,5 +1,5 @@
-#ifndef CMAESAG_HPP
-#define CMAESAG_HPP
+#ifndef OCMAESAG_HPP
+#define OCMAESAG_HPP
 
 #include <vector>
 #include <string>
@@ -18,16 +18,149 @@
 #include <bib/XMLEngine.hpp>
 #include <bib/Combinaison.hpp>
 #include "MLP.hpp"
+#include "CMAESAg.hpp"
 #include "cmaes_interface.h"
 
-class CMAESAg : public arch::AACAgent<MLP> {
+template <typename Policy>
+class DpmtStructure
+{
+public:
+  DpmtStructure(uint _old_input_size, uint _new_input_size) : 
+    old_input_size(_old_input_size), final_input_size(_new_input_size),
+    old_input(_old_input_size), final_input(final_input_size) {
+
+    LOG_INFO("DONT ADD TIME IN STATE");
+  }    
+  virtual void extract_old_input(const std::vector<double>& sensors) = 0;
+  virtual void extract_final_input(Policy* old_policy, const std::vector<double>& sensors) = 0;
+  virtual void initialize(Policy* _new, Policy* _old) { 
+    (void) _new;
+    (void) _old;
+  }
+  
+  uint final_input_size;
+  std::vector<double> final_input;
+  
+protected:
+  std::vector<double> old_input;
+  uint old_input_size;
+};
+
+template <typename Policy>
+class AugmentedDpmtStructure : public DpmtStructure<Policy> {
+public:
+  AugmentedDpmtStructure(uint _new_input_size) : 
+    DpmtStructure<Policy>(0, _new_input_size)
+  {
+
+  }
+  
+  void initialize(Policy* _new, Policy* _old) override { 
+    _new->initializeFrom(_old);
+  }
+    
+  void extract_old_input(const std::vector<double>& sensors) override {
+    
+  }
+  
+  void extract_final_input(Policy* old_policy, const std::vector<double>& sensors) override {
+    this->final_input = sensors;
+  }
+
+};
+
+template <typename Policy>
+class SimpleDpmtStructure : public DpmtStructure<Policy> {
+public:
+  SimpleDpmtStructure(uint _old_input_size, uint _old_output_size, uint _new_input_size) : 
+    DpmtStructure<Policy>(_old_input_size, _old_output_size + _new_input_size - _old_input_size)
+  {
+
+  }                                                           
+    
+  void extract_old_input(const std::vector<double>& sensors) override {
+    std::copy(sensors.begin(), sensors.begin() + this->old_input.size(), this->old_input.begin());
+  }
+  
+  void extract_final_input(Policy* old_policy, const std::vector<double>& sensors) override {
+    vector<double>* sub_next_output = old_policy->computeOut(this->old_input);
+    
+    //outputs of old NN
+    std::copy(sub_next_output->begin(), sub_next_output->end(), this->final_input.begin());
+    //new sensors
+    std::copy(sensors.begin() + this->old_input_size, sensors.end(), this->final_input.begin() + sub_next_output->size());
+    
+    delete sub_next_output;
+  }
+};
+
+
+template <typename Policy>
+class SFullyDpmtStructure : public DpmtStructure<Policy> {
+public:
+  SFullyDpmtStructure(uint _old_input_size, uint _old_output_size, uint _new_input_size) : 
+    DpmtStructure<Policy>(_old_input_size, _old_output_size + _new_input_size)
+  {
+
+  }
+    
+  void extract_old_input(const std::vector<double>& sensors) override {
+    std::copy(sensors.begin(), sensors.begin() + this->old_input.size(), this->old_input.begin());
+  }
+  
+  void extract_final_input(Policy* old_policy, const std::vector<double>& sensors) override {
+    vector<double>* sub_next_output = old_policy->computeOut(this->old_input);
+    
+    //all sensors
+    std::copy(sensors.begin(), sensors.end(), this->final_input.begin());
+    //outputs of old NN
+    std::copy(sub_next_output->begin(), sub_next_output->end(), this->final_input.begin() + sensors.size());
+    
+    delete sub_next_output;
+  }
+};
+
+template <typename Policy>
+class FullyDpmtStructure : public DpmtStructure<Policy> {
+public:
+  FullyDpmtStructure(uint _old_input_size, uint _old_output_size, uint _new_input_size, Policy* old_policy) : 
+    DpmtStructure<Policy>(_old_input_size, _old_output_size + _new_input_size + old_policy->getNumberHiddenNeurons()) 
+  {
+
+  }
+    
+  void extract_old_input(const std::vector<double>& sensors) override {
+    std::copy(sensors.begin(), sensors.begin() + this->old_input.size(), this->old_input.begin());
+  }
+  
+  void extract_final_input(Policy* old_policy, const std::vector<double>& sensors) override {
+    vector<double>* sub_next_output = old_policy->computeOut(this->old_input);
+    
+    //all sensors
+    std::copy(sensors.begin(), sensors.end(), this->final_input.begin());
+    //outputs of old NN
+    std::copy(sub_next_output->begin(), sub_next_output->end(), this->final_input.begin() + sensors.size());
+    //hidden neurones of old NN
+    std::vector<double> hiddens(old_policy->getNumberHiddenNeurons());
+    old_policy->getHiddenNeurons(hiddens);
+    std::copy(hiddens.begin(), hiddens.end(), this->final_input.begin() + sensors.size() + sub_next_output->size());
+    
+    
+    delete sub_next_output;
+  }
+};
+
+class OCMAESAg : public arch::AACAgent<MLP> {
+  
+  friend class CMAESAg;
+  
  public:
-  CMAESAg(unsigned int _nb_motors, unsigned int _nb_sensors)
+  OCMAESAg(unsigned int _nb_motors, unsigned int _nb_sensors)
     : AACAgent(_nb_motors), nb_sensors(_nb_sensors){
 
   }
 
-  virtual ~CMAESAg() {
+  virtual ~OCMAESAg() {
     cmaes_exit(evo);
     delete evo;
     delete ann;
@@ -36,7 +169,9 @@ class CMAESAg : public arch::AACAgent<MLP> {
   const std::vector<double>& _run(double , const std::vector<double>& sensors,
                                  bool learning, bool, bool) {
 
-    vector<double>* next_action = ann->computeOut(sensors);
+    d->extract_old_input(sensors);
+    d->extract_final_input(old_ag->ann, sensors);
+    vector<double>* next_action = ann->computeOut(d->final_input);
 
     if(learning) {
       if(gaussian_policy){
@@ -54,7 +189,8 @@ class CMAESAg : public arch::AACAgent<MLP> {
     return *next_action;
   }
 
-
+  DpmtStructure<MLP>* d;
+  
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
     hidden_unit_a         = pt->get<int>("agent.hidden_unit_a");
     lecun_activation      = pt->get<bool>("agent.lecun_activation");
@@ -63,19 +199,26 @@ class CMAESAg : public arch::AACAgent<MLP> {
     policy_stochasticity  = pt->get<double>("agent.policy_stochasticity");
     
     
+//     d = new SFullyDpmtStructure<MLP>(old_ag->nb_sensors, old_ag->getNbMotors(), nb_sensors);
+//     d = new SimpleDpmtStructure<MLP>(old_ag->nb_sensors, old_ag->getNbMotors(), nb_sensors);
+//     d = new FullyDpmtStructure<MLP>(old_ag->nb_sensors, old_ag->getNbMotors(), nb_sensors, old_ag->ann);
+    d = new AugmentedDpmtStructure<MLP>(nb_sensors);
+    
     if(hidden_unit_a == 0){
       LOG_ERROR("Linear MLP");
       exit(1);
 //       ann = new LinMLP(nb_sensors , nb_motors, 0.0, lecun_activation);
     }
      else {
-      ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
+      ann = new MLP(d->final_input_size, hidden_unit_a, nb_motors, lecun_activation);
       fann_set_training_algorithm(ann->getNeuralNet(), FANN_TRAIN_INCREMENTAL);
+      d->initialize(ann, old_ag->ann);
     }
     
     struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(ann->getNeuralNet()), sizeof(struct fann_connection));
     fann_get_connection_array(ann->getNeuralNet(), connections);
-    const uint dimension = (nb_sensors+1)*hidden_unit_a + (hidden_unit_a+1)*nb_motors;
+//     const uint dimension = (nb_sensors+1)*hidden_unit_a + (hidden_unit_a+1)*nb_motors;
+    const uint dimension = (d->final_input_size+1)*hidden_unit_a + (hidden_unit_a+1)*nb_motors;
     double* startx  = new double[dimension];
     double* deviation  = new double[dimension];
     for(uint j=0; j< dimension; j++){
@@ -138,15 +281,21 @@ class CMAESAg : public arch::AACAgent<MLP> {
 	parameters = pop[current_individual];
       else
 	parameters = cmaes_GetPtr(evo, "xbestever");
+      const uint dimension = (uint) cmaes_Get(evo, "dim");
       
-      loadPolicyParameters(parameters);
+      struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(ann->getNeuralNet()), sizeof(struct fann_connection));
+      fann_get_connection_array(ann->getNeuralNet(), connections);
+      
+  //     LOG_DEBUG("DIM: " <<dimension << " " << fann_get_total_connections(ann->getNeuralNet()));
+      ASSERT(dimension == fann_get_total_connections(ann->getNeuralNet()), "dimension mismatch");
+      for(uint j=0; j< dimension; j++)
+	connections[j].weight=parameters[j];
+      
+      fann_set_weight_array(ann->getNeuralNet(), connections, dimension);
+      free(connections);
+      //bib::Logger::PRINT_ELEMENTS(parameters, dimension);
     }
     //LOG_FILE("policy_exploration", ann->hash());
-  }
-  
-  void restoreBest() {
-    const double* parameters = cmaes_GetPtr(evo, "xbestever");
-    loadPolicyParameters(parameters);
   }
 
   void end_episode() override {
@@ -211,6 +360,10 @@ class CMAESAg : public arch::AACAgent<MLP> {
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
       return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, policy_stochasticity, decision_each);
   }
+  
+  void provide_early_development(AAgent<>* _old_ag) override {
+    old_ag= static_cast<CMAESAg *>(_old_ag);
+  }
 
  protected:
   void _display(std::ostream& out) const override {
@@ -221,29 +374,7 @@ class CMAESAg : public arch::AACAgent<MLP> {
     out << " " << std::setw(8) << std::fixed << std::setprecision(5) << sum_weighted_reward;
   }
 
-private:
-  void loadPolicyParameters(const double* parameters){
-    const uint dimension = (uint) cmaes_Get(evo, "dim");
-    struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(ann->getNeuralNet()), sizeof(struct fann_connection));
-    fann_get_connection_array(ann->getNeuralNet(), connections);
-    
-//     LOG_DEBUG("DIM: " <<dimension << " " << fann_get_total_connections(ann->getNeuralNet()));
-    ASSERT(dimension == fann_get_total_connections(ann->getNeuralNet()), "dimension mismatch");
-    for(uint j=0; j< dimension; j++)
-      connections[j].weight=parameters[j];
-    
-    fann_set_weight_array(ann->getNeuralNet(), connections, dimension);
-    free(connections);
-    
-    //bib::Logger::PRINT_ELEMENTS(parameters, dimension);
-  }
-  
-//  private:
-public://TODO rm me
-  uint getNbMotors(){
-    return nb_motors;
-  }
-  
+ private:
   uint nb_sensors;
 
   double policy_stochasticity;
@@ -262,6 +393,8 @@ public://TODO rm me
   bool justLoaded = false;
   bool cmaes_UpdateDistribution_done_once = false;
   uint current_individual;
+  
+  CMAESAg* old_ag = nullptr;
 };
 
 #endif
