@@ -174,6 +174,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     replay_memory           = pt->get<uint>("agent.replay_memory");
     inverting_grad          = pt->get<bool>("agent.inverting_grad");
     shrink_greater_action   = pt->get<bool>("agent.shrink_greater_action");
+    sure_shrink 	    = pt->get<bool>("agent.sure_shrink");
     force_more_update       = pt->get<uint>("agent.force_more_update");
     tau_soft_update         = pt->get<double>("agent.tau_soft_update");
     alpha_a                 = pt->get<double>("agent.alpha_a");
@@ -282,7 +283,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       last_trajectory.clear();
     }
     
-    if(!learning || trajectory.size() < 250)
+    if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
       return;
     
     for(uint fupd=0;fupd<1+force_more_update;fupd++)
@@ -334,7 +335,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       ann->ZeroGradParameters();
       
       auto all_actions_outputs = ann->computeOutBatch(all_states);
-      if(shrink_greater_action)
+      if(shrink_greater_action && sure_shrink)
         shrink_actions(all_actions_outputs);
 
       delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
@@ -432,7 +433,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   uint replay_memory;
   uint force_more_update;
   
-  bool learning, pure_online, inverting_grad, shrink_greater_action;
+  bool learning, pure_online, inverting_grad, shrink_greater_action,sure_shrink;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
