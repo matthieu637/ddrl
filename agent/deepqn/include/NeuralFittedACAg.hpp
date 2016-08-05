@@ -41,13 +41,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
                                  bool learning, bool goal_reached, bool) {
 
     vector<double>* next_action = ann->computeOut(sensors);
-
-#warning inverting
-      for(uint i=0;i < nb_motors ; i++)
-        if(next_action->at(i) > 1.f)
-          next_action->at(i)=1.f;
-        else if(next_action->at(i) < -1.f)
-          next_action->at(i)=-1.f;
+    shrink_actions(next_action);
     
     if (last_action.get() != nullptr && learning){
       double p0 = 1.f;
@@ -82,25 +76,35 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
   void insertSample(const sample& sa){
     
-    if(pure_online){
+    if(!on_policy_update){
       if(trajectory.size() >= replay_memory)
         trajectory.pop_front();
       trajectory.push_back(sa);
       
-//       end_episode();//not here
+      if(force_online_update)
+        end_episode();
+      
     } else {
       last_trajectory.push_back(sa);
     }
   }
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* command_args) override {
-    hidden_unit_q           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_q"));
-    hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
-    noise                   = pt->get<double>("agent.noise");
-    gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
-    kMinibatchSize          = pt->get<uint>("agent.mini_batch_size");
-    pure_online             = true;
-    replay_memory           = 50000;
+    hidden_unit_q               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_q"));
+    hidden_unit_a               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
+    noise                       = pt->get<double>("agent.noise");
+    gaussian_policy             = pt->get<bool>("agent.gaussian_policy");
+    kMinibatchSize              = 128; //don't care it will increase
+    on_policy_update            = pt->get<bool>("agent.on_policy_update");
+    replay_memory               = pt->get<uint>("agent.replay_memory");
+    reset_qnn                   = pt->get<bool>("agent.reset_qnn");
+    force_online_update         = pt->get<bool>("agent.force_online_update");
+    nb_actor_updates            = pt->get<uint>("agent.nb_actor_updates");
+    nb_critic_updates           = pt->get<uint>("agent.nb_critic_updates");
+    nb_fitted_updates           = pt->get<uint>("agent.nb_fitted_updates");
+    nb_internal_critic_updates  = pt->get<uint>("agent.nb_internal_critic_updates");
+    alpha_a                     = pt->get<double>("agent.alpha_a");
+    alpha_v                     = pt->get<double>("agent.alpha_v");
     
     if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
@@ -111,11 +115,24 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       LOG_INFO("GPU mode");
     }
     
-    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, 0.0001, kMinibatchSize, -1);
+    if(force_online_update && on_policy_update){
+        LOG_ERROR("cannot update online & on policy in this algo.");
+        exit(1);
+    }
+    
+    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, -1);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, 0.001, kMinibatchSize, false);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, false);
   }
 
+  void shrink_actions(vector<double>* next_action){
+    for(uint i=0;i < nb_motors ; i++)
+      if(next_action->at(i) > 1.f)
+        next_action->at(i)=1.f;
+      else if(next_action->at(i) < -1.f)
+        next_action->at(i)=-1.f;
+  }
+  
   void _start_episode(const std::vector<double>& sensors, bool _learning) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
@@ -132,6 +149,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     for(auto it = vtraj.begin(); it != vtraj.end() ; ++it) {
       sample sm = *it;
       vector<double>* next_action = ann->computeOut(sm.s);
+      shrink_actions(next_action);
       
       double p0 = 1.f;
       for(uint i=0;i < nb_motors;i++)
@@ -149,6 +167,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       sample sm = *it;
       
       vector<double>* next_action = ann->computeOut(sm.s);
+      shrink_actions(next_action);
       
       sum += qnn->computeOutVF(sm.s, *next_action);
       delete next_action;
@@ -192,6 +211,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     }
 
     auto all_next_actions = ann->computeOutBatch(all_next_states);
+    shrink_actions(all_next_actions);
     //compute next q
     auto q_targets = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
     delete all_next_actions;
@@ -204,24 +224,20 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       else 
         q_targets->at(i) = it.r + gamma * q_targets->at(i);
       
-      if(!pure_online)
+      if(on_policy_update)
         q_targets->at(i) = 0.5f * q_targets->at(i) + 0.5f*it.onpolicy_target;
       
       i++;
     }
     
-#warning reset critic
-    delete qnn;
-    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, 0.0001, kMinibatchSize, -1);
+    if(reset_qnn){
+      delete qnn;
+      qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, -1);
+    }
     
     //Update critic
     qnn->InputDataIntoLayers(*qnn->getNN(), all_states.data(), all_actions.data(), q_targets->data(), NULL);
-//     LOG_DEBUG("begin");
-//     for(uint t=0;t<100;t++){
-//       LOG_DEBUG(qnn->error());
-    qnn->getSolver()->Step(50);
-    
-//     }
+    qnn->getSolver()->Step(iter);
     
     delete q_targets;
     
@@ -243,9 +259,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     ann->ZeroGradParameters();
     
     auto all_actions_outputs = ann->computeOutBatch(all_states);
-//     for(auto a : *all_actions_outputs)
-//       if(a > 1.f || a < -1.f)
-//         LOG_ERROR("aie");
+    shrink_actions(all_actions_outputs);
+
     delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
     
     const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
@@ -285,7 +300,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   
   void end_episode() override {
     
-    if(!pure_online){
+    if(on_policy_update){
       while(trajectory.size() + last_trajectory.size() > replay_memory)
         trajectory.pop_front();
       
@@ -307,12 +322,10 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 //     std::vector<sample> traj(kMinibatchSize);
 //     sample_transition(traj);
     
-    for(uint n=0;n<10; n++){
-//       for(uint i=0; i<20 ; i++){
-//         LOG_DEBUG(n << " " << i <<" " << std::setw(12) << std::fixed << std::setprecision(10) << qnn->error());
-        critic_update(trajectory, 10);
-//       }
-      for(uint i=0; i<10 ; i++)
+    for(uint n=0;n<nb_fitted_updates; n++){
+      for(uint i=0; i<nb_critic_updates ; i++)
+        critic_update(trajectory, nb_internal_critic_updates);
+      for(uint i=0; i<nb_actor_updates ; i++)
         actor_update_grad(trajectory);
     }
   }
@@ -326,14 +339,14 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   }
 
   void save(const std::string& path) override {
-//      ann->save(path+".actor");
-//      qnn->save(path+".critic");
+     ann->save(path+".actor");
+     qnn->save(path+".critic");
 //      bib::XMLEngine::save<>(trajectory, "trajectory", "trajectory.data");
   }
 
   void load(const std::string& path) override {
-//     ann->load(path+".actor");
-//     qnn->load(path+".critic");
+    ann->load(path+".actor");
+    qnn->load(path+".critic");
   }
 
  protected:
@@ -358,9 +371,11 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   std::vector<uint>* hidden_unit_q;
   std::vector<uint>* hidden_unit_a;
   uint kMinibatchSize;
-  uint replay_memory;
+  uint replay_memory, nb_actor_updates, nb_critic_updates, nb_fitted_updates, nb_internal_critic_updates;
+  double alpha_a; 
+  double alpha_v;
   
-  bool learning, pure_online;
+  bool learning, on_policy_update, reset_qnn, force_online_update;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

@@ -269,7 +269,7 @@ class MLP {
 #endif
           break;
       }
-      for(uint n=0; n < blob->count();n++)
+      for(int n=0; n < blob->count();n++)
           sum += fabs(weights[n]);
     }
     
@@ -281,7 +281,7 @@ class MLP {
     double sum = 0.f;
     const double* errors = caffe::Caffe::mode() == caffe::Caffe::CPU ? blob->cpu_data() : blob->gpu_data();
     
-    for(uint n=0; n < blob->count();n++)
+    for(int n=0; n < blob->count();n++)
         sum += fabs(errors[n]);
     
     return sum;
@@ -564,10 +564,14 @@ class MLP {
   
   void save(const std::string& path){
     solver->Snapshot();
+    caffe::NetParameter net_param;
+    neural_net->ToProto(&net_param);
+    caffe::WriteProtoToBinaryFile(net_param, path);
   }
   
   void load(const std::string& path) {
-    
+    solver->Restore(path.c_str());
+    neural_net->CopyTrainedLayersFrom(path);
   }
   
  protected:
