@@ -393,14 +393,20 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   }
 
   void save(const std::string& path) override {
-//      ann->save(path+".actor");
-//      qnn->save(path+".critic");
+     ann->save(path+".actor");
+     qnn->save(path+".critic");
 //      bib::XMLEngine::save<>(trajectory, "trajectory", "trajectory.data");
   }
 
   void load(const std::string& path) override {
-//     ann->load(path+".actor");
-//     qnn->load(path+".critic");
+    ann->load(path+".actor");
+    qnn->load(path+".critic");
+    
+    delete qnn_target;
+    delete ann_target;
+    
+    qnn_target = new MLP(*qnn);
+    ann_target = new MLP(*ann);
   }
 
  protected:

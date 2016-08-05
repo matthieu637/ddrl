@@ -40,6 +40,11 @@ add_executable(adacrobot src/test/Adacrobot.cpp ${all_include} ${all_sources} )
 target_link_libraries(adacrobot 
   ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} 
   ${Boost_LIBRARIES} ${CUDA_LIBRARIES} ${PROTOBUF_LIBRARIES} ${GLOG_LIBRARIES} ${Caffe_LIBRARIES} )
+  
+add_executable(ada-nfac src/test/NFACAda.cpp ${all_include} ${all_sources} )
+target_link_libraries(ada-nfac 
+  ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} 
+  ${Boost_LIBRARIES} ${CUDA_LIBRARIES} ${PROTOBUF_LIBRARIES} ${GLOG_LIBRARIES} ${Caffe_LIBRARIES} )
 
 add_executable(cartpole src/test/Cartpole.cpp ${all_include} ${all_sources} )
 target_link_libraries(cartpole 
@@ -55,7 +60,7 @@ execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_
 #execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/acrobot-3l.ini data/base-acrobot-3l.ini)
 execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/cartpole.ini data/base-cartpole.ini)
 
-execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-acrobot.ini data/ddpg.ini acrobot-ddpg.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-acrobot.ini data/ddpg-ada1d.ini acrobot-ddpg.ini)
 #execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-acrobot-3l.ini data/cmaes-acrobot-3l.ini acrobot-3l.ini)
 execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-cartpole.ini data/ddpg.ini cartpole-ddpg.ini)
 
