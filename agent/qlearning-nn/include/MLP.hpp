@@ -384,9 +384,6 @@ class MLP {
   void print(){
       struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(neural_net), sizeof(struct fann_connection));
 
-      for(uint j=0; j<fann_get_total_connections(neural_net); j++)
-          connections[j].weight=0;
-
       fann_get_connection_array(neural_net, connections);
 
       for(uint j=0; j<fann_get_total_connections(neural_net); j++)
@@ -394,6 +391,81 @@ class MLP {
       std::cout << std::endl;
 
       free(connections);
+  }
+  
+  uint getNumberHiddenNeurons(){
+    std::vector<uint> layers(fann_get_num_layers(neural_net));
+    
+    //struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_num_layers(neural_net), sizeof(unsigned int));
+    
+    fann_get_layer_array(neural_net, layers.data());
+
+    uint sum = 0;
+    for(uint i=1;i<layers.size()-1;i++){
+      sum += layers[i]-1;//minus bias
+    }
+    
+    return sum;
+  }
+  
+  void getHiddenNeurons(std::vector<double>& neurons){
+    struct fann_layer *layer_it;
+    struct fann_neuron *neuron_it;
+    struct fann_neuron *neuron_it_end;
+    struct fann_layer *layer_it_end = neural_net->last_layer;
+    
+    /* The following assumes that the last unused bias has no connections */
+    uint i = 0;
+    /* for each layer */
+    layer_it = neural_net->first_layer;
+    layer_it++;
+    --layer_it_end;
+    for(; layer_it != layer_it_end; layer_it++){
+        /* for each neuron */
+        neuron_it_end = layer_it->last_neuron;
+        --neuron_it_end;
+        
+        for(neuron_it = layer_it->first_neuron; neuron_it != neuron_it_end; neuron_it++){
+            neurons[i++] = neuron_it->value;
+        }
+    }
+  }
+  
+  void initializeFrom(MLP* _old){
+    NN old = _old->neural_net;
+    
+    struct fann_connection* new_connections = (struct fann_connection*) calloc(fann_get_total_connections(neural_net), sizeof(struct fann_connection));
+    struct fann_connection* old_connections = (struct fann_connection*) calloc(fann_get_total_connections(old), sizeof(struct fann_connection));
+    
+    fann_get_connection_array(neural_net, new_connections);
+    fann_get_connection_array(old, old_connections);
+    
+    std::vector<uint> new_layers(fann_get_num_layers(neural_net));
+    std::vector<uint> old_layers(fann_get_num_layers(old));
+    
+    fann_get_layer_array(neural_net, new_layers.data());
+    fann_get_layer_array(old, old_layers.data());
+    
+    uint new_index=0;
+    uint old_index=0;
+    ASSERT(new_layers.size() == old_layers.size(), "same layer size for now");
+    for(uint l=0; l < new_layers.size() - 1; l++){
+      for(uint n=0 ; n < new_layers[l] ; n++) {
+        for(uint c=0; c < new_layers[l+1] ; c++){
+            if(n < old_layers[l] && c < old_layers[l+1]){
+              new_connections[new_index].weight = old_connections[old_index].weight;
+              old_index++;
+            }
+            new_index++;
+            
+        }
+      }
+    }
+    
+    fann_set_weight_array(neural_net, new_connections, fann_get_total_connections(neural_net));
+    
+    delete new_connections;
+    delete old_connections;
   }
   
   static unsigned long long GetHashForDouble(double x, int discretization)
@@ -426,6 +498,10 @@ class MLP {
       double f = ret;
       f = f / ((double)max);
       return f;
+  }
+  
+  uint getNbParameters(){
+      return fann_get_total_connections(neural_net);
   }
 
   void copy(NN new_nn) {

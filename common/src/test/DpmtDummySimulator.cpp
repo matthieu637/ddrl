@@ -2,6 +2,7 @@
 #include "arch/Simulator.hpp"
 #include "bib/Logger.hpp"
 #include "arch/Example.hpp"
+#include "arch/DpmtAgent.hpp"
 
 
 class GreaterExampleEnv : public arch::AEnvironment<> {
@@ -52,16 +53,16 @@ class DpmtExampleAgent : public arch::AAgent<> {
   }
   
   void provide_early_development(AAgent* _old_ag) override {
-    old_ag= static_cast<DpmtExampleAgent*>(_old_ag);
+    old_ag= static_cast<arch::ExampleAgent*>(_old_ag);
   }
 
   int decision_each, time_for_ac;
   std::vector<double> actuator;
-  DpmtExampleAgent* old_ag = nullptr;
+  arch::ExampleAgent* old_ag = nullptr;
 };
 
 int main(int argc, char **argv) {
-  arch::Simulator<arch::ExampleEnv, DpmtExampleAgent> s(0);
+  arch::Simulator<arch::ExampleEnv, arch::ExampleAgent> s(0);
   s.init(argc, argv);
 
   s.run();
@@ -71,7 +72,7 @@ int main(int argc, char **argv) {
   arch::Simulator<GreaterExampleEnv, DpmtExampleAgent> s2(1);
   s2.init(argc, argv);
 
-  s2.run(s.getAgent());
+  s2.run(s.getAgent(), s.getMaxEpisode());
   
   LOG_DEBUG("final worked");
 }

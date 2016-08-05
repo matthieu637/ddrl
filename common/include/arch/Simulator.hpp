@@ -57,22 +57,23 @@ class Simulator {
     readConfig(config_file);
   }
 
-  void run(Agent* early_stage=nullptr) {
+  template <typename OAgent=Agent>
+  void run(OAgent* early_stage=nullptr, uint starting_ep = 0) {
     ASSERT(well_init, "Please call init() first on Simulator");
 
     env = new Environment;
     env->unique_invoke(properties, command_args);
 
     agent = new Agent(env->number_of_actuators(), env->number_of_sensors());
-    agent->unique_invoke(properties, command_args);
     if(early_stage != nullptr){
       agent->provide_early_development(early_stage);
     }
+    agent->unique_invoke(properties, command_args);
     
     Stat stat;
 
     time_spend.start();
-    for (unsigned int episode = 0; episode < max_episode; episode++) {
+    for (uint episode = starting_ep; episode < max_episode + starting_ep; episode++) {
       //  learning
       run_episode(true, episode, 0, stat);
 
@@ -84,7 +85,7 @@ class Simulator {
 
     for (unsigned int test_episode = 0; test_episode < test_episode_at_end; test_episode++) {
       //  testing after learning
-      run_episode(false, max_episode, test_episode, stat);
+      run_episode(false, max_episode + starting_ep, test_episode, stat);
     }
 
     env->unique_destroy();
@@ -95,6 +96,10 @@ class Simulator {
   
   Agent* getAgent(){
     return agent;
+  }
+  
+  uint getMaxEpisode(){
+    return max_episode;
   }
 
  protected:
