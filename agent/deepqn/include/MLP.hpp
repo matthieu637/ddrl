@@ -34,7 +34,7 @@ class MLP {
 
   constexpr static auto kStateInputCount = 1;
    
-  MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha, uint _kMinibatchSize, double decay_v) : size_input_state(input),
+  MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha, uint _kMinibatchSize, double decay_v, bool batch_norm) : size_input_state(input),
     size_sensors(sensors), size_motors(size_input_state - sensors), kMinibatchSize(_kMinibatchSize) {
 
       caffe::SolverParameter solver_param;
@@ -51,7 +51,7 @@ class MLP {
                   boost::none, {kMinibatchSize, 1, 1, 1});
       SilenceLayer(net_param_init, "silence", {"dummy1","dummy2","dummy3"}, {}, boost::none);
       ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {"state_actions"}, boost::none, 2);
-      std::string tower_top = Tower(net_param_init, "", "state_actions", hiddens);
+      std::string tower_top = Tower(net_param_init, "", "state_actions", hiddens, batch_norm);
       IPLayer(net_param_init, q_values_layer_name, {tower_top}, {q_values_blob_name}, boost::none, 1);
       EuclideanLossLayer(net_param_init, "loss", {q_values_blob_name, targets_blob_name},
                         {loss_blob_name}, boost::none);
@@ -75,7 +75,7 @@ class MLP {
   }
   
   MLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize, 
-      bool add_last_RELU_layer) : size_input_state(sensors),
+      bool add_last_RELU_layer, bool batch_norm) : size_input_state(sensors),
     size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize) {
 
       caffe::SolverParameter solver_param;
@@ -87,7 +87,7 @@ class MLP {
       MemoryDataLayer(net_param_init, state_input_layer_name, {states_blob_name,"dummy1"},
                   boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
       SilenceLayer(net_param_init, "silence", {"dummy1"}, {}, boost::none);
-      std::string tower_top = Tower(net_param_init, "", states_blob_name, hiddens);
+      std::string tower_top = Tower(net_param_init, "", states_blob_name, hiddens, batch_norm);
       if(!add_last_RELU_layer)
         IPLayer(net_param_init, "action_layer", {tower_top}, {actions_blob_name}, boost::none, motors);
       else {
@@ -464,16 +464,23 @@ class MLP {
   std::string Tower(caffe::NetParameter& np,
                     const std::string& layer_prefix,
                     const std::string& input_blob_name,
-                    const std::vector<uint>& layer_sizes) {
+                    const std::vector<uint>& layer_sizes,
+                    bool batch_norm) {
     std::string input_name = input_blob_name;
     for (uint i=1; i<layer_sizes.size()+1; ++i) {
+      if(batch_norm){
+        std::string layer_name2 = layer_prefix + "bn" + std::to_string(i);
+        BatchNormLayer(np, layer_name2, {input_name}, {layer_name2}, boost::none);
+        std::string layer_name3 = layer_prefix + "sc" + std::to_string(i);
+        input_name = input_name+"_sc";
+        ScaleLayer(np, layer_name3, {layer_name2}, {input_name}, boost::none);
+      }
+      
       std::string layer_name = layer_prefix + "ip" + std::to_string(i) + "_layer";
       std::string top_name = layer_prefix + "ip" + std::to_string(i);
       IPLayer(np, layer_name, {input_name}, {top_name}, boost::none, layer_sizes[i-1]);
       layer_name = layer_prefix + "ip" + std::to_string(i) + "_relu_layer";
       ReluLayer(np, layer_name, {top_name}, {top_name}, boost::none);
-      //layer_name = layer_prefix + "bn" + std::to_string(i) + "_layer";
-      //BatchNormLayer(np, layer_name, {top_name}, {top_name}, boost::none);
       input_name = top_name;
     }
     return input_name;
@@ -487,6 +494,15 @@ class MLP {
     caffe::LayerParameter& layer = *net_param.add_layer();
     PopulateLayer(layer, name, "BatchNorm", bottoms, tops, include_phase);
 //     caffe::BatchNormParameter* param = layer.mutable_batch_norm_param();
+  }
+  
+  void ScaleLayer(caffe::NetParameter& net_param,
+                    const std::string& name,
+                    const std::vector<std::string>& bottoms,
+                    const std::vector<std::string>& tops,
+                    const boost::optional<caffe::Phase>& include_phase) {
+    caffe::LayerParameter& layer = *net_param.add_layer();
+    PopulateLayer(layer, name, "Scale", bottoms, tops, include_phase);
   }
   
   void InputDataIntoLayers(caffe::Net<double>& net,

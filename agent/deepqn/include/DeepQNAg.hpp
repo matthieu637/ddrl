@@ -180,6 +180,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
     decay_v                 = pt->get<double>("agent.decay_v");
+    batch_norm              = pt->get<bool>("agent.batch_norm");
     
     if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
@@ -190,10 +191,10 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       LOG_INFO("GPU mode");
     }
     
-    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v);
+    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, batch_norm);
     qnn_target = new MLP(*qnn);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, !inverting_grad);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, !inverting_grad, batch_norm);
     ann_target = new MLP(*ann);
   }
 
@@ -439,7 +440,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   uint replay_memory;
   uint force_more_update;
   
-  bool learning, pure_online, inverting_grad, shrink_greater_action,sure_shrink;
+  bool learning, pure_online, inverting_grad, shrink_greater_action, sure_shrink, batch_norm;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

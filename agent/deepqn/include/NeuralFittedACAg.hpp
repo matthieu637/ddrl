@@ -94,7 +94,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     hidden_unit_a               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                       = pt->get<double>("agent.noise");
     gaussian_policy             = pt->get<bool>("agent.gaussian_policy");
-    kMinibatchSize              = 128; //don't care it will increase
+    kMinibatchSize              = 512; //don't care it will increase
     on_policy_update            = pt->get<bool>("agent.on_policy_update");
     replay_memory               = pt->get<uint>("agent.replay_memory");
     reset_qnn                   = pt->get<bool>("agent.reset_qnn");
@@ -105,6 +105,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     nb_internal_critic_updates  = pt->get<uint>("agent.nb_internal_critic_updates");
     alpha_a                     = pt->get<double>("agent.alpha_a");
     alpha_v                     = pt->get<double>("agent.alpha_v");
+    batch_norm                  = pt->get<bool>("agent.batch_norm");
     
     if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
@@ -120,9 +121,9 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
         exit(1);
     }
     
-    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, -1);
+    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, -1, batch_norm);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, false);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, false, batch_norm);
   }
 
   void shrink_actions(vector<double>* next_action){
@@ -232,7 +233,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     
     if(reset_qnn){
       delete qnn;
-      qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, -1);
+      qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, -1, batch_norm);
     }
     
     //Update critic
@@ -259,7 +260,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     ann->ZeroGradParameters();
     
     auto all_actions_outputs = ann->computeOutBatch(all_states);
-    shrink_actions(all_actions_outputs);
+    //shrink_actions(all_actions_outputs); //sure_shrink to false from DDPG
 
     delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
     
@@ -375,7 +376,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   double alpha_a; 
   double alpha_v;
   
-  bool learning, on_policy_update, reset_qnn, force_online_update;
+  bool learning, on_policy_update, reset_qnn, force_online_update, batch_norm;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
