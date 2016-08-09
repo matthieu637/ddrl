@@ -8,7 +8,6 @@
 #include "arch/Example.hpp"
 #include "AdvancedAcrobotEnv.hpp"
 
-#include "DeepQNAg.hpp"
 #include "NeuralFittedACAg.hpp"
 
 int main(int argc, char **argv) {

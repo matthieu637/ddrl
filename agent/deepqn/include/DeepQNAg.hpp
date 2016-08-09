@@ -113,7 +113,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                 bool learning, bool goal_reached, bool last) {
+                                 bool learning, bool goal_reached, bool last) override {
 
     vector<double>* next_action = ann->computeOut(sensors);
 

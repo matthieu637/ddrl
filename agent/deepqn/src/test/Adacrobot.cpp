@@ -9,7 +9,6 @@
 #include "AdvancedAcrobotEnv.hpp"
 
 #include "DeepQNAg.hpp"
-#include "NeuralFittedACAg.hpp"
 
 int main(int argc, char **argv) {
 //   std::string usage(argv[0]);

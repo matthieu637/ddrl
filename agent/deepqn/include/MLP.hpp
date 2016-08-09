@@ -117,8 +117,8 @@ class MLP {
     net_param.set_force_backward(true);
     
     neural_net.reset(new caffe::Net<double>(net_param));
-    
-    LOG_INFO("don't copy solver!" <<  neural_net->params().size() );
+
+    solver = caffe::SolverRegistry<double>::CreateSolver(m.solver->param());
   }
 
   virtual ~MLP() {
