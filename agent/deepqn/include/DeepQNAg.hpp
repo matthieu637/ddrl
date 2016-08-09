@@ -113,7 +113,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                 bool learning, bool goal_reached, bool) {
+                                 bool learning, bool goal_reached, bool last) {
 
     vector<double>* next_action = ann->computeOut(sensors);
 
@@ -125,7 +125,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       for(uint i=0;i < nb_motors;i++)
         p0 *= exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_action->at(i))/(2.f*noise*noise));
       
-      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0, 0.};
+      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || (count_last && last), p0, 0.};
       insertSample(sa);
 
     }
@@ -180,7 +180,8 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
     decay_v                 = pt->get<double>("agent.decay_v");
-    batch_norm              = pt->get<bool>("agent.batch_norm");
+    batch_norm              = pt->get<uint>("agent.batch_norm");
+    count_last              = pt->get<bool>("agent.count_last");
     
     if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
@@ -439,8 +440,9 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   uint kMinibatchSize;
   uint replay_memory;
   uint force_more_update;
+  uint batch_norm;
   
-  bool learning, pure_online, inverting_grad, shrink_greater_action, sure_shrink, batch_norm;
+  bool learning, pure_online, inverting_grad, shrink_greater_action, sure_shrink, count_last;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

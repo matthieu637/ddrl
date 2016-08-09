@@ -34,7 +34,7 @@ class MLP {
 
   constexpr static auto kStateInputCount = 1;
    
-  MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha, uint _kMinibatchSize, double decay_v, bool batch_norm) : size_input_state(input),
+  MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha, uint _kMinibatchSize, double decay_v, uint batch_norm) : size_input_state(input),
     size_sensors(sensors), size_motors(size_input_state - sensors), kMinibatchSize(_kMinibatchSize) {
 
       caffe::SolverParameter solver_param;
@@ -75,7 +75,7 @@ class MLP {
   }
   
   MLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize, 
-      bool add_last_RELU_layer, bool batch_norm) : size_input_state(sensors),
+      bool add_last_RELU_layer, uint batch_norm) : size_input_state(sensors),
     size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize) {
 
       caffe::SolverParameter solver_param;
@@ -465,15 +465,20 @@ class MLP {
                     const std::string& layer_prefix,
                     const std::string& input_blob_name,
                     const std::vector<uint>& layer_sizes,
-                    bool batch_norm) {
+                    uint batch_norm) {
     std::string input_name = input_blob_name;
     for (uint i=1; i<layer_sizes.size()+1; ++i) {
-      if(batch_norm){
+      if(batch_norm == 1){
         std::string layer_name2 = layer_prefix + "bn" + std::to_string(i);
         BatchNormLayer(np, layer_name2, {input_name}, {layer_name2}, boost::none);
         std::string layer_name3 = layer_prefix + "sc" + std::to_string(i);
         input_name = input_name+"_sc";
         ScaleLayer(np, layer_name3, {layer_name2}, {input_name}, boost::none);
+      } else if(batch_norm == 2){
+        std::string input_name2 = input_name+"_bn";
+        std::string layer_name2 = layer_prefix + "bn" + std::to_string(i);
+        BatchNormLayer(np, layer_name2, {input_name}, {input_name2}, boost::none);
+        input_name = input_name2;
       }
       
       std::string layer_name = layer_prefix + "ip" + std::to_string(i) + "_layer";

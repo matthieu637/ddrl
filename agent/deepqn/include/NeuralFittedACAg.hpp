@@ -105,7 +105,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     nb_internal_critic_updates  = pt->get<uint>("agent.nb_internal_critic_updates");
     alpha_a                     = pt->get<double>("agent.alpha_a");
     alpha_v                     = pt->get<double>("agent.alpha_v");
-    batch_norm                  = pt->get<bool>("agent.batch_norm");
+    batch_norm                  = pt->get<uint>("agent.batch_norm");
     
     if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
@@ -376,7 +376,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   double alpha_a; 
   double alpha_v;
   
-  bool learning, on_policy_update, reset_qnn, force_online_update, batch_norm;
+  uint batch_norm;
+  bool learning, on_policy_update, reset_qnn, force_online_update;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
