@@ -25,7 +25,7 @@ build() {
     mkdir build
     cd build
     cmake ../ -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCMAKE_C_COMPILER=gcc-5 \
-                -DCMAKE_INSTALL_PREFIX=$pkgdir/usr/
+                -DCMAKE_INSTALL_PREFIX=$pkgdir/usr/ -DCUDA_ARCH_NAME=All
 
     make all -j4
 }
