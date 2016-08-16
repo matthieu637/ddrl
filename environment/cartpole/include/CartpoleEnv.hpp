@@ -26,10 +26,10 @@ class CartpoleEnv : public arch::AEnvironment<> {
   }
 
   double performance() const {
-    if(final_state()){
-      if(instance->goal_state())
-        return 0;
-      return -50.f;
+    if(instance->goal_state())
+      return 0;
+    else if(final_state()){
+      return -2.f*(500.f - current_step);
     }
     
     return -1.f;

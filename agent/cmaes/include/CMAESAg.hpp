@@ -56,12 +56,12 @@ class CMAESAg : public arch::AACAgent<MLP> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
-    hidden_unit_a         = pt->get<int>("agent.hidden_unit_a");
-    lecun_activation      = pt->get<bool>("agent.lecun_activation");
-    population            = pt->get<uint>("agent.population");
-    gaussian_policy       = pt->get<bool>("agent.gaussian_policy");
-    policy_stochasticity  = pt->get<double>("agent.policy_stochasticity");
-    
+    hidden_unit_a               = pt->get<int>("agent.hidden_unit_a");
+    lecun_activation            = pt->get<bool>("agent.lecun_activation");
+    population                  = pt->get<uint>("agent.population");
+    gaussian_policy             = pt->get<bool>("agent.gaussian_policy");
+    policy_stochasticity        = pt->get<double>("agent.policy_stochasticity");
+    bool last_activation_linear = pt->get<bool>("agent.last_activation_linear");
     
     if(hidden_unit_a == 0){
       LOG_ERROR("Linear MLP");
@@ -72,6 +72,9 @@ class CMAESAg : public arch::AACAgent<MLP> {
       ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
       fann_set_training_algorithm(ann->getNeuralNet(), FANN_TRAIN_INCREMENTAL);
     }
+    
+    if(last_activation_linear)
+      fann_set_activation_function_output(ann->getNeuralNet(), FANN_LINEAR);
     
     struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(ann->getNeuralNet()), sizeof(struct fann_connection));
     fann_get_connection_array(ann->getNeuralNet(), connections);

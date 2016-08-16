@@ -8,9 +8,10 @@
 #include "ODEObject.hpp"
 #include "ODEFactory.hpp"
 
-#define POLE_LENGTH 0.5
-//sqrt(0,1÷(0,5×1062)) so mass = 0.1
-#define POLE_LARGER 0.013723116
+//0.5 half lenght pole
+#define POLE_LENGTH 1
+//sqrt(0,1÷(1×1062)) so mass = 0.1
+#define POLE_LARGER 0.009703708
 
 #define CART_LARGER 0.098014838
 //((1÷1062)^(1÷3)) so mass = 1
@@ -19,10 +20,12 @@
 #define MAX_HINGE_ANGLE 0.523598776 //PI/6
 
 #define GRAVITY -9.81
-#define INERTIA 0.5f
+//disable inertia :
+#define INERTIA 0.000000000001f
 #define BONE_DENSITY 1062  // Average human body density
 #define MAX_TORQUE_SLIDER 10
-#define WORLD_STEP 0.01
+#define WORLD_STEP 0.02
+
 
 class CartpoleWorld {
  public:

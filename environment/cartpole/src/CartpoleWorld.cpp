@@ -52,6 +52,11 @@ void CartpoleWorld::createWorld() {
   dJointSetSliderAxis(first_slider, 1, 0, 0);
   dJointSetSliderParam(first_slider, dParamHiStop, MAX_SLIDER_POSITON);
   dJointSetSliderParam(first_slider, dParamLoStop, -MAX_SLIDER_POSITON);
+  //simulate friction:
+//   dJointSetSliderParam(first_slider, dParamFMax, 0.9);
+//   dJointSetSliderParam(first_slider, dParamVel, 0);
+//   dJointSetSliderParam(first_slider, dParamFMax1, 0.9);
+//   dJointSetSliderParam(first_slider, dParamVel1, 0);
   joints.push_back(first_slider);
   
 //   bib::Logger::PRINT_ELEMENTS(first_bone->getMass().I, 9, "cart inertia : ");
@@ -65,6 +70,11 @@ void CartpoleWorld::createWorld() {
   dJointAttach(first_hinge, first_bone->getID(), second_bone->getID());
   //dJointSetHingeAnchor(first_hinge, 0, 0, POLE_LENGTH/2.f+CART_LARGER/2.f);
   dJointSetHingeAxis(first_hinge, 0, 1, 0);
+  //simulate friction:
+//   dJointSetHingeParam(first_hinge, dParamFMax, 0.000002);
+//   dJointSetHingeParam(first_hinge, dParamVel, 0);
+//   dJointSetHingeParam(first_hinge, dParamFMax2, 0.000002);
+//   dJointSetHingeParam(first_hinge, dParamVel2, 0);
   joints.push_back(first_hinge);
   
 //   bib::Logger::PRINT_ELEMENTS(second_bone->getMass().I, 9, "pole inertia : ");
@@ -159,8 +169,9 @@ bool CartpoleWorld::final_state() const {
   if( fabs(dJointGetHingeAngle(joints[1])) >= MAX_HINGE_ANGLE)
     return true;
   
-  if(goal_state())
-    return true;
+// continue even in goal state
+//  if(goal_state())
+//    return true;
   
   return false;
 }
