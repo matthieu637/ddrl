@@ -274,7 +274,9 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   }
 
   void end_episode() override {
-    
+    if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
+      return;
+ 
     if(!pure_online){
       while(trajectory.size() + last_trajectory.size() > replay_memory)
         trajectory.pop_front();
@@ -284,9 +286,6 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       trajectory.insert(it, last_trajectory.begin(), last_trajectory.end());
       last_trajectory.clear();
     }
-    
-    if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
-      return;
     
     for(uint fupd=0;fupd<1+force_more_update;fupd++)
     {
