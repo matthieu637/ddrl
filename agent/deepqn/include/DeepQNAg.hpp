@@ -19,6 +19,7 @@
 #include <bib/XMLEngine.hpp>
 
 #define DOUBLE_COMPARE_PRECISION 1e-9
+//#define POOL_FOR_TESTING
 
 typedef struct _sample {
   std::vector<double> s;
@@ -108,8 +109,16 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     delete qnn;
     delete ann;
     
+    delete qnn_target;
+    delete ann_target;
+    
     delete hidden_unit_q;
     delete hidden_unit_a;
+    
+#ifdef POOL_FOR_TESTING
+    for (auto i : last_trajectory_ftesting)
+      delete i->ann;
+#endif
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
@@ -127,7 +136,9 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || (count_last && last), p0, 0.};
       insertSample(sa);
-
+#ifdef POOL_FOR_TESTING       
+      last_trajectory_ftesting.push_back(sa);
+#endif
     }
 
     last_pure_action.reset(new vector<double>(*next_action));
@@ -183,6 +194,10 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     batch_norm              = pt->get<uint>("agent.batch_norm");
     count_last              = pt->get<bool>("agent.count_last");
     
+#ifdef CAFFE_CPU_ONLY
+    LOG_INFO("CPU mode");
+    (void) command_args;
+#else
     if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
       LOG_INFO("CPU mode");
@@ -191,6 +206,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       caffe::Caffe::SetDevice(0);
       LOG_INFO("GPU mode");
     }
+#endif    
     
     qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, batch_norm);
     qnn_target = new MLP(*qnn);
@@ -244,10 +260,10 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     return sum / trajectory.size();
   }
   
-  void sample_transition(std::vector<sample>& traj){
+  void sample_transition(std::vector<sample>& traj, const std::deque<sample>& from){
      for(uint i=0;i<traj.size();i++){
-       int r = std::uniform_int_distribution<int>(0, traj.size() - 1)(*bib::Seed::random_engine());
-       traj[i] = trajectory[r];
+       int r = std::uniform_int_distribution<int>(0, from.size() - 1)(*bib::Seed::random_engine());
+       traj[i] = from[r];
      }
   }
   
@@ -273,6 +289,71 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
         next_action->at(i)=-1.f;
   }
 
+#ifdef POOL_FOR_TESTING
+  void start_instance(bool learning) override {
+    last_trajectory_ftesting.clear();
+    
+    if(!learning && best_pol_population.size() > 0){
+      to_be_restaured_ann = ann;
+      ann = best_pol_population.begin()->ann;
+      LOG_DEBUG("first power " << best_pol_population.begin()->played << " "<< best_pol_population.begin()->J );
+    } 
+  }
+  
+  void end_instance(bool learning) override {
+    if(!learning && best_pol_population.size() > 0){
+      //restore ann
+      ann = to_be_restaured_ann;
+      
+      //update score of played pol
+      double new_score = (best_pol_population.begin()->J * best_pol_population.begin()->played + sum_weighted_reward);
+      new_score /= ((double)best_pol_population.begin()->played + 1);
+      my_pol np = *best_pol_population.begin();
+      np.J = new_score;
+      np.played++;
+      best_pol_population.erase(best_pol_population.begin());
+      best_pol_population.insert(np);
+    } else if(learning) {
+      //not totaly stable because J(the policy stored here ) != sum_weighted_reward (online updates)
+      //so include first & last policy
+    
+      //policies pool for testing
+      if(best_pol_population.size() == 0 || best_pol_population.rbegin()->J < sum_weighted_reward){
+        if(best_pol_population.size() > 50){
+          //remove smallest
+          auto it = best_pol_population.end();
+          --it;
+          delete it->ann;
+          best_pol_population.erase(it);
+        }
+        MLP* pol_fitted_sample = new MLP(*ann, true);
+        uint nb_update = (last_trajectory_ftesting.size() / kMinibatchSize) * 3;
+        for(uint fupd=0;fupd<nb_update;fupd++){
+          std::vector<sample> traj(kMinibatchSize);
+          sample_transition(traj, last_trajectory_ftesting);
+          
+          std::vector<double> all_states(traj.size() * nb_sensors);
+          std::vector<double> all_actions(traj.size() * nb_motors);
+          
+          uint i=0;
+          for (auto it : traj){
+            std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
+            std::copy(it.a.begin(), it.a.end(), all_actions.begin() + i * nb_motors);
+            i++;
+          }
+          
+          pol_fitted_sample->InputDataIntoLayers(all_states.data(), NULL, all_actions.data());
+          pol_fitted_sample->getSolver()->Step(1);
+        }
+        
+        best_pol_population.insert({pol_fitted_sample,sum_weighted_reward, 0});
+        
+        LOG_DEBUG(best_pol_population.begin()->J << " " << best_pol_population.rbegin()->J);
+      } 
+    }
+  }
+#endif
+  
   void end_episode() override {
     if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
       return;
@@ -291,7 +372,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     {
     
       std::vector<sample> traj(kMinibatchSize);
-      sample_transition(traj);
+      sample_transition(traj, trajectory);
       
       //compute \pi(s_{t+1})
       std::vector<double> all_next_states(traj.size() * nb_sensors);
@@ -328,7 +409,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       }
       
       //Update critic
-      qnn->InputDataIntoLayers(*qnn->getNN(), all_states.data(), all_actions.data(), q_targets->data(), NULL);
+      qnn->InputDataIntoLayers(all_states.data(), all_actions.data(), q_targets->data());
       qnn->getSolver()->Step(1);
       
       //Update actor
@@ -449,6 +530,21 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
   std::deque<sample> trajectory;
   std::vector<sample> last_trajectory;
+
+#ifdef POOL_FOR_TESTING  
+  struct my_pol{
+    MLP* ann;
+    double J;
+    uint played;
+    
+    bool operator< (const my_pol& b) const {
+      return J > b.J;
+    }
+  };
+  std::multiset<my_pol> best_pol_population;
+  MLP* to_be_restaured_ann;
+  std::deque<sample> last_trajectory_ftesting;
+#endif  
   
   MLP* ann, *ann_target;
   MLP* qnn, *qnn_target;

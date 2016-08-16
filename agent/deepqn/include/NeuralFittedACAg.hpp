@@ -201,7 +201,11 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
 
     old_executed_policies.clear();
 
-    if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0) {
+#ifdef CAFFE_CPU_ONLY
+    LOG_INFO("CPU mode");
+    (void) command_args;
+#else
+    if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
       LOG_INFO("CPU mode");
     } else {
@@ -209,6 +213,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
       caffe::Caffe::SetDevice(0);
       LOG_INFO("GPU mode");
     }
+#endif    
 
     if(reset_qnn && minibatcher != 0) {
       LOG_DEBUG("option splash -> cannot reset_qnn and count on minibatch to train a new Q function");
@@ -305,7 +310,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
   void sample_transition(std::deque<sample>& traj, const std::deque<sample>& from, uint nb_sample) {
     if(sampling_strategy == 1) {
       for(uint i=0; i<nb_sample; i++) {
-        int r = std::uniform_int_distribution<int>(0, nb_sample - 1)(*bib::Seed::random_engine());
+        int r = std::uniform_int_distribution<int>(0, from.size() - 1)(*bib::Seed::random_engine());
         traj[i] = from[r];
       }
     } else if(sampling_strategy > 1) {
@@ -401,7 +406,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
       }
 
       //Update critic
-      qnn->InputDataIntoLayers(*qnn->getNN(), all_states.data(), all_actions.data(), q_targets->data(), NULL);
+      qnn->InputDataIntoLayers(all_states.data(), all_actions.data(), q_targets->data());
       if(minibatcher != 0)
         qnn->getSolver()->Step(1);
       else

@@ -111,14 +111,36 @@ class MLP {
 //       LOG_DEBUG("actor critic : " <<  neural_net->params().size());
   }
   
-  MLP(const MLP& m) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors), kMinibatchSize(m.kMinibatchSize){
+  MLP(const MLP& m) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors),   
+      kMinibatchSize(m.kMinibatchSize){
     caffe::NetParameter net_param;
     m.neural_net->ToProto(&net_param);
     net_param.set_force_backward(true);
     
     neural_net.reset(new caffe::Net<double>(net_param));
 
-    solver = caffe::SolverRegistry<double>::CreateSolver(m.solver->param());
+    caffe::SolverParameter solver_param(m.solver->param());
+    solver_param.mutable_net_param()->CopyFrom(net_param);
+    solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
+  }
+  
+  MLP(const MLP& m, bool _add_loss_layer) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), 
+      size_motors(m.size_motors), kMinibatchSize(m.kMinibatchSize), add_loss_layer(_add_loss_layer){
+    caffe::NetParameter net_param;
+    m.neural_net->ToProto(&net_param);
+    net_param.set_force_backward(true);
+    if(add_loss_layer){
+      MemoryDataLayer(net_param, target_input_layer_name, {targets_blob_name,"dummy2"},
+                      boost::none, {kMinibatchSize, 1, size_motors, 1});
+      EuclideanLossLayer(net_param, "loss", {actions_blob_name, targets_blob_name},
+                         {loss_blob_name}, boost::none);
+    }
+    
+    neural_net.reset(new caffe::Net<double>(net_param));
+    
+    caffe::SolverParameter solver_param(m.solver->param());
+    solver_param.mutable_net_param()->CopyFrom(net_param);
+    solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
   }
 
   virtual ~MLP() {
@@ -195,7 +217,7 @@ class MLP {
     
     std::vector<double> target_input(kMinibatchSize, 0.0f);
 
-    InputDataIntoLayers(*neural_net, states_input.data(), actions_input.data(), target_input.data(), NULL);
+    InputDataIntoLayers(states_input.data(), actions_input.data(), target_input.data());
     neural_net->Forward(nullptr);
     
     const auto actions_blob = neural_net->blob_by_name(actions_blob_name);
@@ -206,7 +228,7 @@ class MLP {
   std::vector<double>* computeOutVFBatch(std::vector<double>& sensors, std::vector<double>& motors) {
     std::vector<double> target_input(kMinibatchSize, 0.0f);
     
-    InputDataIntoLayers(*neural_net, sensors.data(), motors.data(), target_input.data(), NULL);
+    InputDataIntoLayers(sensors.data(), motors.data(), target_input.data());
     neural_net->Forward(nullptr);
     
     const auto q_values_blob = neural_net->blob_by_name(q_values_blob_name);
@@ -222,9 +244,18 @@ class MLP {
   std::vector<double>* computeOut(const std::vector<double>& states_batch) {
     std::vector<double> states_input(size_input_state * kMinibatchSize, 0.0f);
     std::copy(states_batch.begin(), states_batch.end(),states_input.begin());
-
-    InputDataIntoLayers(*neural_net, states_input.data(), NULL, NULL, NULL);
+    std::vector<double>* target_input = nullptr;
+    
+    if(add_loss_layer){
+      target_input = new std::vector<double>(size_motors * kMinibatchSize, 0.0f);
+      InputDataIntoLayers(states_input.data(), NULL, target_input->data());
+    }
+    else
+      InputDataIntoLayers(states_input.data(), NULL, NULL);
     neural_net->Forward(nullptr);
+    
+    if(add_loss_layer)
+      delete target_input;
     
     std::vector<double>* outputs = new std::vector<double>(size_motors);
     const auto actions_blob = neural_net->blob_by_name(actions_blob_name);
@@ -236,7 +267,7 @@ class MLP {
   }
 
   std::vector<double>* computeOutBatch(std::vector<double>& in) {
-    InputDataIntoLayers(*neural_net, in.data(), NULL, NULL, NULL);
+    InputDataIntoLayers(in.data(), NULL, NULL);
     neural_net->Forward(nullptr);
     
     auto outputs = new std::vector<double>(kMinibatchSize * size_motors);
@@ -256,19 +287,18 @@ class MLP {
     const double* weights;
     for (uint i = 0; i < net.learnable_params().size(); ++i) {
       auto blob = net.learnable_params()[i];
-      
+#ifdef CAFFE_CPU_ONLY
+      weights = blob->cpu_data();
+#else
       switch (caffe::Caffe::mode()) {
         case caffe::Caffe::CPU:
           weights = blob->cpu_data();
           break;
         case caffe::Caffe::GPU:
-#ifndef CAFFE_CPU_ONLY
           weights = blob->gpu_data();
-#else
-          LOG_ERROR("cannot be called");
-#endif
           break;
       }
+#endif
       for(int n=0; n < blob->count();n++)
           sum += fabs(weights[n]);
     }
@@ -510,11 +540,8 @@ class MLP {
     PopulateLayer(layer, name, "Scale", bottoms, tops, include_phase);
   }
   
-  void InputDataIntoLayers(caffe::Net<double>& net,
-                              double* states_input,
-                              double* actions_input,
-                              double* target_input,
-                              double* filter_input) {
+  void InputDataIntoLayers(double* states_input, double* actions_input, double* target_input) {
+    caffe::Net<double>& net = *neural_net;
     if (states_input != NULL) {
       const auto state_input_layer =
           boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(net.layer_by_name(state_input_layer_name));
@@ -539,20 +566,16 @@ class MLP {
       target_input_layer->Reset(target_input, target_input,
                                 target_input_layer->batch_size());
     }
-    if (filter_input != NULL) {
-      const auto filter_input_layer =
-          boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(
-              net.layer_by_name(filter_input_layer_name));
-      CHECK(filter_input_layer);
-      filter_input_layer->Reset(filter_input, filter_input,
-                                filter_input_layer->batch_size());
-    }
   }
 
   void ZeroGradParameters() {
     caffe::Net<double>& net = *neural_net;
     for (uint i = 0; i < net.params().size(); ++i) {
       caffe::shared_ptr<caffe::Blob<double> > blob = net.params()[i];
+#ifdef CAFFE_CPU_ONLY
+      caffe::caffe_set(blob->count(), static_cast<double>(0),
+                       blob->mutable_cpu_diff());
+#else
       switch (caffe::Caffe::mode()) {
         case caffe::Caffe::CPU:
           caffe::caffe_set(blob->count(), static_cast<double>(0),
@@ -560,14 +583,11 @@ class MLP {
           break;
 
         case caffe::Caffe::GPU:
-#ifndef CAFFE_CPU_ONLY
           caffe::caffe_gpu_set(blob->count(), static_cast<double>(0),
                               blob->mutable_gpu_diff());
-#else
-          LOG_ERROR("cannot be called");
-#endif
           break;
       }
+#endif
     }
   }
   
@@ -602,6 +622,7 @@ class MLP {
   uint size_sensors;
   uint size_motors;
   uint kMinibatchSize;
+  bool add_loss_layer=false;
 };
 
 #endif  // MLP_HPP
