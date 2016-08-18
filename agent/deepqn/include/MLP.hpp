@@ -323,8 +323,12 @@ public:
   double error() {
     auto blob = neural_net->blob_by_name(MLP::loss_blob_name);
     double sum = 0.f;
-    const double* errors = caffe::Caffe::mode() == caffe::Caffe::CPU ? blob->cpu_data() : blob->gpu_data();
-    
+    const double* errors;
+#ifdef CAFFE_CPU_ONLY
+    errors = blob->cpu_data();
+#else    
+    errors = caffe::Caffe::mode() == caffe::Caffe::CPU ? blob->cpu_data() : blob->gpu_data();
+#endif    
     for(int n=0; n < blob->count();n++)
         sum += fabs(errors[n]);
     

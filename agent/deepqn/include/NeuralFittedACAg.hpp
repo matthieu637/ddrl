@@ -585,9 +585,15 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
 
  protected:
   void _display(std::ostream& out) const override {
-    out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " " << std::setw(8) <<
-        std::fixed << std::setprecision(5) << noise << " " << trajectory.size() << " " << ann->weight_l1_norm() << " "
-        << std::fixed << std::setprecision(7) << qnn->error() << " " << qnn->weight_l1_norm();
+    out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward 
+#ifndef NDEBUG
+    << " " << std::setw(8) << std::fixed << std::setprecision(5) << noise 
+    << " " << trajectory.size() 
+    << " " << ann->weight_l1_norm() 
+    << " " << std::fixed << std::setprecision(7) << qnn->error() 
+    << " " << qnn->weight_l1_norm()
+#endif
+    ;
   }
 
   void _dump(std::ostream& out) const override {
