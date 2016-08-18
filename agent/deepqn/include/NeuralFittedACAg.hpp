@@ -194,7 +194,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
     minibatcher                 = pt->get<uint>("agent.minibatcher");
     sampling_strategy           = pt->get<uint>("agent.sampling_strategy");
     fishing_policy              = pt->get<uint>("agent.fishing_policy");
-    inverting_grad              = pt->get<uint>("agent.inverting_grad");
+    inverting_grad              = pt->get<bool>("agent.inverting_grad");
     double decay_v              = pt->get<double>("agent.decay_v");
 
     on_policy_update            = max_stabilizer;
