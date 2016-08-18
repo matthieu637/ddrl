@@ -117,10 +117,10 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                  bool learning, bool goal_reached, bool) override {
+                                  bool learning, bool goal_reached, bool last) override {
 
     vector<double>* next_action = ann->computeOut(sensors);
-    shrink_actions(next_action);
+//     shrink_actions(next_action);
 
     if (last_action.get() != nullptr && learning) {
       double p0 = 1.f;
@@ -129,7 +129,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
           
 exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_action->at(i))/(2.f*noise*noise));
 
-      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0, 0., false};
+      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || last, p0, 0., false};
       if(goal_reached && reward > rmax) {
         rmax = reward;
         rmax_labeled = true;
@@ -194,6 +194,8 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
     minibatcher                 = pt->get<uint>("agent.minibatcher");
     sampling_strategy           = pt->get<uint>("agent.sampling_strategy");
     fishing_policy              = pt->get<uint>("agent.fishing_policy");
+    inverting_grad              = pt->get<uint>("agent.inverting_grad");
+    double decay_v              = pt->get<double>("agent.decay_v");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -225,9 +227,9 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
       exit(1);
     }
 
-    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, mini_batch_size, -1, batch_norm);
+    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, mini_batch_size, decay_v, batch_norm);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, false, batch_norm);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, !inverting_grad, batch_norm);
   }
 
   void shrink_actions(vector<double>* next_action) {
@@ -265,7 +267,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
       }
 
       auto all_next_actions = ann->computeOutBatch(all_states);
-      shrink_actions(all_next_actions);
+//       shrink_actions(all_next_actions);
 
       for(uint i=0; i<mini_batch_size && it2 != vtraj.cend(); i++) {
         sample sm = *it2;
@@ -295,7 +297,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
       ++it1;
     }
     auto all_actions_outputs = policy->computeOutBatch(all_states);
-    shrink_actions(all_actions_outputs); //sure_shrink to false from DDPG
+//     shrink_actions(all_actions_outputs); //sure_shrink to false from DDPG
 
     auto all_qsa = qnn->computeOutVFBatch(all_states, *all_actions_outputs);
 
@@ -377,7 +379,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
       }
 
       auto all_next_actions = ann->computeOutBatch(all_next_states);
-      shrink_actions(all_next_actions);
+//       shrink_actions(all_next_actions);
       //compute next q
       auto q_targets = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
       delete all_next_actions;
@@ -456,21 +458,23 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
         q_values_diff[q_values_blob->offset(i++,0,0,0)] = -1.0f;
       qnn->getNN()->BackwardFrom(qnn->GetLayerIndex(MLP::q_values_layer_name));
       const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
-      double* action_diff = critic_action_blob->mutable_cpu_diff();
+      if(inverting_grad){
+        double* action_diff = critic_action_blob->mutable_cpu_diff();
 
-      for (uint n = 0; n < traj->size(); ++n) {
-        for (uint h = 0; h < nb_motors; ++h) {
-          int offset = critic_action_blob->offset(n,0,h,0);
-          double diff = action_diff[offset];
-          double output = all_actions_outputs->at(offset);
-          double min = -1.0;
-          double max = 1.0;
-          if (diff < 0) {
-            diff *= (max - output) / (max - min);
-          } else if (diff > 0) {
-            diff *= (output - min) / (max - min);
+        for (uint n = 0; n < traj->size(); ++n) {
+          for (uint h = 0; h < nb_motors; ++h) {
+            int offset = critic_action_blob->offset(n,0,h,0);
+            double diff = action_diff[offset];
+            double output = all_actions_outputs->at(offset);
+            double min = -1.0;
+            double max = 1.0;
+            if (diff < 0) {
+              diff *= (max - output) / (max - min);
+            } else if (diff > 0) {
+              diff *= (output - min) / (max - min);
+            }
+            action_diff[offset] = diff;
           }
-          action_diff[offset] = diff;
         }
       }
 
@@ -512,7 +516,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
         critic_update(nb_internal_critic_updates);
 
       if(fishing_policy > 0) {
-        candidate_policies[n]=new MLP(*ann);
+        candidate_policies[n]=new MLP(*ann, true);
 
         if(fishing_policy == 0) {
           candidate_policies_scores[n]=sum_QSA(*samples_for_score, *candidate_policies.crbegin());
@@ -531,7 +535,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
           index_best++;
         
         delete ann;
-        ann = new MLP(*candidate_policies[index_best]);
+        ann = new MLP(*candidate_policies[index_best], true);
         
         delete samples_for_score;
       }
@@ -543,7 +547,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
 
   void end_episode() override {
     if(fishing_policy > 0)
-      old_executed_policies.push_back(new MLP(*ann));
+      old_executed_policies.push_back(new MLP(*ann, true));
 
     if(on_policy_update) {
       while(trajectory.size() + last_trajectory.size() > replay_memory)
@@ -563,7 +567,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
   }
 
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
-    return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN :
+    return new arch::Policy<MLP>(new MLP(*ann, true) , gaussian_policy ? arch::policy_type::GAUSSIAN :
                                  arch::policy_type::GREEDY,
                                  noise, decision_each);
   }
@@ -608,7 +612,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
   double alpha_v;
 
   uint batch_norm, minibatcher, sampling_strategy, fishing_policy;
-  bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer;
+  bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

@@ -18,8 +18,13 @@
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 
+// 
+// POOL_FOR_TESTING need to be define for stochastics environements
+// in order to test (learning=false) "the best" known policy
+// 
+#undef POOL_FOR_TESTING
+
 #define DOUBLE_COMPARE_PRECISION 1e-9
-//#define POOL_FOR_TESTING
 
 typedef struct _sample {
   std::vector<double> s;
@@ -116,8 +121,8 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     delete hidden_unit_a;
     
 #ifdef POOL_FOR_TESTING
-    for (auto i : last_trajectory_ftesting)
-      delete i->ann;
+    for (auto i : best_pol_population)
+      delete i.ann;
 #endif
   }
 
@@ -209,10 +214,10 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 #endif    
     
     qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, batch_norm);
-    qnn_target = new MLP(*qnn);
+    qnn_target = new MLP(*qnn, false);
 
     ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, !inverting_grad, batch_norm);
-    ann_target = new MLP(*ann);
+    ann_target = new MLP(*ann, false);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool _learning) override {
@@ -296,8 +301,9 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     if(!learning && best_pol_population.size() > 0){
       to_be_restaured_ann = ann;
       ann = best_pol_population.begin()->ann;
-      LOG_DEBUG("first power " << best_pol_population.begin()->played << " "<< best_pol_population.begin()->J );
-    } 
+    } else if(learning){
+      to_be_restaured_ann = new MLP(*ann, false);
+    }
   }
   
   void end_instance(bool learning) override {
@@ -319,15 +325,17 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     
       //policies pool for testing
       if(best_pol_population.size() == 0 || best_pol_population.rbegin()->J < sum_weighted_reward){
-        if(best_pol_population.size() > 50){
+        if(best_pol_population.size() > 100){
           //remove smallest
           auto it = best_pol_population.end();
           --it;
           delete it->ann;
           best_pol_population.erase(it);
         }
-        MLP* pol_fitted_sample = new MLP(*ann, true);
+//         MLP* pol_fitted_sample = new MLP(*ann, true, true);
+        MLP* pol_fitted_sample=to_be_restaured_ann;
         uint nb_update = (last_trajectory_ftesting.size() / kMinibatchSize) * 3;
+        nb_update=0;
         for(uint fupd=0;fupd<nb_update;fupd++){
           std::vector<sample> traj(kMinibatchSize);
           sample_transition(traj, last_trajectory_ftesting);
@@ -347,9 +355,9 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
         }
         
         best_pol_population.insert({pol_fitted_sample,sum_weighted_reward, 0});
-        
-        LOG_DEBUG(best_pol_population.begin()->J << " " << best_pol_population.rbegin()->J);
-      } 
+      } else
+        delete to_be_restaured_ann;
+      
     }
   }
 #endif
@@ -472,7 +480,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   }
   
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
-        return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
+        return new arch::Policy<MLP>(new MLP(*ann, true) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
   }
 
   void save(const std::string& path) override {
@@ -488,8 +496,8 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     delete qnn_target;
     delete ann_target;
     
-    qnn_target = new MLP(*qnn);
-    ann_target = new MLP(*ann);
+    qnn_target = new MLP(*qnn, false);
+    ann_target = new MLP(*ann, false);
   }
 
  protected:

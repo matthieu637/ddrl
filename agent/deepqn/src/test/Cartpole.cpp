@@ -8,6 +8,7 @@
 #include "arch/Example.hpp"
 #include "CartpoleEnv.hpp"
 
+#define POOL_FOR_TESTING
 #include "DeepQNAg.hpp"
 
 int main(int argc, char **argv) {
@@ -22,4 +23,10 @@ int main(int argc, char **argv) {
   s.run();
 
   LOG_DEBUG("works !");
+  
+  google::ShutDownCommandLineFlags();
+  google::ShutdownGoogleLogging();
+  google::protobuf::ShutdownProtobufLibrary();
+  
+  return 0;
 }

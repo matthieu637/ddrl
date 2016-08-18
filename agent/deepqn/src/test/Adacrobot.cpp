@@ -11,12 +11,6 @@
 #include "DeepQNAg.hpp"
 
 int main(int argc, char **argv) {
-//   std::string usage(argv[0]);
-//   usage.append(" -[evaluate|save [path]]");
-//   gflags::SetUsageMessage(usage);
-//   gflags::SetVersionString("0.1");
-//   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  
   FLAGS_minloglevel = 2;
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
@@ -28,4 +22,10 @@ int main(int argc, char **argv) {
   s.run();
 
   LOG_DEBUG("works !");
+  
+  google::ShutDownCommandLineFlags();
+  google::ShutdownGoogleLogging();
+  google::protobuf::ShutdownProtobufLibrary();
+  
+  return 0;
 }

@@ -111,20 +111,24 @@ class MLP {
 //       LOG_DEBUG("actor critic : " <<  neural_net->params().size());
   }
   
-  MLP(const MLP& m) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors),   
+  MLP(const MLP& m, bool copy_solver) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors),   
       kMinibatchSize(m.kMinibatchSize){
-    caffe::NetParameter net_param;
-    m.neural_net->ToProto(&net_param);
-    net_param.set_force_backward(true);
+    if(!copy_solver){
+      caffe::NetParameter net_param;
+      m.neural_net->ToProto(&net_param);
+      net_param.set_force_backward(true);
     
-    neural_net.reset(new caffe::Net<double>(net_param));
-
-    caffe::SolverParameter solver_param(m.solver->param());
-    solver_param.mutable_net_param()->CopyFrom(net_param);
-    solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
+      neural_net.reset(new caffe::Net<double>(net_param));
+      solver = nullptr;
+    } else {
+      caffe::SolverParameter solver_param(m.solver->param());
+      m.neural_net->ToProto(solver_param.mutable_net_param());
+      solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
+      neural_net = solver->net();
+    }
   }
   
-  MLP(const MLP& m, bool _add_loss_layer) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), 
+  MLP(const MLP& m, bool _add_loss_layer, bool copy_have_solver) : size_input_state(m.size_input_state), size_sensors(m.size_sensors), 
       size_motors(m.size_motors), kMinibatchSize(m.kMinibatchSize), add_loss_layer(_add_loss_layer){
     caffe::NetParameter net_param;
     m.neural_net->ToProto(&net_param);
@@ -136,15 +140,25 @@ class MLP {
                          {loss_blob_name}, boost::none);
     }
     
-    neural_net.reset(new caffe::Net<double>(net_param));
-    
-    caffe::SolverParameter solver_param(m.solver->param());
-    solver_param.mutable_net_param()->CopyFrom(net_param);
-    solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
+    //neural_net.reset(new caffe::Net<double>(net_param));
+    if(copy_have_solver){
+      caffe::SolverParameter solver_param(m.solver->param());
+      solver_param.mutable_net_param()->CopyFrom(net_param);
+      solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
+      neural_net = solver->net();
+    } else 
+      LOG_ERROR("to be implemented");
   }
 
+private:
+  MLP(const MLP&){
+    LOG_ERROR("should not be called");
+  }
+public:
+
   virtual ~MLP() {
-    delete solver;
+    if(solver != nullptr)
+      delete solver;
   }
   
   
