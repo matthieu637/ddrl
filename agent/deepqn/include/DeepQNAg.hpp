@@ -22,7 +22,6 @@
 // POOL_FOR_TESTING need to be define for stochastics environements
 // in order to test (learning=false) "the best" known policy
 // 
-#undef POOL_FOR_TESTING
 
 #define DOUBLE_COMPARE_PRECISION 1e-9
 
@@ -141,9 +140,6 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || (count_last && last), p0, 0.};
       insertSample(sa);
-#ifdef POOL_FOR_TESTING       
-      last_trajectory_ftesting.push_back(sa);
-#endif
     }
 
     last_pure_action.reset(new vector<double>(*next_action));
@@ -296,10 +292,11 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
 #ifdef POOL_FOR_TESTING
   void start_instance(bool learning) override {
-    last_trajectory_ftesting.clear();
-    
+
     if(!learning && best_pol_population.size() > 0){
       to_be_restaured_ann = ann;
+      auto it = best_pol_population.begin();
+      ++it;
       ann = best_pol_population.begin()->ann;
     } else if(learning){
       to_be_restaured_ann = new MLP(*ann, false);
@@ -311,21 +308,21 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       //restore ann
       ann = to_be_restaured_ann;
       
+      //       no cheat -> no update on testing
       //update score of played pol
-      double new_score = (best_pol_population.begin()->J * best_pol_population.begin()->played + sum_weighted_reward);
-      new_score /= ((double)best_pol_population.begin()->played + 1);
-      my_pol np = *best_pol_population.begin();
-      np.J = new_score;
-      np.played++;
-      best_pol_population.erase(best_pol_population.begin());
-      best_pol_population.insert(np);
+//       double new_score = (best_pol_population.begin()->J * best_pol_population.begin()->played + sum_weighted_reward);
+//       new_score /= ((double)best_pol_population.begin()->played + 1);
+//       my_pol np = *best_pol_population.begin();
+//       np.J = new_score;
+//       np.played++;
+//       best_pol_population.erase(best_pol_population.begin());
+//       best_pol_population.insert(np);
     } else if(learning) {
       //not totaly stable because J(the policy stored here ) != sum_weighted_reward (online updates)
-      //so include first & last policy
     
       //policies pool for testing
       if(best_pol_population.size() == 0 || best_pol_population.rbegin()->J < sum_weighted_reward){
-        if(best_pol_population.size() > 100){
+        if(best_pol_population.size() > 10){
           //remove smallest
           auto it = best_pol_population.end();
           --it;
@@ -334,26 +331,6 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
         }
 //         MLP* pol_fitted_sample = new MLP(*ann, true, true);
         MLP* pol_fitted_sample=to_be_restaured_ann;
-        uint nb_update = (last_trajectory_ftesting.size() / kMinibatchSize) * 3;
-        nb_update=0;
-        for(uint fupd=0;fupd<nb_update;fupd++){
-          std::vector<sample> traj(kMinibatchSize);
-          sample_transition(traj, last_trajectory_ftesting);
-          
-          std::vector<double> all_states(traj.size() * nb_sensors);
-          std::vector<double> all_actions(traj.size() * nb_motors);
-          
-          uint i=0;
-          for (auto it : traj){
-            std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
-            std::copy(it.a.begin(), it.a.end(), all_actions.begin() + i * nb_motors);
-            i++;
-          }
-          
-          pol_fitted_sample->InputDataIntoLayers(all_states.data(), NULL, all_actions.data());
-          pol_fitted_sample->getSolver()->Step(1);
-        }
-        
         best_pol_population.insert({pol_fitted_sample,sum_weighted_reward, 0});
       } else
         delete to_be_restaured_ann;
@@ -502,8 +479,15 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
  protected:
   void _display(std::ostream& out) const override {
-    out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " " << std::setw(
-          8) << std::fixed << std::setprecision(5) << noise << " " << trajectory.size() ;
+    out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward 
+//     #ifndef NDEBUG
+//     << " " << std::setw(8) << std::fixed << std::setprecision(5) << noise 
+//     << " " << trajectory.size() 
+//     << " " << ann->weight_l1_norm() 
+//     << " " << std::fixed << std::setprecision(7) << qnn->error() 
+//     << " " << qnn->weight_l1_norm()
+//     #endif
+    ;
   }
 
   void _dump(std::ostream& out) const override {
@@ -551,7 +535,6 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   };
   std::multiset<my_pol> best_pol_population;
   MLP* to_be_restaured_ann;
-  std::deque<sample> last_trajectory_ftesting;
 #endif  
   
   MLP* ann, *ann_target;

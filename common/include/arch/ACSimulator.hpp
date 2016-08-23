@@ -77,7 +77,7 @@ protected:
     if(generate_bestV)
       learning = false;
       
-    this->env->reset_episode();
+    this->env->reset_episode(learning);
     std::list<double> all_rewards;
     this->agent->start_instance(learning);
     
@@ -150,7 +150,7 @@ protected:
         this->agent->learn_V(s_BVS);
       }
 
-      this->env->next_instance();
+      this->env->next_instance(learning);
       this->agent->end_episode();
       
       delete policy;

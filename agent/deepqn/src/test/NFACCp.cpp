@@ -6,21 +6,24 @@
 #include "bib/Assert.hpp"
 #include "arch/Simulator.hpp"
 #include "arch/Example.hpp"
-#include "AdvancedAcrobotEnv.hpp"
+#include "CartpoleEnv.hpp"
 
+#define POOL_FOR_TESTING
 #include "NeuralFittedACAg.hpp"
 
 int main(int argc, char **argv) {
   FLAGS_minloglevel = 2;
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
-
-  arch::Simulator<AdvancedAcrobotEnv, NeuralFittedACAg> s;
-
+  
+  arch::Simulator<CartpoleEnv, NeuralFittedACAg> s;
+  
   s.init(argc, argv);
-
+  
   s.run();
-
+  
+  LOG_DEBUG("works !");
+  
   google::ShutDownCommandLineFlags();
   google::ShutdownGoogleLogging();
   google::protobuf::ShutdownProtobufLibrary();

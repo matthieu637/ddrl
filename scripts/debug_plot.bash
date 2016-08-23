@@ -1,6 +1,6 @@
 #!/bin/bash
 
-STAT_FILE="*.learning.data"
+STAT_FILE=".learning.data"
 LHPO_PATH="$(pwd)/extern/lhpo"
 
 echoerr() { echo "$@" 1>&2; }
@@ -53,7 +53,7 @@ function ask_higher_better(){
 
 lot=`ask_learning_testing`
 if [[ $lot == "T" ]] ; then
-	STAT_FILE="*.testing.data"
+	STAT_FILE=".testing.data"
 fi
 
 dimension=`ask_dimension`
@@ -72,5 +72,6 @@ while [ 1 ] ; do
 	cd $1
 	echo "OCTAVE_PATH=$LHPO_PATH/utils octave $LHPO_PATH/utils/$COMMAND"
 	OCTAVE_PATH=$LHPO_PATH/utils octave $LHPO_PATH/utils/$COMMAND
+	sleep 1s
 done
 

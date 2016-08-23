@@ -29,10 +29,10 @@ class AEnvironment : public ProgOptions, public CommonAE {
     _unique_invoke(properties, vm);
   }
 
-  void reset_episode() {
+  void reset_episode(bool learning) {
     current_instance = 0;
     current_step = 0;
-    _reset_episode();
+    _reset_episode(learning);
   }
   
   void reset_episode_choose(const std::vector<double>& stochasticity){
@@ -41,10 +41,10 @@ class AEnvironment : public ProgOptions, public CommonAE {
     _reset_episode_choose(stochasticity);
   }
 
-  void next_instance() {
+  void next_instance(bool learning) {
     current_step = 0;
     current_instance++;
-    _next_instance();
+    _next_instance(learning);
   }
 
   void next_instance_choose(const std::vector<double>& stochasticity) {
@@ -79,11 +79,19 @@ class AEnvironment : public ProgOptions, public CommonAE {
 
   virtual void _reset_episode() {}
   
+  virtual void _reset_episode(bool) {
+    _reset_episode();
+  }
+  
   virtual void _reset_episode_choose(const std::vector<double>&) {
     _reset_episode();
   }
 
   virtual void _next_instance() {}
+  
+  virtual void _next_instance(bool) {
+    _next_instance();
+  }
   
   virtual void _next_instance_choose(const std::vector<double>&) {
     _next_instance();

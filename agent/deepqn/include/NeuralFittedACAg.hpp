@@ -16,6 +16,11 @@
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 
+// 
+// POOL_FOR_TESTING need to be define for stochastics environements
+// in order to test (learning=false) "the best" known policy
+// 
+
 #define DOUBLE_COMPARE_PRECISION 1e-9
 
 typedef struct _sample {
@@ -114,6 +119,11 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
     for(auto p : old_executed_policies)
       delete p;
+    
+#ifdef POOL_FOR_TESTING
+    for (auto i : best_pol_population)
+      delete i.ann;
+#endif
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
@@ -195,7 +205,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
     sampling_strategy           = pt->get<uint>("agent.sampling_strategy");
     fishing_policy              = pt->get<uint>("agent.fishing_policy");
     inverting_grad              = pt->get<bool>("agent.inverting_grad");
-    double decay_v              = pt->get<double>("agent.decay_v");
+    decay_v                     = pt->get<double>("agent.decay_v");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -404,7 +414,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
 
       if(reset_qnn) {
         delete qnn;
-        qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, mini_batch_size, -1, batch_norm);
+        qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, mini_batch_size, decay_v, batch_norm);
       }
 
       //Update critic
@@ -561,7 +571,43 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
 
     update_actor_critic();
   }
+#ifdef POOL_FOR_TESTING
+  void start_instance(bool learning) override {
+    if(!learning && best_pol_population.size() > 0){
+      to_be_restaured_ann = ann;
+      auto it = best_pol_population.begin();
+      ++it;
+      ann = best_pol_population.begin()->ann;
+    } else if(learning){
+      to_be_restaured_ann = new MLP(*ann, false);
+    }
+  }
+    
+  void end_instance(bool learning) override {
+    if(!learning && best_pol_population.size() > 0){
+      //restore ann
+      ann = to_be_restaured_ann;
+    } else if(learning) {
+      //not totaly stable because J(the policy stored here ) != sum_weighted_reward (online updates)
+      
+      //policies pool for testing
+      if(best_pol_population.size() == 0 || best_pol_population.rbegin()->J < sum_weighted_reward){
+        if(best_pol_population.size() > 10){
+          //remove smallest
+          auto it = best_pol_population.end();
+          --it;
+          delete it->ann;
+          best_pol_population.erase(it);
+        }
 
+        MLP* pol_fitted_sample=to_be_restaured_ann;
+        best_pol_population.insert({pol_fitted_sample,sum_weighted_reward, 0});
+      } else
+        delete to_be_restaured_ann;
+      
+    }
+  }
+#endif
   double criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions) override {
     return qnn->computeOutVF(perceptions, actions);
   }
@@ -616,6 +662,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
   uint replay_memory, nb_actor_updates, nb_critic_updates, nb_fitted_updates, nb_internal_critic_updates;
   double alpha_a;
   double alpha_v;
+  double decay_v;
 
   uint batch_norm, minibatcher, sampling_strategy, fishing_policy;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
@@ -631,6 +678,20 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
 
   MLP* ann;
   MLP* qnn;
+  
+#ifdef POOL_FOR_TESTING  
+  struct my_pol{
+    MLP* ann;
+    double J;
+    uint played;
+    
+    bool operator< (const my_pol& b) const {
+      return J > b.J;
+    }
+  };
+  std::multiset<my_pol> best_pol_population;
+  MLP* to_be_restaured_ann;
+#endif
 };
 
 #endif

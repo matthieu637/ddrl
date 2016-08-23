@@ -51,6 +51,10 @@ target_link_libraries(cartpole
   ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} 
   ${Boost_LIBRARIES} ${CUDA_LIBRARIES} ${PROTOBUF_LIBRARIES} ${GLOG_LIBRARIES} ${Caffe_LIBRARIES} )
 
+add_executable(cp-nfac src/test/NFACCp.cpp ${all_include} ${all_sources} )
+target_link_libraries(cp-nfac
+  ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} 
+  ${Boost_LIBRARIES} ${CUDA_LIBRARIES} ${PROTOBUF_LIBRARIES} ${GLOG_LIBRARIES} ${Caffe_LIBRARIES} )
   
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

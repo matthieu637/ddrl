@@ -195,7 +195,7 @@ void CartpoleWorld::resetPositions(std::vector<double>& stochasticity, const std
   
   double theta, x;
   
-  do {
+//   do {
     dBodySetPosition(bones[0]->getID(), 0, 0, CART_LARGER/2.f);
     dBodySetPosition(bones[1]->getID(), 0, 0, POLE_LENGTH/2.f+CART_LARGER/2.f);
     
@@ -217,7 +217,7 @@ void CartpoleWorld::resetPositions(std::vector<double>& stochasticity, const std
     
     dBodySetPosition(bones[0]->getID(), x + shifting, 0, CART_LARGER/2.f);
     dBodySetPosition(bones[1]->getID(), x, 0, POLE_LENGTH/2.f+CART_LARGER/2.f);
-  } while(goal_state()); 
+//   } while(goal_state()); 
   
   dJointAddSliderForce(joints[0], 0);
 

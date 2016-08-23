@@ -104,7 +104,7 @@ class Simulator {
 
  protected:
   virtual void run_episode(bool learning, unsigned int lepisode, unsigned int tepsiode, Stat& stat) {
-    env->reset_episode();
+    env->reset_episode(learning);
     std::list<double> all_rewards;
     agent->start_instance(learning);
     
@@ -132,7 +132,7 @@ class Simulator {
       agent->runf(reward, perceptions, learning, env->final_state(), true);
       all_rewards.push_back(reward);
 
-      env->next_instance();
+      env->next_instance(learning);
       agent->end_episode();
 
       dump_and_display(lepisode, instance, tepsiode, all_rewards, env, agent, learning, step);
