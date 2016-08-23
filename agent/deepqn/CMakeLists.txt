@@ -68,6 +68,7 @@ execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-a
 #execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-acrobot-3l.ini data/cmaes-acrobot-3l.ini acrobot-3l.ini)
 execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-cartpole.ini data/ddpg-cp.ini cartpole-ddpg.ini)
 
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-acrobot.ini data/nfac-ada.ini acrobot-nfac.ini)
 #
 # -------------------
 # Unit Test
