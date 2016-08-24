@@ -16,10 +16,10 @@
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 
-// 
+//
 // POOL_FOR_TESTING need to be define for stochastics environements
 // in order to test (learning=false) "the best" known policy
-// 
+//
 
 #define DOUBLE_COMPARE_PRECISION 1e-9
 
@@ -119,7 +119,12 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
     for(auto p : old_executed_policies)
       delete p;
-    
+
+    if(target_network) {
+      delete qnn_target;
+      delete ann_target;
+    }
+
 #ifdef POOL_FOR_TESTING
     for (auto i : best_pol_population)
       delete i.ann;
@@ -130,14 +135,16 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
                                   bool learning, bool goal_reached, bool last) override {
 
     vector<double>* next_action = ann->computeOut(sensors);
+    if(next_action->at(0) > 1. || next_action->at(0) < -1.)
+      LOG_DEBUG("WATH");
 //     shrink_actions(next_action);
 
     if (last_action.get() != nullptr && learning) {
       double p0 = 1.f;
       for(uint i=0; i < nb_motors; i++)
         p0 *=
-          
-exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_action->at(i))/(2.f*noise*noise));
+
+          exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_action->at(i))/(2.f*noise*noise));
 
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || last, p0, 0., false};
       if(goal_reached && reward > rmax) {
@@ -150,7 +157,11 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
       if(gaussian_policy) {
-        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
+        vector<double>* randomized_action = nullptr;
+        if(gaussian_reject)
+          randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
+        else
+          randomized_action = bib::Proba<double>::multidimentionnalGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
       } else if(bib::Utils::rand01() < noise) { //e-greedy
@@ -206,6 +217,10 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
     fishing_policy              = pt->get<uint>("agent.fishing_policy");
     inverting_grad              = pt->get<bool>("agent.inverting_grad");
     decay_v                     = pt->get<double>("agent.decay_v");
+    target_network              = pt->get<bool>("agent.target_network");
+    tau_soft_update             = pt->get<double>("agent.tau_soft_update");
+    weighting_strategy          = pt->get<uint>("agent.weighting_strategy");
+    gaussian_reject             = pt->get<bool>("agent.gaussian_reject");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -217,7 +232,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
     LOG_INFO("CPU mode");
     (void) command_args;
 #else
-    if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){
+    if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0) {
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
       LOG_INFO("CPU mode");
     } else {
@@ -225,7 +240,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
       caffe::Caffe::SetDevice(0);
       LOG_INFO("GPU mode");
     }
-#endif    
+#endif
 
     if(reset_qnn && minibatcher != 0) {
       LOG_DEBUG("option splash -> cannot reset_qnn and count on minibatch to train a new Q function");
@@ -237,9 +252,19 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
       exit(1);
     }
 
-    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, mini_batch_size, decay_v, batch_norm);
+    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
+                  alpha_v,
+                  mini_batch_size,
+                  decay_v,
+                  batch_norm,
+                  weighting_strategy > 0);
 
     ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, !inverting_grad, batch_norm);
+
+    if(target_network) {
+      qnn_target = new MLP(*qnn, false);
+      ann_target = new MLP(*ann, false);
+    }
   }
 
   void shrink_actions(vector<double>* next_action) {
@@ -388,11 +413,29 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
         i++;
       }
 
-      auto all_next_actions = ann->computeOutBatch(all_next_states);
-//       shrink_actions(all_next_actions);
+      std::vector<double>* all_next_actions;
+      if(target_network)
+        all_next_actions = ann_target->computeOutBatch(all_next_states);
+      else
+        all_next_actions = ann->computeOutBatch(all_next_states);
+
       //compute next q
-      auto q_targets = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+      std::vector<double>* q_targets;
+      std::vector<double>* q_targets_weights = nullptr;
+      double* ptheta = nullptr;
+      if(target_network)
+        q_targets = qnn_target->computeOutVFBatch(all_next_states, *all_next_actions);
+      else
+        q_targets = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
       delete all_next_actions;
+
+      if(weighting_strategy != 0) {
+        q_targets_weights = new std::vector<double>(q_targets->size(), 1.0f);
+        if(weighting_strategy > 1) {
+          ptheta = new double[traj->size()];
+          computePTheta(*traj, ptheta);
+        }
+      }
 
       //adjust q_targets
       i=0;
@@ -409,28 +452,54 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
             q_targets->at(i) = rmax;
         }
 
+        if(it.p0 == 0) {
+          LOG_DEBUG(it.p0 << " " << 1.0f/it.p0);
+          bib::Logger::PRINT_ELEMENTS(it.a);
+          bib::Logger::PRINT_ELEMENTS(it.pure_a);
+        }
+
+
+        if(weighting_strategy==1)
+          q_targets_weights->at(i)=1.0f/it.p0;
+        else if(weighting_strategy==2)
+          q_targets_weights->at(i)=ptheta[i]/it.p0;
+        else if(weighting_strategy==3)
+          q_targets_weights->at(i)=std::min((double)1.0f, ptheta[i]/it.p0);
+
         i++;
       }
 
       if(reset_qnn) {
         delete qnn;
-        qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, mini_batch_size, decay_v, batch_norm);
+        qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, mini_batch_size,
+                      decay_v, batch_norm, weighting_strategy > 0);
       }
 
       //Update critic
       qnn->InputDataIntoLayers(all_states.data(), all_actions.data(), q_targets->data());
+      if(weighting_strategy != 0)
+        qnn->setWeightedSampleVector(q_targets_weights->data());
       if(minibatcher != 0)
         qnn->getSolver()->Step(1);
       else
         qnn->getSolver()->Step(iter);
 
       delete q_targets;
+      if(weighting_strategy != 0) {
+        delete q_targets_weights;
+        if(weighting_strategy > 1)
+          delete[] ptheta;
+      }
 
       //usefull?
       qnn->ZeroGradParameters();
 
       if(minibatcher != 0)
         delete traj;
+
+      if(target_network) {
+        qnn_target->soft_update(*qnn, tau_soft_update);
+      }
     }
   }
 
@@ -468,7 +537,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
         q_values_diff[q_values_blob->offset(i++,0,0,0)] = -1.0f;
       qnn->getNN()->BackwardFrom(qnn->GetLayerIndex(MLP::q_values_layer_name));
       const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
-      if(inverting_grad){
+      if(inverting_grad) {
         double* action_diff = critic_action_blob->mutable_cpu_diff();
 
         for (uint n = 0; n < traj->size(); ++n) {
@@ -499,6 +568,10 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
 
       if(minibatcher != 0)
         delete traj;
+
+      if(target_network) {
+        ann_target->soft_update(*ann, tau_soft_update);
+      }
     }
   }
 
@@ -515,8 +588,8 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
     std::vector<MLP*> candidate_policies(nb_fitted_updates);
     std::vector<double> candidate_policies_scores(nb_fitted_updates);
     std::deque<sample>* samples_for_score = nullptr;
-    
-    if(fishing_policy == 1){
+
+    if(fishing_policy == 1) {
       samples_for_score = new std::deque<sample>(mini_batch_size);
       sample_transition(*samples_for_score, trajectory, mini_batch_size);
     }
@@ -543,10 +616,10 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
         uint index_best = 0;
         while(candidate_policies_scores[index_best] < mmax)
           index_best++;
-        
+
         delete ann;
         ann = new MLP(*candidate_policies[index_best], true);
-        
+
         delete samples_for_score;
       }
 
@@ -573,26 +646,26 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
   }
 #ifdef POOL_FOR_TESTING
   void start_instance(bool learning) override {
-    if(!learning && best_pol_population.size() > 0){
+    if(!learning && best_pol_population.size() > 0) {
       to_be_restaured_ann = ann;
       auto it = best_pol_population.begin();
       ++it;
       ann = best_pol_population.begin()->ann;
-    } else if(learning){
+    } else if(learning) {
       to_be_restaured_ann = new MLP(*ann, false);
     }
   }
-    
+
   void end_instance(bool learning) override {
-    if(!learning && best_pol_population.size() > 0){
+    if(!learning && best_pol_population.size() > 0) {
       //restore ann
       ann = to_be_restaured_ann;
     } else if(learning) {
       //not totaly stable because J(the policy stored here ) != sum_weighted_reward (online updates)
-      
+
       //policies pool for testing
-      if(best_pol_population.size() == 0 || best_pol_population.rbegin()->J < sum_weighted_reward){
-        if(best_pol_population.size() > 10){
+      if(best_pol_population.size() == 0 || best_pol_population.rbegin()->J < sum_weighted_reward) {
+        if(best_pol_population.size() > 10) {
           //remove smallest
           auto it = best_pol_population.end();
           --it;
@@ -604,7 +677,7 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
         best_pol_population.insert({pol_fitted_sample,sum_weighted_reward, 0});
       } else
         delete to_be_restaured_ann;
-      
+
     }
   }
 #endif
@@ -631,15 +704,15 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
 
  protected:
   void _display(std::ostream& out) const override {
-    out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward 
+    out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward
 #ifndef NDEBUG
-    << " " << std::setw(8) << std::fixed << std::setprecision(5) << noise 
-    << " " << trajectory.size() 
-    << " " << ann->weight_l1_norm() 
-    << " " << std::fixed << std::setprecision(7) << qnn->error() 
-    << " " << qnn->weight_l1_norm()
+        << " " << std::setw(8) << std::fixed << std::setprecision(5) << noise
+        << " " << trajectory.size()
+        << " " << ann->weight_l1_norm()
+        << " " << std::fixed << std::setprecision(7) << qnn->error()
+        << " " << qnn->weight_l1_norm()
 #endif
-    ;
+        ;
   }
 
   void _dump(std::ostream& out) const override {
@@ -663,9 +736,11 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
   double alpha_a;
   double alpha_v;
   double decay_v;
+  double tau_soft_update;
 
-  uint batch_norm, minibatcher, sampling_strategy, fishing_policy;
+  uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
+  bool target_network, gaussian_reject;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
@@ -678,13 +753,16 @@ exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_
 
   MLP* ann;
   MLP* qnn;
-  
-#ifdef POOL_FOR_TESTING  
-  struct my_pol{
+
+  MLP* ann_target;
+  MLP* qnn_target;
+
+#ifdef POOL_FOR_TESTING
+  struct my_pol {
     MLP* ann;
     double J;
     uint played;
-    
+
     bool operator< (const my_pol& b) const {
       return J > b.J;
     }
