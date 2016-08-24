@@ -194,6 +194,9 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     decay_v                 = pt->get<double>("agent.decay_v");
     batch_norm              = pt->get<uint>("agent.batch_norm");
     count_last              = pt->get<bool>("agent.count_last");
+#ifdef POOL_FOR_TESTING
+    testing_strategy        = pt->get<uint>("agent.testing_strategy");
+#endif
     
 #ifdef CAFFE_CPU_ONLY
     LOG_INFO("CPU mode");
@@ -292,14 +295,38 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
 #ifdef POOL_FOR_TESTING
   void start_instance(bool learning) override {
-
+    to_be_pushed.clear();
+    
     if(!learning && best_pol_population.size() > 0){
       to_be_restaured_ann = ann;
       auto it = best_pol_population.begin();
       ++it;
-      ann = best_pol_population.begin()->ann;
-    } else if(learning){
+      if(testing_strategy <= 3)
+        ann = best_pol_population.begin()->ann;
+      else {
+        double best_score = best_pol_population.begin()->J;
+        int max_index_with_bests = -1;
+        for(auto pols : best_pol_population){
+          if(pols.J >= best_score)
+            max_index_with_bests++;
+          else
+            break;
+        }
+        
+        if(max_index_with_bests == 0)
+          ann = best_pol_population.begin()->ann;
+        else {
+          int choosed_pol = bib::Utils::rand01() * max_index_with_bests;
+          auto it = best_pol_population.begin();
+          for(int i=0;i<choosed_pol;i++)
+            ++it;
+          ann = it->ann;
+        }
+      }
+    } else if(learning && testing_strategy == 0){
       to_be_restaured_ann = new MLP(*ann, false);
+    } else if(learning && testing_strategy == 1){
+      to_be_restaured_ann = new MLP(*ann_target, false);
     }
   }
   
@@ -322,17 +349,31 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     
       //policies pool for testing
       if(best_pol_population.size() == 0 || best_pol_population.rbegin()->J < sum_weighted_reward){
-        if(best_pol_population.size() > 10){
+        if(best_pol_population.size() > 200){
           //remove smallest
           auto it = best_pol_population.end();
           --it;
           delete it->ann;
           best_pol_population.erase(it);
         }
-//         MLP* pol_fitted_sample = new MLP(*ann, true, true);
-        MLP* pol_fitted_sample=to_be_restaured_ann;
-        best_pol_population.insert({pol_fitted_sample,sum_weighted_reward, 0});
-      } else
+        
+        if(testing_strategy <= 3 || testing_strategy == 6 ){
+          MLP* pol_fitted_sample= nullptr;
+          if(testing_strategy <= 1)
+            pol_fitted_sample = to_be_restaured_ann;
+          else if(testing_strategy == 2)
+            pol_fitted_sample = new MLP(*ann, false);
+          else if(testing_strategy == 3)
+            pol_fitted_sample = new MLP(*ann_target, false);
+          
+          best_pol_population.insert({pol_fitted_sample,sum_weighted_reward, 0});
+          if(testing_strategy == 6)
+            best_pol_population.insert({new MLP(*ann_target, false),sum_weighted_reward, 0});
+        } else {
+          for(auto pol : to_be_pushed)
+            best_pol_population.insert({pol,sum_weighted_reward, 0});
+        }
+      } else if(testing_strategy <= 1)
         delete to_be_restaured_ann;
       
     }
@@ -351,6 +392,17 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       auto it = trajectory.end();
       trajectory.insert(it, last_trajectory.begin(), last_trajectory.end());
       last_trajectory.clear();
+
+#ifdef POOL_FOR_TESTING
+      dedicated_counted++;
+      
+      if(dedicated_counted % 20 == 0){
+        if(testing_strategy == 4)
+          to_be_pushed.push_back(new MLP(*ann, false));
+        else if(testing_strategy == 5)
+          to_be_pushed.push_back(new MLP(*ann_target, false));
+      }
+#endif
     }
     
     for(uint fupd=0;fupd<1+force_more_update;fupd++)
@@ -534,7 +586,17 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     }
   };
   std::multiset<my_pol> best_pol_population;
+  std::list<MLP*> to_be_pushed;
   MLP* to_be_restaured_ann;
+  uint dedicated_counted = 0;
+  uint testing_strategy;
+  // 0 -> copy ann before episode
+  // 1 -> copy ann_target before episode
+  // 2 -> copy ann after episode
+  // 3 -> copy ann_target after episode
+  // 4 -> copy several ann during one episode
+  // 5 -> copy several ann_target during one episode
+  // 6 -> mix of 0/3
 #endif  
   
   MLP* ann, *ann_target;
