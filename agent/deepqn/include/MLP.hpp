@@ -106,8 +106,8 @@ class MLP {
       IPLayer(net_param_init, "action_layer_ip", {tower_top}, {"last_relu"}, boost::none, motors);
       ReluLayer(net_param_init, "action_layer", {"last_relu"}, {actions_blob_name}, boost::none);
     } else if(last_layer_type == 2) {
-      IPLayer(net_param_init, "action_layer_ip", {tower_top}, {"last_relu"}, boost::none, motors);
-      ReluLayer(net_param_init, "action_layer", {"last_relu"}, {actions_blob_name}, boost::none);
+      IPLayer(net_param_init, "action_layer_ip", {tower_top}, {"last_tanh"}, boost::none, motors);
+      TanhLayer(net_param_init, "action_layer", {"last_tanh"}, {actions_blob_name}, boost::none);
     }
 
     net_param->CopyFrom(net_param_init);
