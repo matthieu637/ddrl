@@ -145,7 +145,11 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
       if(gaussian_policy){
-        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
+        vector<double>* randomized_action = nullptr;
+        if(gaussian_reject)
+          randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
+        else
+          randomized_action = bib::Proba<double>::multidimentionnalGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
       } else if(bib::Utils::rand01() < noise){ //e-greedy
@@ -186,7 +190,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     replay_memory           = pt->get<uint>("agent.replay_memory");
     inverting_grad          = pt->get<bool>("agent.inverting_grad");
     shrink_greater_action   = pt->get<bool>("agent.shrink_greater_action");
-    sure_shrink 	    = pt->get<bool>("agent.sure_shrink");
+    sure_shrink 	          = pt->get<bool>("agent.sure_shrink");
     force_more_update       = pt->get<uint>("agent.force_more_update");
     tau_soft_update         = pt->get<double>("agent.tau_soft_update");
     alpha_a                 = pt->get<double>("agent.alpha_a");
@@ -194,6 +198,8 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     decay_v                 = pt->get<double>("agent.decay_v");
     batch_norm              = pt->get<uint>("agent.batch_norm");
     count_last              = pt->get<bool>("agent.count_last");
+    gaussian_reject         = pt->get<bool>("agent.gaussian_reject");
+    last_layer_actor        = pt->get<uint>("agent.last_layer_actor");
 #ifdef POOL_FOR_TESTING
     testing_strategy        = pt->get<uint>("agent.testing_strategy");
 #endif
@@ -215,7 +221,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, batch_norm);
     qnn_target = new MLP(*qnn, false);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, !inverting_grad, batch_norm);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, last_layer_actor, batch_norm);
     ann_target = new MLP(*ann, false);
   }
 
@@ -565,8 +571,10 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   uint replay_memory;
   uint force_more_update;
   uint batch_norm;
+  uint last_layer_actor;
   
   bool learning, pure_online, inverting_grad, shrink_greater_action, sure_shrink, count_last;
+  bool gaussian_reject;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

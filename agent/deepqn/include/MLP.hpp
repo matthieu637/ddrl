@@ -87,7 +87,7 @@ class MLP {
   }
 
   MLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize,
-      bool add_last_RELU_layer, uint batch_norm) : size_input_state(sensors),
+      uint last_layer_type, uint batch_norm) : size_input_state(sensors),
     size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize) {
 
     caffe::SolverParameter solver_param;
@@ -100,9 +100,12 @@ class MLP {
                     boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
     SilenceLayer(net_param_init, "silence", {"dummy1"}, {}, boost::none);
     std::string tower_top = Tower(net_param_init, "", states_blob_name, hiddens, batch_norm);
-    if(!add_last_RELU_layer)
+    if(last_layer_type == 0)
       IPLayer(net_param_init, "action_layer", {tower_top}, {actions_blob_name}, boost::none, motors);
-    else {
+    else if(last_layer_type == 1) {
+      IPLayer(net_param_init, "action_layer_ip", {tower_top}, {"last_relu"}, boost::none, motors);
+      ReluLayer(net_param_init, "action_layer", {"last_relu"}, {actions_blob_name}, boost::none);
+    } else if(last_layer_type == 2) {
       IPLayer(net_param_init, "action_layer_ip", {tower_top}, {"last_relu"}, boost::none, motors);
       ReluLayer(net_param_init, "action_layer", {"last_relu"}, {actions_blob_name}, boost::none);
     }
