@@ -135,16 +135,16 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
                                   bool learning, bool goal_reached, bool last) override {
 
     vector<double>* next_action = ann->computeOut(sensors);
-    if(next_action->at(0) > 1. || next_action->at(0) < -1.)
-      LOG_DEBUG("WATH");
-//     shrink_actions(next_action);
+    if(shrink_greater_action)
+      shrink_actions(next_action);
 
     if (last_action.get() != nullptr && learning) {
       double p0 = 1.f;
-      for(uint i=0; i < nb_motors; i++)
-        p0 *=
-
-          exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_action->at(i))/(2.f*noise*noise));
+      for(uint i=0; i < nb_motors; i++){
+        double diff = last_pure_action->at(i)-last_action->at(i);
+        double pre_exp = -diff*diff/(2.f*noise*noise);
+        p0 *= exp(pre_exp);
+      }
 
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || last, p0, 0., false};
       if(goal_reached && reward > rmax) {
@@ -221,6 +221,9 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     tau_soft_update             = pt->get<double>("agent.tau_soft_update");
     weighting_strategy          = pt->get<uint>("agent.weighting_strategy");
     gaussian_reject             = pt->get<bool>("agent.gaussian_reject");
+    last_layer_actor            = pt->get<uint>("agent.last_layer_actor");
+    shrink_greater_action       = pt->get<bool>("agent.shrink_greater_action");
+//     reset_ann
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -243,12 +246,17 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 #endif
 
     if(reset_qnn && minibatcher != 0) {
-      LOG_DEBUG("option splash -> cannot reset_qnn and count on minibatch to train a new Q function");
+      LOG_INFO("option splash -> cannot reset_qnn and count on minibatch to train a new Q function");
       exit(1);
     }
 
     if(minibatcher == 0 && sampling_strategy > 0) {
-      LOG_DEBUG("option splash -> cannot have a sampling stat without sampling");
+      LOG_INFO("option splash -> cannot have a sampling stat without sampling");
+      exit(1);
+    }
+    
+    if(gaussian_reject && weighting_strategy > 0){
+      LOG_INFO("option splash -> cannot compute p0 with reject gaussian");
       exit(1);
     }
 
@@ -259,7 +267,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
                   batch_norm,
                   weighting_strategy > 0);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, !inverting_grad, batch_norm);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, last_layer_actor, batch_norm);
 
     if(target_network) {
       qnn_target = new MLP(*qnn, false);
@@ -302,7 +310,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       }
 
       auto all_next_actions = ann->computeOutBatch(all_states);
-//       shrink_actions(all_next_actions);
+      if(shrink_greater_action)
+        shrink_actions(all_next_actions);
 
       for(uint i=0; i<mini_batch_size && it2 != vtraj.cend(); i++) {
         sample sm = *it2;
@@ -332,7 +341,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       ++it1;
     }
     auto all_actions_outputs = policy->computeOutBatch(all_states);
-//     shrink_actions(all_actions_outputs); //sure_shrink to false from DDPG
+    if(shrink_greater_action)
+      shrink_actions(all_actions_outputs);
 
     auto all_qsa = qnn->computeOutVFBatch(all_states, *all_actions_outputs);
 
@@ -412,13 +422,16 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
         std::copy(it.a.begin(), it.a.end(), all_actions.begin() + i * nb_motors);
         i++;
       }
-
+      
       std::vector<double>* all_next_actions;
       if(target_network)
         all_next_actions = ann_target->computeOutBatch(all_next_states);
       else
         all_next_actions = ann->computeOutBatch(all_next_states);
 
+      if(shrink_greater_action)
+        shrink_actions(all_next_actions);
+      
       //compute next q
       std::vector<double>* q_targets;
       std::vector<double>* q_targets_weights = nullptr;
@@ -526,7 +539,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       ann->ZeroGradParameters();
 
       auto all_actions_outputs = ann->computeOutBatch(all_states);
-      //shrink_actions(all_actions_outputs); //sure_shrink to false from DDPG
+//       shrink_actions(all_actions_outputs);
 
       delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
 
@@ -738,9 +751,9 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   double decay_v;
   double tau_soft_update;
 
-  uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy;
+  uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy, last_layer_actor;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
-  bool target_network, gaussian_reject;
+  bool target_network, gaussian_reject, shrink_greater_action;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
