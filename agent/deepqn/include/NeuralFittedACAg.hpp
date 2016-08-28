@@ -465,11 +465,11 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
             q_targets->at(i) = rmax;
         }
 
-        if(it.p0 == 0) {
-          LOG_DEBUG(it.p0 << " " << 1.0f/it.p0);
-          bib::Logger::PRINT_ELEMENTS(it.a);
-          bib::Logger::PRINT_ELEMENTS(it.pure_a);
-        }
+//         if(it.p0 == 0) {
+//           LOG_DEBUG(it.p0 << " " << 1.0f/it.p0);
+//           bib::Logger::PRINT_ELEMENTS(it.a);
+//           bib::Logger::PRINT_ELEMENTS(it.pure_a);
+//         }
 
 
         if(weighting_strategy==1)
