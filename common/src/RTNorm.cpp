@@ -28,9 +28,9 @@
 
 #include <cmath>
 #include <iostream>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_sf_erf.h>
+// #include <gsl/gsl_rng.h>
+// #include <gsl/gsl_randist.h>
+// #include <gsl/gsl_sf_erf.h>
 
 #include "bib/RTNorm.hpp"
 #include "bib/Seed.hpp"
