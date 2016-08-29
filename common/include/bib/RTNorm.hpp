@@ -29,7 +29,7 @@
 #ifndef RTNORNM_HPP
 #define RTNORNM_HPP
 
-#include <gsl/gsl_rng.h>
+// #include <gsl/gsl_rng.h>
 #include <vector>
 
 
