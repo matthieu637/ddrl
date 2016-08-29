@@ -29,6 +29,12 @@ class Seed {
     std::uniform_real_distribution<double> dis(min, max);
     return dis(engine);
   }
+  
+  template<typename Real>
+  static Real gaussianRand(Real mean, Real sigma){
+    std::normal_distribution<Real> dis(mean, sigma);
+    return dis(engine);
+  }
 
   static std::mt19937* random_engine() {
     return &engine;

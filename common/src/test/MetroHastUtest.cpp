@@ -105,7 +105,7 @@ TEST(MetropolisHasting, MultiStepConsistency) {
 
     outfile.close();
     double lg = bib::Proba<double>::loglikelihood<std::vector< std::shared_ptr<std::vector<double> > >, UnkownDistribution>
-               (*points, &dist);
+                (*points, &dist);
     mean_llw += lg;
 
     delete points;
@@ -139,7 +139,7 @@ TEST(MetropolisHasting, MultiStepWithInitConsistency) {
 
     outfile.close();
     double lg = bib::Proba<double>::loglikelihood<std::vector< std::shared_ptr<std::vector<double> > >, UnkownDistribution>
-               (*points, &dist);
+                (*points, &dist);
     mean_llw += lg;
 
     delete points;
@@ -155,4 +155,21 @@ TEST(MetropolisHasting, MultiStepWithInitConsistency) {
   //figure; Y=load('mcmc2.data'); plot3(Y(:,1),Y(:,2), '.'); axis([-1 1 -1 1]);
   //figure; Z=load('mcmc3.data'); plot3(Z(:,1),Z(:,2), '.'); axis([-1 1 -1 1]);
 
+}
+
+TEST(Proba, GaussianTruncated) {
+
+  std::vector<double> a(1);
+
+  for(double x=-5.f; x <=2.f; x+= 0.01f) {
+    a[0] = x;
+    std::vector<double>* r = bib::Proba<double>::multidimentionnalTruncatedGaussian(a, 0.1);
+    LOG_FILE("Proba.GaussianTruncated.data", x << " " << r->at(0));
+    EXPECT_GE(r->at(0), -1.);
+    EXPECT_LE(r->at(0), 1.);
+    delete r;
+  }
+
+  // octave code
+  //clear all; close all; figure; X=load('Proba.GaussianTruncated.data'); plot(X(:,1),X(:,2), '.'); 
 }

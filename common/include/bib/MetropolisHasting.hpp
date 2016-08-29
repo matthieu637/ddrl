@@ -7,6 +7,7 @@
 
 #include "Utils.hpp"
 #include "Seed.hpp"
+#include "RTNorm.hpp"
 
 
 namespace bib {
@@ -23,6 +24,15 @@ class Proba {
       gauss->at(i) = number;
     }
 
+    return gauss;
+  }
+  
+  static std::vector<Real>* multidimentionnalTruncatedGaussian(const std::vector<Real>& centers, Real sigma) {
+    std::vector<Real>* gauss = new std::vector<Real>(centers.size());
+    
+    for (uint i = 0; i < centers.size(); i++)
+      gauss->at(i) = rtnorm(-1.0f, 1.0f, centers[i], sigma);
+    
     return gauss;
   }
 
