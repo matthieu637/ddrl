@@ -158,10 +158,12 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     if(learning) {
       if(gaussian_policy) {
         vector<double>* randomized_action = nullptr;
-        if(gaussian_reject)
+        if(gaussian_type == 0)
           randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
-        else
+        else if(gaussian_type == 1)
           randomized_action = bib::Proba<double>::multidimentionnalGaussian(*next_action, noise);
+        else if(gaussian_type == 2)
+          randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
       } else if(bib::Utils::rand01() < noise) { //e-greedy
@@ -220,7 +222,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     target_network              = pt->get<bool>("agent.target_network");
     tau_soft_update             = pt->get<double>("agent.tau_soft_update");
     weighting_strategy          = pt->get<uint>("agent.weighting_strategy");
-    gaussian_reject             = pt->get<bool>("agent.gaussian_reject");
+    gaussian_type               = pt->get<uint>("agent.gaussian_type");
     last_layer_actor            = pt->get<uint>("agent.last_layer_actor");
     shrink_greater_action       = pt->get<bool>("agent.shrink_greater_action");
 //     reset_ann
@@ -255,7 +257,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       exit(1);
     }
     
-    if(gaussian_reject && weighting_strategy > 0){
+    if(gaussian_type != 1 && weighting_strategy > 0){
       LOG_INFO("option splash -> cannot compute p0 with reject gaussian");
       exit(1);
     }
@@ -751,9 +753,10 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   double decay_v;
   double tau_soft_update;
 
+  uint gaussian_type;
   uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy, last_layer_actor;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
-  bool target_network, gaussian_reject, shrink_greater_action;
+  bool target_network, shrink_greater_action;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
