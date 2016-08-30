@@ -173,3 +173,16 @@ TEST(Proba, GaussianTruncated) {
   // octave code
   //clear all; close all; figure; X=load('Proba.GaussianTruncated.data'); plot(X(:,1),X(:,2), '.'); 
 }
+
+TEST(Proba, GaussianTruncatedDensity) {
+  
+  double previous = bib::Proba<double>::truncatedGaussianDensity(1.0, 0.85, 0.05);
+  for(double x=0.9f; x <=1.9f; x+= 0.01f) {
+    double newv = bib::Proba<double>::truncatedGaussianDensity(1.0, x, 0.05);
+    if(x <= 1.15f)
+      EXPECT_GT(newv, previous);
+    else
+      EXPECT_GE(newv, previous);
+    previous = newv;
+  }
+}

@@ -26,14 +26,37 @@ class Proba {
 
     return gauss;
   }
-  
+
   static std::vector<Real>* multidimentionnalTruncatedGaussian(const std::vector<Real>& centers, Real sigma) {
     std::vector<Real>* gauss = new std::vector<Real>(centers.size());
-    
+
     for (uint i = 0; i < centers.size(); i++)
       gauss->at(i) = rtnorm(-1.0f, 1.0f, centers[i], sigma);
-    
+
     return gauss;
+  }
+
+  static Real truncatedGaussianDensity(Real r, Real mu, const Real sigma, Real a=-1.f, Real b=1.f) {
+    //68–95–99.7 rule
+    if(mu > b + 3.f*sigma)
+      mu = b + 3.f*sigma;
+    else if(mu < a - 3.f*sigma)
+      mu = a - 3.f*sigma;
+    
+    const static Real sq2 = 7.071067811865475e-1;            // = 1/sqrt(2)
+    const static Real sqpi = 1.772453850905516;              // = sqrt(pi)
+
+    // Scaling
+    if(mu!=0 || sigma!=1) {
+      a=(a-mu)/sigma;
+      b=(b-mu)/sigma;
+    }
+
+    Real Z = sqpi *sq2 * sigma * ( erf(b*sq2) - erf(a*sq2) );
+    Real p = exp(-pow((r-mu)/sigma,2)/2) / Z;
+//     LOG_DEBUG(p << " " << r << " " << mu << " " << Z << " " << a << " " << b <<
+//               " " <<erf(b*sq2) << " " << erf(a*sq2));
+    return  p;
   }
 
   static std::vector<Real>* multidimentionnalGaussianWReject(const std::vector<Real>& centers, Real sigma) {
@@ -41,14 +64,14 @@ class Proba {
 
     for (uint i = 0; i < centers.size(); i++) {
       Real number;
-      if(centers[i] > 1.0 && centers[i] - 1.0 > 1.5 * sigma){
+      if(centers[i] > 1.0 && centers[i] - 1.0 > 1.5 * sigma) {
         gauss->at(i) = 1.;
         continue;
-      } else if(centers[i] < -1.0 && centers[i] + 1.0 < - 1.5 * sigma){
+      } else if(centers[i] < -1.0 && centers[i] + 1.0 < - 1.5 * sigma) {
         gauss->at(i) = -1.;
         continue;
       }
-      
+
       std::normal_distribution<Real> dist(centers[i], sigma);
       do {
         number = dist(*bib::Seed::random_engine());

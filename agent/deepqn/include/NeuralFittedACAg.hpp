@@ -141,9 +141,13 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     if (last_action.get() != nullptr && learning) {
       double p0 = 1.f;
       for(uint i=0; i < nb_motors; i++){
-        double diff = last_pure_action->at(i)-last_action->at(i);
-        double pre_exp = -diff*diff/(2.f*noise*noise);
-        p0 *= exp(pre_exp);
+        if(gaussian_type == 1){
+          double diff = last_pure_action->at(i)-last_action->at(i);
+          double pre_exp = -diff*diff/(2.f*noise*noise);
+          p0 *= exp(pre_exp);
+        } else {
+          p0 *= bib::Proba<double>::truncatedGaussianDensity(last_action->at(i), last_pure_action->at(i), noise);
+        }
       }
 
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || last, p0, 0., false};
@@ -257,9 +261,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       exit(1);
     }
     
-    if(gaussian_type != 1 && weighting_strategy > 0){
-      LOG_INFO("option splash -> cannot compute p0 with reject gaussian");
-      exit(1);
+    if(gaussian_type == 0 && weighting_strategy > 0){
+      LOG_INFO("gaussian_type -> 0 => proba probably wrong for weighting strat");
     }
 
     qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
@@ -318,9 +321,13 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       for(uint i=0; i<mini_batch_size && it2 != vtraj.cend(); i++) {
         sample sm = *it2;
         double p0 = 1.f;
-        for(uint j=0; i < nb_motors; i++)
-          p0 *= exp(-(all_next_actions->at(i*nb_motors+j)-sm.a[j])*(all_next_actions->at(i*nb_motors+j)-sm.a[j])/
+        for(uint j=0; i < nb_motors; i++){
+          if(gaussian_type == 1)
+            p0 *= exp(-(all_next_actions->at(i*nb_motors+j)-sm.a[j])*(all_next_actions->at(i*nb_motors+j)-sm.a[j])/
                     (2.f*noise*noise));
+          else
+            p0 *= bib::Proba<double>::truncatedGaussianDensity(sm.a[j], all_next_actions->at(i*nb_motors+j), noise);
+        }
 
         ptheta[index] = p0;
         index++;
@@ -467,12 +474,12 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
             q_targets->at(i) = rmax;
         }
 
+// #warning RMME
 //         if(it.p0 == 0) {
 //           LOG_DEBUG(it.p0 << " " << 1.0f/it.p0);
 //           bib::Logger::PRINT_ELEMENTS(it.a);
 //           bib::Logger::PRINT_ELEMENTS(it.pure_a);
 //         }
-
 
         if(weighting_strategy==1)
           q_targets_weights->at(i)=1.0f/it.p0;

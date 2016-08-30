@@ -34,6 +34,7 @@
 
 #include "bib/RTNorm.hpp"
 #include "bib/Seed.hpp"
+#include "bib/Logger.hpp"
 
 int N = 4001;   // Index of the right tail
 
@@ -56,8 +57,6 @@ double rtnorm(
   double ALPHA = 1.837877066409345;             // = log(2*pi)
   int xsize=sizeof(Rtnorm::x)/sizeof(double);   // Length of table x
   int stop = false;
-//   double sq2 = 7.071067811865475e-1;            // = 1/sqrt(2)
-//   double sqpi = 1.772453850905516;              // = sqrt(pi)
 
   double r, z, e, ylk, simy, lbound, u, d, sim;
   int i, ka, kb, k;
@@ -175,8 +174,12 @@ double rtnorm(
     r = r*sigma + mu;
 
   // Compute the probability
-//   Z = sqpi *sq2 * sigma * ( gsl_sf_erf(b*sq2) - gsl_sf_erf(a*sq2) );
+//   double sq2 = 7.071067811865475e-1;            // = 1/sqrt(2)
+//   double sqpi = 1.772453850905516;              // = sqrt(pi)
+//   double Z, p;
+//   Z = sqpi *sq2 * sigma * ( erf(b*sq2) - erf(a*sq2) );
 //   p = exp(-pow((r-mu)/sigma,2)/2) / Z;
+//   LOG_DEBUG("" << r << " " << mu << " (" << p << ")");
 
   return r;
 }
