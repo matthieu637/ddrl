@@ -187,6 +187,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
   void insertSample(const sample& sa) {
 
+    if(no_forgot_offline)
+      trajectory_noforgot.push_back(sa);
     if(!on_policy_update) {
       if(trajectory.size() >= replay_memory)
         trajectory.pop_front();
@@ -230,6 +232,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     last_layer_actor            = pt->get<uint>("agent.last_layer_actor");
     shrink_greater_action       = pt->get<bool>("agent.shrink_greater_action");
     reset_ann                   = pt->get<bool>("agent.reset_ann");
+    no_forgot_offline           = pt->get<bool>("agent.no_forgot_offline");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -599,6 +602,12 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       qnn->increase_batchsize(mini_batch_size);
       ann->increase_batchsize(mini_batch_size);
     }
+    
+    if(no_forgot_offline && trajectory_noforgot.size() > trajectory.size() 
+      && trajectory_noforgot.size() > replay_memory){
+      trajectory.clear();
+      sample_transition(trajectory, trajectory_noforgot, replay_memory);
+    }
 
     std::vector<MLP*> candidate_policies(nb_fitted_updates);
     std::vector<double> candidate_policies_scores(nb_fitted_updates);
@@ -761,7 +770,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   uint gaussian_type;
   uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy, last_layer_actor;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
-  bool target_network, shrink_greater_action, reset_ann;
+  bool target_network, shrink_greater_action, reset_ann, no_forgot_offline;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
@@ -769,6 +778,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
   std::deque<sample> trajectory;
   std::vector<sample> last_trajectory;
+  std::deque<sample> trajectory_noforgot;
 
   std::list<MLP*> old_executed_policies;
 
