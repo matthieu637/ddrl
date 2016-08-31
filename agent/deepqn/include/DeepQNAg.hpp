@@ -302,6 +302,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   }
 
 #ifdef POOL_FOR_TESTING
+  int choosenPol = 0;
   void start_instance(bool learning) override {
     to_be_pushed.clear();
     
@@ -329,9 +330,10 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
           for(int i=0;i<choosed_pol;i++)
             ++it;
           ann = it->ann;
+          choosenPol = choosed_pol;
         }
       }
-    } else if(learning && testing_strategy == 0){
+    } else if(learning && (testing_strategy == 0 || testing_strategy == 6)){
       to_be_restaured_ann = new MLP(*ann, false);
     } else if(learning && testing_strategy == 1){
       to_be_restaured_ann = new MLP(*ann_target, false);
@@ -345,13 +347,19 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       
       //       no cheat -> no update on testing
       //update score of played pol
-//       double new_score = (best_pol_population.begin()->J * best_pol_population.begin()->played + sum_weighted_reward);
-//       new_score /= ((double)best_pol_population.begin()->played + 1);
-//       my_pol np = *best_pol_population.begin();
-//       np.J = new_score;
-//       np.played++;
-//       best_pol_population.erase(best_pol_population.begin());
-//       best_pol_population.insert(np);
+      if(testing_strategy == 7){
+        auto it = best_pol_population.begin();
+        for(int i=0;i<choosenPol;i++)
+          ++it;
+        
+        double new_score = (it->J * it->played + sum_weighted_reward);
+        new_score /= ((double)it->played + 1);
+        my_pol np = *it;
+        np.J = new_score;
+        np.played++;
+        best_pol_population.erase(it);
+        best_pol_population.insert(np);
+      }
     } else if(learning) {
       //not totaly stable because J(the policy stored here ) != sum_weighted_reward (online updates)
     
@@ -367,7 +375,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
         
         if(testing_strategy <= 3 || testing_strategy == 6 ){
           MLP* pol_fitted_sample= nullptr;
-          if(testing_strategy <= 1)
+          if(testing_strategy <= 1 || testing_strategy == 6)
             pol_fitted_sample = to_be_restaured_ann;
           else if(testing_strategy == 2)
             pol_fitted_sample = new MLP(*ann, false);
@@ -405,7 +413,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       dedicated_counted++;
       
       if(dedicated_counted % 20 == 0){
-        if(testing_strategy == 4)
+        if(testing_strategy == 4 || testing_strategy == 7)
           to_be_pushed.push_back(new MLP(*ann, false));
         else if(testing_strategy == 5)
           to_be_pushed.push_back(new MLP(*ann_target, false));
@@ -600,13 +608,14 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   MLP* to_be_restaured_ann;
   uint dedicated_counted = 0;
   uint testing_strategy;
-  // 0 -> copy ann before episode
+  // 0 -> copy ann before episode [BEST]
   // 1 -> copy ann_target before episode
   // 2 -> copy ann after episode
   // 3 -> copy ann_target after episode
   // 4 -> copy several ann during one episode
   // 5 -> copy several ann_target during one episode
   // 6 -> mix of 0/3
+  // 7 -> 4+cheat
 #endif  
   
   MLP* ann, *ann_target;

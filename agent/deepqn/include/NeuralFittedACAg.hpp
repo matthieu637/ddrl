@@ -229,7 +229,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     gaussian_type               = pt->get<uint>("agent.gaussian_type");
     last_layer_actor            = pt->get<uint>("agent.last_layer_actor");
     shrink_greater_action       = pt->get<bool>("agent.shrink_greater_action");
-//     reset_ann
+    reset_ann                   = pt->get<bool>("agent.reset_ann");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -474,13 +474,6 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
             q_targets->at(i) = rmax;
         }
 
-// #warning RMME
-//         if(it.p0 == 0) {
-//           LOG_DEBUG(it.p0 << " " << 1.0f/it.p0);
-//           bib::Logger::PRINT_ELEMENTS(it.a);
-//           bib::Logger::PRINT_ELEMENTS(it.pure_a);
-//         }
-
         if(weighting_strategy==1)
           q_targets_weights->at(i)=1.0f/it.p0;
         else if(weighting_strategy==2)
@@ -627,6 +620,11 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
           candidate_policies_scores[n]=sum_QSA(*samples_for_score, *candidate_policies.crbegin());
         }
       }
+      
+      if(reset_ann) {
+        delete ann;
+        ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, last_layer_actor, batch_norm);
+      }
 
       for(uint i=0; i<nb_actor_updates ; i++)
         actor_update_grad();
@@ -763,7 +761,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   uint gaussian_type;
   uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy, last_layer_actor;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
-  bool target_network, shrink_greater_action;
+  bool target_network, shrink_greater_action, reset_ann;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
