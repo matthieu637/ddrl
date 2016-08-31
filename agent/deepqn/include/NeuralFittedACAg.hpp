@@ -605,7 +605,6 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     
     if(no_forgot_offline && trajectory_noforgot.size() > trajectory.size() 
       && trajectory_noforgot.size() > replay_memory){
-      trajectory.clear();
       sample_transition(trajectory, trajectory_noforgot, replay_memory);
     }
 
