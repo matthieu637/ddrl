@@ -367,7 +367,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   }
 
   void sample_transition(std::deque<sample>& traj, const std::deque<sample>& from, uint nb_sample) {
-    if(sampling_strategy == 1) {
+    if(sampling_strategy <= 1) {
       for(uint i=0; i<nb_sample; i++) {
         int r = std::uniform_int_distribution<int>(0, from.size() - 1)(*bib::Seed::random_engine());
         traj[i] = from[r];
@@ -605,6 +605,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     
     if(no_forgot_offline && trajectory_noforgot.size() > trajectory.size() 
       && trajectory_noforgot.size() > replay_memory){
+      trajectory.resize(replay_memory);
       sample_transition(trajectory, trajectory_noforgot, replay_memory);
     }
 
