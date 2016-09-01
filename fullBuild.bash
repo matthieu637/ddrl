@@ -10,6 +10,8 @@ cd $LIB
 . scripts/check_program.bash
 check_all
 
+export CPU=$(nbcpu)
+
 function hr(){
 	echo "---------------------------------------------------------------------------------"
 }
@@ -50,7 +52,7 @@ function cmakeBuild(){
 	cp $tmplog cmake.log
 	echo '' > $tmplog
 
-	make -j $(nbcpu) >& $tmplog
+	make -j $CPU >& $tmplog
 	stopOnError $? $tmplog
 
 	mv $tmplog build.log
@@ -74,7 +76,7 @@ function cmakeBuildRecall(){
 	cp $tmplog cmake.log
 	echo '' > $tmplog
 
-	make -j $(nbcpu) >& $tmplog
+	make -j $CPU >& $tmplog
 	stopOnError $? $tmplog
 
 	mv $tmplog build.log
@@ -244,6 +246,7 @@ function echo_usage(){
 	echo "--clear : remove old build (without build)"
 	echo "--debug : build only debug"
 	echo "--report : merge all report into one (build_report.log) usefull for continuous integration"
+	echo "-j n : limit the build with n cpu (use all by default)"
 	echo "--help | -h : displays this message"
 }
 
@@ -282,11 +285,15 @@ do
 		"--debug")
 			export BUILD_DEBUG=1
 			;;
+		"-j")
+			shift
+			export CPU=$1
+			;;
 	esac
 done
 
 
-
+echo "INFO : $CPU CPU used"
 echo "INFO : cmake well founded. Look what following to know if you need other software."
 
 if [[ "$FORCE_REMOVE" == '' && $CLEAR -eq 0 ]]  ; then
