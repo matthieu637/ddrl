@@ -233,6 +233,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     shrink_greater_action       = pt->get<bool>("agent.shrink_greater_action");
     reset_ann                   = pt->get<bool>("agent.reset_ann");
     no_forgot_offline           = pt->get<bool>("agent.no_forgot_offline");
+    mixed_sampling              = pt->get<bool>("agent.mixed_sampling");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -259,13 +260,18 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       exit(1);
     }
 
-    if(minibatcher == 0 && sampling_strategy > 0) {
+    if(minibatcher == 0 && sampling_strategy > 0 && !no_forgot_offline) {
       LOG_INFO("option splash -> cannot have a sampling stat without sampling");
       exit(1);
     }
     
     if(gaussian_type == 0 && weighting_strategy > 0){
       LOG_INFO("gaussian_type -> 0 => proba probably wrong for weighting strat");
+    }
+    
+    if(mixed_sampling && !no_forgot_offline){
+      LOG_INFO("option splash -> cannot have mixed_sampling stat without no_forgot_offline");
+      exit(1);
     }
 
     qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
@@ -601,6 +607,10 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       mini_batch_size = trajectory.size();
       qnn->increase_batchsize(mini_batch_size);
       ann->increase_batchsize(mini_batch_size);
+      if(target_network){
+        qnn_target->increase_batchsize(mini_batch_size);
+        ann_target->increase_batchsize(mini_batch_size);
+      }
     }
     
     if(no_forgot_offline && trajectory_noforgot.size() > trajectory.size() 
@@ -637,6 +647,12 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
 
       for(uint i=0; i<nb_actor_updates ; i++)
         actor_update_grad();
+      
+      if(no_forgot_offline && trajectory_noforgot.size() > trajectory.size() 
+        && trajectory_noforgot.size() > replay_memory && mixed_sampling){
+        trajectory.resize(replay_memory);
+        sample_transition(trajectory, trajectory_noforgot, replay_memory);
+      }
     }
 
     if(fishing_policy > 0) {
@@ -770,7 +786,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   uint gaussian_type;
   uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy, last_layer_actor;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
-  bool target_network, shrink_greater_action, reset_ann, no_forgot_offline;
+  bool target_network, shrink_greater_action, reset_ann, no_forgot_offline, mixed_sampling;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
