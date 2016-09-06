@@ -17,7 +17,6 @@
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 #include "MLP.hpp"
-#include "LinMLP.hpp"
 #include "kde.hpp"
 #include "kdtree++/kdtree.hpp"
 

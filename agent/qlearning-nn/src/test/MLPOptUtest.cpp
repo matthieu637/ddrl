@@ -38,7 +38,7 @@ double sech(double x) {
 }
 
 TEST(MLP, ConsistentActivationFunction) {
-  MLP nn(1, 1, 0, 0.01f);
+  MLP nn(1, {1}, 0, 0.01f);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, 1.f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
@@ -85,7 +85,7 @@ TEST(MLP, ConsistentActivationFunction) {
 
 
 TEST(MLP, LearnOpposite) {
-  MLP nn(1, 1, 0, 0.5f);
+  MLP nn(1, {1}, 0, 0.5f);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, -1.f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
@@ -135,7 +135,7 @@ TEST(MLP, LearnOpposite) {
 
 
 TEST(MLP, LearnAndOr) {
-  MLP nn(3, 10, 2, 0.5f);
+  MLP nn(3, {10}, 2, 0.5f);
 
   // Learn
   for (uint n = 0; n < 10000 ; n++) {
@@ -175,7 +175,7 @@ TEST(MLP, LearnAndOr) {
 
 
 TEST(MLP, MLPCheckOuput) {
-  MLP nn(1, 1, 2, 0.5f);
+  MLP nn(1, {1}, 2, 0.5f);
   std::vector<double> sens(0);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, 1.f);
@@ -206,7 +206,7 @@ TEST(MLP, MLPCheckOuput) {
 }
 
 TEST(MLP, MLPCheckDerivative) {
-  MLP nn(1, 1, 2, 0.5f);
+  MLP nn(1, {1}, 2, 0.5f);
   std::vector<double> sens(0);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, 1.f);
@@ -249,7 +249,7 @@ TEST(MLP, MLPCheckDerivative) {
 }
 
 TEST(MLP, MLPCheckAnalyticscFuncDerHess) {
-  MLP nn(1, 1, 0, 0.5f);
+  MLP nn(1, {1}, 0, 0.5f);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, -1.f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
@@ -289,7 +289,7 @@ TEST(MLP, MLPCheckAnalyticscFuncDerHess) {
 }
 
 TEST(MLP, MLPCheckDerivativeHard) {
-  MLP nn(4, 10, 3, 0.5f);
+  MLP nn(4, {10}, 3, 0.5f);
   std::vector<double> sens(3);
   sens[0] = bib::Utils::randin(-1, 1);
   sens[1] = bib::Utils::randin(-1, 1);
@@ -330,7 +330,7 @@ TEST(MLP, MLPCheckDerivativeHard) {
 }
 
 TEST(MLP, MLPCheckHessian) {
-  MLP nn(4, 10, 3, 0.5f);
+  MLP nn(4, {10}, 3, 0.5f);
   std::vector<double> sens(3);
   sens[0] = bib::Utils::randin(-1, 1);
   sens[1] = bib::Utils::randin(-1, 1);
@@ -367,7 +367,7 @@ TEST(MLP, MLPCheckHessian) {
 }
 
 TEST(MLP, OptimizeOpposite) {
-  MLP nn(1, 1, 0, 0.5f);
+  MLP nn(1, {1}, 0, 0.5f);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, -1.f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
@@ -424,7 +424,7 @@ TEST(MLP, OptimizeOpposite) {
 
 
 TEST(MLP, OptimizeAndOr) {
-  MLP nn(3, 10, 2, 0.5f);
+  MLP nn(3, {10}, 2, 0.5f);
 
   // Learn
   for (uint n = 0; n < 10000 ; n++) {
@@ -467,7 +467,7 @@ TEST(MLP, OptimizeAndOr) {
 
 
 TEST(MLP, OptimizeMultiDim) {
-  MLP nn(3, 20, 0, 0.5f);
+  MLP nn(3, {20}, 0, 0.5f);
 
   // Learn
   for (uint n = 0; n < 10000 ; n++) {
@@ -505,7 +505,7 @@ TEST(MLP, OptimizeNonExtremum) {
 
   double sensv = 1. ;
   for (uint n = 0; n < 1 ; n++) {
-    MLP nn(1, 3, 0, 0.2f);
+    MLP nn(1, {3}, 0, 0.2f);
     std::vector<double> sens(0);
     std::vector<double> ac(1);
 
@@ -550,7 +550,7 @@ TEST(MLP, OptimizeNonExtremum) {
 TEST(MLP, Optimize2LocalMaxima) {
   //learn - cos(5.*x1)/2.
 
-  MLP nn(1, 10, 0, 0.1f);
+  MLP nn(1, {10}, 0, 0.1f);
   std::vector<double> sens(0);
   std::vector<double> ac(1);
 
@@ -610,7 +610,7 @@ TEST(MLP, OptimizeTrapInEvilLocalOptimal) {
   //local max ~0.6
   //global max -0.7
 
-  MLP nn(1, 12, 0, 0.1f);
+  MLP nn(1, {12}, 0, 0.1f);
   std::vector<double> sens(0);
   std::vector<double> ac(1);
 
@@ -669,7 +669,7 @@ TEST(MLP, OptimizePlateau) {
   //local max ~0.6
   //global max -0.7
 
-  MLP nn(1, 2, 0, 0.1f);
+  MLP nn(1, {2}, 0, 0.1f);
   std::vector<double> sens(0);
   std::vector<double> ac(1);
 
@@ -715,7 +715,7 @@ TEST(MLP, OptimizePlateau) {
 }
 
 TEST(MLP, ConsistentActivationFunctionLecun) {
-  MLP nn(1, 1, 0, 0.01f, true);
+  MLP nn(1, {1}, 0, 0.01f, true);
 
   fann_set_weight(nn.getNeuralNet(), 0, 2, 1.f);
   fann_set_weight(nn.getNeuralNet(), 1, 2, 0.f);
@@ -749,7 +749,7 @@ TEST(MLP, ConsistentActivationFunctionLecun) {
 }
 
 TEST(MLP, LearnAndOrLecun) {
-  MLP nn(3, 10, 2, 0.05f, true);
+  MLP nn(3, {10}, 2, 0.05f, true);
 
   // Learn
   for (uint n = 0; n < 10000 ; n++) {
@@ -788,7 +788,7 @@ TEST(MLP, LearnAndOrLecun) {
 }
 
 TEST(MLP, LearnAndOrLecun2) {
-  MLP nn(3, 5, 1, true);
+  MLP nn(3, {5}, 1, true);
 
   struct fann_train_data* data = fann_create_train(2*2*2, 3, 1);
    
@@ -939,7 +939,7 @@ TEST(MLP, LearnLabelWeight) {
 }
 
 TEST(MLP, LearnNonLinearLabelWeight) {
-  MLP nn(1, 4, 1, true);
+  MLP nn(1, {4}, 1, true);
 
   struct fann_train_data* data = fann_create_train(11*2, 1, 1);
   fann_type label_weight[11*2];
@@ -1012,7 +1012,7 @@ TEST(MLP, LearnNonLinearLabelWeight) {
 
 
 TEST(MLP, LearnNonLinearLabelWeightWithNullImportance) {
-  MLP nn(1, 4, 1, true);
+  MLP nn(1, {4}, 1, true);
 
   struct fann_train_data* data = fann_create_train(11*2, 1, 1);
   fann_type label_weight[11*2];
@@ -1061,7 +1061,7 @@ double derivative(double* s, double* a, int, void*){
 
 // try to learn a function pi that maximize another one : f(s, pi(a)) = a^2-(s^2)*a
 TEST(MLP, OptimizeNNTroughGradient) {
-  MLP nn(1, 4, 1, 0.0, true);
+  MLP nn(1, {4}, 1, 0.0, true);
 
   struct fann_train_data* data = fann_create_train(200, 1, 1);
   
@@ -1210,8 +1210,8 @@ double derivative2(double* input, double *neuron_value, int, void* data){
 }
 
 TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
-  MLP nn(2, 50, 1, 0.0);
-  MLP actor(1, 4, 1);
+  MLP nn(2, {50}, 1, 0.0);
+  MLP actor(1, {4}, 1);
 
   struct fann_train_data* data = fann_create_train(200*200, 2, 1);
   
@@ -1269,9 +1269,9 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
 }
 
 TEST(MLP, OptimizeNNTroughGradientOfAnotherNNFann) {
-  MLP nn(2, 50, 1, 0.0, true);
+  MLP nn(2, {50}, 1, 0.0, true);
 //   MLP nn(2, 1, 1, 0.0);
-  MLP actor(1, 8, 1);
+  MLP actor(1, {8}, 1);
   
   MLP actor2(actor);
   fann_set_activation_function_output(actor.getNeuralNet(), FANN_SIGMOID_SYMMETRIC);
@@ -1362,8 +1362,8 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNNFann) {
 }
 
 TEST(MLP, OptimizeNNTroughGradientOfAnotherNNFannMinDerivative) {
-  MLP nn(2, 50, 1, 0.0, true);
-  MLP actor(1, 8, 1);
+  MLP nn(2, {50}, 1, 0.0, true);
+  MLP actor(1, {8}, 1);
   
   MLP actor2(actor);
   fann_set_activation_function_output(actor.getNeuralNet(), FANN_SIGMOID_SYMMETRIC);

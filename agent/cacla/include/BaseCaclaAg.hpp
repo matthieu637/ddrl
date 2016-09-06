@@ -17,8 +17,6 @@
 #include <bib/XMLEngine.hpp>
 #include <bib/Combinaison.hpp>
 #include "MLP.hpp"
-#include "LinMLP.hpp"
-#include "Trajectory.hpp"
 
 class BaseCaclaAg : public arch::ARLAgent<> {
  public:
@@ -30,6 +28,9 @@ class BaseCaclaAg : public arch::ARLAgent<> {
   virtual ~BaseCaclaAg() {
     delete vnn;
     delete ann;
+    
+    delete hidden_unit_v;
+    delete hidden_unit_a;
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
@@ -85,11 +86,11 @@ class BaseCaclaAg : public arch::ARLAgent<> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
+    hidden_unit_v       = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
+    hidden_unit_a       = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     alpha_v             = pt->get<double>("agent.alpha_v");
     alpha_a             = pt->get<double>("agent.alpha_a");
     noise               = pt->get<double>("agent.noise");
-    hidden_unit_v       = pt->get<int>("agent.hidden_unit_v");
-    hidden_unit_a       = pt->get<int>("agent.hidden_unit_a");
     plus_var_version    = pt->get<bool>("agent.plus_var_version");
     gaussian_policy     = pt->get<bool>("agent.gaussian_policy");
     lecun_activation    = pt->get<bool>("agent.lecun_activation");
@@ -98,19 +99,10 @@ class BaseCaclaAg : public arch::ARLAgent<> {
     beta = 0.001;
     delta_var = 1;
     
-    if(hidden_unit_v == 0){
-      vnn = new LinMLP(nb_sensors, 1, alpha_v, lecun_activation);
-      fann_set_activation_function_output(vnn->getNeuralNet(), FANN_LINEAR);
-    } else
-      vnn = new MLP(nb_sensors, hidden_unit_v, nb_sensors, alpha_v, lecun_activation);
+    vnn = new MLP(nb_sensors, *hidden_unit_v, nb_sensors, alpha_v, lecun_activation);
 
-    if(hidden_unit_a == 0){
-      ann = new LinMLP(nb_sensors , nb_motors, alpha_a, lecun_activation);
-    }
-     else {
-      ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
-      fann_set_training_algorithm(ann->getNeuralNet(), FANN_TRAIN_INCREMENTAL);
-    }
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, lecun_activation);
+    fann_set_training_algorithm(ann->getNeuralNet(), FANN_TRAIN_INCREMENTAL);
     
     fann_set_learning_rate(ann->getNeuralNet(), alpha_a / fann_get_total_connections(ann->getNeuralNet()));
     fann_set_learning_rate(vnn->getNeuralNet(), alpha_v / fann_get_total_connections(vnn->getNeuralNet()));
@@ -222,7 +214,8 @@ class BaseCaclaAg : public arch::ARLAgent<> {
 
   double alpha_v, alpha_a;
   double noise;
-  uint hidden_unit_v, hidden_unit_a;
+  std::vector<uint>* hidden_unit_v;
+  std::vector<uint>* hidden_unit_a;
 
   double beta, delta_var;
   bool plus_var_version;

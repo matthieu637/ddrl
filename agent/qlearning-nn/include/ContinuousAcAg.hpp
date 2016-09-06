@@ -71,7 +71,7 @@ class ContinuousAcAg : public arch::AAgent<> {
     gamma = 0.999;
     alpha = 0.01;
     epsilon = 0.15;
-    nn = new MLP(nb_sensors + nb_motors, hidden_unit, nb_sensors, alpha);
+    nn = new MLP(nb_sensors + nb_motors, {hidden_unit}, nb_sensors, alpha);
   }
 
   void start_episode(const std::vector<double>& sensors, bool) override {

@@ -81,10 +81,15 @@ struct ParallelOptimization {
 class MLP {
  public:
 
-  MLP(unsigned int input, unsigned int hidden, unsigned int sensors, double alpha, bool _lecun=false) : size_input_state(input),
+ MLP(unsigned int input, const std::vector<uint>& hiddens, unsigned int sensors, double alpha, bool _lecun=false) : size_input_state(input),
     size_sensors(sensors), size_motors(size_input_state - sensors) {
 #ifdef STANDARD_MLP
-    neural_net = fann_create_standard(3, input, hidden, 1);
+    std::vector<uint> layers(hiddens.size()+2);
+    layers.push_back(input);
+    for (auto i : hiddens)
+      layers.push_back(i);
+    layers.push_back(1);
+    neural_net = fann_create_standard_array(layers.size(), layers.data());
     
     fann_set_training_algorithm(neural_net, FANN_TRAIN_INCREMENTAL);
     fann_set_train_stop_function(neural_net, FANN_STOPFUNC_MSE);
@@ -111,10 +116,15 @@ class MLP {
 
   }
 
-  MLP(unsigned int input, unsigned int hidden, unsigned int motors, bool _lecun=false) : size_input_state(input), size_sensors(input),
+  MLP(unsigned int input, const std::vector<uint>& hiddens, unsigned int motors, bool _lecun=false) : size_input_state(input), size_sensors(input),
     size_motors(motors) {
 #ifdef STANDARD_MLP
-    neural_net = fann_create_standard(3, input, hidden, motors);
+    std::vector<uint> layers(hiddens.size()+2);
+    layers.push_back(input);
+    for (auto i : hiddens)
+      layers.push_back(i);
+    layers.push_back(motors);
+    neural_net = fann_create_standard(layers.size(), layers.data());
 #else
     neural_net = fann_create_shortcut(2, input, motors);
 #endif

@@ -6,7 +6,6 @@
 
 int main(int argc, char **argv) {
   arch::Simulator<AdvancedAcrobotEnv, OfflineCaclaAg> s;
-  //arch::Simulator<AdvancedAcrobotEnv, arch::ExampleAgent> s;
 
   s.init(argc, argv);
 

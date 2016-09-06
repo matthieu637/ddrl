@@ -210,7 +210,7 @@ class ContinuousAcTAg : public arch::AAgent<> {
     softmax = false;
 
 //     nn = new MLP(nb_sensors + nb_motors + 1, hidden_unit, nb_sensors, alpha);
-    nn = new MLP(nb_sensors + nb_motors, hidden_unit, nb_sensors, 0.0);
+    nn = new MLP(nb_sensors + nb_motors, {hidden_unit}, nb_sensors, 0.0);
 //     if (boost::filesystem::exists("trajectory.data")) {
 //       decltype(trajectory)* obj = bib::XMLEngine::load<decltype(trajectory)>("trajectory", "trajectory.data");
 //       trajectory = *obj;

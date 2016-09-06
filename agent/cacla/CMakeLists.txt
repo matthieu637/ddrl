@@ -41,24 +41,6 @@ target_link_libraries(cp-cacla-off ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY
 add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
 target_link_libraries(ada-nfac ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
 
-add_executable(ada-polset src/test/AdaPolset.cpp ${all_include} ${all_sources} )
-target_link_libraries(ada-polset ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
-
-add_executable(ada-polset-genvf src/test/AdaPolsetGenVF.cpp ${all_include} ${all_sources} )
-target_link_libraries(ada-polset-genvf ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
-
-add_executable(cp-polset src/test/CartpolePolset.cpp ${all_include} ${all_sources} )
-target_link_libraries(cp-polset ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
-
-add_executable(cp-polset-genvf src/test/CartpolePolsetGenVF.cpp ${all_include} ${all_sources} )
-target_link_libraries(cp-polset-genvf ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
-
-add_executable(ada-vset src/test/AdaVset.cpp ${all_include} ${all_sources} )
-target_link_libraries(ada-vset ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
-
-add_executable(cp-vset src/test/CartpoleVset.cpp ${all_include} ${all_sources} )
-target_link_libraries(cp-vset ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
-
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

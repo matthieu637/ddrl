@@ -16,7 +16,6 @@
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 #include "MLP.hpp"
-#include "LinMLP.hpp"
 
 typedef struct _sample {
   std::vector<double> s;
@@ -66,6 +65,9 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   virtual ~OfflineCaclaAg() {
     delete vnn;
     delete ann;
+    
+    delete hidden_unit_v;
+    delete hidden_unit_a;
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
@@ -99,8 +101,8 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
-    hidden_unit_v           = pt->get<int>("agent.hidden_unit_v");
-    hidden_unit_a           = pt->get<int>("agent.hidden_unit_a");
+    hidden_unit_v           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
+    hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
     update_pure_ac          = pt->get<bool>("agent.update_pure_ac");
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
@@ -113,15 +115,9 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     if(!gaussian_policy)
       noise = 0.05;
 
-    if(hidden_unit_v == 0)
-      vnn = new LinMLP(nb_sensors , 1, 0.0, lecun_activation);
-    else
-      vnn = new MLP(nb_sensors, hidden_unit_v, nb_sensors, 0.0, lecun_activation);
+    vnn = new MLP(nb_sensors, *hidden_unit_v, nb_sensors, 0.0, lecun_activation);
 
-    if(hidden_unit_a == 0)
-      ann = new LinMLP(nb_sensors , nb_motors, 0.0, lecun_activation);
-    else
-      ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, lecun_activation);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool) override {
@@ -328,8 +324,6 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   double noise;
   bool gaussian_policy, vnn_from_scratch, lecun_activation, 
         determinist_vnn_update, clear_trajectory, update_delta_neg;
-  uint hidden_unit_v;
-  uint hidden_unit_a;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
@@ -340,6 +334,9 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
   MLP* ann;
   MLP* vnn;
+  
+  std::vector<uint>* hidden_unit_v;
+  std::vector<uint>* hidden_unit_a;
 };
 
 #endif

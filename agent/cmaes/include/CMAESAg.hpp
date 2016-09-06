@@ -69,7 +69,7 @@ class CMAESAg : public arch::AACAgent<MLP> {
 //       ann = new LinMLP(nb_sensors , nb_motors, 0.0, lecun_activation);
     }
      else {
-      ann = new MLP(nb_sensors, hidden_unit_a, nb_motors, lecun_activation);
+      ann = new MLP(nb_sensors, {hidden_unit_a}, nb_motors, lecun_activation);
       fann_set_training_algorithm(ann->getNeuralNet(), FANN_TRAIN_INCREMENTAL);
     }
     
