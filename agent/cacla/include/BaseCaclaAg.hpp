@@ -10,7 +10,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 
-#include "arch/AAgent.hpp"
+#include "arch/ARLAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
 #include <bib/MetropolisHasting.hpp>
@@ -20,10 +20,10 @@
 #include "LinMLP.hpp"
 #include "Trajectory.hpp"
 
-class BaseCaclaAg : public arch::AAgent<> {
+class BaseCaclaAg : public arch::ARLAgent<> {
  public:
   BaseCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : nb_motors(_nb_motors), nb_sensors(_nb_sensors), time_for_ac(1), returned_ac(nb_motors), obs(nb_sensors) {
+    : ARLAgent<>(_nb_motors), nb_sensors(_nb_sensors) {
 
   }
 
@@ -32,64 +32,16 @@ class BaseCaclaAg : public arch::AAgent<> {
     delete ann;
   }
 
-  const std::vector<double>& run(double r, const std::vector<double>& sensors,
-                                bool learning, bool goal_reached) override {
-
-    const std::vector<double>* sin;
-    if(standard_score){
-      std::vector<double> s(nb_sensors);
-      obs.transform(s, sensors);
-      sin = &s;
-    } else
-      sin = &sensors;
-
-//     if(r >= 1.)
-//       noise = 0.00f;
-
-    double reward = r;
-    internal_time ++;
-
-    weighted_reward += reward * pow_gamma;
-    pow_gamma *= gamma;
-
-    sum_weighted_reward += reward * global_pow_gamma;
-    global_pow_gamma *= gamma;
-
-    time_for_ac--;
-    if (time_for_ac == 0 || goal_reached) {
-      const std::vector<double>& next_action = _run(weighted_reward, *sin, learning, goal_reached);
-      time_for_ac = decision_each;
-
-      for (uint i = 0; i < nb_motors; i++)
-        returned_ac[i] = next_action[i];
-
-      weighted_reward = 0;
-      pow_gamma = 1.f;
-    }
-    
-//     LOG_FILE("test_ech.data", sensors[0] << " "<< sensors[1]<< " "<< sensors[2]<< " "<< sensors[3]<< " "<< sensors[4]<< " " << sensors.size());
-//     LOG_FILE("test_echa.data", returned_ac[0] );
-//     LOG_FILE("test_ech.data", s[0] << " "<< s[1]<< " "<< s[2]<< " "<< s[3]<< " "<< s[4]<< " " << s.size());
-/*
-    clear all; close all; X=load('test_ech.data' );
-    for i=1:size(X,2)
-      figure; plot(X(:,i));
-    endfor
-*/
-    return returned_ac;
-  }
-
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                 bool learning, bool goal_reached) {
+                                  bool learning, bool goal_reached, bool finished) {
 
     vector<double>* next_action = ann->computeOut(sensors);
     
-//     LOG_DEBUG(next_action->at(0));
 
     if (last_action.get() != nullptr && learning) {  // Update Q
 
       double vtarget = reward;
-      if (!goal_reached) {
+      if (!goal_reached && !finished) {
         double nextV = vnn->computeOutVF(sensors, {});
         vtarget += gamma * nextV;
       }
@@ -113,7 +65,7 @@ class BaseCaclaAg : public arch::AAgent<> {
 
     if(learning) {
       if(gaussian_policy){
-        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
       } else {
@@ -133,21 +85,15 @@ class BaseCaclaAg : public arch::AAgent<> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
-
-    gamma               = pt->get<double>("agent.gamma");
     alpha_v             = pt->get<double>("agent.alpha_v");
     alpha_a             = pt->get<double>("agent.alpha_a");
     noise               = pt->get<double>("agent.noise");
     hidden_unit_v       = pt->get<int>("agent.hidden_unit_v");
     hidden_unit_a       = pt->get<int>("agent.hidden_unit_a");
-    decision_each       = pt->get<int>("agent.decision_each");
     plus_var_version    = pt->get<bool>("agent.plus_var_version");
-    standard_score      = pt->get<bool>("agent.standard_score");
     gaussian_policy     = pt->get<bool>("agent.gaussian_policy");
     lecun_activation    = pt->get<bool>("agent.lecun_activation");
-    
-    if(!gaussian_policy)
-      noise=0.1;
+    bool last_activation_linear = pt->get<bool>("agent.last_activation_linear");
     
     beta = 0.001;
     delta_var = 1;
@@ -168,60 +114,25 @@ class BaseCaclaAg : public arch::AAgent<> {
     
     fann_set_learning_rate(ann->getNeuralNet(), alpha_a / fann_get_total_connections(ann->getNeuralNet()));
     fann_set_learning_rate(vnn->getNeuralNet(), alpha_v / fann_get_total_connections(vnn->getNeuralNet()));
+    if(last_activation_linear)
+      fann_set_activation_function_output(ann->getNeuralNet(), FANN_LINEAR);
   }
 
-  void start_episode(const std::vector<double>& sensors, bool) override {
+  void _start_episode(const std::vector<double>& sensors, bool) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
     last_action = nullptr;
 
-    weighted_reward = 0;
-    pow_gamma = 1.d;
-    time_for_ac = 1;
-
-    sum_weighted_reward = 0;
-    global_pow_gamma = 1.f;
-    internal_time = 0;
-    
-//     noise *= 0.999;
-//     alpha_a *= 0.99999f;
-//     alpha_v *= 0.99999f;
-
     fann_reset_MSE(vnn->getNeuralNet());
   }
 
-//     double sign(double x){
-//         if (x>0)
-//             return 1;
-//         else if(x<0)
-//             return -1;
-//         return 0;
-//     }
-
   void end_episode() override {
-//         double last_E = last_last_sum_weighted_reward - last_sum_weighted_reward;
-//         double E = last_sum_weighted_reward - sum_weighted_reward;
-//
-//         if(last_E * E > 0 ){
-//             rprop_factor = std::min(rprop_factor * 1.2, 0.1);
-//         } else if(last_E * E < 0) {
-//             rprop_factor = std::max(rprop_factor * 0.5, 0.01);
-// //             E = 0;
-//         }
-//
-// //         noise = noise - sign(E) * rprop_factor;
-//
-//         if(E > 0)
-//             noise = noise - rprop_factor;
-//         else
-//             noise = noise + rprop_factor;
-    
 //      write_actionf_file("ac_func.data");
 //      write_valuef_file("v_after.data");
-    ann->print();
-    LOG_FILE("policy_exploration", ann->hash());
+//     ann->print();
+//     LOG_FILE("policy_exploration", ann->hash());
   }
   
    void write_actionf_file(const std::string& file){
@@ -307,24 +218,14 @@ class BaseCaclaAg : public arch::AAgent<> {
   }
 
  private:
-  uint nb_motors;
   uint nb_sensors;
-  uint time_for_ac;
 
-  double weighted_reward;
-  double pow_gamma;
-  double global_pow_gamma;
-  double sum_weighted_reward;
-
-  uint internal_time, decision_each;
-
-  double alpha_v, gamma, alpha_a;
+  double alpha_v, alpha_a;
   double noise;
   uint hidden_unit_v, hidden_unit_a;
 
   double beta, delta_var;
   bool plus_var_version;
-  bool standard_score;
   bool gaussian_policy;
   bool lecun_activation;
 
@@ -335,8 +236,6 @@ class BaseCaclaAg : public arch::AAgent<> {
 
   MLP* ann;
   MLP* vnn;
-  
-  Observer obs;
 };
 
 #endif
