@@ -1,15 +1,19 @@
 cmake_minimum_required(VERSION 2.8)
 
 #Project name
-project(deepqn CXX)
+project(deepqn CXX C)
 
 if(NOT DEFINED ROOT_DRL_PATH)
         set(ROOT_DRL_PATH "${CMAKE_SOURCE_DIR}/../..")
 endif()
 
 if(NOT DEFINED CUDA_TOOLKIT_ROOT_DIR)
-        message("CUDA_TOOLKIT_ROOT_DIR not found or specified, set to /opt/cuda")
-        set(CUDA_TOOLKIT_ROOT_DIR "/opt/cuda")
+	if(EXISTS "/opt/cuda")
+	        set(CUDA_TOOLKIT_ROOT_DIR "/opt/cuda")
+	else()
+	        set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-7.0/")
+	endif()
+        message("CUDA_TOOLKIT_ROOT_DIR not found or specified, set to ${CUDA_TOOLKIT_ROOT_DIR}")
 endif()
 
 include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
