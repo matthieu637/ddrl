@@ -111,10 +111,13 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     clear_trajectory        = pt->get<bool>("agent.clear_trajectory");
     update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
+    bool last_activation_linear = pt->get<bool>("agent.last_activation_linear");
 
     vnn = new MLP(nb_sensors, *hidden_unit_v, nb_sensors, 0.0, lecun_activation);
 
     ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, lecun_activation);
+    if(last_activation_linear)
+      fann_set_activation_function_output(ann->getNeuralNet(), FANN_LINEAR);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool) override {
