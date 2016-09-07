@@ -92,8 +92,6 @@ class MLP {
     for (auto i : hiddens)
       layers.push_back(i);
     layers.push_back(1);
-    bib::Logger::PRINT_ELEMENTS(layers);
-    bib::Logger::PRINT_ELEMENTS(hiddens);
     neural_net = fann_create_standard_array(layers.size(), layers.data());
     
     fann_set_training_algorithm(neural_net, FANN_TRAIN_INCREMENTAL);
@@ -129,7 +127,7 @@ class MLP {
     for (auto i : hiddens)
       layers.push_back(i);
     layers.push_back(motors);
-    neural_net = fann_create_standard(layers.size(), layers.data());
+    neural_net = fann_create_standard_array(layers.size(), layers.data());
 #else
     neural_net = fann_create_shortcut(2, input, motors);
 #endif
