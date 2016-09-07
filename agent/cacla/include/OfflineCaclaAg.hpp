@@ -81,7 +81,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
       if(gaussian_policy){
-        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
       } else if(bib::Utils::rand01() < noise){ //e-greedy
@@ -111,9 +111,6 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     clear_trajectory        = pt->get<bool>("agent.clear_trajectory");
     update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
-    
-    if(!gaussian_policy)
-      noise = 0.05;
 
     vnn = new MLP(nb_sensors, *hidden_unit_v, nb_sensors, 0.0, lecun_activation);
 
@@ -190,7 +187,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
           if(vnn_from_scratch)
             fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
-          vnn->learn(dq.data, 10000, 0, 0.0001);
+          vnn->learn(dq.data, 200, 0, 0.0001);
         };
 
         auto eval = [&]() {
@@ -198,7 +195,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         };
 
         if(determinist_vnn_update)
-              bib::Converger::determinist<>(iter, eval, 30, 0.0001, 0);
+              bib::Converger::determinist<>(iter, eval, 10, 0.0001, 0);
         else {
           NN best_nn = nullptr;
           auto save_best = [&]() {
@@ -207,7 +204,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
             best_nn = fann_copy(vnn->getNeuralNet());
           };
 
-          bib::Converger::min_stochastic<>(iter, eval, save_best, 30, 0.0001, 0, 10);
+          bib::Converger::min_stochastic<>(iter, eval, save_best, 10, 0.0001, 0, 10);
           vnn->copy(best_nn);
           fann_destroy(best_nn);
         }
@@ -217,7 +214,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
 
   void end_episode() override {
-    LOG_FILE("policy_exploration", ann->hash());
+//     LOG_FILE("policy_exploration", ann->hash());
     
     if (trajectory.size() > 0) {
 
