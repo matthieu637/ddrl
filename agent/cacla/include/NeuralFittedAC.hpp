@@ -11,7 +11,6 @@
 #include <boost/filesystem.hpp>
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
-#include "cmaes_interface.h"
 
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"

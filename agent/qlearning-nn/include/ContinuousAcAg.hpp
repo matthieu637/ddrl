@@ -26,7 +26,9 @@ class ContinuousAcAg : public arch::AAgent<> {
       reward = 100;
     }
 
-    vector<double>* next_action = nn->optimized(sensors);
+    //vector<double>* next_action = nn->optimized(sensors);
+    vector<double>* next_action = nullptr;
+	exit(1);
 
     if (last_action.get() != nullptr && learning) {  // Update Q
       double nextQ = nn->computeOutVF(sensors, *next_action);

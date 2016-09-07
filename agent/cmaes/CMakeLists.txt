@@ -18,20 +18,27 @@ find_package(TBB)
 find_package(FANN)
 find_package(OPTPP)
 
-include_directories(${CMAKE_SOURCE_DIR}/include ../qlearning-nn/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${FANN_INCLUDE_DIRS} ${OPTPP_INCLUDE_DIRS} )#  ${FLANN_INCLUDE_DIRS}
+include_directories(${CMAKE_SOURCE_DIR}/include ../qlearning-nn/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${FANN_INCLUDE_DIRS})
 
+set(BASE_LIBRARIES ${COMMON_DRL_LIBRARY} ${TBB_LIBRARIES} ${DOUBLEFANN_LIBRARY} ${Boost_LIBRARIES} )
+file ( GLOB_RECURSE all_include include/*.hpp include/*.h ${ROOT_DRL_PATH}/agent/qlearning-nn/include/MLP.hpp )
+file ( GLOB all_sources src/*.cpp src/*.c ${ROOT_DRL_PATH}/agent/qlearning-nn/src/MLP.cpp )
 
-file ( GLOB_RECURSE all_include include/*.hpp include/*.h ${ROOT_DRL_PATH}/agent/qlearning-nn/include/MLP.hpp ${ROOT_DRL_PATH}/agent/qlearning-nn/include/UNLF2.hpp )
-file ( GLOB all_sources src/*.cpp src/*.c ${ROOT_DRL_PATH}/agent/qlearning-nn/src/MLP.cpp ${ROOT_DRL_PATH}/agent/qlearning-nn/src/UNLF2.cpp )
+if(${OPTPP_LIBRARY_FOUND})
+	include_directories(${OPTPP_INCLUDE_DIRS})
+	set(BASE_LIBRARIES ${BASE_LIBRARIES} ${OPTPP_LIBRARIES})
+        set(all_include ${all_include} ${ROOT_DRL_PATH}/agent/qlearning-nn/include/UNLF2.hpp)
+        set(all_sources ${all_sources} ${ROOT_DRL_PATH}/agent/qlearning-nn/src/UNLF2.cpp)
+endif()
 
 add_executable(adacrobot src/test/Adacrobot.cpp ${all_include} ${all_sources} )
-target_link_libraries(adacrobot ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
+target_link_libraries(adacrobot ${BASE_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY})
 
 add_executable(cartpole src/test/Cartpole.cpp ${all_include} ${all_sources} )
-target_link_libraries(cartpole ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
+target_link_libraries(cartpole ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(dpmt-adacrobot src/test/DpmtAdacrobot.cpp ${all_include} ${all_sources} )
-target_link_libraries(dpmt-adacrobot ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
+target_link_libraries(dpmt-adacrobot ${ADVANCED_ACROBOT_LIBRARY} ${BASE_LIBRARIES} )
 
 
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

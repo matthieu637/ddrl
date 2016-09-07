@@ -1,11 +1,23 @@
-#ifndef MLP_H
-#define MLP_H
+#ifndef MLP_HPP
+#define MLP_HPP
 
 #include <vector>
 #include <functional>
 #include <thread>
 
 #include "doublefann.h"
+#include "fann_data.h"
+#include <bib/Logger.hpp>
+#include <bib/Converger.hpp>
+#include <bib/Seed.hpp>
+#include <bib/Utils.hpp>
+
+typedef struct fann* NN;
+
+#ifndef NO_OPTPP
+#include <tbb/parallel_for.h>
+#include <tbb/blocked_range.h>
+
 #include "opt++/newmat.h"
 #include "opt++/NLF.h"
 #include "opt++/BoundConstraint.h"
@@ -15,16 +27,8 @@
 #include "opt++/OptBCNewton.h"
 #include "opt++/OptBaNewton.h"
 #include "opt++/OptDHNIPS.h"
-#include "fann_data.h"
-#include <tbb/parallel_for.h>
-#include <tbb/blocked_range.h>
 
 #include "UNLF2.hpp"
-#include "bib/Logger.hpp"
-#include <bib/Converger.hpp>
-#include <bib/Seed.hpp>
-#include <bib/Utils.hpp>
-
 using OPTPP::Constraint;
 using OPTPP::CompoundConstraint;
 using OPTPP::NLF2;
@@ -41,9 +45,6 @@ using NEWMAT::ColumnVector;
 using NEWMAT::Matrix;
 using NEWMAT::SymmetricMatrix;
 
-#define STANDARD_MLP
-
-typedef struct fann* NN;
 struct passdata {
   NN neural_net;
   const std::vector<double>& inputs;
@@ -71,7 +72,9 @@ struct ParallelOptimization {
   std::vector < std::vector<double>* > a;
   std::vector<double>* cost;
 };
+#endif //NO_OPTPP
 
+#define STANDARD_MLP
 /*
  Lecun activation function is only used for hidden layer.
  For the last layer of approximation => useless
@@ -347,9 +350,15 @@ class MLP {
    * @return std::vector< double >* your job to delete it
    */
 
+#ifdef NO_OPTPP
+  virtual std::vector<double>* optimized(const std::vector<double>&, const std::vector<double>&, uint) const {
+	LOG_ERROR("not implemented : OPTPP optional");
+	exit(1);
+	return nullptr;
+  }
+#else
   virtual std::vector<double>* optimized(const std::vector<double>& inputs, const std::vector<double>& init_search = {},
                                         uint nb_solution = 12) const {
-
     ParallelOptimization para(neural_net, inputs, init_search, size_motors, nb_solution);
     tbb::parallel_for(tbb::blocked_range<uint>(0, nb_solution), para);
 
@@ -366,6 +375,7 @@ class MLP {
 
     return para.a[imin];
   }
+#endif
   
   std::vector<double>* optimizedBruteForce(const std::vector<double>& inputs, double discre=0.1){
     std::vector<double> motors(1);

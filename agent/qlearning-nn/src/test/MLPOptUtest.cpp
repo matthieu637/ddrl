@@ -173,7 +173,7 @@ TEST(MLP, LearnAndOr) {
   }
 }
 
-
+#ifndef NO_OPTPP
 TEST(MLP, MLPCheckOuput) {
   MLP nn(1, {1}, 2, 0.5f);
   std::vector<double> sens(0);
@@ -713,6 +713,7 @@ TEST(MLP, OptimizePlateau) {
 
   delete acopt;
 }
+#endif //NO_OPTPP
 
 TEST(MLP, ConsistentActivationFunctionLecun) {
   MLP nn(1, {1}, 0, 0.01f, true);

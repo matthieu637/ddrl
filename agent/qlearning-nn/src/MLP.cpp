@@ -1,12 +1,8 @@
 #include "MLP.hpp"
 
-#include <vector>
-#include "doublefann.h"
-#include "bib/Assert.hpp"
-#include <bib/Utils.hpp>
-
 #define activation_function(x, lambda) tanh(lambda * x)
 
+#ifndef NO_OPTPP
 ParallelOptimization::ParallelOptimization(const NN _neural_net, const std::vector<double>& _inputs,
     const std::vector<double>& _init_search,
     uint _size_motors, uint number_parra): neural_net(_neural_net), inputs(_inputs), init_search(_init_search),
@@ -317,6 +313,7 @@ void hs65(int mode, int ndim, const ColumnVector& x, double& fx,
     }
   }
 }
+#endif //NO_OPTPP
 
 double derivative_nn_easy(double*, double *, int, void*){
     return 1.0f;

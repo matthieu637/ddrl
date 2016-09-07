@@ -18,28 +18,34 @@ find_package(TBB)
 find_package(FANN)
 find_package(OPTPP)
 find_package(Threads REQUIRED)
-# find_package(FLANN)
 
-include_directories(${CMAKE_SOURCE_DIR}/include ../qlearning-nn/include ../cmaes/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${FANN_INCLUDE_DIRS} ${OPTPP_INCLUDE_DIRS} )#  ${FLANN_INCLUDE_DIRS}
+include_directories(${CMAKE_SOURCE_DIR}/include ../qlearning-nn/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${FANN_INCLUDE_DIRS} )
 
+set(BASE_LIBRARIES ${COMMON_DRL_LIBRARY} ${TBB_LIBRARIES} ${DOUBLEFANN_LIBRARY} ${Boost_LIBRARIES} )
+file ( GLOB_RECURSE all_include include/*.hpp ${ROOT_DRL_PATH}/agent/qlearning-nn/include/MLP.hpp)
+file ( GLOB all_sources src/*.cpp ${ROOT_DRL_PATH}/agent/qlearning-nn/src/MLP.cpp)
 
-file ( GLOB_RECURSE all_include include/*.hpp ${ROOT_DRL_PATH}/agent/qlearning-nn/include/MLP.hpp ${ROOT_DRL_PATH}/agent/qlearning-nn/include/UNLF2.hpp ${ROOT_DRL_PATH}/agent/cmaes/include/cmaes.h ${ROOT_DRL_PATH}/agent/cmaes/include/cmaes_interface.h)
-file ( GLOB all_sources src/*.cpp ${ROOT_DRL_PATH}/agent/qlearning-nn/src/MLP.cpp ${ROOT_DRL_PATH}/agent/qlearning-nn/src/UNLF2.cpp ${ROOT_DRL_PATH}/agent/cmaes/src/cmaes.c)
+if(${OPTPP_LIBRARY_FOUND})
+	include_directories(${OPTPP_INCLUDE_DIRS})
+	set(BASE_LIBRARIES ${BASE_LIBRARIES} ${OPTPP_LIBRARIES})
+	set(all_include ${all_include} ${ROOT_DRL_PATH}/agent/qlearning-nn/include/UNLF2.hpp)
+	set(all_sources ${all_sources} ${ROOT_DRL_PATH}/agent/qlearning-nn/src/UNLF2.cpp)
+endif()
 
 add_executable(adacrobot-off src/test/AdacrobotOffline.cpp ${all_include} ${all_sources} )
-target_link_libraries(adacrobot-off ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
+target_link_libraries(adacrobot-off ${ADVANCED_ACROBOT_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(adacrobot-on src/test/AdacrobotOnline.cpp ${all_include} ${all_sources} )
-target_link_libraries(adacrobot-on ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
+target_link_libraries(adacrobot-on ${ADVANCED_ACROBOT_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(cp-cacla-on src/test/CartpoleCacOn.cpp ${all_include} ${all_sources} )
-target_link_libraries(cp-cacla-on ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
+target_link_libraries(cp-cacla-on ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(cp-cacla-off src/test/CartpoleCacOff.cpp ${all_include} ${all_sources} )
-target_link_libraries(cp-cacla-off ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} )
+target_link_libraries(cp-cacla-off ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
-target_link_libraries(ada-nfac ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(ada-nfac ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
 
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
@@ -65,4 +71,4 @@ execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/env-ca
 # Unit Test
 # -------------------
 set(all_test_source ${all_sources} ${all_sources_sml})
-enable_utest(all_test_source ${OPTPP_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY} ${DOUBLEFANN_LIBRARY} ${TBB_LIBRARIES} ${Boost_LIBRARIES})
+enable_utest(all_test_source ${ADVANCED_ACROBOT_LIBRARY} ${BASE_LIBRARIES})
