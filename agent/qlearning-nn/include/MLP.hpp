@@ -87,11 +87,13 @@ class MLP {
  MLP(unsigned int input, const std::vector<uint>& hiddens, unsigned int sensors, double alpha, bool _lecun=false) : size_input_state(input),
     size_sensors(sensors), size_motors(size_input_state - sensors) {
 #ifdef STANDARD_MLP
-    std::vector<uint> layers(hiddens.size()+2);
+    std::vector<uint> layers;
     layers.push_back(input);
     for (auto i : hiddens)
       layers.push_back(i);
     layers.push_back(1);
+    bib::Logger::PRINT_ELEMENTS(layers);
+    bib::Logger::PRINT_ELEMENTS(hiddens);
     neural_net = fann_create_standard_array(layers.size(), layers.data());
     
     fann_set_training_algorithm(neural_net, FANN_TRAIN_INCREMENTAL);
@@ -122,7 +124,7 @@ class MLP {
   MLP(unsigned int input, const std::vector<uint>& hiddens, unsigned int motors, bool _lecun=false) : size_input_state(input), size_sensors(input),
     size_motors(motors) {
 #ifdef STANDARD_MLP
-    std::vector<uint> layers(hiddens.size()+2);
+    std::vector<uint> layers;
     layers.push_back(input);
     for (auto i : hiddens)
       layers.push_back(i);
