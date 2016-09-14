@@ -14,6 +14,9 @@ find_library( ADVANCED_ACROBOT_LIBRARY
   "${ROOT_DRL_PATH}/environment/advanced-acrobot/lib"
 )
 
+find_package(ODE)
+set(ADVANCED_ACROBOT_INCLUDE_DIRS ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${ODE_INCLUDE_DIR})
+
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(AdvancedAcrobot DEFAULT_MSG ADVANCED_ACROBOT_LIBRARY ADVANCED_ACROBOT_INCLUDE_DIRS)
 mark_as_advanced(ADVANCED_ACROBOT_INCLUDE_DIRS ADVANCED_ACROBOT_LIBRARY )
