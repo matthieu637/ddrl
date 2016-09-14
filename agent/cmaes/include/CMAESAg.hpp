@@ -40,7 +40,7 @@ class CMAESAg : public arch::AACAgent<MLP> {
 
     if(learning) {
       if(gaussian_policy){
-        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, policy_stochasticity);
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, policy_stochasticity);
         delete next_action;
         next_action = randomized_action;
       } else {
@@ -61,7 +61,7 @@ class CMAESAg : public arch::AACAgent<MLP> {
     population                  = pt->get<uint>("agent.population");
     gaussian_policy             = pt->get<bool>("agent.gaussian_policy");
     policy_stochasticity        = pt->get<double>("agent.policy_stochasticity");
-    bool last_activation_linear = pt->get<bool>("agent.last_activation_linear");
+    uint last_layer_type = pt->get<uint>("agent.last_layer_type");
     
     if(hidden_unit_a == 0){
       LOG_ERROR("Linear MLP");
@@ -73,8 +73,14 @@ class CMAESAg : public arch::AACAgent<MLP> {
       fann_set_training_algorithm(ann->getNeuralNet(), FANN_TRAIN_INCREMENTAL);
     }
     
-    if(last_activation_linear)
+    if(last_layer_type == 0)
       fann_set_activation_function_output(ann->getNeuralNet(), FANN_LINEAR);
+    else if (last_layer_type == 1){
+      fann_set_activation_steepness_output(ann->getNeuralNet(), atanh(1.d/sqrt(3.d)));
+      fann_set_activation_function_output(ann->getNeuralNet(), FANN_SIGMOID_SYMMETRIC_LECUN);
+    }
+    else//==2 let tanh
+      ;
     
     struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(ann->getNeuralNet()), sizeof(struct fann_connection));
     fann_get_connection_array(ann->getNeuralNet(), connections);

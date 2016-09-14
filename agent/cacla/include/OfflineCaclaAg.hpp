@@ -24,7 +24,6 @@ typedef struct _sample {
   std::vector<double> next_s;
   double r;
   bool goal_reached;
-  int replayed;
 
   friend class boost::serialization::access;
   template <typename Archive>
@@ -71,12 +70,12 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                 bool learning, bool goal_reached, bool) {
+                                 bool learning, bool goal_reached, bool last) {
 
     vector<double>* next_action = ann->computeOut(sensors);
 
     if (last_action.get() != nullptr && learning)
-      trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, 0});
+      trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || last});
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
@@ -107,17 +106,26 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     update_pure_ac          = pt->get<bool>("agent.update_pure_ac");
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
     lecun_activation        = pt->get<bool>("agent.lecun_activation");
-    determinist_vnn_update  = pt->get<bool>("agent.determinist_vnn_update");
-    clear_trajectory        = pt->get<bool>("agent.clear_trajectory");
     update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
-    bool last_activation_linear = pt->get<bool>("agent.last_activation_linear");
+    update_critic_first     = pt->get<bool>("agent.update_critic_first");
+    number_fitted_iteration = pt->get<uint>("agent.number_fitted_iteration");
+    convergence_precision   = pt->get<double>("agent.convergence_precision");
+    convergence_min_iter    = pt->get<uint>("agent.convergence_min_iter");
+    convergence_max_iter    = pt->get<uint>("agent.convergence_max_iter");
+    uint last_layer_type = pt->get<uint>("agent.last_layer_type");
 
     vnn = new MLP(nb_sensors, *hidden_unit_v, nb_sensors, 0.0, lecun_activation);
 
     ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, lecun_activation);
-    if(last_activation_linear)
+    if(last_layer_type == 0)
       fann_set_activation_function_output(ann->getNeuralNet(), FANN_LINEAR);
+    else if (last_layer_type == 1){
+      fann_set_activation_steepness_output(ann->getNeuralNet(), atanh(1.d/sqrt(3.d)));
+      fann_set_activation_function_output(ann->getNeuralNet(), FANN_SIGMOID_SYMMETRIC_LECUN);
+    }
+//       else ==2 let tanh
+          
   }
 
   void _start_episode(const std::vector<double>& sensors, bool) override {
@@ -128,8 +136,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     last_action = nullptr;
     last_pure_action = nullptr;
     
-    if(clear_trajectory)
-      trajectory.clear();
+    trajectory.clear();
 
     fann_reset_MSE(vnn->getNeuralNet());
   }
@@ -177,47 +184,37 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   };
 
   void update_critic(){
-      if (trajectory.size() > 0) {
-        //remove trace of old policy
+    if (trajectory.size() > 0) {
+      //remove trace of old policy
 
-        std::vector<sample> vtraj(trajectory.size());
-        std::copy(trajectory.begin(), trajectory.end(), vtraj.begin());
+      std::vector<sample> vtraj(trajectory.size());
+      std::copy(trajectory.begin(), trajectory.end(), vtraj.begin());
 
-        ParraVtoVNext dq(vtraj, this);
+      ParraVtoVNext dq(vtraj, this);
 
-        auto iter = [&]() {
-          tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj.size()), dq);
+      auto iter = [&]() {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj.size()), dq);
 
-          if(vnn_from_scratch)
-            fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
-          vnn->learn(dq.data, 200, 0, 0.0001);
-        };
+        if(vnn_from_scratch)
+          fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
+        vnn->learn_stoch(dq.data, convergence_max_iter, 0, convergence_precision, convergence_min_iter);
+      };
 
-        auto eval = [&]() {
-          return fann_get_MSE(vnn->getNeuralNet());
-        };
+      auto eval = [&]() {
+        return fann_get_MSE(vnn->getNeuralNet());
+      };
 
-        if(determinist_vnn_update)
-              bib::Converger::determinist<>(iter, eval, 10, 0.0001, 0);
-        else {
-          NN best_nn = nullptr;
-          auto save_best = [&]() {
-            if(best_nn != nullptr)
-              fann_destroy(best_nn);
-            best_nn = fann_copy(vnn->getNeuralNet());
-          };
+      for(uint i=0;i<number_fitted_iteration;i++)
+        iter();
 
-          bib::Converger::min_stochastic<>(iter, eval, save_best, 10, 0.0001, 0, 10);
-          vnn->copy(best_nn);
-          fann_destroy(best_nn);
-        }
-
-        dq.free();
-      }
+      dq.free();
+    }
   }
 
   void end_episode() override {
 //     LOG_FILE("policy_exploration", ann->hash());
+    if(update_critic_first)
+      update_critic();
     
     if (trajectory.size() > 0) {
 
@@ -261,27 +258,15 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
       if(n > 0) {
         struct fann_train_data* subdata = fann_subset_train_data(data, 0, n);
 
-        ann->learn(subdata, 5000, 0, 0.0001);
+        ann->learn_stoch(subdata, convergence_max_iter, 0, convergence_precision, convergence_min_iter);
 
         fann_destroy_train(subdata);
       }
       fann_destroy_train(data);
     }
-      
-    update_critic();  
-      
-    if(!clear_trajectory){
-      std::list<sample> current_trajectory;
-      for(auto it = trajectory.begin(); it != trajectory.end() ; it++ ) {
-        sample sa = *it;
-        sa.replayed++;
-        if(sa.replayed < 5)
-          current_trajectory.push_back(sa);
-      }
-      trajectory.clear();
-      
-      trajectory.insert(current_trajectory.begin(), current_trajectory.end());
-    }
+    
+    if(!update_critic_first)
+      update_critic();
   }
 
   void save(const std::string& path) override {
@@ -321,9 +306,10 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   
   bool update_pure_ac;
 
-  double noise;
-  bool gaussian_policy, vnn_from_scratch, lecun_activation, 
-        determinist_vnn_update, clear_trajectory, update_delta_neg;
+  double noise, convergence_precision;
+  bool gaussian_policy, vnn_from_scratch, lecun_activation, update_critic_first,
+      update_delta_neg;
+  uint number_fitted_iteration, convergence_min_iter, convergence_max_iter;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
