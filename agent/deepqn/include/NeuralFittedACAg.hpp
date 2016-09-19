@@ -9,7 +9,7 @@
 #include <boost/serialization/deque.hpp>
 #include <boost/filesystem.hpp>
 
-#include "MLP.hpp"
+#include "nn/MLP.hpp"
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"

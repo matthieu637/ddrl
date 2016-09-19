@@ -13,18 +13,8 @@ depends=('hdf5' 'boost' 'protobuf' 'google-glog'
 		 'openblas-lapack' 
 		 )
 makedepends=('git' 'cmake')
-source=("git+https://github.com/BVLC/caffe.git" 
-	"https://matthieu-zimmer.net/~matthieu/patches/euclidean_ws_loss_layer.cpp" 
-	"https://matthieu-zimmer.net/~matthieu/patches/euclidean_ws_loss_layer.hpp" 
-	"https://matthieu-zimmer.net/~matthieu/patches/caffe-git.patch")
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
-
-prepare(){
- cd "${srcdir}"
- patch -Np0 -i ${pkgname}-${pkgver}.patch
- cp euclidean_ws_loss_layer.cpp caffe/src/caffe/layers/
- cp euclidean_ws_loss_layer.hpp caffe/include/caffe/layers/
-}
+source=("git+https://github.com/matthieu637/caffe.git")
+sha256sums=('SKIP')
 
 build() {
     cd "$srcdir/$pkgname"
