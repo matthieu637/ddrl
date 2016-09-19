@@ -126,11 +126,12 @@ function buildDir(){
 						cmakeBuild debug Debug
 					fi
 	
-	
-					if [ -e build/relwithdeb ] ; then
-						cmakeBuildRecall relwithdeb
-					else
-	                			cmakeBuild relwithdeb RelWithDebInfo
+					if [ $BUILD_RELWITHDEB -eq 1 ] ; then
+						if [ -e build/relwithdeb ] ; then
+							cmakeBuildRecall relwithdeb
+						else
+		                			cmakeBuild relwithdeb RelWithDebInfo
+						fi
 					fi
 				fi
 
@@ -152,7 +153,9 @@ function buildDir(){
 		else
 	                cmakeBuild release Release
 	                cmakeBuild debug Debug
-	                cmakeBuild relwithdeb RelWithDebInfo
+			if [ $BUILD_RELWITHDEB -eq 1 ] ; then
+		                cmakeBuild relwithdeb RelWithDebInfo
+			fi
 		fi
 
                 echo "INFO : $subdir well builed. Congratz."
@@ -247,6 +250,7 @@ function echo_usage(){
 	echo "--debug : build only debug"
 	echo "--report : merge all report into one (build_report.log) usefull for continuous integration"
 	echo "-j n : limit the build with n cpu (use all by default)"
+	echo "-with-relwithdeb : build also relwithdeb"
 	echo "--help | -h : displays this message"
 }
 
@@ -254,6 +258,7 @@ export CMAKE_ARGS=''
 export FORCE_REMOVE=''
 export CLEAR=0
 export BUILD_DEBUG=0
+export BUILD_RELWITHDEB=0
 REPORT=0
 BUILD_OUTSIDE=0
 
@@ -288,6 +293,9 @@ do
 		"-j")
 			shift
 			export CPU=$1
+			;;
+		"-with-relwithdeb")
+			export BUILD_RELWITHDEB=1
 			;;
 	esac
 done
