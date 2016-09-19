@@ -145,13 +145,7 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
       if(gaussian_policy){
-        vector<double>* randomized_action = nullptr;
-        if(gaussian_type == 0)
-          randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
-        else if(gaussian_type == 1)
-          randomized_action = bib::Proba<double>::multidimentionnalGaussian(*next_action, noise);
-        else if(gaussian_type == 2)
-          randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
       } else if(bib::Utils::rand01() < noise){ //e-greedy
@@ -200,8 +194,8 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     decay_v                 = pt->get<double>("agent.decay_v");
     batch_norm              = pt->get<uint>("agent.batch_norm");
     count_last              = pt->get<bool>("agent.count_last");
-    gaussian_type           = pt->get<uint>("agent.gaussian_type");
     last_layer_actor        = pt->get<uint>("agent.last_layer_actor");
+    hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
 #ifdef POOL_FOR_TESTING
     testing_strategy        = pt->get<uint>("agent.testing_strategy");
 #endif
@@ -220,10 +214,10 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     }
 #endif    
     
-    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, batch_norm);
+    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm);
     qnn_target = new MLP(*qnn, false);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, last_layer_actor, batch_norm);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, last_layer_actor, hidden_layer_type, batch_norm);
     ann_target = new MLP(*ann, false);
   }
 
@@ -581,10 +575,9 @@ class DeepQNAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   uint replay_memory;
   uint force_more_update;
   uint batch_norm;
-  uint last_layer_actor;
+  uint last_layer_actor, hidden_layer_type;
   
   bool learning, pure_online, inverting_grad, shrink_greater_action, sure_shrink, count_last;
-  uint gaussian_type;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

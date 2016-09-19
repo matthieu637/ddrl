@@ -234,6 +234,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
     reset_ann                   = pt->get<bool>("agent.reset_ann");
     no_forgot_offline           = pt->get<bool>("agent.no_forgot_offline");
     mixed_sampling              = pt->get<bool>("agent.mixed_sampling");
+    hidden_layer_type           = pt->get<uint>("agent.hidden_layer_type");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -278,10 +279,10 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
                   alpha_v,
                   mini_batch_size,
                   decay_v,
-                  batch_norm,
+                  hidden_layer_type, batch_norm,
                   weighting_strategy > 0);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, last_layer_actor, batch_norm);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, last_layer_actor, hidden_layer_type, batch_norm);
 
     if(target_network) {
       qnn_target = new MLP(*qnn, false);
@@ -642,7 +643,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       
       if(reset_ann) {
         delete ann;
-        ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, last_layer_actor, batch_norm);
+        ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, last_layer_actor, hidden_layer_type, batch_norm);
       }
 
       for(uint i=0; i<nb_actor_updates ; i++)
@@ -784,7 +785,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
   double tau_soft_update;
 
   uint gaussian_type;
-  uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy, last_layer_actor;
+  uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy, last_layer_actor, hidden_layer_type;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
   bool target_network, shrink_greater_action, reset_ann, no_forgot_offline, mixed_sampling;
 

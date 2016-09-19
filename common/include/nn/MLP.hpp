@@ -35,7 +35,7 @@ class MLP {
   constexpr static auto kStateInputCount = 1;
 
   MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha,
-      uint _kMinibatchSize, double decay_v, uint batch_norm, bool _weighted_sample=false) :
+      uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false) :
     size_input_state(input), size_sensors(sensors), size_motors(size_input_state - sensors),
     kMinibatchSize(_kMinibatchSize), weighted_sample(_weighted_sample) {
 
@@ -58,7 +58,7 @@ class MLP {
     } else
       SilenceLayer(net_param_init, "silence", {"dummy1","dummy2","dummy3"}, {}, boost::none);
     ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {"state_actions"}, boost::none, 2);
-    std::string tower_top = Tower(net_param_init, "", "state_actions", hiddens, batch_norm);
+    std::string tower_top = Tower(net_param_init, "", "state_actions", hiddens, batch_norm, hidden_layer_type);
     IPLayer(net_param_init, q_values_layer_name, {tower_top}, {q_values_blob_name}, boost::none, 1);
     if(!weighted_sample)
       EuclideanLossLayer(net_param_init, "loss", {q_values_blob_name, targets_blob_name},
@@ -87,7 +87,7 @@ class MLP {
   }
 
   MLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize,
-      uint last_layer_type, uint batch_norm) : size_input_state(sensors),
+      uint hidden_layer_type, uint last_layer_type, uint batch_norm) : size_input_state(sensors),
     size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize) {
 
     caffe::SolverParameter solver_param;
@@ -99,7 +99,7 @@ class MLP {
     MemoryDataLayer(net_param_init, state_input_layer_name, {states_blob_name,"dummy1"},
                     boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
     SilenceLayer(net_param_init, "silence", {"dummy1"}, {}, boost::none);
-    std::string tower_top = Tower(net_param_init, "", states_blob_name, hiddens, batch_norm);
+    std::string tower_top = Tower(net_param_init, "", states_blob_name, hiddens, batch_norm, hidden_layer_type);
     if(last_layer_type == 0)
       IPLayer(net_param_init, "action_layer", {tower_top}, {actions_blob_name}, boost::none, motors);
     else if(last_layer_type == 1) {
@@ -341,11 +341,77 @@ class MLP {
         break;
       }
 #endif
-      for(int n=0; n < blob->count(); n++)
+      for(int n=0; n < blob->count(); n++){
+        LOG_DEBUG(weights[n]);
         sum += fabs(weights[n]);
+      }
     }
 
     return sum;
+  }
+  
+  double number_of_parameters() {
+    uint n = 0;
+
+    caffe::Net<double>& net = *neural_net;
+    for (uint i = 0; i < net.learnable_params().size(); ++i) {
+      auto blob = net.learnable_params()[i];
+      n += blob->count();
+    }
+
+    return n;
+  }
+  
+  void copyWeightsTo(double* startx){
+    uint index = 0;
+
+    caffe::Net<double>& net = *neural_net;
+    const double* weights;
+    for (uint i = 0; i < net.learnable_params().size(); ++i) {
+      auto blob = net.learnable_params()[i];
+#ifdef CAFFE_CPU_ONLY
+      weights = blob->cpu_data();
+#else
+      switch (caffe::Caffe::mode()) {
+      case caffe::Caffe::CPU:
+        weights = blob->cpu_data();
+        break;
+      case caffe::Caffe::GPU:
+        weights = blob->gpu_data();
+        break;
+      }
+#endif
+      for(int n=0; n < blob->count(); n++){
+        startx[index] = weights[n];
+        index++;
+      }
+    }
+  }
+  
+  void copyWeightsFrom(const double* startx){
+    uint index = 0;
+
+    caffe::Net<double>& net = *neural_net;
+    double* weights;
+    for (uint i = 0; i < net.learnable_params().size(); ++i) {
+      auto blob = net.learnable_params()[i];
+#ifdef CAFFE_CPU_ONLY
+      weights = blob->mutable_cpu_data();
+#else
+      switch (caffe::Caffe::mode()) {
+      case caffe::Caffe::CPU:
+        weights = blob->mutable_cpu_data();
+        break;
+      case caffe::Caffe::GPU:
+        weights = blob->mutable_gpu_data();
+        break;
+      }
+#endif
+      for(int n=0; n < blob->count(); n++){
+        weights[n] = startx[index];
+        index++;
+      }
+    }
   }
 
   double error() {
@@ -549,7 +615,7 @@ class MLP {
                     const std::string& layer_prefix,
                     const std::string& input_blob_name,
                     const std::vector<uint>& layer_sizes,
-                    uint batch_norm) {
+                    uint batch_norm, uint hidden_layer_type) {
     std::string input_name = input_blob_name;
     for (uint i=1; i<layer_sizes.size()+1; ++i) {
       if(batch_norm == 1) {
@@ -569,7 +635,14 @@ class MLP {
       std::string top_name = layer_prefix + "ip" + std::to_string(i);
       IPLayer(np, layer_name, {input_name}, {top_name}, boost::none, layer_sizes[i-1]);
       layer_name = layer_prefix + "ip" + std::to_string(i) + "_relu_layer";
-      ReluLayer(np, layer_name, {top_name}, {top_name}, boost::none);
+      if(hidden_layer_type==1)
+        ReluLayer(np, layer_name, {top_name}, {top_name}, boost::none);
+      else if(hidden_layer_type==2)
+        TanhLayer(np, layer_name, {top_name}, {top_name}, boost::none);
+      else {
+        LOG_ERROR("hidden_layer_type " << hidden_layer_type << "not implemented");
+        exit(1);
+      }
       input_name = top_name;
     }
     return input_name;

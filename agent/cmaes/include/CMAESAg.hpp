@@ -8,8 +8,6 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
-#include <tbb/parallel_for.h>
-#include <tbb/blocked_range.h>
 
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"
@@ -17,7 +15,7 @@
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 #include <bib/Combinaison.hpp>
-#include "MLP.hpp"
+#include "nn/MLP.hpp"
 #include "cmaes_interface.h"
 
 class CMAESAg : public arch::AACAgent<MLP> {
@@ -31,6 +29,7 @@ class CMAESAg : public arch::AACAgent<MLP> {
     cmaes_exit(evo);
     delete evo;
     delete ann;
+    delete hidden_unit_a;
   }
 
   const std::vector<double>& _run(double , const std::vector<double>& sensors,
@@ -56,42 +55,24 @@ class CMAESAg : public arch::AACAgent<MLP> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
-    hidden_unit_a               = pt->get<int>("agent.hidden_unit_a");
-    lecun_activation            = pt->get<bool>("agent.lecun_activation");
+    hidden_unit_a               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
+    actor_hidden_layer_type     = pt->get<uint>("agent.actor_hidden_layer_type");
+    actor_output_layer_type     = pt->get<uint>("agent.actor_output_layer_type");
+    batch_norm                  = pt->get<uint>("agent.batch_norm");
     population                  = pt->get<uint>("agent.population");
     gaussian_policy             = pt->get<bool>("agent.gaussian_policy");
     policy_stochasticity        = pt->get<double>("agent.policy_stochasticity");
-    uint last_layer_type = pt->get<uint>("agent.last_layer_type");
     
-    if(hidden_unit_a == 0){
-      LOG_ERROR("Linear MLP");
-      exit(1);
-//       ann = new LinMLP(nb_sensors , nb_motors, 0.0, lecun_activation);
-    }
-     else {
-      ann = new MLP(nb_sensors, {hidden_unit_a}, nb_motors, lecun_activation);
-      fann_set_training_algorithm(ann->getNeuralNet(), FANN_TRAIN_INCREMENTAL);
-    }
-    
-    if(last_layer_type == 0)
-      fann_set_activation_function_output(ann->getNeuralNet(), FANN_LINEAR);
-    else if (last_layer_type == 1){
-      fann_set_activation_steepness_output(ann->getNeuralNet(), atanh(1.d/sqrt(3.d)));
-      fann_set_activation_function_output(ann->getNeuralNet(), FANN_SIGMOID_SYMMETRIC_LECUN);
-    }
-    else//==2 let tanh
-      ;
-    
-    struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(ann->getNeuralNet()), sizeof(struct fann_connection));
-    fann_get_connection_array(ann->getNeuralNet(), connections);
-    const uint dimension = (nb_sensors+1)*hidden_unit_a + (hidden_unit_a+1)*nb_motors;
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, 0.1, 1, actor_hidden_layer_type, actor_output_layer_type, batch_norm);
+
+//     const uint dimension = (nb_sensors+1)*hidden_unit_a->at(0) + (hidden_unit_a->at(0)+1)*nb_motors;
+    const uint dimension = ann->number_of_parameters();
     double* startx  = new double[dimension];
     double* deviation  = new double[dimension];
     for(uint j=0; j< dimension; j++){
-        startx[j] = connections[j].weight;
         deviation[j] = 0.3;
     }
-    free(connections);
+    ann->copyWeightsTo(startx);
     
     evo = new cmaes_t;
     arFunvals = cmaes_init(evo, dimension, startx, deviation, 0, population, NULL/*"config.cmaes.ini"*/);
@@ -144,9 +125,9 @@ class CMAESAg : public arch::AACAgent<MLP> {
       //put individual into NN
       const double* parameters = nullptr;
       if(learning || !cmaes_UpdateDistribution_done_once)
-	parameters = pop[current_individual];
+        parameters = pop[current_individual];
       else
-	parameters = cmaes_GetPtr(evo, "xbestever");
+        parameters = cmaes_GetPtr(evo, "xbestever");
       
       loadPolicyParameters(parameters);
     }
@@ -218,7 +199,8 @@ class CMAESAg : public arch::AACAgent<MLP> {
   }
   
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
-      return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, policy_stochasticity, decision_each);
+//       return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, policy_stochasticity, decision_each);
+      return nullptr;
   }
 
  protected:
@@ -232,33 +214,15 @@ class CMAESAg : public arch::AACAgent<MLP> {
 
 private:
   void loadPolicyParameters(const double* parameters){
-    const uint dimension = (uint) cmaes_Get(evo, "dim");
-    struct fann_connection* connections = (struct fann_connection*) calloc(fann_get_total_connections(ann->getNeuralNet()), sizeof(struct fann_connection));
-    fann_get_connection_array(ann->getNeuralNet(), connections);
-    
-//     LOG_DEBUG("DIM: " <<dimension << " " << fann_get_total_connections(ann->getNeuralNet()));
-    ASSERT(dimension == fann_get_total_connections(ann->getNeuralNet()), "dimension mismatch");
-    for(uint j=0; j< dimension; j++)
-      connections[j].weight=parameters[j];
-    
-    fann_set_weight_array(ann->getNeuralNet(), connections, dimension);
-    free(connections);
-    
-    //bib::Logger::PRINT_ELEMENTS(parameters, dimension);
+      ann->copyWeightsFrom(parameters);
   }
   
-//  private:
-public://TODO rm me
-  uint getNbMotors(){
-    return nb_motors;
-  }
-  
+private:  
+  std::vector<uint>* hidden_unit_a;
   uint nb_sensors;
-
   double policy_stochasticity;
-  uint hidden_unit_a, population;
-
-  bool lecun_activation, gaussian_policy;
+  uint population, actor_hidden_layer_type, actor_output_layer_type, batch_norm;
+  bool gaussian_policy;
 
   std::shared_ptr<std::vector<double>> last_action;
   
