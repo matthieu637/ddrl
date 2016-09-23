@@ -8,13 +8,14 @@ if(NOT DEFINED ROOT_DRL_PATH)
 endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/Config.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/CaffeConfig.cmake)
 
 #Boost library
 find_package(Boost COMPONENTS serialization program_options thread system REQUIRED)
 find_package(GTest REQUIRED)
 find_package(Threads REQUIRED)
 
-include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${GTEST_INCLUDE_DIRS})
+include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${GTEST_INCLUDE_DIRS} ${CAFFE_ALL_INCLUDE})
 
 file ( GLOB_RECURSE all_include include/*.hpp )
 file ( GLOB all_sources src/*.cpp )
@@ -39,4 +40,4 @@ target_link_libraries(dpmt-dummy-simulator ${Boost_LIBRARIES})
 file(COPY data/minimal_config.ini DESTINATION . ) 
 file(RENAME ${CMAKE_CURRENT_BINARY_DIR}/minimal_config.ini ${CMAKE_CURRENT_BINARY_DIR}/config.ini)
 
-enable_utest(all_sources ${Boost_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+enable_utest(all_sources ${CMAKE_THREAD_LIBS_INIT} ${CAFFE_ALL_LIBRARIES})

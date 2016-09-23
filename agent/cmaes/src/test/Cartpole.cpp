@@ -21,7 +21,10 @@ class HardCoddedController : public arch::AAgent<> {
 };
 
 int main(int argc, char **argv) {
-
+  FLAGS_minloglevel = 2;
+  google::InitGoogleLogging(argv[0]);
+  google::InstallFailureSignalHandler();
+  
   arch::Simulator<CartpoleEnv, CMAESAg> s;
 //   arch::Simulator<CartpoleEnv, CMAESAg, arch::PerceptionProbStat> s;
 //   arch::Simulator<CartpoleEnv, HardCoddedController> s;

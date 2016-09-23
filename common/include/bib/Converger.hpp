@@ -2,7 +2,7 @@
 #define CONVERGER_HPP
 
 #include <limits>
-
+#include <math.h>
 #include <bib/Logger.hpp>
 
 namespace bib {

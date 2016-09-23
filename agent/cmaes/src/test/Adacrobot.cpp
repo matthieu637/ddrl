@@ -5,6 +5,9 @@
 #include "CMAESAg.hpp"
 
 int main(int argc, char **argv) {
+  FLAGS_minloglevel = 2;
+  google::InitGoogleLogging(argv[0]);
+  google::InstallFailureSignalHandler();
 //   arch::Simulator<AdvancedAcrobotEnv, CMAESAg, arch::PerceptionProbStat> s;
   arch::Simulator<AdvancedAcrobotEnv, CMAESAg> s;
 

@@ -130,6 +130,17 @@ class PerceptionProbStat : public DummyEpisodeStat {
   uint step;
 };
 
+class AgentGPUProgOptions {
+ public:
+  static boost::program_options::options_description program_options() {
+    boost::program_options::options_description desc("Allowed Agent options");
+    desc.add_options()("load", boost::program_options::value<std::string>(), "set the agent to load");
+    desc.add_options()("cpu", "use cpu [default]");
+    desc.add_options()("gpu", "use gpu");
+    return desc;
+  }
+};
+
 }  // namespace arch
 
 #endif  // DUMMY_H
