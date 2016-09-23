@@ -21,10 +21,11 @@
 #include "bib/Assert.hpp"
 #include "Singleton.hpp"
 
-#define LOG(stream)                                            \
-  bib::Logger::getInstance()->isBufferEnable()                 \
-      ? bib::Logger::getInstance()->registerBuffer() << stream \
-      : std::cout << stream << std::endl
+// google log conflict
+// #define LOG(stream)                                            
+//   bib::Logger::getInstance()->isBufferEnable()                 
+//       ? bib::Logger::getInstance()->registerBuffer() << stream 
+//       : std::cout << stream << std::endl
 
 #define LOG_DEBUG(stream)                                             \
   bib::Logger::getInstance()->isEnabled(bib::Logger::DEBUGGING) &&    \
