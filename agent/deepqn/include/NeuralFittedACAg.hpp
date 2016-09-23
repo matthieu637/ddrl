@@ -90,18 +90,7 @@ typedef struct _sample {
 
 } sample;
 
-class AgentGPUProgOptions {
- public:
-  static boost::program_options::options_description program_options() {
-    boost::program_options::options_description desc("Allowed Agent options");
-    desc.add_options()("load", boost::program_options::value<std::string>(), "set the agent to load");
-    desc.add_options()("cpu", "use cpu [default]");
-    desc.add_options()("gpu", "use gpu");
-    return desc;
-  }
-};
-
-class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
+class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
  public:
   typedef MLP PolicyImpl;
 
@@ -282,7 +271,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
                   hidden_layer_type, batch_norm,
                   weighting_strategy > 0);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, last_layer_actor, hidden_layer_type, batch_norm);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, hidden_layer_type, last_layer_actor, batch_norm);
 
     if(target_network) {
       qnn_target = new MLP(*qnn, false);
@@ -643,7 +632,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, AgentGPUProgOptions> {
       
       if(reset_ann) {
         delete ann;
-        ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, last_layer_actor, hidden_layer_type, batch_norm);
+        ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, hidden_layer_type, last_layer_actor, batch_norm);
       }
 
       for(uint i=0; i<nb_actor_updates ; i++)
