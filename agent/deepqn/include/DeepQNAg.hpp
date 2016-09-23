@@ -32,8 +32,6 @@ typedef struct _sample {
   std::vector<double> next_s;
   double r;
   bool goal_reached;
-  double p0;
-  double onpolicy_target;
 
   friend class boost::serialization::access;
   template <typename Archive>
@@ -44,8 +42,6 @@ typedef struct _sample {
     ar& BOOST_SERIALIZATION_NVP(next_s);
     ar& BOOST_SERIALIZATION_NVP(r);
     ar& BOOST_SERIALIZATION_NVP(goal_reached);
-    ar& BOOST_SERIALIZATION_NVP(p0);
-    ar& BOOST_SERIALIZATION_NVP(onpolicy_target);
   }
 
   //Used to store all sample into a tree, might be stochastic
@@ -120,11 +116,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     vector<double>* next_action = ann->computeOut(sensors);
     
     if (last_action.get() != nullptr && learning){
-      double p0 = 1.f;
-      for(uint i=0;i < nb_motors;i++)
-        p0 *= exp(-(last_pure_action->at(i)-last_action->at(i))*(last_pure_action->at(i)-last_action->at(i))/(2.f*noise*noise));
-      
-      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || (count_last && last), p0, 0.};
+      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || (count_last && last)};
       insertSample(sa);
     }
 
@@ -175,6 +167,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     count_last              = pt->get<bool>("agent.count_last");
     actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
     hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
+    bool test_net           = pt->get<bool>("agent.test_net");
     
 #ifdef CAFFE_CPU_ONLY
     LOG_INFO("CPU mode");
@@ -188,13 +181,19 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       caffe::Caffe::SetDevice(0);
       LOG_INFO("GPU mode");
     }
-#endif    
+#endif
     
     qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm_critic);
-    qnn_target = new MLP(*qnn, false);
+    if(test_net)
+      qnn_target = new MLP(*qnn, false);
+    else
+      qnn_target = new MLP(*qnn, true);
 
     ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm_actor);
-    ann_target = new MLP(*ann, false);
+    if(test_net)
+      ann_target = new MLP(*ann, false);
+    else
+      ann_target = new MLP(*ann, true);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool _learning) override {

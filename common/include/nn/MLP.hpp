@@ -163,6 +163,12 @@ class MLP {
             net_param.mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(true);
         } 
       }
+#ifndef NDEBUG
+      if(NetNeedsUpgrade(net_param)){
+        LOG_DEBUG("network need update");
+        exit(1);
+      }
+#endif
       neural_net.reset(new caffe::Net<double>(net_param));
       solver = nullptr;
     } else {
@@ -179,6 +185,12 @@ class MLP {
                 net_param->mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(true);
           }
       }
+#ifndef NDEBUG
+      if(NetNeedsUpgrade(*net_param)){
+        LOG_DEBUG("network need update");
+        exit(1);
+      }
+#endif
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
       neural_net = solver->net();
     }
@@ -391,6 +403,7 @@ class MLP {
 
     caffe::Net<double>& net = *neural_net;
     const double* weights;
+    
     for (uint i = 0; i < net.learnable_params().size(); ++i) {
       auto blob = net.learnable_params()[i];
 #ifdef CAFFE_CPU_ONLY
@@ -406,7 +419,6 @@ class MLP {
       }
 #endif
       for(int n=0; n < blob->count(); n++){
-        LOG_DEBUG(weights[n]);
         sum += fabs(weights[n]);
       }
     }
