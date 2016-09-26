@@ -14,20 +14,19 @@ find_package(Boost COMPONENTS serialization filesystem system program_options th
 find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(Cartpole)
-find_package(TBB)
-find_package(FANN)
-find_package(OPTPP)
+# find_package(TBB)
+# find_package(OPTPP)
 find_package(Threads REQUIRED)
 
-include_directories(${CMAKE_SOURCE_DIR}/include ../qlearning-nn/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${FANN_INCLUDE_DIRS} )
+include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} )
 
-set(BASE_LIBRARIES ${COMMON_DRL_LIBRARY} ${TBB_LIBRARIES} ${DOUBLEFANN_LIBRARY} ${Boost_LIBRARIES} )
-file ( GLOB_RECURSE all_include include/*.hpp ${ROOT_DRL_PATH}/agent/qlearning-nn/include/MLP.hpp)
-file ( GLOB all_sources src/*.cpp ${ROOT_DRL_PATH}/agent/qlearning-nn/src/MLP.cpp)
+set(BASE_LIBRARIES ${COMMON_DRL_LIBRARY} ${Boost_LIBRARIES} )
+file ( GLOB_RECURSE all_include include/*.hpp)
+file ( GLOB all_sources src/*.cpp)
 
 if(${OPTPP_LIBRARY_FOUND})
 	include_directories(${OPTPP_INCLUDE_DIRS})
-	set(BASE_LIBRARIES ${BASE_LIBRARIES} ${OPTPP_LIBRARIES})
+	set(BASE_LIBRARIES ${BASE_LIBRARIES} ${OPTPP_LIBRARIES} ${TBB_LIBRARIES})
 	set(all_include ${all_include} ${ROOT_DRL_PATH}/agent/qlearning-nn/include/UNLF2.hpp)
 	set(all_sources ${all_sources} ${ROOT_DRL_PATH}/agent/qlearning-nn/src/UNLF2.cpp)
 endif()
@@ -44,8 +43,8 @@ target_link_libraries(cp-cacla-on ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY
 add_executable(cp-cacla-off src/test/CartpoleCacOff.cpp ${all_include} ${all_sources} )
 target_link_libraries(cp-cacla-off ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
 
-add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
-target_link_libraries(ada-nfac ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
+# add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
+# target_link_libraries(ada-nfac ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
 
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

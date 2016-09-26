@@ -93,7 +93,7 @@ function buildDir(){
         fi
 
         here=`pwd`
-        for subdir in $(find $dir/ -name 'CMakeLists.txt' -printf '%h\n' | sort -n) ; do
+        for subdir in $(find $dir/ -name 'CMakeLists.txt' -printf '%h\n' | sort -n | grep -v old) ; do
 		
                 cd $here/$subdir
 

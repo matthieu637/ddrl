@@ -16,12 +16,12 @@
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 #include <bib/Combinaison.hpp>
-#include "MLP.hpp"
+#include "nn/MLP.hpp"
 
 class BaseCaclaAg : public arch::ARLAgent<> {
  public:
   BaseCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : ARLAgent<>(_nb_motors), nb_sensors(_nb_sensors) {
+    : ARLAgent<>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0) {
 
   }
 
@@ -48,7 +48,7 @@ class BaseCaclaAg : public arch::ARLAgent<> {
       }
       double lastv = vnn->computeOutVF(last_state, *next_action);
 
-      vnn->learn(last_state, {}, vtarget);
+      vnn->learn(last_state, empty_action, vtarget);
       double delta = vtarget - lastv;
 
       if (delta > 0) { //increase this action
@@ -86,28 +86,23 @@ class BaseCaclaAg : public arch::ARLAgent<> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
-    hidden_unit_v       = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
-    hidden_unit_a       = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
-    alpha_v             = pt->get<double>("agent.alpha_v");
-    alpha_a             = pt->get<double>("agent.alpha_a");
-    noise               = pt->get<double>("agent.noise");
-    plus_var_version    = pt->get<bool>("agent.plus_var_version");
-    gaussian_policy     = pt->get<bool>("agent.gaussian_policy");
-    lecun_activation    = pt->get<bool>("agent.lecun_activation");
-    bool last_activation_linear = pt->get<bool>("agent.last_activation_linear");
+    hidden_unit_v           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
+    hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
+    alpha_v                 = pt->get<double>("agent.alpha_v");
+    alpha_a                 = pt->get<double>("agent.alpha_a");
+    noise                   = pt->get<double>("agent.noise");
+    plus_var_version        = pt->get<bool>("agent.plus_var_version");
+    gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
+    batch_norm              = pt->get<uint>("agent.batch_norm");
+    actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
+    hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     
     beta = 0.001;
     delta_var = 1;
-    
-    vnn = new MLP(nb_sensors, *hidden_unit_v, nb_sensors, alpha_v, lecun_activation);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, lecun_activation);
-    fann_set_training_algorithm(ann->getNeuralNet(), FANN_TRAIN_INCREMENTAL);
+    vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, kMinibatchSize, -1, hidden_layer_type, batch_norm);
     
-    fann_set_learning_rate(ann->getNeuralNet(), alpha_a / fann_get_total_connections(ann->getNeuralNet()));
-    fann_set_learning_rate(vnn->getNeuralNet(), alpha_v / fann_get_total_connections(vnn->getNeuralNet()));
-    if(last_activation_linear)
-      fann_set_activation_function_output(ann->getNeuralNet(), FANN_LINEAR);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm, true);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool) override {
@@ -116,8 +111,6 @@ class BaseCaclaAg : public arch::ARLAgent<> {
       last_state.push_back(sensors[i]);
 
     last_action = nullptr;
-
-    fann_reset_MSE(vnn->getNeuralNet());
   }
 
   void end_episode() override {
@@ -210,7 +203,10 @@ class BaseCaclaAg : public arch::ARLAgent<> {
   }
 
  private:
+  uint kMinibatchSize = 1;
   uint nb_sensors;
+  std::vector<double> empty_action;
+  uint batch_norm, actor_output_layer_type, hidden_layer_type;
 
   double alpha_v, alpha_a;
   double noise;
@@ -220,7 +216,6 @@ class BaseCaclaAg : public arch::ARLAgent<> {
   double beta, delta_var;
   bool plus_var_version;
   bool gaussian_policy;
-  bool lecun_activation;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;

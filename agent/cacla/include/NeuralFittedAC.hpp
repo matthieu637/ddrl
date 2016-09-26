@@ -17,7 +17,7 @@
 #include "bib/Utils.hpp"
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
-#include "MLP.hpp"
+#include "nn/MLP.hpp"
 #include "kde.hpp"
 #include "kdtree++/kdtree.hpp"
 #include "bib/Combinaison.hpp"

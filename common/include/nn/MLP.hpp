@@ -40,7 +40,7 @@ class MLP {
       uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false) :
     size_input_state(input), size_sensors(sensors), size_motors(size_input_state - sensors),
     kMinibatchSize(_kMinibatchSize), weighted_sample(_weighted_sample) {
-        
+
     ASSERT(alpha > 0, "alpha <= 0");
     ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
@@ -56,36 +56,35 @@ class MLP {
     MemoryDataLayer(net_param_init, state_input_layer_name, {states_blob_name,"dummy1"},
                     boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
     if(size_motors > 0)
-        MemoryDataLayer(net_param_init, action_input_layer_name, {actions_blob_name,"dummy2"},
-                    boost::none, {kMinibatchSize, kStateInputCount, size_motors, 1});
+      MemoryDataLayer(net_param_init, action_input_layer_name, {actions_blob_name,"dummy2"},
+                      boost::none, {kMinibatchSize, kStateInputCount, size_motors, 1});
     MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy3"},
                     boost::none, {kMinibatchSize, 1, 1, 1});
-    if(weighted_sample && size_motors > 0){
+    if(weighted_sample && size_motors > 0) {
       MemoryDataLayer(net_param_init, wsample_input_layer_name, {wsample_blob_name,"dummy4"},
                       boost::none, {kMinibatchSize, 1, 1, 1});
       SilenceLayer(net_param_init, "silence", {"dummy1","dummy2","dummy3", "dummy4"}, {}, boost::none);
-    } else if(weighted_sample){
+    } else if(weighted_sample) {
       MemoryDataLayer(net_param_init, wsample_input_layer_name, {wsample_blob_name,"dummy4"},
-                    boost::none, {kMinibatchSize, 1, 1, 1});
+                      boost::none, {kMinibatchSize, 1, 1, 1});
       SilenceLayer(net_param_init, "silence", {"dummy1","dummy3", "dummy4"}, {}, boost::none);
-    }
-    else if(size_motors > 0)
+    } else if(size_motors > 0)
       SilenceLayer(net_param_init, "silence", {"dummy1","dummy2","dummy3"}, {}, boost::none);
-    else 
-      SilenceLayer(net_param_init, "silence", {"dummy1","dummy3"}, {}, boost::none);
-    
-    if(size_motors > 0)
-        ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {"state_actions"}, boost::none, 2);
     else
-        ConcatLayer(net_param_init, "concat", {states_blob_name}, {"state_actions"}, boost::none, 2);
+      SilenceLayer(net_param_init, "silence", {"dummy1","dummy3"}, {}, boost::none);
+
+    if(size_motors > 0)
+      ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {"state_actions"}, boost::none, 2);
+    else
+      ConcatLayer(net_param_init, "concat", {states_blob_name}, {"state_actions"}, boost::none, 2);
     std::string tower_top = Tower(net_param_init, "", "state_actions", hiddens, batch_norm, hidden_layer_type);
     IPLayer(net_param_init, q_values_layer_name, {tower_top}, {q_values_blob_name}, boost::none, 1);
     if(!weighted_sample)
       EuclideanLossLayer(net_param_init, "loss", {q_values_blob_name, targets_blob_name},
-          {loss_blob_name}, boost::none);
+    {loss_blob_name}, boost::none);
     else {
       EuclideanWSLossLayer(net_param_init, "loss", {q_values_blob_name, targets_blob_name, wsample_blob_name},
-          {loss_blob_name}, boost::none);
+      {loss_blob_name}, boost::none);
     }
 
     net_param->CopyFrom(net_param_init);
@@ -108,8 +107,8 @@ class MLP {
   }
 
   MLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize,
-      uint hidden_layer_type, uint last_layer_type, uint batch_norm) : size_input_state(sensors),
-    size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize) {
+      uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false) : size_input_state(sensors),
+    size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize), add_loss_layer(loss_layer) {
 
     caffe::SolverParameter solver_param;
     caffe::NetParameter* net_param = solver_param.mutable_net_param();
@@ -130,6 +129,12 @@ class MLP {
       IPLayer(net_param_init, "action_layer_ip", {tower_top}, {"last_tanh"}, boost::none, motors);
       TanhLayer(net_param_init, "action_layer", {"last_tanh"}, {actions_blob_name}, boost::none);
     }
+    if(loss_layer) {
+      MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy2"},
+                      boost::none, {kMinibatchSize, 1, size_motors, 1});
+      EuclideanLossLayer(net_param_init, "loss", {actions_blob_name, targets_blob_name},
+      {loss_blob_name}, boost::none);
+    }
 
     net_param->CopyFrom(net_param_init);
 
@@ -148,23 +153,25 @@ class MLP {
 //       LOG_DEBUG("actor critic : " <<  neural_net->params().size());
   }
 
-  MLP(const MLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : size_input_state(m.size_input_state), size_sensors(m.size_sensors),
-    size_motors(m.size_motors), kMinibatchSize(m.kMinibatchSize), weighted_sample(m.weighted_sample) {
+  MLP(const MLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : size_input_state(
+      m.size_input_state), size_sensors(m.size_sensors),
+    size_motors(m.size_motors), kMinibatchSize(m.kMinibatchSize), add_loss_layer(m.add_loss_layer),
+    weighted_sample(m.weighted_sample) {
     if(!copy_solver) {
       ASSERT(_phase == ::caffe::Phase::TRAIN, "this constructor is useless");
-      
+
       caffe::NetParameter net_param;
       m.neural_net->ToProto(&net_param);
       net_param.set_force_backward(true);
       net_param.mutable_state()->set_phase(::caffe::Phase::TEST);
-      for(int i =0; i < net_param.layer_size(); i++){
-        if(net_param.layer(i).has_batch_norm_param()){
-            net_param.mutable_layer(i)->clear_param();
-            net_param.mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(true);
-        } 
+      for(int i =0; i < net_param.layer_size(); i++) {
+        if(net_param.layer(i).has_batch_norm_param()) {
+          net_param.mutable_layer(i)->clear_param();
+          net_param.mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(true);
+        }
       }
 #ifndef NDEBUG
-      if(NetNeedsUpgrade(net_param)){
+      if(NetNeedsUpgrade(net_param)) {
         LOG_DEBUG("network need update");
         exit(1);
       }
@@ -176,17 +183,17 @@ class MLP {
       m.neural_net->ToProto(solver_param.mutable_net_param());
       caffe::NetParameter* net_param = solver_param.mutable_net_param();
       net_param->mutable_state()->set_phase(_phase);
-      for(int i =0; i < net_param->layer_size(); i++){
-          if(net_param->layer(i).has_batch_norm_param()){
-              net_param->mutable_layer(i)->clear_param();
-              if(_phase == ::caffe::Phase::TRAIN)
-                net_param->mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(false);
-              else
-                net_param->mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(true);
-          }
+      for(int i =0; i < net_param->layer_size(); i++) {
+        if(net_param->layer(i).has_batch_norm_param()) {
+          net_param->mutable_layer(i)->clear_param();
+          if(_phase == ::caffe::Phase::TRAIN)
+            net_param->mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(false);
+          else
+            net_param->mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(true);
+        }
       }
 #ifndef NDEBUG
-      if(NetNeedsUpgrade(*net_param)){
+      if(NetNeedsUpgrade(*net_param)) {
         LOG_DEBUG("network need update");
         exit(1);
       }
@@ -196,30 +203,30 @@ class MLP {
     }
   }
 
-  MLP(const MLP& m, bool _add_loss_layer, bool copy_solver) :
-    size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors),
-    kMinibatchSize(m.kMinibatchSize), add_loss_layer(_add_loss_layer), weighted_sample(m.weighted_sample) {
-    caffe::NetParameter net_param;
-    m.neural_net->ToProto(&net_param);
-    net_param.set_force_backward(true);
-    if(add_loss_layer) {
-      MemoryDataLayer(net_param, target_input_layer_name, {targets_blob_name,"dummy2"},
-                      boost::none, {kMinibatchSize, 1, size_motors, 1});
-      EuclideanLossLayer(net_param, "loss", {actions_blob_name, targets_blob_name},
-      {loss_blob_name}, boost::none);
-    }
-    LOG_ERROR("to be implemented");
-    exit(1);
-
-    //neural_net.reset(new caffe::Net<double>(net_param));
-    if(copy_solver) {
-      caffe::SolverParameter solver_param(m.solver->param());
-      solver_param.mutable_net_param()->CopyFrom(net_param);
-      solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
-      neural_net = solver->net();
-    } else
-      LOG_ERROR("to be implemented");
-  }
+//   MLP(const MLP& m, bool _add_loss_layer, bool copy_solver) :
+//     size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors),
+//     kMinibatchSize(m.kMinibatchSize), add_loss_layer(_add_loss_layer), weighted_sample(m.weighted_sample) {
+//     caffe::NetParameter net_param;
+//     m.neural_net->ToProto(&net_param);
+//     net_param.set_force_backward(true);
+//     if(add_loss_layer) {
+//       MemoryDataLayer(net_param, target_input_layer_name, {targets_blob_name,"dummy2"},
+//                       boost::none, {kMinibatchSize, 1, size_motors, 1});
+//       EuclideanLossLayer(net_param, "loss", {actions_blob_name, targets_blob_name},
+//       {loss_blob_name}, boost::none);
+//     }
+//     LOG_ERROR("to be implemented");
+//     exit(1);
+// 
+//     //neural_net.reset(new caffe::Net<double>(net_param));
+//     if(copy_solver) {
+//       caffe::SolverParameter solver_param(m.solver->param());
+//       solver_param.mutable_net_param()->CopyFrom(net_param);
+//       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
+//       neural_net = solver->net();
+//     } else
+//       LOG_ERROR("to be implemented");
+//   }
 
  private:
   MLP(const MLP&) {
@@ -264,21 +271,23 @@ class MLP {
                                state_input_layer_name));
     state_input_layer->set_batch_size(kMinibatchSize);
 
-    if(size_input_state != size_sensors) {
-      neural_net->blob_by_name(MLP::actions_blob_name)->Reshape(kMinibatchSize, kStateInputCount, size_motors, 1);
-      auto action_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(neural_net->layer_by_name(
-                                  action_input_layer_name));
-      action_input_layer->set_batch_size(kMinibatchSize);
+    if(size_input_state != size_sensors || add_loss_layer || size_motors == 0) { //critic net constructor 1 or actor with loss
+      if(size_motors > 0 && !add_loss_layer) { //only for critic with action in inputs
+        neural_net->blob_by_name(MLP::actions_blob_name)->Reshape(kMinibatchSize, kStateInputCount, size_motors, 1);
+        auto action_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(neural_net->layer_by_name(
+                                    action_input_layer_name));
+        action_input_layer->set_batch_size(kMinibatchSize);
+      }
 
       neural_net->blob_by_name(MLP::targets_blob_name)->Reshape(kMinibatchSize, kStateInputCount, 1, 1);
       auto target_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(neural_net->layer_by_name(
                                   target_input_layer_name));
       target_input_layer->set_batch_size(kMinibatchSize);
-      
-      if(weighted_sample){
+
+      if(weighted_sample) {
         neural_net->blob_by_name(MLP::wsample_blob_name)->Reshape(kMinibatchSize, kStateInputCount, 1, 1);
         auto wsample_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(neural_net->layer_by_name(
-          wsample_input_layer_name));
+                                     wsample_input_layer_name));
         wsample_input_layer->set_batch_size(kMinibatchSize);
       }
     }
@@ -301,19 +310,25 @@ class MLP {
                              (1.f-tau), to_blob->mutable_cpu_data());
     }
   }
-  
-  void learn(std::vector<double>& sensors, std::vector<double>& motors, double q){
+
+  void learn(std::vector<double>& sensors, std::vector<double>& motors) {
+    InputDataIntoLayers(sensors.data(), nullptr, motors.data());
+    solver->Step(1);
+  }
+
+  void learn(std::vector<double>& sensors, std::vector<double>& motors, double q) {
     double target[] = {q};
     InputDataIntoLayers(sensors.data(), motors.data(), target);
     solver->Step(1);
   }
-  
-  void learn_batch(std::vector<double>& sensors, std::vector<double>& motors, std::vector<double>& q, uint iter){
+
+  void learn_batch(std::vector<double>& sensors, std::vector<double>& motors, std::vector<double>& q, uint iter) {
     InputDataIntoLayers(sensors.data(), motors.data(), q.data());
     solver->Step(iter);
   }
-  
-  void learn_batch_lw(std::vector<double>& sensors, std::vector<double>& motors, std::vector<double>& q, std::vector<double>& lw, uint iter){
+
+  void learn_batch_lw(std::vector<double>& sensors, std::vector<double>& motors, std::vector<double>& q,
+                      std::vector<double>& lw, uint iter) {
     InputDataIntoLayers(sensors.data(), motors.data(), q.data());
     setWeightedSampleVector(lw.data());
     solver->Step(iter);
@@ -324,16 +339,16 @@ class MLP {
     std::copy(sensors.begin(), sensors.end(),states_input.begin());
 
     std::vector<double> target_input(kMinibatchSize, 0.0f);
-    
-    if(size_motors > 0){
-        std::vector<double> actions_input(size_motors * kMinibatchSize, 0.0f);
-        std::copy(motors.begin(), motors.end(),actions_input.begin());
-        
-        InputDataIntoLayers(states_input.data(), actions_input.data(), target_input.data());
-        neural_net->Forward(nullptr); //actions_input will be erase so let me here
+
+    if(size_motors > 0) {
+      std::vector<double> actions_input(size_motors * kMinibatchSize, 0.0f);
+      std::copy(motors.begin(), motors.end(),actions_input.begin());
+
+      InputDataIntoLayers(states_input.data(), actions_input.data(), target_input.data());
+      neural_net->Forward(nullptr); //actions_input will be erase so let me here
     } else {
-        InputDataIntoLayers(states_input.data(), nullptr, target_input.data());
-        neural_net->Forward(nullptr);
+      InputDataIntoLayers(states_input.data(), nullptr, target_input.data());
+      neural_net->Forward(nullptr);
     }
 
     const auto q_values_blob = neural_net->blob_by_name(q_values_blob_name);
@@ -344,7 +359,7 @@ class MLP {
   std::vector<double>* computeOutVFBatch(std::vector<double>& sensors, std::vector<double>& motors) {
     std::vector<double> target_input(kMinibatchSize, 0.0f);
     std::vector<double> target_input2(kMinibatchSize, 0.0f);
-    
+
     InputDataIntoLayers(sensors.data(), motors.data(), target_input.data());
     if(weighted_sample)
       setWeightedSampleVector(target_input2.data());
@@ -403,7 +418,7 @@ class MLP {
 
     caffe::Net<double>& net = *neural_net;
     const double* weights;
-    
+
     for (uint i = 0; i < net.learnable_params().size(); ++i) {
       auto blob = net.learnable_params()[i];
 #ifdef CAFFE_CPU_ONLY
@@ -418,14 +433,14 @@ class MLP {
         break;
       }
 #endif
-      for(int n=0; n < blob->count(); n++){
+      for(int n=0; n < blob->count(); n++) {
         sum += fabs(weights[n]);
       }
     }
 
     return sum;
   }
-  
+
   double number_of_parameters() {
     uint n = 0;
 
@@ -437,8 +452,8 @@ class MLP {
 
     return n;
   }
-  
-  void copyWeightsTo(double* startx){
+
+  void copyWeightsTo(double* startx) {
     uint index = 0;
 
     caffe::Net<double>& net = *neural_net;
@@ -457,14 +472,14 @@ class MLP {
         break;
       }
 #endif
-      for(int n=0; n < blob->count(); n++){
+      for(int n=0; n < blob->count(); n++) {
         startx[index] = weights[n];
         index++;
       }
     }
   }
-  
-  void copyWeightsFrom(const double* startx){
+
+  void copyWeightsFrom(const double* startx) {
     uint index = 0;
 
     caffe::Net<double>& net = *neural_net;
@@ -483,7 +498,7 @@ class MLP {
         break;
       }
 #endif
-      for(int n=0; n < blob->count(); n++){
+      for(int n=0; n < blob->count(); n++) {
         weights[n] = startx[index];
         index++;
       }
@@ -729,7 +744,7 @@ class MLP {
                       const std::vector<std::string>& bottoms,
                       const std::vector<std::string>& tops,
                       const boost::optional<caffe::Phase>& include_phase) {
-    
+
     caffe::LayerParameter& layer = *net_param.add_layer();
     PopulateLayer(layer, name, "BatchNorm", bottoms, tops, include_phase);
     caffe::BatchNormParameter* param = layer.mutable_batch_norm_param();//let me know I am batchnorm
@@ -745,7 +760,7 @@ class MLP {
                  ) {
     caffe::LayerParameter& layer = *net_param.add_layer();
     if(batch_norm == 3)
-        layer.mutable_scale_param()->set_bias_term(true);
+      layer.mutable_scale_param()->set_bias_term(true);
     PopulateLayer(layer, name, "Scale", bottoms, tops, include_phase);
   }
 

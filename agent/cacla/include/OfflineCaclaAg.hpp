@@ -7,15 +7,13 @@
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/filesystem.hpp>
-#include <tbb/parallel_for.h>
-#include <tbb/blocked_range.h>
 
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
-#include "MLP.hpp"
+#include "nn/MLP.hpp"
 
 typedef struct _sample {
   std::vector<double> s;
@@ -41,7 +39,7 @@ typedef struct _sample {
       if(s[i] != b.s[i])
         return s[i] < b.s[i];
     }
-    
+
     for (uint i = 0; i < a.size(); i++) {
       if(a[i] != b.a[i])
         return a[i] < b.a[i];
@@ -54,23 +52,23 @@ typedef struct _sample {
 
 class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
  public:
-  typedef MLP PolicyImpl; 
-   
+  typedef MLP PolicyImpl;
+
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<MLP, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors){
+    : arch::AACAgent<MLP, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0) {
 
   }
 
   virtual ~OfflineCaclaAg() {
     delete vnn;
     delete ann;
-    
+
     delete hidden_unit_v;
     delete hidden_unit_a;
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                 bool learning, bool goal_reached, bool last) {
+                                  bool learning, bool goal_reached, bool last) {
 
     vector<double>* next_action = ann->computeOut(sensors);
 
@@ -79,11 +77,11 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
-      if(gaussian_policy){
+      if(gaussian_policy) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
-      } else if(bib::Utils::rand01() < noise){ //e-greedy
+      } else if(bib::Utils::rand01() < noise) { //e-greedy
         for (uint i = 0; i < next_action->size(); i++)
           next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
       }
@@ -105,27 +103,18 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     noise                   = pt->get<double>("agent.noise");
     update_pure_ac          = pt->get<bool>("agent.update_pure_ac");
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
-    lecun_activation        = pt->get<bool>("agent.lecun_activation");
     update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
     update_critic_first     = pt->get<bool>("agent.update_critic_first");
     number_fitted_iteration = pt->get<uint>("agent.number_fitted_iteration");
-    convergence_precision   = pt->get<double>("agent.convergence_precision");
-    convergence_min_iter    = pt->get<uint>("agent.convergence_min_iter");
-    convergence_max_iter    = pt->get<uint>("agent.convergence_max_iter");
-    uint last_layer_type = pt->get<uint>("agent.last_layer_type");
+    stoch_iter              = pt->get<uint>("agent.stoch_iter");
+    batch_norm              = pt->get<uint>("agent.batch_norm");
+    actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
+    hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
 
-    vnn = new MLP(nb_sensors, *hidden_unit_v, nb_sensors, 0.0, lecun_activation);
+    vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, lecun_activation);
-    if(last_layer_type == 0)
-      fann_set_activation_function_output(ann->getNeuralNet(), FANN_LINEAR);
-    else if (last_layer_type == 1){
-      fann_set_activation_steepness_output(ann->getNeuralNet(), atanh(1.d/sqrt(3.d)));
-      fann_set_activation_function_output(ann->getNeuralNet(), FANN_SIGMOID_SYMMETRIC_LECUN);
-    }
-//       else ==2 let tanh
-          
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm, true);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool) override {
@@ -135,138 +124,124 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
     last_action = nullptr;
     last_pure_action = nullptr;
-    
-    trajectory.clear();
 
-    fann_reset_MSE(vnn->getNeuralNet());
+    trajectory.clear();
   }
 
-  struct ParraVtoVNext {
-    ParraVtoVNext(const std::vector<sample>& _vtraj, const OfflineCaclaAg* _ptr) : vtraj(_vtraj), ptr(_ptr) {
-      data = fann_create_train(vtraj.size(), ptr->nb_sensors, 1);
-      for (uint n = 0; n < vtraj.size(); n++) {
-        sample sm = vtraj[n];
-        for (uint i = 0; i < ptr->nb_sensors ; i++)
-          data->input[n][i] = sm.s[i];
-      }
-    }
-
-    ~ParraVtoVNext() { //must be empty cause of tbb
-
-    }
-
-    void free() {
-      fann_destroy_train(data);
-    }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const {
-
-      struct fann* local_nn = fann_copy(ptr->vnn->getNeuralNet());
-
-      for (size_t n = range.begin(); n < range.end(); n++) {
-        sample sm = vtraj[n];
-
-        double delta = sm.r;
-        if (!sm.goal_reached) {
-          double nextV = MLP::computeOutVF(local_nn, sm.next_s, {});
-          delta += ptr->gamma * nextV;
-        }
-
-        data->output[n][0] = delta;
-      }
-
-      fann_destroy(local_nn);
-    }
-
-    struct fann_train_data* data;
-    const std::vector<sample>& vtraj;
-    const OfflineCaclaAg* ptr;
-  };
-
-  void update_critic(){
+  void update_critic() {
     if (trajectory.size() > 0) {
       //remove trace of old policy
-
-      std::vector<sample> vtraj(trajectory.size());
-      std::copy(trajectory.begin(), trajectory.end(), vtraj.begin());
-
-      ParraVtoVNext dq(vtraj, this);
-
       auto iter = [&]() {
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, vtraj.size()), dq);
+        std::vector<double> all_states(trajectory.size() * nb_sensors);
+        std::vector<double> all_next_states(trajectory.size() * nb_sensors);
+        std::vector<double> v_target(trajectory.size());
+        uint li=0;
+        for (auto it : trajectory) {
+          std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * nb_sensors);
+          std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * nb_sensors);
+          li++;
+        }
 
-        if(vnn_from_scratch)
-          fann_randomize_weights(vnn->getNeuralNet(), -0.025, 0.025);
-        vnn->learn_stoch(dq.data, convergence_max_iter, 0, convergence_precision, convergence_min_iter);
+        auto all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
+
+        li=0;
+        for (auto it : trajectory) {
+          double delta = it.r;
+          if (!it.goal_reached) {
+            double nextV = all_nextV->at(li);
+            delta += gamma * nextV;
+          }
+
+          v_target[li] = delta;
+          li++;
+        }
+
+        ASSERT(li == trajectory.size(), "");
+        if(vnn_from_scratch){
+          delete vnn;
+          vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, trajectory.size(), -1, hidden_layer_type, batch_norm);
+        }
+        vnn->learn_batch(all_states, empty_action, v_target, stoch_iter);
+        
+        delete all_nextV;
       };
 
-      auto eval = [&]() {
-        return fann_get_MSE(vnn->getNeuralNet());
-      };
-
-      for(uint i=0;i<number_fitted_iteration;i++)
+      for(uint i=0; i<number_fitted_iteration; i++)
         iter();
-
-      dq.free();
     }
   }
 
   void end_episode() override {
 //     LOG_FILE("policy_exploration", ann->hash());
+
+    if(trajectory.size() > 0)
+      vnn->increase_batchsize(trajectory.size());
+    
     if(update_critic_first)
       update_critic();
-    
-    if (trajectory.size() > 0) {
 
-      struct fann_train_data* data = fann_create_train(trajectory.size(), nb_sensors, nb_motors);
+    if (trajectory.size() > 0) {
+      std::vector<double> sensors(trajectory.size() * nb_sensors);
+      std::vector<double> actions(trajectory.size() * nb_motors);
+
+      std::vector<double> all_states(trajectory.size() * nb_sensors);
+      std::vector<double> all_next_states(trajectory.size() * nb_sensors);
+      uint li=0;
+      for (auto it : trajectory) {
+        std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * nb_sensors);
+        std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * nb_sensors);
+        li++;
+      }
+
+      auto all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
+      auto all_mine = vnn->computeOutVFBatch(all_states, empty_action);
 
       uint n=0;
+      li=0;
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
         sample sm = *it;
 
         double target = 0.f;
         double mine = 0.f;
-        
+
         target = sm.r;
         if (!sm.goal_reached) {
-          double nextV = vnn->computeOutVF(sm.next_s, {});
+//           double nextV = vnn->computeOutVF(sm.next_s, {});
+          double nextV = all_nextV->at(li);
           target += gamma * nextV;
         }
-        mine = vnn->computeOutVF(sm.s, {});
+//         mine = vnn->computeOutVF(sm.s, {});
+        mine = all_mine->at(li);
 
         if(target > mine) {
-          for (uint i = 0; i < nb_sensors ; i++)
-            data->input[n][i] = sm.s[i];
-          if(update_pure_ac){
-            for (uint i = 0; i < nb_motors; i++)
-              data->output[n][i] = sm.pure_a[i];
-          } else {
-            for (uint i = 0; i < nb_motors; i++)
-              data->output[n][i] = sm.a[i];
-          }
+          std::copy(it->s.begin(), it->s.end(), sensors.begin() + n * nb_sensors);
+
+          if(update_pure_ac)
+            std::copy(it->pure_a.begin(), it->pure_a.end(), actions.begin() + n * nb_motors);
+          else
+            std::copy(it->a.begin(), it->a.end(), actions.begin() + n * nb_motors);
 
           n++;
-        } else if(update_delta_neg && !update_pure_ac){
-            for (uint i = 0; i < nb_sensors ; i++)
-              data->input[n][i] = sm.s[i];
-            for (uint i = 0; i < nb_motors; i++)
-              data->output[n][i] = sm.pure_a[i];
-            n++;
+        } else if(update_delta_neg && !update_pure_ac) {
+          std::copy(it->s.begin(), it->s.end(), sensors.begin() + n * nb_sensors);
+          std::copy(it->pure_a.begin(), it->pure_a.end(), actions.begin() + n * nb_motors);
+          n++;
         }
+        li++;
       }
 
       if(n > 0) {
-        struct fann_train_data* subdata = fann_subset_train_data(data, 0, n);
-
-        ann->learn_stoch(subdata, convergence_max_iter, 0, convergence_precision, convergence_min_iter);
-
-        fann_destroy_train(subdata);
+        ann->increase_batchsize(n);
+        ann->learn_batch(sensors, empty_action, actions, stoch_iter);
       }
-      fann_destroy_train(data);
+
+      delete all_nextV;
+      delete all_mine;
     }
-    
-    if(!update_critic_first)
+
+    if(!update_critic_first){
       update_critic();
+    }
   }
 
   void save(const std::string& path) override {
@@ -279,14 +254,15 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     ann->load(path+".actor");
     vnn->load(path+".critic");
   }
-  
+
   double criticEval(const std::vector<double>&, const std::vector<double>&) override {
     LOG_INFO("not implemented");
     return 0;
   }
-  
+
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
-        return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
+//         return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
+    return nullptr;
   }
 
  protected:
@@ -303,26 +279,29 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
  private:
   uint nb_sensors;
-  
+
   bool update_pure_ac;
 
-  double noise, convergence_precision;
-  bool gaussian_policy, vnn_from_scratch, lecun_activation, update_critic_first,
-      update_delta_neg;
-  uint number_fitted_iteration, convergence_min_iter, convergence_max_iter;
+  double noise;
+  bool gaussian_policy, vnn_from_scratch, update_critic_first,
+       update_delta_neg;
+  uint number_fitted_iteration, stoch_iter;
+  uint batch_norm, actor_output_layer_type, hidden_layer_type;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
   std::vector<double> last_state;
+  double alpha_v, alpha_a;
 
   std::set<sample> trajectory;
 //     std::list<sample> trajectory;
 
   MLP* ann;
   MLP* vnn;
-  
+
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
+  std::vector<double> empty_action;
 };
 
 #endif

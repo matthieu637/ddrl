@@ -5,7 +5,10 @@
 #include "BaseCaclaAg.hpp"
 
 int main(int argc, char **argv) {
-
+  FLAGS_minloglevel = 2;
+  google::InitGoogleLogging(argv[0]);
+  google::InstallFailureSignalHandler();
+  
   arch::Simulator<CartpoleEnv, BaseCaclaAg> s;
   s.init(argc, argv);
 
