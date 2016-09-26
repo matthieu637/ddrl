@@ -110,6 +110,12 @@ class MLP {
       uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false) : size_input_state(sensors),
     size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize), add_loss_layer(loss_layer) {
 
+    ASSERT(alpha > 0, "alpha <= 0");
+    ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
+    ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
+    ASSERT(hidden_layer_type == 1 || hidden_layer_type == 2, "hidden_layer_type not in (1,2)");
+    ASSERT(batch_norm <= 3, "batch_norm not in {0,...,3}");
+
     caffe::SolverParameter solver_param;
     caffe::NetParameter* net_param = solver_param.mutable_net_param();
 
@@ -146,6 +152,7 @@ class MLP {
 //       solver_param.set_momentum(0.95);
 //       solver_param.set_momentum2(0.999);
     solver_param.set_clip_gradients(10);
+//     solver_param.set_display(true);
 
     solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
     neural_net = solver->net();
@@ -217,7 +224,7 @@ class MLP {
 //     }
 //     LOG_ERROR("to be implemented");
 //     exit(1);
-// 
+//
 //     //neural_net.reset(new caffe::Net<double>(net_param));
 //     if(copy_solver) {
 //       caffe::SolverParameter solver_param(m.solver->param());
@@ -271,7 +278,8 @@ class MLP {
                                state_input_layer_name));
     state_input_layer->set_batch_size(kMinibatchSize);
 
-    if(size_input_state != size_sensors || add_loss_layer || size_motors == 0) { //critic net constructor 1 or actor with loss
+    if(size_input_state != size_sensors || add_loss_layer
+        || size_motors == 0) { //critic net constructor 1 or actor with loss
       if(size_motors > 0 && !add_loss_layer) { //only for critic with action in inputs
         neural_net->blob_by_name(MLP::actions_blob_name)->Reshape(kMinibatchSize, kStateInputCount, size_motors, 1);
         auto action_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(neural_net->layer_by_name(
@@ -279,7 +287,8 @@ class MLP {
         action_input_layer->set_batch_size(kMinibatchSize);
       }
 
-      neural_net->blob_by_name(MLP::targets_blob_name)->Reshape(kMinibatchSize, kStateInputCount, 1, 1);
+      neural_net->blob_by_name(MLP::targets_blob_name)->Reshape(kMinibatchSize, kStateInputCount,
+          !add_loss_layer ? 1 : size_motors, 1);
       auto target_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(neural_net->layer_by_name(
                                   target_input_layer_name));
       target_input_layer->set_batch_size(kMinibatchSize);
@@ -514,8 +523,10 @@ class MLP {
 #else
     errors = caffe::Caffe::mode() == caffe::Caffe::CPU ? blob->cpu_data() : blob->gpu_data();
 #endif
-    for(int n=0; n < blob->count(); n++)
+    for(int n=0; n < blob->count(); n++) {
+//       LOG_DEBUG(errors[n] << " " << n);
       sum += fabs(errors[n]);
+    }
 
     return sum;
   }
@@ -558,21 +569,6 @@ class MLP {
     caffe::ConcatParameter* concat_param = layer.mutable_concat_param();
     concat_param->set_axis(axis);
   }
-  void SliceLayer(caffe::NetParameter& net_param,
-                  const std::string& name,
-                  const std::vector<std::string>& bottoms,
-                  const std::vector<std::string>& tops,
-                  const boost::optional<caffe::Phase>& include_phase,
-                  const int axis,
-                  const std::vector<int>& slice_points) {
-    caffe::LayerParameter& layer = *net_param.add_layer();
-    PopulateLayer(layer, name, "Slice", bottoms, tops, include_phase);
-    caffe::SliceParameter* slice_param = layer.mutable_slice_param();
-    slice_param->set_axis(axis);
-    for (auto& p : slice_points) {
-      slice_param->add_slice_point(p);
-    }
-  }
   void MemoryDataLayer(caffe::NetParameter& net_param,
                        const std::string& name,
                        const std::vector<std::string>& tops,
@@ -612,36 +608,6 @@ class MLP {
                  const boost::optional<caffe::Phase>& include_phase) {
     caffe::LayerParameter& layer = *net_param.add_layer();
     PopulateLayer(layer, name, "TanH", bottoms, tops, include_phase);
-  }
-  void EltwiseLayer(caffe::NetParameter& net_param,
-                    const std::string& name,
-                    const std::vector<std::string>& bottoms,
-                    const std::vector<std::string>& tops,
-                    const boost::optional<caffe::Phase>& include_phase,
-                    const caffe::EltwiseParameter::EltwiseOp& op) {
-    caffe::LayerParameter& layer = *net_param.add_layer();
-    PopulateLayer(layer, name, "Eltwise", bottoms, tops, include_phase);
-    caffe::EltwiseParameter* eltwise_param = layer.mutable_eltwise_param();
-    eltwise_param->set_operation(op);
-  }
-  void DummyDataLayer(caffe::NetParameter& net_param,
-                      const std::string& name,
-                      const std::vector<std::string>& tops,
-                      const boost::optional<caffe::Phase>& include_phase,
-                      const std::vector<std::vector<double> > shapes,
-                      const std::vector<double> values) {
-    caffe::LayerParameter& layer = *net_param.add_layer();
-    PopulateLayer(layer, name, "DummyData", {}, tops, include_phase);
-    caffe::DummyDataParameter* param = layer.mutable_dummy_data_param();
-    for (uint i=0; i<values.size(); ++i) {
-      caffe::BlobShape* shape = param->add_shape();
-      for (uint j=0; j<shapes[i].size(); ++j) {
-        shape->add_dim(shapes[i][j]);
-      }
-      caffe::FillerParameter* filler = param->add_data_filler();
-      filler->set_type("constant");
-      filler->set_value(values[i]);
-    }
   }
   void IPLayer(caffe::NetParameter& net_param,
                const std::string& name,
@@ -686,19 +652,6 @@ class MLP {
     PopulateLayer(layer, name, "Softmax", bottoms, tops, include_phase);
     caffe::SoftmaxParameter* param = layer.mutable_softmax_param();
     param->set_axis(axis);
-  }
-  void TileLayer(caffe::NetParameter& net_param,
-                 const std::string& name,
-                 const std::vector<std::string>& bottoms,
-                 const std::vector<std::string>& tops,
-                 const boost::optional<caffe::Phase>& include_phase,
-                 const int axis,
-                 const int tiles) {
-    caffe::LayerParameter& layer = *net_param.add_layer();
-    PopulateLayer(layer, name, "Tile", bottoms, tops, include_phase);
-    caffe::TileParameter* param = layer.mutable_tile_param();
-    param->set_axis(axis);
-    param->set_tiles(tiles);
   }
 
 

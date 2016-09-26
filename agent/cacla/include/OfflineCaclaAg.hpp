@@ -111,6 +111,8 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     batch_norm              = pt->get<uint>("agent.batch_norm");
     actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
     hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
+    alpha_a                 = pt->get<double>("agent.alpha_a");
+    alpha_v                 = pt->get<double>("agent.alpha_v");
 
     vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm);
 
