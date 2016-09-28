@@ -101,7 +101,6 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     hidden_unit_v           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
-    update_pure_ac          = pt->get<bool>("agent.update_pure_ac");
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
     update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
@@ -217,14 +216,9 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
         if(target > mine) {
           std::copy(it->s.begin(), it->s.end(), sensors.begin() + n * nb_sensors);
-
-          if(update_pure_ac)
-            std::copy(it->pure_a.begin(), it->pure_a.end(), actions.begin() + n * nb_motors);
-          else
-            std::copy(it->a.begin(), it->a.end(), actions.begin() + n * nb_motors);
-
+          std::copy(it->a.begin(), it->a.end(), actions.begin() + n * nb_motors);
           n++;
-        } else if(update_delta_neg && !update_pure_ac) {
+        } else if(update_delta_neg) {
           std::copy(it->s.begin(), it->s.end(), sensors.begin() + n * nb_sensors);
           std::copy(it->pure_a.begin(), it->pure_a.end(), actions.begin() + n * nb_motors);
           n++;
@@ -281,8 +275,6 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
  private:
   uint nb_sensors;
-
-  bool update_pure_ac;
 
   double noise;
   bool gaussian_policy, vnn_from_scratch, update_critic_first,

@@ -124,19 +124,11 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
                                   bool learning, bool goal_reached, bool last) override {
 
     vector<double>* next_action = ann->computeOut(sensors);
-    if(shrink_greater_action)
-      shrink_actions(next_action);
 
     if (last_action.get() != nullptr && learning) {
       double p0 = 1.f;
       for(uint i=0; i < nb_motors; i++){
-        if(gaussian_type == 1){
-          double diff = last_pure_action->at(i)-last_action->at(i);
-          double pre_exp = -diff*diff/(2.f*noise*noise);
-          p0 *= exp(pre_exp);
-        } else {
-          p0 *= bib::Proba<double>::truncatedGaussianDensity(last_action->at(i), last_pure_action->at(i), noise);
-        }
+        p0 *= bib::Proba<double>::truncatedGaussianDensity(last_action->at(i), last_pure_action->at(i), noise);
       }
 
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || last, p0, 0., false};
@@ -150,13 +142,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
       if(gaussian_policy) {
-        vector<double>* randomized_action = nullptr;
-        if(gaussian_type == 0)
-          randomized_action = bib::Proba<double>::multidimentionnalGaussianWReject(*next_action, noise);
-        else if(gaussian_type == 1)
-          randomized_action = bib::Proba<double>::multidimentionnalGaussian(*next_action, noise);
-        else if(gaussian_type == 2)
-          randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
       } else if(bib::Utils::rand01() < noise) { //e-greedy
@@ -165,7 +151,6 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       }
     }
     last_action.reset(next_action);
-
 
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
@@ -217,9 +202,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     target_network              = pt->get<bool>("agent.target_network");
     tau_soft_update             = pt->get<double>("agent.tau_soft_update");
     weighting_strategy          = pt->get<uint>("agent.weighting_strategy");
-    gaussian_type               = pt->get<uint>("agent.gaussian_type");
     last_layer_actor            = pt->get<uint>("agent.last_layer_actor");
-    shrink_greater_action       = pt->get<bool>("agent.shrink_greater_action");
     reset_ann                   = pt->get<bool>("agent.reset_ann");
     no_forgot_offline           = pt->get<bool>("agent.no_forgot_offline");
     mixed_sampling              = pt->get<bool>("agent.mixed_sampling");
@@ -255,10 +238,6 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       exit(1);
     }
     
-    if(gaussian_type == 0 && weighting_strategy > 0){
-      LOG_INFO("gaussian_type -> 0 => proba probably wrong for weighting strat");
-    }
-    
     if(mixed_sampling && !no_forgot_offline){
       LOG_INFO("option splash -> cannot have mixed_sampling stat without no_forgot_offline");
       exit(1);
@@ -277,14 +256,6 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       qnn_target = new MLP(*qnn, false);
       ann_target = new MLP(*ann, false);
     }
-  }
-
-  void shrink_actions(vector<double>* next_action) {
-    for(uint i=0; i < nb_motors ; i++)
-      if(next_action->at(i) > 1.f)
-        next_action->at(i)=1.f;
-      else if(next_action->at(i) < -1.f)
-        next_action->at(i)=-1.f;
   }
 
   void _start_episode(const std::vector<double>& sensors, bool _learning) override {
@@ -314,17 +285,11 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       }
 
       auto all_next_actions = ann->computeOutBatch(all_states);
-      if(shrink_greater_action)
-        shrink_actions(all_next_actions);
 
       for(uint i=0; i<mini_batch_size && it2 != vtraj.cend(); i++) {
         sample sm = *it2;
         double p0 = 1.f;
         for(uint j=0; i < nb_motors; i++){
-          if(gaussian_type == 1)
-            p0 *= exp(-(all_next_actions->at(i*nb_motors+j)-sm.a[j])*(all_next_actions->at(i*nb_motors+j)-sm.a[j])/
-                    (2.f*noise*noise));
-          else
             p0 *= bib::Proba<double>::truncatedGaussianDensity(sm.a[j], all_next_actions->at(i*nb_motors+j), noise);
         }
 
@@ -349,8 +314,6 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       ++it1;
     }
     auto all_actions_outputs = policy->computeOutBatch(all_states);
-    if(shrink_greater_action)
-      shrink_actions(all_actions_outputs);
 
     auto all_qsa = qnn->computeOutVFBatch(all_states, *all_actions_outputs);
 
@@ -436,9 +399,6 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         all_next_actions = ann_target->computeOutBatch(all_next_states);
       else
         all_next_actions = ann->computeOutBatch(all_next_states);
-
-      if(shrink_greater_action)
-        shrink_actions(all_next_actions);
       
       //compute next q
       std::vector<double>* q_targets;
@@ -613,7 +573,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     std::vector<double> candidate_policies_scores(nb_fitted_updates);
     std::deque<sample>* samples_for_score = nullptr;
 
-    if(fishing_policy == 1) {
+    if(fishing_policy >= 1) {
       samples_for_score = new std::deque<sample>(mini_batch_size);
       sample_transition(*samples_for_score, trajectory, mini_batch_size);
     }
@@ -625,8 +585,10 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       if(fishing_policy > 0) {
         candidate_policies[n]=new MLP(*ann, true);
 
-        if(fishing_policy == 0) {
+        if(fishing_policy == 1) {
           candidate_policies_scores[n]=sum_QSA(*samples_for_score, *candidate_policies.crbegin());
+        } else if(fishing_policy == 2) {
+          candidate_policies_scores[n]= - qnn->error();
         }
       }
       
@@ -646,7 +608,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
 
     if(fishing_policy > 0) {
-      if(fishing_policy == 1) {
+      if(fishing_policy <= 2) {
         double mmax = *std::max_element(candidate_policies_scores.begin(), candidate_policies_scores.end());
         uint index_best = 0;
         while(candidate_policies_scores[index_best] < mmax)
@@ -773,10 +735,9 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   double decay_v;
   double tau_soft_update;
 
-  uint gaussian_type;
   uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy, last_layer_actor, hidden_layer_type;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
-  bool target_network, shrink_greater_action, reset_ann, no_forgot_offline, mixed_sampling;
+  bool target_network, reset_ann, no_forgot_offline, mixed_sampling;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
