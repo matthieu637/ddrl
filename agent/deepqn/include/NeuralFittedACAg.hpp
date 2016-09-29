@@ -445,8 +445,12 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
       if(reset_qnn) {
         delete qnn;
-        qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, mini_batch_size,
-                      decay_v, batch_norm, weighting_strategy > 0);
+        qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
+                      alpha_v,
+                      mini_batch_size,
+                      decay_v,
+                      hidden_layer_type, batch_norm,
+                      weighting_strategy > 0);
       }
 
       //Update critic
