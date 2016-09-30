@@ -78,6 +78,13 @@ class MLP {
     else
       ConcatLayer(net_param_init, "concat", {states_blob_name}, {"state_actions"}, boost::none, 2);
     std::string tower_top = Tower(net_param_init, "", "state_actions", hiddens, batch_norm, hidden_layer_type);
+    if(batch_norm ==4){
+      std::string layer_name2 = "final_bn";
+      BatchNormLayer(net_param_init, layer_name2, {tower_top}, {layer_name2}, boost::none);
+      std::string layer_name3 = "final_sc";
+      tower_top = tower_top+"_sc";
+      ScaleLayer(net_param_init, layer_name3, {layer_name2}, {tower_top}, boost::none, 1);
+    }
     IPLayer(net_param_init, q_values_layer_name, {tower_top}, {q_values_blob_name}, boost::none, 1);
     if(!weighted_sample)
       EuclideanLossLayer(net_param_init, "loss", {q_values_blob_name, targets_blob_name},
@@ -126,6 +133,13 @@ class MLP {
                     boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
     SilenceLayer(net_param_init, "silence", {"dummy1"}, {}, boost::none);
     std::string tower_top = Tower(net_param_init, "", states_blob_name, hiddens, batch_norm, hidden_layer_type);
+    if(batch_norm ==4){
+      std::string layer_name2 = "final_bn";
+      BatchNormLayer(net_param_init, layer_name2, {tower_top}, {layer_name2}, boost::none);
+      std::string layer_name3 = "final_sc";
+      tower_top = tower_top+"_sc";
+      ScaleLayer(net_param_init, layer_name3, {layer_name2}, {tower_top}, boost::none, 1);
+    }
     if(last_layer_type == 0)
       IPLayer(net_param_init, "action_layer", {tower_top}, {actions_blob_name}, boost::none, motors);
     else if(last_layer_type == 1) {
@@ -208,6 +222,9 @@ class MLP {
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
       neural_net = solver->net();
     }
+    
+    if((uint)neural_net->blob_by_name(MLP::states_blob_name)->num() != kMinibatchSize)
+      increase_batchsize(kMinibatchSize);
   }
 
 //   MLP(const MLP& m, bool _add_loss_layer, bool copy_solver) :
