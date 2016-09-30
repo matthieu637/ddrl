@@ -317,10 +317,10 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
     auto all_qsa = qnn->computeOutVFBatch(all_states, *all_actions_outputs);
 
-    delete all_actions_outputs;
-    delete all_qsa;
-
     double sum = std::accumulate(all_qsa->cbegin(), all_qsa->cend(), (double) 0.f);
+    
+    delete all_qsa;
+    delete all_actions_outputs;
 
     return sum /((double) vtraj.size());
   }
@@ -590,7 +590,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         candidate_policies[n]=new MLP(*ann, true);
 
         if(fishing_policy == 1) {
-          candidate_policies_scores[n]=sum_QSA(*samples_for_score, *candidate_policies.crbegin());
+          candidate_policies_scores[n]=sum_QSA(*samples_for_score, candidate_policies[n]);
         } else if(fishing_policy == 2) {
           candidate_policies_scores[n]= - qnn->error();
         }
@@ -618,6 +618,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         while(candidate_policies_scores[index_best] < mmax)
           index_best++;
 
+        ASSERT(index_best < nb_fitted_updates, "out of range");
         delete ann;
         ann = new MLP(*candidate_policies[index_best], true);
 
