@@ -90,7 +90,7 @@ class AAgent : public ProgOptions, public CommonAE {
    *
    * @return void
    */
-  virtual void save(const std::string&) {}
+  virtual void save(const std::string&, bool) {}
 
   /**
   * @brief To load your previous agent saved to a file.

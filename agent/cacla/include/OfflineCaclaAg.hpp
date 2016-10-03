@@ -240,7 +240,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     }
   }
 
-  void save(const std::string& path) override {
+  void save(const std::string& path, bool) override {
     ann->save(path+".actor");
     vnn->save(path+".critic");
     bib::XMLEngine::save<>(trajectory, "trajectory", path+".trajectory");

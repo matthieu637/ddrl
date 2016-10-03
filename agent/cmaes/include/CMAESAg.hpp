@@ -185,8 +185,17 @@ class CMAESAg : public arch::AACAgent<MLP> {
 */    
    }
 
-  void save(const std::string& path) override {
-    ann->save(path+".actor");
+  void save(const std::string& path, bool save_best) override {
+    if(!save_best || !cmaes_UpdateDistribution_done_once){
+      ann->save(path+".actor");
+    } else {
+      MLP* to_be_restaured = new MLP(*ann, true);
+      const double* parameters = cmaes_GetPtr(evo, "xbestever");
+      loadPolicyParameters(parameters);
+      ann->save(path+".actor");
+      delete ann;
+      ann = to_be_restaured;
+    }
   }
 
   void load(const std::string& path) override {

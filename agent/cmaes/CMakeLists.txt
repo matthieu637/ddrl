@@ -13,9 +13,10 @@ include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
 find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(Cartpole)
+find_package(HalfCheetah)
 find_package(OPTPP)
 
-include_directories(${CMAKE_SOURCE_DIR}/include ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS})
+include_directories(${CMAKE_SOURCE_DIR}/include ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${HALF_CHEETAH_INCLUDE_DIRS})
 
 set(BASE_LIBRARIES ${COMMON_DRL_LIBRARY} )
 file ( GLOB_RECURSE all_include include/*.hpp include/*.h)
@@ -26,6 +27,9 @@ target_link_libraries(adacrobot ${BASE_LIBRARIES} ${ADVANCED_ACROBOT_LIBRARY})
 
 add_executable(cartpole src/test/Cartpole.cpp ${all_include} ${all_sources} )
 target_link_libraries(cartpole ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
+
+add_executable(half-cheetah src/test/HalfCheetah.cpp ${all_include} ${all_sources} )
+target_link_libraries(half-cheetah ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 
 # add_executable(dpmt-adacrobot src/test/DpmtAdacrobot.cpp ${all_include} ${all_sources} )
 # target_link_libraries(dpmt-adacrobot ${ADVANCED_ACROBOT_LIBRARY} ${BASE_LIBRARIES} )

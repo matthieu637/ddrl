@@ -186,7 +186,7 @@ class Simulator {
       std::string filename = learning ? DEFAULT_AGENT_SAVE_FILE : DEFAULT_AGENT_TEST_SAVE_FILE;
       std::string filename2 = std::to_string(episode);
       std::string path = filename + filename2;
-      agent->save(path);
+      agent->save(path, save_best_agent);
     }
   }
  private:
@@ -198,6 +198,7 @@ class Simulator {
     desc.add(Agent::program_options());
     desc.add_options()
     ("config", po::value<std::vector<string>>(), "set the config file to load [default : config.ini]")
+    ("save-best", "save only best params")
     ("help", "produce help message");
 
     command_args = new po::variables_map;
@@ -213,6 +214,11 @@ class Simulator {
 
     if (command_args->count("config")) {
       *s = (*command_args)["config"].as<std::vector<string>>()[config_file_index];
+    }
+    
+    save_best_agent = false;
+    if (command_args->count("save-best")) {
+      save_best_agent = true;
     }
   }
 
@@ -248,7 +254,7 @@ class Simulator {
   unsigned int display_log_each;
   unsigned int save_agent_each;
   
-  bool display_learning;
+  bool display_learning, save_best_agent;
 
 protected:
   uint config_file_index;

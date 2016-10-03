@@ -180,7 +180,7 @@ class BaseCaclaAg : public arch::ARLAgent<> {
 */    
   }
 
-  void save(const std::string& path) override {
+  void save(const std::string& path, bool) override {
     ann->save(path+".actor");
     vnn->save(path+".critic");
   }
