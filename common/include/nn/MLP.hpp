@@ -45,7 +45,7 @@ class MLP {
     ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
     ASSERT(hidden_layer_type == 1 || hidden_layer_type == 2, "hidden_layer_type not in (1,2)");
-    ASSERT(batch_norm <= 3, "batch_norm not in {0,...,3}");
+    ASSERT(batch_norm <= 5, "batch_norm not in {0,...,3}");
 
     caffe::SolverParameter solver_param;
     caffe::NetParameter* net_param = solver_param.mutable_net_param();
@@ -121,7 +121,7 @@ class MLP {
     ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
     ASSERT(hidden_layer_type == 1 || hidden_layer_type == 2, "hidden_layer_type not in (1,2)");
-    ASSERT(batch_norm <= 3, "batch_norm not in {0,...,3}");
+    ASSERT(batch_norm <= 5, "batch_norm not in {0,...,3}");
 
     caffe::SolverParameter solver_param;
     caffe::NetParameter* net_param = solver_param.mutable_net_param();
@@ -679,7 +679,7 @@ class MLP {
                     uint batch_norm, uint hidden_layer_type) {
     std::string input_name = input_blob_name;
     for (uint i=1; i<layer_sizes.size()+1; ++i) {
-      if(batch_norm == 1 || batch_norm == 3) {
+      if(batch_norm == 1 || batch_norm == 3 || (batch_norm == 5 && i ==1)) {
         std::string layer_name2 = layer_prefix + "bn" + std::to_string(i);
         BatchNormLayer(np, layer_name2, {input_name}, {layer_name2}, boost::none);
         std::string layer_name3 = layer_prefix + "sc" + std::to_string(i);

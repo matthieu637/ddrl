@@ -17,6 +17,8 @@ struct hcheetah_physics{
   bool apply_armature;
   uint approx;
   uint damping;
+  uint control;
+  uint reward;
   double mu;
   double mu2;
   double soft_cfm;
@@ -35,7 +37,7 @@ class HalfCheetahWorld {
   
   bool final_state() const;
   
-  double torso_velocity() const;
+  double performance() const;
 
   virtual void step(const std::vector<double> &motors);
   const std::vector<double> &state() const;
@@ -52,9 +54,13 @@ class HalfCheetahWorld {
   std::vector<ODEObject *> bones;
   dGeomID ground;
   hcheetah_physics phy;
+  dContact contact[2];
+  bool head_touch, fknee_touch, bknee_touch;
   
  protected:
   std::vector<dJointID> joints;
+  double penalty;
+  double reward;
 
   std::vector<double> internal_state;
 };

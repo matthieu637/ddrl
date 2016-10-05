@@ -39,7 +39,7 @@ void parseCommandHalfCheetah(int cmd) {
     break;
   case 's':
     bib::Logger::PRINT_ELEMENTS_FT(inst->state(), "STATE : ", 8, 2);
-    LOG_DEBUG("REWARD : " << inst->torso_velocity());
+    LOG_DEBUG("REWARD : " << inst->performance());
     break;
   case 'v':
     float vxyz[3];
@@ -77,16 +77,18 @@ void threadloopHalfCheetah(const std::string& goodpath) {
 
   HACKinitDs(1280, 720, &inst->fn);
 
-  static float xyz[3] = {-1.43, -3.53, 1.79};
-  static float hpr[3] = {61.5, -23, -1.3};
+  float xyz[3] = {-1.43, -3.53, 1.79};
+  float hpr[3] = {61.5, -23, -1.3};
   dsSetViewpoint(xyz, hpr);
 
   while (!inst->requestEnd) {
     HACKdraw(&inst->fn);
     //wait time between frame draw
-    usleep(1 * 1000);
+//     usleep(1 * 1000);//each milisecond -> 1000fps
+    usleep(10 * 1000);//each milisecond -> 100fps
     
     double x = dBodyGetPosition(inst->bones[1]->getID())[0];
+    dsGetViewpoint(xyz, hpr);
     xyz[0] = x - 1.43;
     dsSetViewpoint(xyz, hpr);
   }
@@ -161,7 +163,8 @@ void HalfCheetahWorldView::step(const std::vector<double>& motors) {
 
   inst->modified_motor = -2.f;
   // approximative human vision smooth
-  // usleep(25 * 1000);
+//   usleep(25 * 1000);
+  
 
-  usleep((25 / speed)  * 1000);  // needed to don't be faster than the view
+  usleep(3*WORLD_STEP / speed * 1000 * 1000);  // needed to don't be faster than the view
 }

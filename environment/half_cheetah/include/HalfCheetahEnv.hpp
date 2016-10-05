@@ -25,7 +25,7 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
   }
 
   double performance() const {
-    return reward;
+    return instance->performance();
   }
 
   bool final_state() const {
@@ -45,6 +45,8 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
     init.apply_armature = pt->get<bool>("environment.apply_armature");
     init.damping = pt->get<uint>("environment.damping");
     init.approx = pt->get<uint>("environment.approx");
+    init.control = pt->get<uint>("environment.control");
+    init.reward = pt->get<uint>("environment.reward");
     init.mu = pt->get<double>("environment.mu");
     init.mu2 = pt->get<double>("environment.mu2");
     init.soft_cfm = pt->get<double>("environment.soft_cfm");
@@ -62,18 +64,6 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
 
   void _apply(const std::vector<double>& actuators) {
     instance->step(actuators);
-    
-    double ctrl_cost = 0;
-    for (auto a : actuators)
-      ctrl_cost += a*a;
-    ctrl_cost = 1e-1 * 0.5 * ctrl_cost;
-    
-    double run_cost = -1.f * instance->torso_velocity();
-    reward = ctrl_cost + run_cost;
-    reward = -reward;
-    
-    if(perceptions()[1] < 0.2 || perceptions()[1] > 0.85)
-      reward = -100000;
   }
 
   void _reset_episode(bool learning) override {
@@ -101,7 +91,6 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
  private:
   bool visible = false;
   HalfCheetahWorld* instance;
-  double reward; 
   std::vector<double> internal_state;
 };
 

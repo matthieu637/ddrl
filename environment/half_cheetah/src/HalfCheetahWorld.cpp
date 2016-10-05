@@ -9,12 +9,91 @@
 #include "ODEFactory.hpp"
 
 
+double softstepf(double x){
+  if (x<=0)
+    return 0;
+  else if(x <= 0.5)
+    return 2*x*x;
+  else if(x <= 1)
+    return 1 - 2*(x-1)*(x-1);
+  else
+    return 1;
+}
+
 HalfCheetahWorld::HalfCheetahWorld(hcheetah_physics _phy) : odeworld(ODEFactory::getInstance()->createWorld()), phy(_phy) {
 
   dWorldSetGravity(odeworld.world_id, 0, 0.0, GRAVITY);
-
+  
+//   dContact contact[2];          // up to 3 contacts
+  contact[0].surface.mode = dContactApprox0;
+  contact[1].surface.mode = dContactApprox0;
+  
+  if (phy.approx == 1){
+    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1;
+    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1;
+  }
+  else if (phy.approx == 2){
+    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1_1;
+    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1_1;
+  }
+  else if (phy.approx == 3){
+    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1_N;
+    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1_N;
+  }
+  
+  if (phy.mu2 >= 0.0000f){
+    contact[0].surface.mode = contact[0].surface.mode | dContactMu2;
+    contact[1].surface.mode = contact[1].surface.mode | dContactMu2;
+  }
+  
+  if (phy.soft_cfm >= 0.0000f){
+    contact[0].surface.mode = contact[0].surface.mode | dContactSoftCFM;
+    contact[1].surface.mode = contact[1].surface.mode | dContactSoftCFM;
+  }
+  
+  if (phy.slip1 >= 0.0000f){
+    contact[0].surface.mode = contact[0].surface.mode | dContactSlip1;
+    contact[1].surface.mode = contact[1].surface.mode | dContactSlip1;
+  }
+  
+  if (phy.slip2 >= 0.0000f){
+    contact[0].surface.mode = contact[0].surface.mode | dContactSlip2;
+    contact[1].surface.mode = contact[1].surface.mode | dContactSlip2;
+  }
+  
+  if (phy.soft_erp >= 0.0000f){
+    contact[0].surface.mode = contact[0].surface.mode | dContactSoftERP;
+    contact[1].surface.mode = contact[1].surface.mode | dContactSoftERP;
+  }
+  
+  if (phy.bounce >= 0.0000f){
+    contact[0].surface.mode = contact[0].surface.mode | dContactBounce;
+    contact[1].surface.mode = contact[1].surface.mode | dContactBounce;
+  }
+  
+  contact[0].surface.mu = phy.mu;
+  contact[0].surface.mu2 = phy.mu2;
+  contact[0].surface.soft_cfm = phy.soft_cfm;
+  contact[0].surface.slip1 = phy.slip1;
+  contact[0].surface.slip2 = phy.slip2;
+  contact[0].surface.soft_erp = phy.soft_erp;
+  contact[0].surface.bounce = phy.bounce;
+  
+  contact[1].surface.mu = phy.mu;
+  contact[1].surface.mu2 = phy.mu2;
+  contact[1].surface.soft_cfm = phy.soft_cfm;
+  contact[1].surface.slip1 = phy.slip1;
+  contact[1].surface.slip2 = phy.slip2;
+  contact[1].surface.soft_erp = phy.soft_erp;
+  contact[1].surface.bounce = phy.bounce;
+  
   createWorld();
-
+  
+  head_touch = false;
+  fknee_touch = false;
+  bknee_touch = false;
+  penalty = 0;
+  
   internal_state.resize(18);
   update_state();
 }
@@ -46,6 +125,10 @@ void HalfCheetahWorld::apply_damping(dBodyID body, double v){
     dBodySetLinearDampingThreshold(body, v);
   else if(phy.damping == 2)
     dBodySetAngularDampingThreshold(body, v);
+  else if(phy.damping == 3)
+    dBodySetLinearDamping(body, v);
+  else if(phy.damping == 4)
+    dBodySetAngularDamping(body, v);
 }
 
 void HalfCheetahWorld::createWorld() {
@@ -63,6 +146,10 @@ void HalfCheetahWorld::createWorld() {
     dWorldSetLinearDampingThreshold(odeworld.world_id, .01);
   else if(phy.damping == 2)
     dWorldSetAngularDampingThreshold(odeworld.world_id, .01);
+  else if(phy.damping == 3)
+    dWorldSetLinearDamping(odeworld.world_id, .01);
+  else if(phy.damping == 4)
+    dWorldSetAngularDamping(odeworld.world_id, .01);
 //   armature
 //     Armature inertia (or rotor inertia) of all degrees of freedom created by this joint. These are constants added to the diagonal of the inertia matrix in generalized coordinates. They make the simulation more stable, and often increase physical realism. This is because when a motor is attached to the system with a transmission that amplifies the motor force by c, the inertia of the rotor (i.e. the moving part of the motor) is amplified by c*c. The same holds for gears in the early stages of planetary gear boxes. These extra inertias often dominate the inertias of the robot parts that are represented explicitly in the model, and the armature attribute is the way to model them.
 //   stiffness
@@ -296,72 +383,16 @@ void nearCallbackHalfCheetah(void* data, dGeomID o1, dGeomID o2) {
     return;
 
 //   <geom contype='1' conaffinity='0' condim='3' friction='.4 .1 .1' rgba='0.8 0.6 .4 1' solimp='0.0 0.8 0.01' solref='0.02 1' />
-  dContact contact[2];          // up to 3 contacts
-  contact[0].surface.mode = dContactApprox0;
-  contact[1].surface.mode = dContactApprox0;
-  
-  if (inst->phy.approx == 1){
-    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1;
-    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1;
-  }
-  else if (inst->phy.approx == 2){
-    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1_1;
-    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1_1;
-  }
-  else if (inst->phy.approx == 3){
-    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1_N;
-    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1_N;
-  }
+  if(o1 == inst->bones[5]->getGeom() || o2 == inst->bones[5]->getGeom())
+    inst->fknee_touch = true;
+  if(o1 == inst->bones[2]->getGeom() || o2 == inst->bones[2]->getGeom())
+    inst->bknee_touch = true;
+  if(o1 == inst->bones[0]->getGeom() || o2 == inst->bones[0]->getGeom())
+    inst->head_touch = true;
 
-  if (inst->phy.mu2 >= 0.0000f){
-    contact[0].surface.mode = contact[0].surface.mode | dContactMu2;
-    contact[1].surface.mode = contact[1].surface.mode | dContactMu2;
-  }
-  
-  if (inst->phy.soft_cfm >= 0.0000f){
-    contact[0].surface.mode = contact[0].surface.mode | dContactSoftCFM;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSoftCFM;
-  }
-  
-  if (inst->phy.slip1 >= 0.0000f){
-    contact[0].surface.mode = contact[0].surface.mode | dContactSlip1;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSlip1;
-  }
-  
-  if (inst->phy.slip2 >= 0.0000f){
-    contact[0].surface.mode = contact[0].surface.mode | dContactSlip2;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSlip2;
-  }
-  
-  if (inst->phy.soft_erp >= 0.0000f){
-    contact[0].surface.mode = contact[0].surface.mode | dContactSoftERP;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSoftERP;
-  }
-  
-  if (inst->phy.bounce >= 0.0000f){
-    contact[0].surface.mode = contact[0].surface.mode | dContactBounce;
-    contact[1].surface.mode = contact[1].surface.mode | dContactBounce;
-  }
-  
-  contact[0].surface.mu = inst->phy.mu;
-  contact[0].surface.mu2 = inst->phy.mu2;
-  contact[0].surface.soft_cfm = inst->phy.soft_cfm;
-  contact[0].surface.slip1 = inst->phy.slip1;
-  contact[0].surface.slip2 = inst->phy.slip2;
-  contact[0].surface.soft_erp = inst->phy.soft_erp;
-  contact[0].surface.bounce = inst->phy.bounce;
-  
-  contact[1].surface.mu = inst->phy.mu;
-  contact[1].surface.mu2 = inst->phy.mu2;
-  contact[1].surface.soft_cfm = inst->phy.soft_cfm;
-  contact[1].surface.slip1 = inst->phy.slip1;
-  contact[1].surface.slip2 = inst->phy.slip2;
-  contact[1].surface.soft_erp = inst->phy.soft_erp;
-  contact[1].surface.bounce = inst->phy.bounce;
-
-  if (int numc = dCollide (o1,o2,2,&contact[0].geom,sizeof(dContact))) {
+  if (int numc = dCollide (o1,o2,2,&inst->contact[0].geom,sizeof(dContact))) {
     for (int i=0; i<numc; i++) {
-      dJointID c = dJointCreateContact (inst->odeworld.world_id,inst->odeworld.contactgroup,&contact[i]);
+      dJointID c = dJointCreateContact (inst->odeworld.world_id,inst->odeworld.contactgroup,&inst->contact[i]);
       dJointAttach (c, dGeomGetBody(o1), dGeomGetBody(o2));
     }
 //     LOG_DEBUG(numc);
@@ -370,15 +401,17 @@ void nearCallbackHalfCheetah(void* data, dGeomID o1, dGeomID o2) {
 }
 
 void HalfCheetahWorld::step(const vector<double>& motors) {
-  // No collision in this world
-
+  head_touch = false;
+  fknee_touch = false;
+  bknee_touch = false;
+  penalty = 0;
+  
   nearCallbackDataHalfCheetah d = {this};
   dSpaceCollide(odeworld.space_id, &d, &nearCallbackHalfCheetah);
 
   unsigned int begin_index = 0;
   
-  uint control = 2;
-  if(control == 1){
+  if(phy.control == 1){
     begin_index = 0;
     double f_bthigh = bib::Utils::transform(motors[begin_index++], -1, 1, -120, 120);
     double f_bshin = bib::Utils::transform(motors[begin_index++], -1, 1, -90, 90);
@@ -394,7 +427,7 @@ void HalfCheetahWorld::step(const vector<double>& motors) {
     dJointAddHingeTorque(joints[begin_index++], f_fthigh);
     dJointAddHingeTorque(joints[begin_index++], f_fshin);
     dJointAddHingeTorque(joints[begin_index++], f_ffoot);
-  } else if(control==2) { //origin paper
+  } else if(phy.control==2) { //origin paper
     double p_bthigh = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[0])) - 0.05 * dJointGetHingeAngleRate(joints[0]));
     double p_bshin = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[1])) - 0.05 * dJointGetHingeAngleRate(joints[1]));
     double p_bfoot = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[2])) - 0.05 * dJointGetHingeAngleRate(joints[2]));
@@ -417,6 +450,34 @@ void HalfCheetahWorld::step(const vector<double>& motors) {
     dJointAddHingeTorque(joints[begin_index++], f_fthigh);
     dJointAddHingeTorque(joints[begin_index++], f_fshin);
     dJointAddHingeTorque(joints[begin_index++], f_ffoot);
+    
+    if(phy.reward == 2){
+      begin_index = 0;
+      double sub_pelnalty = 0.f;
+      sub_pelnalty += std::max(fabs(p_bthigh+motors[begin_index++]) - 1.f, (double) 0.f);
+      sub_pelnalty += std::max(fabs(p_bshin+motors[begin_index++]) - 1.f, (double) 0.f);
+      sub_pelnalty += std::max(fabs(p_bfoot+motors[begin_index++]) - 1.f, (double) 0.f);
+      sub_pelnalty += std::max(fabs(p_ffthigh+motors[begin_index++]) - 1.f, (double) 0.f);
+      sub_pelnalty += std::max(fabs(p_fshin+motors[begin_index++]) - 1.f, (double) 0.f);
+      sub_pelnalty += std::max(fabs(p_ffoot+motors[begin_index++]) - 1.f, (double) 0.f);
+      penalty += -0.05 * sub_pelnalty;
+      
+//       already managed by stops 
+//       sub_pelnalty = 0.f;
+//       sub_pelnalty += std::min(fabs(p_bthigh*120) , (double) 50.f);
+//       sub_pelnalty += std::min(fabs(p_bshin*90) , (double) 50.f);
+//       sub_pelnalty += std::min(fabs(p_bfoot*60) , (double) 50.f);
+//       sub_pelnalty += std::min(fabs(p_ffthigh*90) , (double) 50.f);
+//       sub_pelnalty += std::min(fabs(p_fshin*60) , (double) 50.f);
+//       sub_pelnalty += std::min(fabs(p_ffoot*30) , (double) 50.f);
+//       penalty += -0.1 * sub_pelnalty;
+    }
+  }
+  
+  if(phy.reward == 1 || phy.reward == 3){
+    for (auto a : motors)
+      penalty += a*a;
+    penalty = - 1e-1 * 0.5 * penalty;
   }
 
   Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
@@ -461,6 +522,23 @@ void HalfCheetahWorld::update_state() {
 
   ASSERT(begin_index == 18, "wrong indices");
 //   bib::Logger::PRINT_ELEMENTS(internal_state);
+  
+  if(phy.reward == 2 || phy.reward == 3){
+    if(head_touch)
+      penalty += -1;
+    if(fknee_touch){
+      penalty += -1;
+//       LOG_DEBUG("front touched");
+    }
+    if(bknee_touch){
+      penalty += -1;
+//       LOG_DEBUG("back touched");
+    }
+    
+    reward = penalty + root_vel[0];
+  } else if(phy.reward == 1){
+    reward = penalty + root_vel[0];
+  }
 }
 
 const std::vector<double>& HalfCheetahWorld::state() const {
@@ -472,11 +550,13 @@ unsigned int HalfCheetahWorld::activated_motors() const {
 }
 
 bool HalfCheetahWorld::final_state() const {
-  return false;
+    return head_touch;
 }
 
-double HalfCheetahWorld::torso_velocity() const {
-  return dBodyGetLinearVel(bones[1]->getID())[0];
+double HalfCheetahWorld::performance() const {
+  if(final_state())
+    return -1000;
+  return reward;
 }
 
 void HalfCheetahWorld::resetPositions(std::vector<double>&, const std::vector<double>&) {
@@ -497,4 +577,10 @@ void HalfCheetahWorld::resetPositions(std::vector<double>&, const std::vector<do
 //   ODEFactory::getInstance()->destroyWorld(odeworld);
 
   createWorld();
+  update_state();
+  
+  head_touch = false;
+  fknee_touch = false;
+  bknee_touch = false;
+  penalty = 0;
 }
