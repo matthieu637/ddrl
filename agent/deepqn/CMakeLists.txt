@@ -12,9 +12,10 @@ include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
 find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(Cartpole)
+find_package(HalfCheetah)
 
-include_directories(${CMAKE_SOURCE_DIR}/include
-  ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} )
+include_directories(${CMAKE_SOURCE_DIR}/include ${COMMON_DRL_INCLUDE_DIRS}
+  ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${HALF_CHEETAH_INCLUDE_DIRS})
 
 file ( GLOB_RECURSE all_include include/*.hpp include/*.h)
 file ( GLOB all_sources src/*.cpp src/*.c)
@@ -34,6 +35,14 @@ target_link_libraries(cartpole
 add_executable(cp-nfac src/test/NFACCp.cpp ${all_include} ${all_sources} )
 target_link_libraries(cp-nfac
   ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  
+add_executable(half-cheetah src/test/HalfCheetah.cpp ${all_include} ${all_sources} )
+target_link_libraries(half-cheetah 
+  ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+
+add_executable(half-cheetah-nfac src/test/NFACHalfCheetah.cpp ${all_include} ${all_sources} )
+target_link_libraries(half-cheetah-nfac
+  ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

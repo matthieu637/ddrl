@@ -427,7 +427,7 @@ void HalfCheetahWorld::step(const vector<double>& motors) {
     dJointAddHingeTorque(joints[begin_index++], f_fthigh);
     dJointAddHingeTorque(joints[begin_index++], f_fshin);
     dJointAddHingeTorque(joints[begin_index++], f_ffoot);
-  } else if(phy.control==2) { //origin paper
+  } else if(phy.control==2 || phy.control==3) { //origin paper
     double p_bthigh = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[0])) - 0.05 * dJointGetHingeAngleRate(joints[0]));
     double p_bshin = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[1])) - 0.05 * dJointGetHingeAngleRate(joints[1]));
     double p_bfoot = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[2])) - 0.05 * dJointGetHingeAngleRate(joints[2]));
@@ -436,12 +436,27 @@ void HalfCheetahWorld::step(const vector<double>& motors) {
     double p_ffoot = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[5])) - 0.05 * dJointGetHingeAngleRate(joints[5]));
     
     begin_index = 0;
-    double f_bthigh = 120* std::min(std::max((double)-1., p_bthigh+motors[begin_index++]), (double)1.);
-    double f_bshin = 90*std::min(std::max((double)-1., p_bshin+motors[begin_index++]), (double)1.);
-    double f_bfoot = 60*std::min(std::max((double)-1., p_bfoot+motors[begin_index++]), (double)1.);
-    double f_fthigh = 90*std::min(std::max((double)-1., p_ffthigh+motors[begin_index++]), (double)1.);
-    double f_fshin = 60*std::min(std::max((double)-1., p_fshin+motors[begin_index++]), (double)1.);
-    double f_ffoot = 30*std::min(std::max((double)-1., p_ffoot+motors[begin_index++]), (double)1.);
+    double a_bthigh = motors[begin_index++];
+    double a_bshin = motors[begin_index++];
+    double a_bfoot = motors[begin_index++];
+    double a_fthigh = motors[begin_index++];
+    double a_fshin = motors[begin_index++];
+    double a_ffoot = motors[begin_index++];
+    if(phy.control==3){
+      a_bthigh = bib::Utils::transform(a_bthigh, -1.f, 1.f, -2.f, 2.f);
+      a_bshin = bib::Utils::transform(a_bshin, -1.f, 1.f, -2.f, 2.f);
+      a_bfoot = bib::Utils::transform(a_bfoot, -1.f, 1.f, -2.f, 2.f);
+      a_fthigh = bib::Utils::transform(a_fthigh, -1.f, 1.f, -2.f, 2.f);
+      a_fshin = bib::Utils::transform(a_fshin, -1.f, 1.f, -2.f, 2.f);
+      a_ffoot = bib::Utils::transform(a_ffoot, -1.f, 1.f, -2.f, 2.f);
+    }
+    
+    double f_bthigh = 120* std::min(std::max((double)-1., p_bthigh+a_bthigh), (double)1.);
+    double f_bshin = 90*std::min(std::max((double)-1., p_bshin+a_bshin), (double)1.);
+    double f_bfoot = 60*std::min(std::max((double)-1., p_bfoot+a_bfoot), (double)1.);
+    double f_fthigh = 90*std::min(std::max((double)-1., p_ffthigh+a_fthigh), (double)1.);
+    double f_fshin = 60*std::min(std::max((double)-1., p_fshin+a_fshin), (double)1.);
+    double f_ffoot = 30*std::min(std::max((double)-1., p_ffoot+a_ffoot), (double)1.);
     
     begin_index = 0;
     dJointAddHingeTorque(joints[begin_index++], f_bthigh);
@@ -523,17 +538,20 @@ void HalfCheetahWorld::update_state() {
   ASSERT(begin_index == 18, "wrong indices");
 //   bib::Logger::PRINT_ELEMENTS(internal_state);
   
+//   if(fknee_touch){
+//     LOG_DEBUG("front touched");
+//   }
+//   if(bknee_touch){
+//     LOG_DEBUG("back touched");
+//   }
+  
   if(phy.reward == 2 || phy.reward == 3){
     if(head_touch)
       penalty += -1;
-    if(fknee_touch){
+    if(fknee_touch)
       penalty += -1;
-//       LOG_DEBUG("front touched");
-    }
-    if(bknee_touch){
+    if(bknee_touch)
       penalty += -1;
-//       LOG_DEBUG("back touched");
-    }
     
     reward = penalty + root_vel[0];
   } else if(phy.reward == 1){

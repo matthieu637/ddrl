@@ -14,11 +14,13 @@ find_package(Boost COMPONENTS serialization filesystem system program_options th
 find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(Cartpole)
+find_package(HalfCheetah)
 # find_package(TBB)
 # find_package(OPTPP)
 find_package(Threads REQUIRED)
 
-include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} )
+include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} 
+  ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${HALF_CHEETAH_INCLUDE_DIRS})
 
 set(BASE_LIBRARIES ${COMMON_DRL_LIBRARY} ${Boost_LIBRARIES} )
 file ( GLOB_RECURSE all_include include/*.hpp)
@@ -42,6 +44,13 @@ target_link_libraries(cp-cacla-on ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY
 
 add_executable(cp-cacla-off src/test/CartpoleCacOff.cpp ${all_include} ${all_sources} )
 target_link_libraries(cp-cacla-off ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
+
+add_executable(hf-cacla-on src/test/HalfCheetahCacOn.cpp ${all_include} ${all_sources} )
+target_link_libraries(hf-cacla-on ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+
+add_executable(hf-cacla-off src/test/HalfCheetahCacOff.cpp ${all_include} ${all_sources} )
+target_link_libraries(hf-cacla-off ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+
 
 # add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
 # target_link_libraries(ada-nfac ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
