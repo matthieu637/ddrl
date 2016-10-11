@@ -289,7 +289,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       for(uint i=0; i<mini_batch_size && it2 != vtraj.cend(); i++) {
         sample sm = *it2;
         double p0 = 1.f;
-        for(uint j=0; i < nb_motors; i++){
+        for(uint j=0; j < nb_motors; j++){
             p0 *= bib::Proba<double>::truncatedGaussianDensity(sm.a[j], all_next_actions->at(i*nb_motors+j), noise);
         }
 
@@ -302,6 +302,19 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
 
     ASSERT(index == vtraj.size(), "");
+  }
+  
+  void computePThetaBatch(const std::deque< sample >& vtraj, double *ptheta, const std::vector<double>* all_next_actions){
+    uint i=0;
+    for(auto it : vtraj) {
+      double p0 = 1.f;
+      for(uint j=0; j < nb_motors; j++){
+        p0 *= bib::Proba<double>::truncatedGaussianDensity(it.a[j], all_next_actions->at(i*nb_motors+j), noise);
+      }
+      
+      ptheta[i] = p0;
+      i++;
+    }
   }
 
   double sum_QSA(const std::deque<sample>& vtraj, MLP* policy) {
@@ -408,15 +421,16 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         q_targets = qnn_target->computeOutVFBatch(all_next_states, *all_next_actions);
       else
         q_targets = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
-      delete all_next_actions;
 
       if(weighting_strategy != 0) {
         q_targets_weights = new std::vector<double>(q_targets->size(), 1.0f);
         if(weighting_strategy > 1) {
           ptheta = new double[traj->size()];
-          computePTheta(*traj, ptheta);
+//           computePTheta(*traj, ptheta);
+          computePThetaBatch(*traj, ptheta, all_next_actions);
         }
       }
+      delete all_next_actions;
 
       //adjust q_targets
       i=0;
