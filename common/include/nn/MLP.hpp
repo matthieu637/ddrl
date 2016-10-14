@@ -365,6 +365,8 @@ class MLP {
     std::copy(sensors.begin(), sensors.end(),states_input.begin());
 
     std::vector<double> target_input(kMinibatchSize, 0.0f);
+    if(weighted_sample)
+      setWeightedSampleVector(target_input.data());
 
     if(size_motors > 0) {
       std::vector<double> actions_input(size_motors * kMinibatchSize, 0.0f);

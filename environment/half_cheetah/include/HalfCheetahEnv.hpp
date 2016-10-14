@@ -55,6 +55,12 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
     init.soft_erp = pt->get<double>("environment.soft_erp");
     init.bounce = pt->get<double>("environment.bounce");
     visible     = vm->count("view");
+    
+    init.predev = 0;
+    try {
+      init.predev = pt->get<uint>("environment.predev");
+    } catch(boost::exception const& ) {
+    }
 
     if (visible)
       instance = new HalfCheetahWorldView("data/textures", init);

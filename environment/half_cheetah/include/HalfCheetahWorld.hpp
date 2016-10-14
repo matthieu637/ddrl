@@ -26,6 +26,12 @@ struct hcheetah_physics{
   double slip2;
   double soft_erp;
   double bounce;
+  uint predev;
+//   PREDEV: 1 -> two low joint
+//           10 -> two middle joints
+//   +0 -> PD controller init pos
+//   +1 (2/11) -> keep sensors
+//   
 };
 
 class HalfCheetahWorld {

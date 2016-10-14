@@ -94,7 +94,13 @@ HalfCheetahWorld::HalfCheetahWorld(hcheetah_physics _phy) : odeworld(ODEFactory:
   bknee_touch = false;
   penalty = 0;
   
-  internal_state.resize(18);
+  if(phy.predev == 0)
+    internal_state.resize(18);
+  else if(phy.predev == 1 || phy.predev == 10)
+    internal_state.resize(18 - 4);
+  else if(phy.predev == 2 || phy.predev == 11)
+    internal_state.resize(18);
+  
   update_state();
 }
 
@@ -400,7 +406,23 @@ void nearCallbackHalfCheetah(void* data, dGeomID o1, dGeomID o2) {
 
 }
 
-void HalfCheetahWorld::step(const vector<double>& motors) {
+void HalfCheetahWorld::step(const vector<double>& _motors) {
+  std::vector<double> motors(_motors);
+  if(phy.predev == 1 || phy.predev == 2){
+    motors.resize(6);
+    motors[2] = 0;
+    motors[3] = _motors[2];
+    motors[4] = _motors[3];
+    motors[5] = 0;
+  } else if (phy.predev == 10 || phy.predev == 11){
+    motors.resize(6);
+    motors[1] = 0;
+    motors[2] = _motors[1];
+    motors[3] = _motors[2];
+    motors[4] = 0;
+    motors[5] = _motors[3];
+  }
+  
   head_touch = false;
   fknee_touch = false;
   bknee_touch = false;
@@ -514,28 +536,70 @@ void HalfCheetahWorld::update_state() {
   const dReal* root_rot = dBodyGetQuaternion(torso);
   ASSERT(root_rot[3] <= 1 , "not normalized");
   double s = dSqrt(1.0f-root_rot[3]*root_rot[3]);
+  
+  std::list<double> substate;
 
-  internal_state[begin_index++] = root_pos[0];//- rootx     slider      position (m)
-  internal_state[begin_index++] = root_pos[2];//- rootz     slider      position (m)
-  internal_state[begin_index++] = s <= 0.0000001f ? root_rot[2] : root_rot[2]/s ;// - rooty     hinge       angle (rad)
-  internal_state[begin_index++] = dJointGetHingeAngle(joints[0]); //- bthigh    hinge       angle (rad)
-  internal_state[begin_index++] = dJointGetHingeAngle(joints[1]);
-  internal_state[begin_index++] = dJointGetHingeAngle(joints[2]);
-  internal_state[begin_index++] = dJointGetHingeAngle(joints[3]);
-  internal_state[begin_index++] = dJointGetHingeAngle(joints[4]);
-  internal_state[begin_index++] = dJointGetHingeAngle(joints[5]);
+  substate.push_back(root_pos[0]);//- rootx     slider      position (m)
+  substate.push_back(root_pos[2]);//- rootz     slider      position (m)
+  substate.push_back(s <= 0.0000001f ? root_rot[2] : root_rot[2]/s) ;// - rooty     hinge       angle (rad)
+  substate.push_back(dJointGetHingeAngle(joints[0])); //- bthigh    hinge       angle (rad)
+  substate.push_back(dJointGetHingeAngle(joints[1]));
+  substate.push_back(dJointGetHingeAngle(joints[2]));
+  substate.push_back(dJointGetHingeAngle(joints[3]));
+  substate.push_back(dJointGetHingeAngle(joints[4]));
+  substate.push_back(dJointGetHingeAngle(joints[5]));
 
-  internal_state[begin_index++] = root_vel[0];//- rootx     slider      velocity (m/s)
-  internal_state[begin_index++] = root_vel[2];//- rootz     slider      velocity (m/s)
-  internal_state[begin_index++] = root_angvel[1];//- rooty     hinge       angular velocity (rad/s)
-  internal_state[begin_index++] = dJointGetHingeAngleRate(joints[0]); //- bthigh    hinge       angular velocity (rad/s)
-  internal_state[begin_index++] = dJointGetHingeAngleRate(joints[1]);
-  internal_state[begin_index++] = dJointGetHingeAngleRate(joints[2]);
-  internal_state[begin_index++] = dJointGetHingeAngleRate(joints[3]);
-  internal_state[begin_index++] = dJointGetHingeAngleRate(joints[4]);
-  internal_state[begin_index++] = dJointGetHingeAngleRate(joints[5]);
+  substate.push_back(root_vel[0]);//- rootx     slider      velocity (m/s)
+  substate.push_back(root_vel[2]);//- rootz     slider      velocity (m/s)
+  substate.push_back(root_angvel[1]);//- rooty     hinge       angular velocity (rad/s)
+  substate.push_back(dJointGetHingeAngleRate(joints[0])); //- bthigh    hinge       angular velocity (rad/s)
+  substate.push_back(dJointGetHingeAngleRate(joints[1]));
+  substate.push_back(dJointGetHingeAngleRate(joints[2]));
+  substate.push_back(dJointGetHingeAngleRate(joints[3]));
+  substate.push_back(dJointGetHingeAngleRate(joints[4]));
+  substate.push_back(dJointGetHingeAngleRate(joints[5]));
 
-  ASSERT(begin_index == 18, "wrong indices");
+  ASSERT(substate.size() == 18, "wrong indices");
+  
+  if(phy.predev == 0 || phy.predev == 2 || phy.predev == 11){
+    std::copy(substate.begin(), substate.end(), internal_state.begin());
+  } else if(phy.predev == 1){
+    auto it = substate.begin();
+    std::advance(it, 17);
+    substate.erase(it);
+    
+    it = substate.begin();
+    std::advance(it, 14);
+    substate.erase(it);
+    
+    it = substate.begin();
+    std::advance(it, 8);
+    substate.erase(it);
+    
+    it = substate.begin();
+    std::advance(it, 5);
+    substate.erase(it);
+    
+    std::copy(substate.begin(), substate.end(), internal_state.begin());
+  } else if(phy.predev == 10){
+    auto it = substate.begin();
+    std::advance(it, 16);
+    substate.erase(it);
+    
+    it = substate.begin();
+    std::advance(it, 13);
+    substate.erase(it);
+    
+    it = substate.begin();
+    std::advance(it, 7);
+    substate.erase(it);
+    
+    it = substate.begin();
+    std::advance(it, 4);
+    substate.erase(it);
+    std::copy(substate.begin(), substate.end(), internal_state.begin());
+  }
+
 //   bib::Logger::PRINT_ELEMENTS(internal_state);
   
 //   if(fknee_touch){
@@ -564,6 +628,8 @@ const std::vector<double>& HalfCheetahWorld::state() const {
 }
 
 unsigned int HalfCheetahWorld::activated_motors() const {
+  if(phy.predev != 0)
+    return 4;
   return 6;
 }
 

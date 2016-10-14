@@ -44,6 +44,10 @@ add_executable(half-cheetah-nfac src/test/NFACHalfCheetah.cpp ${all_include} ${a
 target_link_libraries(half-cheetah-nfac
   ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
+add_executable(half-cheetah-nfmac src/test/NFMACHalfCheetah.cpp ${all_include} ${all_sources} )
+target_link_libraries(half-cheetah-nfmac
+  ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
