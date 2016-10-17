@@ -135,6 +135,8 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
         delete next_action;
       }
       next_action = ann[best_index]->computeOut(sensors);
+    } else if(policy_selection == 1) {
+      next_action = ann[(uint)(bib::Utils::rand01()*multi_policies)]->computeOut(sensors);
     } else if(policy_selection == 10) {
       next_action = ann[policy_selected]->computeOut(sensors);
     }
@@ -263,7 +265,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
 
     learning = _learning;
 
-    if(policy_selection == 10 && trajectory.size() > 0) {
+    if(policy_selection == 10 && trajectory.size() > 0 && multi_policies > 1) {
       double bestS = sum_QSA(trajectory, ann[0], qnn[0]);
       uint best_index = 0;
 
@@ -275,7 +277,19 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
         }
       }
       policy_selected = best_index;
-    } else if(policy_selection == 10){
+    } else if(policy_selection == 11 && trajectory.size() > 0 && multi_policies > 1){
+      double bestS = qnn[0]->error();
+      uint best_index = 0;
+      
+      for(uint mm=1; mm < multi_policies; mm++) {
+        double lscore = qnn[mm]->error();
+        if(lscore < bestS) {
+          bestS = lscore;
+          best_index = mm;
+        }
+      }
+      policy_selected = best_index;
+    } else {
       policy_selected = (uint)(bib::Utils::rand01()*multi_policies);
     }
   }

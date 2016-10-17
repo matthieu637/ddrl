@@ -207,6 +207,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     no_forgot_offline           = pt->get<bool>("agent.no_forgot_offline");
     mixed_sampling              = pt->get<bool>("agent.mixed_sampling");
     hidden_layer_type           = pt->get<uint>("agent.hidden_layer_type");
+    stop_reset                  = pt->get<bool>("agent.stop_reset");
+    only_one_traj               = pt->get<bool>("agent.only_one_traj");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -267,6 +269,9 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     last_pure_action = nullptr;
 
     learning = _learning;
+    
+    if(only_one_traj)
+      trajectory.clear();
   }
 
   void computePTheta(const std::deque< sample >& vtraj, double *ptheta) {
@@ -457,7 +462,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         i++;
       }
 
-      if(reset_qnn) {
+      if(reset_qnn && (stop_reset ? episode < 1000 : true)) {
         delete qnn;
         qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
                       alpha_v,
@@ -568,7 +573,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
 
   void update_actor_critic() {
-    if(!learning || trajectory.size() < mini_batch_size)
+    if(!learning)
       return;
 
     if(minibatcher == 0 && trajectory.size() != mini_batch_size) {
@@ -610,7 +615,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         }
       }
       
-      if(reset_ann) {
+      if(reset_ann && (stop_reset ? episode < 1000 : true)) {
         delete ann;
         ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, hidden_layer_type, last_layer_actor, batch_norm);
       }
@@ -645,6 +650,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
 
   void end_episode() override {
+    episode++;
+    
     if(fishing_policy > 0)
       old_executed_policies.push_back(new MLP(*ann, true));
 
@@ -740,6 +747,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
  private:
   uint nb_sensors;
+  uint episode = 0;
 
   double noise;
   double rmax;
@@ -749,6 +757,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::vector<uint>* hidden_unit_a;
   uint mini_batch_size;
   uint replay_memory, nb_actor_updates, nb_critic_updates, nb_fitted_updates, nb_internal_critic_updates;
+  bool stop_reset, only_one_traj;
   double alpha_a;
   double alpha_v;
   double decay_v;
