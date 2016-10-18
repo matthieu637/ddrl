@@ -137,7 +137,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       next_action = ann[best_index]->computeOut(sensors);
     } else if(policy_selection == 1) {
       next_action = ann[(uint)(bib::Utils::rand01()*multi_policies)]->computeOut(sensors);
-    } else if(policy_selection == 10) {
+    } else if(policy_selection >= 10) {
       next_action = ann[policy_selected]->computeOut(sensors);
     }
 
