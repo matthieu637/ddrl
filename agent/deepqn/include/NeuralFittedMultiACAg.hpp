@@ -594,7 +594,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
         q_targets[p] = _qnn->computeOutVFBatch(all_next_states, *all_next_actions[p]);
         
         if(weighting_strategy != 0) {
-          q_targets_weights[p] = new std::vector<double>(q_targets[p]->size(), 1.0f);
+          q_targets_weights[p] = new std::vector<double>(traj->size(), 1.0f);
           if(weighting_strategy > 1) {
             ptheta[p] = new double[traj->size()];
             computePThetaBatch(*traj, ptheta[p], all_next_actions[p]);
@@ -610,6 +610,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
           if(it.goal_reached)
             q_targets[p]->at(i) = it.r;
           else {
+//             LOG_DEBUG(i << " " << traj->size() << " " << mini_batch_size);
             q_targets[p]->at(i) = it.r + gamma * q_targets[p]->at(i);
           }
           
@@ -645,7 +646,8 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
             imax = p;
           }
         q_targets_final[i]= bestS;
-        q_targets_weights_final[i] = q_targets_weights[imax]->at(i);
+        if(weighting_strategy != 0)
+          q_targets_weights_final[i] = q_targets_weights[imax]->at(i);
       }
       
       //Update critic
@@ -727,6 +729,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
           trajectory.resize(replay_memory);
           sample_transition(trajectory, trajectory_noforgot, replay_memory, nullptr);
         }
+        global_qnn->increase_batchsize(trajectory.size());
         critic_global_update(nb_internal_critic_updates, global_qnn, ann);
       }
     }
