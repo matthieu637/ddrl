@@ -105,6 +105,9 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       delete i;
     for(auto i : ann)
       delete i;
+    
+    if(policy_selection == 2)
+      delete global_qnn;
 
     delete hidden_unit_q;
     delete hidden_unit_a;
@@ -137,6 +140,22 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       next_action = ann[best_index]->computeOut(sensors);
     } else if(policy_selection == 1) {
       next_action = ann[(uint)(bib::Utils::rand01()*multi_policies)]->computeOut(sensors);
+    } else if(policy_selection == 2) {
+      next_action = ann[0]->computeOut(sensors);
+      double bestS = global_qnn->computeOutVF(sensors, *next_action);
+      uint best_index = 0;
+      delete next_action;
+      
+      for(uint mm=1; mm < multi_policies; mm++) {
+        next_action = ann[mm]->computeOut(sensors);
+        double lscore = global_qnn->computeOutVF(sensors, *next_action);
+        if(lscore > bestS) {
+          bestS = lscore;
+          best_index = mm;
+        }
+        delete next_action;
+      }
+      next_action = ann[best_index]->computeOut(sensors);
     } else if(policy_selection >= 10) {
       next_action = ann[policy_selected]->computeOut(sensors);
     }
@@ -253,6 +272,14 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       ann[mm] = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, hidden_layer_type, last_layer_actor,
                         batch_norm);
     }
+    
+    if(policy_selection == 2)
+    global_qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
+                         alpha_v,
+                         mini_batch_size,
+                         decay_v,
+                         hidden_layer_type, batch_norm,
+                         weighting_strategy > 0);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool _learning) override {
@@ -536,6 +563,110 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       delete all_actions_outputs;
     }
   }
+  
+  void critic_global_update(uint iter, MLP* _qnn, std::vector<MLP*>& _ann) {
+    std::deque<sample>* traj = &trajectory;
+    uint number_of_run = 1;
+    
+    for(uint batch_sampling=0; batch_sampling < number_of_run; batch_sampling++) { //at least one time
+      //compute \pi(s_{t+1})
+      std::vector<double> all_next_states(traj->size() * nb_sensors);
+      std::vector<double> all_states(traj->size() * nb_sensors);
+      std::vector<double> all_actions(traj->size() * nb_motors);
+      uint i=0;
+      for (auto it : *traj) {
+        std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
+        std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
+        std::copy(it.a.begin(), it.a.end(), all_actions.begin() + i * nb_motors);
+        i++;
+      }
+      
+      std::vector<std::vector<double>*> all_next_actions(_ann.size());
+      std::vector< std::vector<double>*> q_targets(_ann.size());
+      std::vector<std::vector<double>*> q_targets_weights(_ann.size());
+      std::vector<double*> ptheta(_ann.size());
+      for(uint p=0;p < _ann.size(); p++){
+        all_next_actions[p] = _ann[p]->computeOutBatch(all_next_states);
+      
+        //compute next q
+
+        
+        q_targets[p] = _qnn->computeOutVFBatch(all_next_states, *all_next_actions[p]);
+        
+        if(weighting_strategy != 0) {
+          q_targets_weights[p] = new std::vector<double>(q_targets[p]->size(), 1.0f);
+          if(weighting_strategy > 1) {
+            ptheta[p] = new double[traj->size()];
+            computePThetaBatch(*traj, ptheta[p], all_next_actions[p]);
+          }
+        }
+
+        delete all_next_actions[p];
+      
+      
+        //adjust q_targets
+        i=0;
+        for (auto it : *traj) {
+          if(it.goal_reached)
+            q_targets[p]->at(i) = it.r;
+          else {
+            q_targets[p]->at(i) = it.r + gamma * q_targets[p]->at(i);
+          }
+          
+          if(weighting_strategy==1)
+            q_targets_weights[p]->at(i)=1.0f/it.p0;
+          else if(weighting_strategy==2)
+            q_targets_weights[p]->at(i)=ptheta[p][i]/it.p0;
+          else if(weighting_strategy==3)
+            q_targets_weights[p]->at(i)=std::min((double)1.0f, ptheta[p][i]/it.p0);
+          
+          i++;
+        }
+      }
+      
+      if(reset_qnn) {
+        delete _qnn;
+        _qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
+                       alpha_v,
+                       mini_batch_size,
+                       decay_v,
+                       hidden_layer_type, batch_norm,
+                       weighting_strategy > 0);
+      }
+      
+      std::vector<double> q_targets_final(traj->size());
+      std::vector<double> q_targets_weights_final(traj->size());
+      for(uint i=0;i<traj->size();i++){
+        uint imax = 0;
+        double bestS = q_targets[0]->at(i);
+        for(uint p=1;p<_ann.size();p++)
+          if(q_targets[p]->at(i) > bestS){
+            bestS = q_targets[p]->at(i);
+            imax = p;
+          }
+        q_targets_final[i]= bestS;
+        q_targets_weights_final[i] = q_targets_weights[imax]->at(i);
+      }
+      
+      //Update critic
+      _qnn->InputDataIntoLayers(all_states.data(), all_actions.data(), q_targets_final.data());
+      if(weighting_strategy != 0)
+        _qnn->setWeightedSampleVector(q_targets_weights_final.data());
+      _qnn->getSolver()->Step(iter);
+      
+      for(uint p=0;p < _ann.size(); p++){
+        delete q_targets[p];
+        if(weighting_strategy != 0) {
+          delete q_targets_weights[p];
+          if(weighting_strategy > 1)
+            delete[] ptheta[p];
+        }
+      }
+      
+      //usefull?
+      _qnn->ZeroGradParameters();
+    }
+  }
 
   void update_actor_critic() {
     if(!learning || trajectory.size() < mini_batch_size)
@@ -586,6 +717,17 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
 //           trajectory.resize(replay_memory);
 //           sample_transition(trajectory, trajectory_noforgot, replay_memory, ann[mm]);
 //         }
+      }
+    }
+    
+    if(policy_selection == 2){
+      for(uint i=0; i < std::max(nb_critic_updates, nb_fitted_updates) ; i++){
+        if(no_forgot_offline && trajectory_noforgot.size() > trajectory.size()
+          && trajectory_noforgot.size() > replay_memory){
+          trajectory.resize(replay_memory);
+          sample_transition(trajectory, trajectory_noforgot, replay_memory, nullptr);
+        }
+        critic_global_update(nb_internal_critic_updates, global_qnn, ann);
       }
     }
   }
@@ -696,6 +838,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
 
   std::vector<MLP*> ann;
   std::vector<MLP*> qnn;
+  MLP* global_qnn;
 
 #ifdef POOL_FOR_TESTING
   struct my_pol {
