@@ -174,6 +174,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     } else {
       last_trajectory.push_back(sa);
     }
+    current_trajectory.push_back(sa);
   }
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* command_args) override {
@@ -209,6 +210,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     hidden_layer_type           = pt->get<uint>("agent.hidden_layer_type");
     stop_reset                  = pt->get<bool>("agent.stop_reset");
     only_one_traj               = pt->get<bool>("agent.only_one_traj");
+    only_one_traj_actor         = pt->get<bool>("agent.only_one_traj_actor");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -272,6 +274,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     if(only_one_traj)
       trajectory.clear();
+    
+    current_trajectory.clear();
   }
 
   void computePTheta(const std::deque< sample >& vtraj, double *ptheta) {
@@ -502,6 +506,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
   void actor_update_grad() {
     std::deque<sample>* traj = &trajectory;
+    if(only_one_traj_actor)
+      traj = &current_trajectory;
     uint number_of_run = std::max((uint) 1, minibatcher);
 
     for(uint batch_sampling=0; batch_sampling < number_of_run; batch_sampling++) { //at least one time
@@ -757,7 +763,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::vector<uint>* hidden_unit_a;
   uint mini_batch_size;
   uint replay_memory, nb_actor_updates, nb_critic_updates, nb_fitted_updates, nb_internal_critic_updates;
-  bool stop_reset, only_one_traj;
+  bool stop_reset, only_one_traj, only_one_traj_actor;
   double alpha_a;
   double alpha_v;
   double decay_v;
@@ -774,6 +780,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::deque<sample> trajectory;
   std::vector<sample> last_trajectory;
   std::deque<sample> trajectory_noforgot;
+  std::deque<sample> current_trajectory;
 
   std::list<MLP*> old_executed_policies;
 
