@@ -106,7 +106,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
     for(auto i : ann)
       delete i;
     
-    if(policy_selection == 2)
+    if(policy_selection == 2 || policy_selection == 12)
       delete global_qnn;
 
     delete hidden_unit_q;
@@ -273,7 +273,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
                         batch_norm);
     }
     
-    if(policy_selection == 2)
+    if(policy_selection == 2 || policy_selection == 12)
     global_qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
                          alpha_v,
                          mini_batch_size,
@@ -311,6 +311,18 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       for(uint mm=1; mm < multi_policies; mm++) {
         double lscore = qnn[mm]->error();
         if(lscore < bestS) {
+          bestS = lscore;
+          best_index = mm;
+        }
+      }
+      policy_selected = best_index;
+    } else if(policy_selection == 12 && trajectory.size() > 0 && multi_policies > 1){
+      double bestS = sum_QSA(trajectory, ann[0], global_qnn);
+      uint best_index = 0;
+      
+      for(uint mm=1; mm < multi_policies; mm++) {
+        double lscore = sum_QSA(trajectory, ann[mm], global_qnn);
+        if(lscore > bestS) {
           bestS = lscore;
           best_index = mm;
         }
@@ -722,7 +734,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       }
     }
     
-    if(policy_selection == 2){
+    if(policy_selection == 2 || policy_selection == 12){
       for(uint i=0; i < std::max(nb_critic_updates, nb_fitted_updates) ; i++){
         if(no_forgot_offline && trajectory_noforgot.size() > trajectory.size()
           && trajectory_noforgot.size() > replay_memory){

@@ -608,6 +608,11 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
 
     for(uint n=0; n<nb_fitted_updates; n++) {
+      if(only_one_traj_actor){
+        ann->increase_batchsize(mini_batch_size);
+        qnn->increase_batchsize(mini_batch_size);
+      }
+      
       for(uint i=0; i<nb_critic_updates ; i++)
         critic_update(nb_internal_critic_updates);
 
@@ -626,6 +631,11 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, hidden_layer_type, last_layer_actor, batch_norm);
       }
 
+      if(only_one_traj_actor){
+        ann->increase_batchsize(current_trajectory.size());
+        qnn->increase_batchsize(current_trajectory.size());
+      }
+      
       for(uint i=0; i<nb_actor_updates ; i++)
         actor_update_grad();
       
