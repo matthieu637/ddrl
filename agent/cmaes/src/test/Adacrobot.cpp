@@ -9,7 +9,7 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
 //   arch::Simulator<AdvancedAcrobotEnv, CMAESAg, arch::PerceptionProbStat> s;
-  arch::Simulator<AdvancedAcrobotEnv, CMAESAg> s;
+  arch::Simulator<AdvancedAcrobotEnv, CMAESAg<>> s;
 
   s.init(argc, argv);
 

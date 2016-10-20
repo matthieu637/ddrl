@@ -14,11 +14,13 @@
 #include <caffe/layers/memory_data_layer.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 //depends on CAFFE_CPU_ONLY
 
 class MLP {
  public:
+  friend class DevMLP;
 
   // Layer Names
   constexpr static auto state_input_layer_name         = "state_input_layer";
@@ -78,7 +80,7 @@ class MLP {
     else
       ConcatLayer(net_param_init, "concat", {states_blob_name}, {"state_actions"}, boost::none, 2);
     std::string tower_top = Tower(net_param_init, "", "state_actions", hiddens, batch_norm, hidden_layer_type);
-    if(batch_norm ==4){
+    if(batch_norm ==4) {
       std::string layer_name2 = "final_bn";
       BatchNormLayer(net_param_init, layer_name2, {tower_top}, {layer_name2}, boost::none);
       std::string layer_name3 = "final_sc";
@@ -133,7 +135,7 @@ class MLP {
                     boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
     SilenceLayer(net_param_init, "silence", {"dummy1"}, {}, boost::none);
     std::string tower_top = Tower(net_param_init, "", states_blob_name, hiddens, batch_norm, hidden_layer_type);
-    if(batch_norm ==4){
+    if(batch_norm ==4) {
       std::string layer_name2 = "final_bn";
       BatchNormLayer(net_param_init, layer_name2, {tower_top}, {layer_name2}, boost::none);
       std::string layer_name3 = "final_sc";
@@ -222,7 +224,7 @@ class MLP {
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
       neural_net = solver->net();
     }
-    
+
     if((uint)neural_net->blob_by_name(MLP::states_blob_name)->num() != kMinibatchSize)
       increase_batchsize(kMinibatchSize);
   }
@@ -256,6 +258,14 @@ class MLP {
   MLP(const MLP&) {
     LOG_ERROR("should not be called");
   }
+
+ protected:
+  MLP(unsigned int _size_input_state, uint _size_sensors, unsigned int _motors, uint _kMinibatchSize, bool loss_layer,
+      bool _weighted_sample) :
+    size_input_state(_size_input_state), size_sensors(_size_sensors), size_motors(_motors),
+    kMinibatchSize(_kMinibatchSize), add_loss_layer(loss_layer), weighted_sample(_weighted_sample) {
+  }
+  
  public:
 
   virtual ~MLP() {
@@ -263,6 +273,9 @@ class MLP {
       delete solver;
   }
 
+  virtual void exploit(boost::property_tree::ptree*, MLP*) {
+
+  }
 //   void randomizeWeights(const std::vector<uint>& hiddens){
 //     //TODO: better
 //     caffe::NetParameter net_param_init;
@@ -619,6 +632,18 @@ class MLP {
     PopulateLayer(layer, name, "ReLU", bottoms, tops, include_phase);
     caffe::ReLUParameter* relu_param = layer.mutable_relu_param();
     relu_param->set_negative_slope(0.01);
+  }
+  void SliceLayer(caffe::NetParameter& net_param,
+                 const std::string& name,
+                 const std::vector<std::string>& bottoms,
+                 const std::vector<std::string>& tops,
+                 const boost::optional<caffe::Phase>& include_phase, int until) {
+    caffe::LayerParameter& layer = *net_param.add_layer();
+    PopulateLayer(layer, name, "Slice", bottoms, tops, include_phase);
+    caffe::SliceParameter* slice_param = layer.mutable_slice_param();
+//     slice_param->set
+    slice_param->set_axis(2);
+    slice_param->add_slice_point(until);
   }
   void TanhLayer(caffe::NetParameter& net_param,
                  const std::string& name,

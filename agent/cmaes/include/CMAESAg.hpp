@@ -3,25 +3,28 @@
 
 #include <vector>
 #include <string>
+#include <type_traits>
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
 
-#include "arch/AACAgent.hpp"
+#include "arch/ARLAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 #include <bib/Combinaison.hpp>
 #include "nn/MLP.hpp"
+#include "nn/DevMLP.hpp"
 #include "cmaes_interface.h"
 
-class CMAESAg : public arch::AACAgent<MLP> {
+template<typename NN = MLP>
+class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
  public:
   CMAESAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : AACAgent(_nb_motors), nb_sensors(_nb_sensors){
+  : arch::ARLAgent<arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors){
 
   }
 
@@ -63,7 +66,9 @@ class CMAESAg : public arch::AACAgent<MLP> {
     gaussian_policy             = pt->get<bool>("agent.gaussian_policy");
     policy_stochasticity        = pt->get<double>("agent.policy_stochasticity");
     
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, 0.1, 1, actor_hidden_layer_type, actor_output_layer_type, batch_norm);
+    ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, 0.1, 1, actor_hidden_layer_type, actor_output_layer_type, batch_norm);
+    if(std::is_same<NN, DevMLP>::value)
+      ann->exploit(pt, static_cast<CMAESAg *>(old_ag)->ann);
 
 //     const uint dimension = (nb_sensors+1)*hidden_unit_a->at(0) + (hidden_unit_a->at(0)+1)*nb_motors;
     const uint dimension = ann->number_of_parameters();
@@ -189,7 +194,7 @@ class CMAESAg : public arch::AACAgent<MLP> {
     if(!save_best || !cmaes_UpdateDistribution_done_once){
       ann->save(path+".actor");
     } else {
-      MLP* to_be_restaured = new MLP(*ann, true);
+      NN* to_be_restaured = new NN(*ann, true);
       const double* parameters = cmaes_GetPtr(evo, "xbestever");
       loadPolicyParameters(parameters);
       ann->save(path+".actor");
@@ -201,15 +206,6 @@ class CMAESAg : public arch::AACAgent<MLP> {
   void load(const std::string& path) override {
     justLoaded = true;
     ann->load(path+".actor");
-  }
-  
-  double criticEval(const std::vector<double>&, const std::vector<double>&) override {
-      return 0;
-  }
-  
-  arch::Policy<MLP>* getCopyCurrentPolicy() override {
-//       return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, policy_stochasticity, decision_each);
-      return nullptr;
   }
 
  protected:

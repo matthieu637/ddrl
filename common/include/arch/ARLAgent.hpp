@@ -112,6 +112,11 @@ class ARLAgent : public AAgent<ProgOptions> {
       this->load((*command_args)["load"].as<std::string>());
   }
   
+  
+  void provide_early_development(AAgent<ProgOptions>* _old_ag) override {
+    old_ag = _old_ag;
+  }
+  
 protected:
     /**
    * @brief This is the main method to define the behavior of your agent
@@ -154,6 +159,7 @@ protected:
   double gamma;
   uint nb_motors;
   uint decision_each;
+  AAgent<ProgOptions>* old_ag;
 };
 }  // namespace arch
 

@@ -2,7 +2,6 @@
 #include "arch/Simulator.hpp"
 #include "bib/Logger.hpp"
 #include "arch/Example.hpp"
-#include "arch/DpmtAgent.hpp"
 
 
 class GreaterExampleEnv : public arch::AEnvironment<> {

@@ -1,13 +1,13 @@
 #include "bib/Assert.hpp"
 #include "arch/Simulator.hpp"
 #include "arch/Example.hpp"
-#include "AdvancedAcrobotEnv.hpp"
+#include "HalfCheetahEnv.hpp"
 #include "CMAESAg.hpp"
-#include "OCMAESAg.hpp"
-#include "arch/DpmtAgent.hpp"
+#include "nn/DevMLP.hpp"
+// #include "OCMAESAg.hpp"
 
 int main(int argc, char **argv) {
-  arch::Simulator<AdvancedAcrobotEnv, CMAESAg> s;
+  arch::Simulator<HalfCheetahEnv, CMAESAg<>> s;
   s.init(argc, argv);
 
   s.run();
@@ -15,9 +15,9 @@ int main(int argc, char **argv) {
   LOG_DEBUG("first worked -> developping ...");
   
 //   typedef arch::DpmtAgent<CMAESAg, arch::FullyDpmtStructure, arch::FixedDpmtLearning> AgentType;
-  typedef OCMAESAg AgentType;
+//   typedef OCMAESAg AgentType;
   
-  arch::Simulator<AdvancedAcrobotEnv, AgentType> s2(1);
+  arch::Simulator<HalfCheetahEnv, CMAESAg<DevMLP>> s2(1);
   s2.init(argc, argv);
 
   s.getAgent()->restoreBest();
