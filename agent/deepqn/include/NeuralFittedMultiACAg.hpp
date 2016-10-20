@@ -190,6 +190,23 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
         }
       }
       next_action = ann[best_index]->computeOut(sensors);
+    } else if(policy_selection == 5) {
+      for(uint mm=0; mm < multi_policies; mm++){
+        next_action = ann[mm]->computeOut(sensors);
+        sum_onlineQSA[mm] = qnn[mm]->computeOutVF(sensors, *next_action) + gamma * sum_onlineQSA[mm];
+        delete next_action;
+      }
+      
+      double bestS = sum_onlineQSA[0];
+      uint best_index = 0;
+      for(uint mm=1; mm < multi_policies; mm++) {
+        double lscore = sum_onlineQSA[mm];
+        if(lscore > bestS) {
+          bestS = lscore;
+          best_index = mm;
+        }
+      }
+      next_action = ann[best_index]->computeOut(sensors);
     } else if(policy_selection >= 10) {
       next_action = ann[policy_selected]->computeOut(sensors);
     }
