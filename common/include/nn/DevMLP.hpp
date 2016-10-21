@@ -2,6 +2,8 @@
 #ifndef DevMLP_HPP
 #define DevMLP_HPP
 
+#include <caffe/layers/inner_product_layer.hpp>
+
 #include "MLP.hpp"
 
 //depends on CAFFE_CPU_ONLY
@@ -28,7 +30,9 @@ class DevMLP : public MLP {
     //ok
   }
 
-  virtual void exploit(boost::property_tree::ptree*, MLP* old) override {
+  virtual void exploit(boost::property_tree::ptree* pt, MLP* old) override {
+    bool start_same = pt->get<bool>("devnn.start_same");
+    
     caffe::NetParameter net_param_old;
     old->getNN()->ToProto(&net_param_old);
 
@@ -90,12 +94,12 @@ class DevMLP : public MLP {
                   boost::none, 1);
 
       if(c->last_layer_type == 0)
-        IPLayer(net_param_init, "action_layer", {actions_blob_name_new}, {actions_blob_name}, boost::none, size_motors);
+        IPLayer(net_param_init, "action_layer_ip2", {actions_blob_name_new}, {actions_blob_name}, boost::none, size_motors);
       else if(c->last_layer_type == 1) {
-        IPLayer(net_param_init, "action_layer_ip", {actions_blob_name_new}, {"last_relu"}, boost::none, size_motors);
+        IPLayer(net_param_init, "action_layer_ip2", {actions_blob_name_new}, {"last_relu"}, boost::none, size_motors);
         ReluLayer(net_param_init, "action_layer", {"last_relu"}, {actions_blob_name}, boost::none);
       } else if(c->last_layer_type == 2) {
-        IPLayer(net_param_init, "action_layer_ip", {actions_blob_name_new}, {"last_tanh"}, boost::none, size_motors);
+        IPLayer(net_param_init, "action_layer_ip2", {actions_blob_name_new}, {"last_tanh"}, boost::none, size_motors);
         TanhLayer(net_param_init, "action_layer", {"last_tanh"}, {actions_blob_name}, boost::none);
       }
 
@@ -123,8 +127,52 @@ class DevMLP : public MLP {
       ASSERT(neural_net->blob_by_name(states_blob_name_old)->height() == old->neural_net->blob_by_name(states_blob_name)->height(), "failed fusion");
       ASSERT(add_loss_layer == false, "to be implemented");
       ASSERT(c->batch_norm == 0, "to be implemented");
-      //TODO:adapt weight of last linear layer
+      
+      //adapt weight of last linear layer
+      if(start_same){
+        auto blob = neural_net->layer_by_name("action_layer_ip2")->blobs()[0];
+        auto blob_biais = neural_net->layer_by_name("action_layer_ip2")->blobs()[1];
+        double* weights = blob->mutable_cpu_data();
+        const double* fweights = blob->cpu_data();
+        const double* fweights_bias = blob_biais->cpu_data();
+        
+        for(int i=0;i < blob_biais->count();i++)
+          LOG_DEBUG(fweights_bias[i]);
+        
+        for(int i=0;i < blob->count();i++)
+//           weights[i] = weights[i] / 100;
+          weights[i] = 0.f;
+        
+        ASSERT((uint)blob->count() == (size_motors*(old->size_motors + c->hiddens.back())), 
+               "failed fusion "<< blob->count() << " " << (size_motors*(old->size_motors + c->hiddens.back())));
+        
+//         for(int i = 0; i < size_motors*old->size_motors;i+=size_motors){
+//           LOG_DEBUG("pop");
+//           weights[i] = 1.0f;
+//         }
+//         
+//         for(int i = size_motors*c->hiddens.back(); i < blob->count();i+=size_motors){
+//           LOG_DEBUG("pop");
+//           weights[i] = 1.0f;
+//         }
+//         
+//         for(int i = 0; i < old->size_motors*(old->size_motors + c->hiddens.back()) ;i+=(old->size_motors + c->hiddens.back())){
+//           LOG_DEBUG("pop");
+//           weights[i] = 1.0f;
+//         }
+        
+        for(int i = (old->size_motors + c->hiddens.back())*(size_motors-old->size_motors); i < blob->count() ;i+=(old->size_motors + c->hiddens.back())){
+          LOG_DEBUG("pop");
+          weights[i] = 1.0f;
+        }
+        
+        //TODO : invert 4/10 in concat?
+        //disable bias?
+      }
     }
+  }
+  
+  void copyWeightsFrom(const double*) override {
   }
 
  public:

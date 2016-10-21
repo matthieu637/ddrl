@@ -494,7 +494,7 @@ class MLP {
     return n;
   }
 
-  void copyWeightsTo(double* startx) {
+  virtual void copyWeightsTo(double* startx) {
     uint index = 0;
 
     caffe::Net<double>& net = *neural_net;
@@ -520,7 +520,7 @@ class MLP {
     }
   }
 
-  void copyWeightsFrom(const double* startx) {
+  virtual void copyWeightsFrom(const double* startx) {
     uint index = 0;
 
     caffe::Net<double>& net = *neural_net;
@@ -666,9 +666,12 @@ class MLP {
     caffe::FillerParameter* weight_filler = ip_param->mutable_weight_filler();
     weight_filler->set_type("gaussian");
     weight_filler->set_std(0.01);
-    // caffe::FillerParameter* bias_filler = ip_param->mutable_bias_filler();
-    // bias_filler->set_type("constant");
-    // bias_filler->set_value(1);
+    LOG_DEBUG(ip_param->has_bias_term());
+//     ip_param->set_bias_term(true);
+//     caffe::FillerParameter* bias_filler = ip_param->mutable_bias_filler();
+//     bias_filler->set_type("constant");
+//     bias_filler->set_value(1);
+//     bias already here but not in first blob but set to 0?
   }
   void EuclideanLossLayer(caffe::NetParameter& net_param,
                           const std::string& name,
