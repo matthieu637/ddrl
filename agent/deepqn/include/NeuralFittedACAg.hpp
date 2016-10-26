@@ -170,7 +170,11 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
       if(force_online_update)
         update_actor_critic();
-
+      
+      step++;
+      if(force_online_update_each > 0 && (step % force_online_update_each == 0) && !sa.goal_reached){
+        update_actor_critic();
+      }
     } else {
       last_trajectory.push_back(sa);
     }
@@ -211,6 +215,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     stop_reset                  = pt->get<bool>("agent.stop_reset");
     only_one_traj               = pt->get<bool>("agent.only_one_traj");
     only_one_traj_actor         = pt->get<bool>("agent.only_one_traj_actor");
+    keep_weights_wr             = pt->get<bool>("agent.keep_weights_wr");
+    force_online_update_each    = pt->get<uint>("agent.force_online_update_each");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -277,6 +283,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       trajectory.clear();
 
     current_trajectory.clear();
+    step = 0;
   }
 
   void computePTheta(const std::deque< sample >& vtraj, double *ptheta) {
@@ -540,6 +547,12 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       }
 
       if(reset_qnn && (stop_reset ? episode < 1000 : true)) {
+        double* weights = nullptr;
+        if(keep_weights_wr){
+          uint dim = qnn->number_of_parameters();
+          weights = new double[dim];
+          qnn->copyWeightsTo(weights);
+        }
         delete qnn;
         qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
                       alpha_v,
@@ -547,6 +560,10 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
                       decay_v,
                       hidden_layer_type, batch_norm,
                       weighting_strategy > 0);
+        if(keep_weights_wr){
+          qnn->copyWeightsFrom(weights);
+          delete[] weights;
+        }
       }
 
       //Update critic
@@ -701,9 +718,18 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       }
 
       if(reset_ann && (stop_reset ? episode < 1000 : true)) {
+        double* weights = nullptr;
+        if(keep_weights_wr){
+          uint dim = ann->number_of_parameters();
+          weights = new double[dim];
+          ann->copyWeightsTo(weights);
+        }
         delete ann;
-        ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, hidden_layer_type, last_layer_actor,
-                      batch_norm);
+        ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, hidden_layer_type, last_layer_actor, batch_norm);
+        if(keep_weights_wr){
+          ann->copyWeightsFrom(weights);
+          delete[] weights;
+        }
       }
 
       if(only_one_traj_actor) {
@@ -855,9 +881,9 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   double tau_soft_update;
 
   uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy, last_layer_actor,
-       hidden_layer_type;
+    hidden_layer_type, force_online_update_each, step;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
-  bool target_network, reset_ann, no_forgot_offline, mixed_sampling;
+  bool target_network, reset_ann, no_forgot_offline, mixed_sampling, keep_weights_wr;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
