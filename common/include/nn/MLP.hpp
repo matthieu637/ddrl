@@ -265,7 +265,7 @@ class MLP {
     size_input_state(_size_input_state), size_sensors(_size_sensors), size_motors(_motors),
     kMinibatchSize(_kMinibatchSize), add_loss_layer(loss_layer), weighted_sample(_weighted_sample) {
   }
-  
+
  public:
 
   virtual ~MLP() {
@@ -274,7 +274,7 @@ class MLP {
   }
 
   virtual void exploit(boost::property_tree::ptree*, MLP*) {
-
+    LOG_ERROR("should not be called");
   }
 //   void randomizeWeights(const std::vector<uint>& hiddens){
 //     //TODO: better
@@ -416,7 +416,7 @@ class MLP {
     return outputs;
   }
 
-  std::vector<double>* computeOut(const std::vector<double>& states_batch) {
+  virtual std::vector<double>* computeOut(const std::vector<double>& states_batch) {
     std::vector<double> states_input(size_input_state * kMinibatchSize, 0.0f);
     std::copy(states_batch.begin(), states_batch.end(),states_input.begin());
     std::vector<double>* target_input = nullptr;
@@ -482,7 +482,7 @@ class MLP {
     return sum;
   }
 
-  double number_of_parameters() {
+  virtual double number_of_parameters() {
     uint n = 0;
 
     caffe::Net<double>& net = *neural_net;
@@ -590,6 +590,18 @@ class MLP {
       layer.add_include()->set_phase(*include_phase);
     }
   }
+  void ReshapeLayer(caffe::NetParameter& net_param,
+                   const std::string& name,
+                   const std::vector<std::string>& bottoms,
+                   const std::vector<std::string>& tops,
+                   const boost::optional<caffe::Phase>& include_phase,
+                   const std::vector<uint>& _shape) {
+    caffe::LayerParameter& layer = *net_param.add_layer();
+    PopulateLayer(layer, name, "Reshape", bottoms, tops, include_phase);
+    caffe::ReshapeParameter* reshape_param = layer.mutable_reshape_param();
+    for(auto i : _shape)
+      reshape_param->mutable_shape()->add_dim(i);
+  }
   void ConcatLayer(caffe::NetParameter& net_param,
                    const std::string& name,
                    const std::vector<std::string>& bottoms,
@@ -634,10 +646,10 @@ class MLP {
     relu_param->set_negative_slope(0.01);
   }
   void SliceLayer(caffe::NetParameter& net_param,
-                 const std::string& name,
-                 const std::vector<std::string>& bottoms,
-                 const std::vector<std::string>& tops,
-                 const boost::optional<caffe::Phase>& include_phase, int until) {
+                  const std::string& name,
+                  const std::vector<std::string>& bottoms,
+                  const std::vector<std::string>& tops,
+                  const boost::optional<caffe::Phase>& include_phase, int until) {
     caffe::LayerParameter& layer = *net_param.add_layer();
     PopulateLayer(layer, name, "Slice", bottoms, tops, include_phase);
     caffe::SliceParameter* slice_param = layer.mutable_slice_param();
@@ -666,12 +678,13 @@ class MLP {
     caffe::FillerParameter* weight_filler = ip_param->mutable_weight_filler();
     weight_filler->set_type("gaussian");
     weight_filler->set_std(0.01);
-    LOG_DEBUG(ip_param->has_bias_term());
+//     LOG_DEBUG("" << (ip_param->has_bias_term() ? "oui" : "non"));
 //     ip_param->set_bias_term(true);
 //     caffe::FillerParameter* bias_filler = ip_param->mutable_bias_filler();
 //     bias_filler->set_type("constant");
 //     bias_filler->set_value(1);
 //     bias already here but not in first blob but set to 0?
+//     can learn layer_param().inner_product_param().bias_term(); -> true
   }
   void EuclideanLossLayer(caffe::NetParameter& net_param,
                           const std::string& name,
@@ -706,9 +719,32 @@ class MLP {
                     const std::string& layer_prefix,
                     const std::string& input_blob_name,
                     const std::vector<uint>& layer_sizes,
-                    uint batch_norm, uint hidden_layer_type) {
+                    uint batch_norm, uint hidden_layer_type, 
+                    uint link_struct=0) {
     std::string input_name = input_blob_name;
     for (uint i=1; i<layer_sizes.size()+1; ++i) {
+      if(link_struct != 0){
+        std::string top = input_name +"_after_concat";
+        std::vector<std::string> bottoms;
+        bottoms.push_back(input_name);
+        if(link_struct & (1 << 0)) {
+          std::string states_blob_name_old = std::string(input_name);
+          states_blob_name_old.replace(states_blob_name_old.end()-4, states_blob_name_old.end(), "_old");
+          
+          bottoms.push_back(states_blob_name_old);
+        }
+        if(link_struct & (1 << 1)) {
+          ReshapeLayer(np, "rshtest", {"ip1"}, {"ip1_rs"}, boost::none, {1,1,20,1});
+          bottoms.push_back("ip1_rs");
+        }
+        if(link_struct & (1 << 2)) {
+          ReshapeLayer(np, "rshtest2", {"ip2"}, {"ip2_rs"}, boost::none, {1,1,10,1});
+          bottoms.push_back("ip2_rs");
+        }
+        ConcatLayer(np, "concat_tower_"+std::to_string(i), bottoms, {top}, boost::none, 2);
+        input_name = top;
+      }
+      
       if(batch_norm == 1 || batch_norm == 3 || (batch_norm == 5 && i ==1)) {
         std::string layer_name2 = layer_prefix + "bn" + std::to_string(i);
         BatchNormLayer(np, layer_name2, {input_name}, {layer_name2}, boost::none);
