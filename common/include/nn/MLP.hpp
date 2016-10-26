@@ -666,7 +666,7 @@ class MLP {
     caffe::FillerParameter* weight_filler = ip_param->mutable_weight_filler();
     weight_filler->set_type("gaussian");
     weight_filler->set_std(0.01);
-    LOG_DEBUG(ip_param->has_bias_term());
+//    LOG_DEBUG(ip_param->has_bias_term());
 //     ip_param->set_bias_term(true);
 //     caffe::FillerParameter* bias_filler = ip_param->mutable_bias_filler();
 //     bias_filler->set_type("constant");
