@@ -280,10 +280,12 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
   void computePTheta(const std::deque< sample >& vtraj, double *ptheta) {
 
-    uint number_minibatch = (int)(trajectory.size() / mini_batch_size) + 1;
+    uint number_minibatch = (int)(vtraj.size() / mini_batch_size) + 1;
     auto it1 = vtraj.cbegin();
     auto it2 = vtraj.cbegin();
     uint index = 0;
+    
+//     LOG_DEBUG("nb mini : " << number_minibatch << " for a traj " << vtraj.size() << " " <<mini_batch_size);
 
     for(uint n=0; n < number_minibatch; n++) {
       std::vector<double> all_states(mini_batch_size * nb_sensors, 0.f);
@@ -594,7 +596,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     if(no_forgot_offline && trajectory_noforgot.size() > trajectory.size() 
       && trajectory_noforgot.size() > replay_memory){
-      trajectory.resize(replay_memory);
+      ASSERT(trajectory.size() == replay_memory, "increase minibatch?");
+//       trajectory.resize(replay_memory);
       sample_transition(trajectory, trajectory_noforgot, replay_memory);
     }
 
