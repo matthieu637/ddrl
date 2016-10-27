@@ -217,6 +217,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     only_one_traj_actor         = pt->get<bool>("agent.only_one_traj_actor");
     keep_weights_wr             = pt->get<bool>("agent.keep_weights_wr");
     force_online_update_each    = pt->get<uint>("agent.force_online_update_each");
+    add_last_traj_sampling      = pt->get<bool>("agent.add_last_traj_sampling");
 
     on_policy_update            = max_stabilizer;
     rmax_labeled                = false;
@@ -403,8 +404,16 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
 
   void sample_transition(std::deque<sample>& traj, const std::deque<sample>& from, uint nb_sample) {
+    uint start_index = 0;
+    if(add_last_traj_sampling){
+      for(uint i=0;i<current_trajectory.size();i++)
+        traj[i] = current_trajectory[i];
+      start_index = current_trajectory.size();
+      ASSERT(start_index < traj.size() && start_index < nb_sample, "ltc");
+    }
+    
     if(sampling_strategy <= 1) {
-      for(uint i=0; i<nb_sample; i++) {
+      for(uint i=start_index; i<nb_sample; i++) {
         int r = std::uniform_int_distribution<int>(0, from.size() - 1)(*bib::Seed::random_engine());
         traj[i] = from[r];
       }
@@ -427,7 +436,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       delete[] ptheta;
 
       std::discrete_distribution<int> dist(weights.begin(), weights.end());
-      for(i = 0; i < nb_sample; i++)
+      for(i = start_index; i < nb_sample; i++)
         traj[i] = from[dist(*bib::Seed::random_engine())];
     } else if(sampling_strategy > 3) {
       std::vector<double> weights(from.size());
@@ -452,7 +461,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
       delete[] td_error;
       std::discrete_distribution<int> dist(weights.begin(), weights.end());
-      for(i = 0; i < nb_sample; i++)
+      for(i = start_index; i < nb_sample; i++)
         traj[i] = from[dist(*bib::Seed::random_engine())];
     }
   }
@@ -883,7 +892,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   uint batch_norm, minibatcher, sampling_strategy, fishing_policy, weighting_strategy, last_layer_actor,
     hidden_layer_type, force_online_update_each, step;
   bool learning, on_policy_update, reset_qnn, force_online_update, max_stabilizer, min_stabilizer, inverting_grad;
-  bool target_network, reset_ann, no_forgot_offline, mixed_sampling, keep_weights_wr;
+  bool target_network, reset_ann, no_forgot_offline, mixed_sampling, keep_weights_wr, add_last_traj_sampling;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
