@@ -9,7 +9,7 @@ endif()
 
 include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
 
-find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
+find_package(Boost 1.60 COMPONENTS serialization filesystem system program_options thread REQUIRED)
 find_package(ODE)
 find_package(OpenGL)
 find_package(X11)
