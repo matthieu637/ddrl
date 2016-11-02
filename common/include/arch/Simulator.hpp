@@ -8,10 +8,7 @@
 #include "boost/property_tree/ptree.hpp"
 #include "boost/property_tree/ini_parser.hpp"
 #include "boost/program_options.hpp"
-
-#define BOOST_NO_CXX11_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
-#undef BOOST_NO_CXX11_SCOPED_ENUMS
 
 #include "bib/Assert.hpp"
 #include "bib/Logger.hpp"
