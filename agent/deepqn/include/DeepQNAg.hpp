@@ -9,7 +9,6 @@
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/deque.hpp>
-#include <boost/filesystem.hpp>
 
 #include "nn/MLP.hpp"
 #include "arch/AACAgent.hpp"

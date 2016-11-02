@@ -6,7 +6,6 @@
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
-#include <boost/filesystem.hpp>
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 
