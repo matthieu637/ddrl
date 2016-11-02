@@ -110,6 +110,15 @@ class AAgent : public ProgOptions, public CommonAE {
   
   virtual void provide_early_development(AAgent<ProgOptions>* ){}
 
+  virtual void load_previous_run(){
+    LOG_ERROR("not implemented");
+    exit(1);
+  }
+  
+  virtual void save_run(){
+    LOG_ERROR("not implemented");
+    exit(1);
+  }
  protected:
   /**
   * @brief Called only at the creation of the agent.

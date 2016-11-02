@@ -224,7 +224,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     rmax                        = std::numeric_limits<double>::lowest();
 
     old_executed_policies.clear();
-
+    
 #ifdef CAFFE_CPU_ONLY
     LOG_INFO("CPU mode");
     (void) command_args;
@@ -269,7 +269,45 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       ann_target = new MLP(*ann, false);
     }
   }
+  
+  void load_previous_run() override{
+    ann->load("continue.actor");
+    qnn->load("continue.critic");
+    auto p1 = bib::XMLEngine::load<std::deque<sample>>("trajectory", "continue.trajectory.data");
+    trajectory = *p1;
+    delete p1;
+    auto p2 = bib::XMLEngine::load<std::deque<sample>>("trajectory_noforgot", "continue.trajectory_noforgot.data");
+    trajectory_noforgot = *p2;
+    delete p2;
+    auto p3 = bib::XMLEngine::load<struct algo_state>("algo_state", "continue.algo_state.data");
+    mini_batch_size = p3->mini_batch_size;
+    replay_memory = p3->replay_memory;
+    delete p3;
+    
+    ann->increase_batchsize(mini_batch_size);
+    qnn->increase_batchsize(mini_batch_size);
+    
+    LOG_DEBUG(" " << trajectory.size() << " " << trajectory_noforgot.size());
+    
+    if(target_network || fishing_policy > 0){
+      LOG_DEBUG("not implemented");
+      exit(1);
+    }
+  }
 
+  void save_run() override {
+    ann->save("continue.actor");
+    qnn->save("continue.critic");
+    bib::XMLEngine::save(trajectory, "trajectory", "continue.trajectory.data");
+    bib::XMLEngine::save(trajectory_noforgot, "trajectory_noforgot", "continue.trajectory_noforgot.data");
+    struct algo_state st = {mini_batch_size, replay_memory};
+    bib::XMLEngine::save(st, "algo_state", "continue.algo_state.data");
+    if(target_network || fishing_policy > 0){
+      LOG_DEBUG("not implemented");
+      exit(1);
+    }
+  }
+  
   void _start_episode(const std::vector<double>& sensors, bool _learning) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
@@ -793,6 +831,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
     update_actor_critic();
   }
+  
 #ifdef POOL_FOR_TESTING
   void start_instance(bool learning) override {
     if(!learning && best_pol_population.size() > 0) {
@@ -872,6 +911,18 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
 
  private:
+   struct algo_state {
+     uint mini_batch_size;
+     uint replay_memory;
+     
+     friend class boost::serialization::access;
+     template <typename Archive>
+     void serialize(Archive& ar, const unsigned int) {
+       ar& BOOST_SERIALIZATION_NVP(mini_batch_size);
+       ar& BOOST_SERIALIZATION_NVP(replay_memory);
+     }
+   };
+   
   uint nb_sensors;
   uint episode = 0;
 

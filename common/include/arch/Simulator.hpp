@@ -8,12 +8,14 @@
 #include "boost/property_tree/ptree.hpp"
 #include "boost/property_tree/ini_parser.hpp"
 #include "boost/program_options.hpp"
+#include "boost/filesystem.hpp"
 
 #include "bib/Assert.hpp"
 #include "bib/Logger.hpp"
 #include "bib/Utils.hpp"
 #include "bib/Chrono.hpp"
 #include "bib/Dumper.hpp"
+#include "bib/XMLEngine.hpp"
 #include "arch/AAgent.hpp"
 #include "arch/AEnvironment.hpp"
 #include "arch/DefaultParam.hpp"
@@ -65,11 +67,19 @@ class Simulator {
     env->unique_invoke(properties, command_args);
 
     agent = new Agent(env->number_of_actuators(), env->number_of_sensors());
-    if(early_stage != nullptr){
+    if(early_stage != nullptr) {
       agent->provide_early_development(early_stage);
     }
     agent->unique_invoke(properties, command_args);
-    
+    if(can_continue && boost::filesystem::exists("continue.simu.data")){
+      agent->load_previous_run();
+      auto p = bib::XMLEngine::load<simu_state>("episode","continue.simu.data");
+      starting_ep = p->episode;
+      delete p;
+      LOG_INFO("loading previous data ... " << starting_ep);
+      must_load_previous_run = true;
+    }
+
     Stat stat;
 
     time_spend.start();
@@ -93,21 +103,21 @@ class Simulator {
 
     LOG_FILE(DEFAULT_END_FILE, "" << (double)(time_spend.finish() / 60.f));  // in minutes
   }
-  
-  Agent* getAgent(){
+
+  Agent* getAgent() {
     return agent;
   }
-  
-  uint getMaxEpisode(){
+
+  uint getMaxEpisode() {
     return max_episode;
   }
 
  protected:
-  virtual void run_episode(bool learning, unsigned int lepisode, unsigned int tepsiode, Stat& stat) {
+  virtual void run_episode(bool learning, unsigned int lepisode, unsigned int tepisode, Stat& stat) {
     env->reset_episode(learning);
     std::list<double> all_rewards;
     agent->start_instance(learning);
-    
+
     uint instance = 0;
     while (env->hasInstance()) {
       uint step = 0;
@@ -135,25 +145,53 @@ class Simulator {
       env->next_instance(learning);
       agent->end_episode();
 
-      dump_and_display(lepisode, instance, tepsiode, all_rewards, env, agent, learning, step);
+      if(must_load_previous_run){
+        std::string source_path = learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :
+        std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE;
+        std::string destination_path = learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :
+        std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE;
+        destination_path = "continue." + destination_path;
+        boost::filesystem::copy_file(destination_path, source_path, boost::filesystem::copy_option::overwrite_if_exists);
+        LOG_FILEA(source_path);
+      }
+      
+      dump_and_display(lepisode, instance, tepisode, all_rewards, env, agent, learning, step);
+      
+      if(can_continue && lepisode % DEFAULT_AGENT_SAVE_EACH_CONTINUE == 0 && lepisode > 0 && !must_load_previous_run) {
+        std::string source_path = learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :
+                                  std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE;
+        std::string destination_path = learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :
+                                        std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE;
+        destination_path = "continue." + destination_path;
+        boost::filesystem::copy_file(source_path, destination_path, boost::filesystem::copy_option::overwrite_if_exists);
+      }
       instance++;
     }
-    
+
     agent->end_instance(learning);
     
+    if(can_continue){
+      if(lepisode % DEFAULT_AGENT_SAVE_EACH_CONTINUE == 0 && !must_load_previous_run && lepisode > 0){
+        agent->save_run();
+        bib::XMLEngine::save<simu_state>({lepisode+1}, "episode", "continue.simu.data");
+      }
+      must_load_previous_run = false;
+    }
+
     save_agent(agent, lepisode, learning);
   }
- 
-  void dump_and_display(unsigned int episode, unsigned int instance, unsigned int tepisode, const std::list<double>& all_rewards, Environment* env,
+
+  void dump_and_display(unsigned int episode, unsigned int instance, unsigned int tepisode,
+                        const std::list<double>& all_rewards, Environment* env,
                         Agent* ag, bool learning, uint step) {
     bool display = episode % display_log_each == 0;
     bool dump = episode % dump_log_each == 0;
 
-    if(!learning){
+    if(!learning) {
       display = (episode+tepisode) % display_log_each == 0;
       dump = (episode+tepisode) % dump_log_each == 0;
     }
-    
+
     if (dump || display) {
       bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
 
@@ -173,8 +211,8 @@ class Simulator {
       if (dump) {
         bib::Dumper<Environment, bool, bool> env_dump(env, false, true);
         bib::Dumper<Agent, bool, bool> agent_dump(ag, false, true);
-        LOG_FILE(learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE : 
-                  std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE,
+        LOG_FILE(learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :
+                 std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE,
                  episode << " " << reward_stats.mean << " " << reward_stats.var << " " <<
                  reward_stats.max << " " << reward_stats.min << " " << step << env_dump << agent_dump);
       }
@@ -199,6 +237,7 @@ class Simulator {
     desc.add_options()
     ("config", po::value<std::vector<string>>(), "set the config file to load [default : config.ini]")
     ("save-best", "save only best params")
+    ("continue", "process can be killed and run again")
     ("help", "produce help message");
 
     command_args = new po::variables_map;
@@ -215,11 +254,13 @@ class Simulator {
     if (command_args->count("config")) {
       *s = (*command_args)["config"].as<std::vector<string>>()[config_file_index];
     }
-    
+
     save_best_agent = false;
     if (command_args->count("save-best")) {
       save_best_agent = true;
     }
+
+    can_continue = command_args->count("continue") > 0;
   }
 
   void readConfig(const string& config_file) {
@@ -233,8 +274,8 @@ class Simulator {
     dump_log_each               = properties->get<unsigned int>("simulation.dump_log_each");
     display_log_each            = properties->get<unsigned int>("simulation.display_log_each");
     save_agent_each             = properties->get<unsigned int>("simulation.save_agent_each");
-    
-    try{
+
+    try {
       display_learning            = properties->get<bool>("simulation.display_learning");
     } catch(boost::exception const& ) {
       display_learning            = true;
@@ -246,6 +287,15 @@ class Simulator {
   }
 
  private:
+  struct simu_state {
+    uint episode;
+    
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive& ar, const unsigned int) {
+      ar& BOOST_SERIALIZATION_NVP(episode);
+    }
+  };
   unsigned int max_episode;
   unsigned int test_episode_per_episode;
   unsigned int test_episode_at_end;
@@ -253,10 +303,11 @@ class Simulator {
   unsigned int dump_log_each;
   unsigned int display_log_each;
   unsigned int save_agent_each;
-  
-  bool display_learning, save_best_agent;
 
-protected:
+  bool display_learning, save_best_agent, can_continue;
+  bool must_load_previous_run = false;
+
+ protected:
   uint config_file_index;
   boost::property_tree::ptree* properties;
   boost::program_options::variables_map* command_args;
@@ -267,7 +318,7 @@ protected:
   Agent* agent;
 
 #ifndef NDEBUG
-private:
+ private:
   bool well_init = false;
 #endif
 };

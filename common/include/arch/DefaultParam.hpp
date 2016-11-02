@@ -9,5 +9,6 @@
 #define DEFAULT_DUMP_TESTING_FILE ".testing.data"
 #define DEFAULT_AGENT_SAVE_FILE "agent."
 #define DEFAULT_AGENT_TEST_SAVE_FILE "agent.test."
+#define DEFAULT_AGENT_SAVE_EACH_CONTINUE 50
 
 #endif  // DEFAULTPARAM_H

@@ -63,6 +63,9 @@
 #define LOG_FILE(file, stream) \
   bib::Logger::getInstance()->getFile(file) << stream << std::endl;
   
+#define LOG_FILEA(file) \
+  bib::Logger::getInstance()->getFile(file, true);
+  
 #define LOG_FILE_NNL(file, stream) \
   bib::Logger::getInstance()->getFile(file) << stream;
 
@@ -74,10 +77,13 @@ class Logger : public Singleton<Logger> {
  public:
   enum LogLevel { DEBUGGING, INFO, WARNING, ERROR };
 
-  std::ofstream &getFile(const std::string &s) {
+  std::ofstream &getFile(const std::string &s, bool append=false) {
     if (open_files.find(s) == open_files.end()) {
       std::ofstream *ofs = new std::ofstream;
-      ofs->open(s, std::ofstream::out);
+      if(append)
+        ofs->open(s, std::ofstream::out | std::ofstream::app);
+      else
+        ofs->open(s, std::ofstream::out);
       open_files.insert(std::pair<std::string, std::ofstream *>(s, ofs));
       
       struct rlimit old;
