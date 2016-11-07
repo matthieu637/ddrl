@@ -1,4 +1,4 @@
-find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
+find_package(Boost 1.60 COMPONENTS serialization filesystem system program_options thread REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(Caffe REQUIRED)
 find_package(GLOG)

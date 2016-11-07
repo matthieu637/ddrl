@@ -11,7 +11,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/Config.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/CaffeConfig.cmake)
 
 #Boost library
-find_package(Boost COMPONENTS serialization program_options thread system filesystem REQUIRED)
+find_package(Boost 1.60 COMPONENTS serialization program_options thread system filesystem REQUIRED)
 find_package(GTest REQUIRED)
 find_package(Threads REQUIRED)
 
