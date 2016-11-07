@@ -71,10 +71,13 @@ class Simulator {
       agent->provide_early_development(early_stage);
     }
     agent->unique_invoke(properties, command_args);
+    
+    uint fepsiode = max_episode + starting_ep;
     if(can_continue && boost::filesystem::exists("continue.simu.data")){
       agent->load_previous_run();
       auto p = bib::XMLEngine::load<simu_state>("episode","continue.simu.data");
       starting_ep = p->episode;
+      fepsiode = max_episode;
       delete p;
       LOG_INFO("loading previous data ... " << starting_ep);
       must_load_previous_run = true;
@@ -83,7 +86,7 @@ class Simulator {
     Stat stat;
 
     time_spend.start();
-    for (uint episode = starting_ep; episode < max_episode + starting_ep; episode++) {
+    for (uint episode = starting_ep; episode < fepsiode; episode++) {
       //  learning
       run_episode(true, episode, 0, stat);
 
