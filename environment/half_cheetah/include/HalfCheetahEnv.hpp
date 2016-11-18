@@ -61,6 +61,13 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
       init.predev = pt->get<uint>("environment.predev");
     } catch(boost::exception const& ) {
     }
+    init.from_predev = 0;
+    try {
+      init.from_predev = pt->get<uint>("environment.from_predev");
+    } catch(boost::exception const& ) {
+    }
+    
+    ASSERT(init.predev == 0 || init.from_predev ==0, "for now only one dev");
 
     if (visible)
       instance = new HalfCheetahWorldView("data/textures", init);

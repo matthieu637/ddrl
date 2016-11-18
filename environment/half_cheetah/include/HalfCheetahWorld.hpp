@@ -27,6 +27,7 @@ struct hcheetah_physics{
   double soft_erp;
   double bounce;
   uint predev;
+  uint from_predev;
 //   PREDEV: 1 -> two low joint
 //           10 -> two middle joints
 //   +0 -> PD controller init pos

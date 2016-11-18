@@ -44,13 +44,15 @@ class AEnvironment : public ProgOptions, public CommonAE {
   void next_instance(bool learning) {
     current_step = 0;
     current_instance++;
-    _next_instance(learning);
+    if(hasInstance())
+      _next_instance(learning);
   }
 
   void next_instance_choose(const std::vector<double>& stochasticity) {
     current_step = 0;
     current_instance++;
-    _next_instance_choose(stochasticity);
+    if(hasInstance())
+      _next_instance_choose(stochasticity);
   }
   
   void apply(const std::vector<double>& actuators) {
