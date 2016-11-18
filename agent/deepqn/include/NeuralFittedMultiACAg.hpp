@@ -598,7 +598,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       i=0;
       for (auto it : *traj)
         q_values_diff[q_values_blob->offset(i++,0,0,0)] = -1.0f;
-      _qnn->getNN()->BackwardFrom(_qnn->GetLayerIndex(MLP::q_values_layer_name));
+      _qnn->critic_backward();
       const auto critic_action_blob = _qnn->getNN()->blob_by_name(MLP::actions_blob_name);
       if(inverting_grad) {
         double* action_diff = critic_action_blob->mutable_cpu_diff();
@@ -623,7 +623,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       // Transfer input-level diffs from Critic to Actor
       const auto actor_actions_blob = _ann->getNN()->blob_by_name(MLP::actions_blob_name);
       actor_actions_blob->ShareDiff(*critic_action_blob);
-      _ann->getNN()->BackwardFrom(_ann->GetLayerIndex("action_layer"));
+      _ann->actor_backward();
       _ann->getSolver()->ApplyUpdate();
       _ann->getSolver()->set_iter(_ann->getSolver()->iter() + 1);
 

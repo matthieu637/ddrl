@@ -309,7 +309,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       i=0;
       for (auto it : traj)
         q_values_diff[q_values_blob->offset(i++,0,0,0)] = -1.0f;
-      qnn->getNN()->BackwardFrom(qnn->GetLayerIndex(MLP::q_values_layer_name));
+      qnn->critic_backward();
       const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
       
       if(inverting_grad){
@@ -335,7 +335,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       // Transfer input-level diffs from Critic to Actor
       const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
       actor_actions_blob->ShareDiff(*critic_action_blob);
-      ann->getNN()->BackwardFrom(ann->GetLayerIndex("action_layer"));
+      ann->actor_backward();
       ann->getSolver()->ApplyUpdate();
       ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
       

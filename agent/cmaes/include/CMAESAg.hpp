@@ -49,7 +49,12 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
           for (uint i = 0; i < next_action->size(); i++)
             next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
       }
+    } //TODO: might not be necessary in the future?
+    else {
+      for (uint i = 0; i < next_action->size(); i++)
+        next_action->at(i) = std::min(std::max(next_action->at(i), (double)-1.f), (double) 1.f);
     }
+    
     last_action.reset(next_action);
 
     return *next_action;
@@ -88,7 +93,9 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     
     printf("%s\n", cmaes_SayHello(evo));
     new_population();
-    LOG_DEBUG(cmaes_Get(evo, "lambda"));
+    LOG_DEBUG(cmaes_Get(evo, "lambda") << " " << dimension << " " << population << " " << cmaes_Get(evo, "N"));
+    if (population < 2)
+      LOG_DEBUG("population too small, changed to : " << (4+(int)(3*log((double)dimension))));
   }
   
   bool is_feasible(const double* parameters){
@@ -138,7 +145,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     //LOG_FILE("policy_exploration", ann->hash());
   }
   
-  void restoreBest() {
+  void restoreBest() override {
     const double* parameters = cmaes_GetPtr(evo, "xbestever");
     loadPolicyParameters(parameters);
   }
@@ -159,6 +166,12 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
       }
     }
     justLoaded = false;
+    
+//     LOG_DEBUG(cmaes_Get(evo, "fbestever"));
+//     const double* parameters = cmaes_GetPtr(evo, "xbestever");
+//     bib::Logger::PRINT_ELEMENTS(parameters, ann->number_of_parameters());
+//     LOG_DEBUG("");
+//     LOG_DEBUG("");
   }
   
    void write_actionf_file(const std::string& file){

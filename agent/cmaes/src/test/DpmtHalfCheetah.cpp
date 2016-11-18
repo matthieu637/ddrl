@@ -7,6 +7,13 @@
 // #include "OCMAESAg.hpp"
 
 int main(int argc, char **argv) {
+//   FLAGS_minloglevel = 2;
+//   FLAGS_logtostderr = 1;
+  FLAGS_minloglevel = -4;
+  FLAGS_log_dir = ".";
+  google::InitGoogleLogging(argv[0]);
+  google::InstallFailureSignalHandler();
+  
   arch::Simulator<HalfCheetahEnv, CMAESAg<>> s;
   s.init(argc, argv);
 

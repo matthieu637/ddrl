@@ -23,31 +23,66 @@ class MLP {
   friend class DevMLP;
 
   // Layer Names
-  constexpr static auto state_input_layer_name         = "state_input_layer";
-  constexpr static auto action_input_layer_name        = "action_input_layer";
-  constexpr static auto target_input_layer_name        = "target_input_layer";
-  constexpr static auto wsample_input_layer_name       = "wsample_input_layer";
-  constexpr static auto q_values_layer_name            = "q_values_layer";
+  static const std::string state_input_layer_name;
+  static const std::string action_input_layer_name;
+  static const std::string target_input_layer_name;
+  static const std::string wsample_input_layer_name;
+
   // Blob names
-  constexpr static auto states_blob_name        = "states";
-  constexpr static auto actions_blob_name       = "actions";
-  constexpr static auto targets_blob_name       = "target";
-  constexpr static auto wsample_blob_name       = "wsample";
-  constexpr static auto q_values_blob_name      = "q_values";
-  constexpr static auto loss_blob_name          = "loss";
+  static const std::string states_blob_name;
+  static const std::string actions_blob_name;
+  static const std::string targets_blob_name;
+  static const std::string wsample_blob_name;
+  static const std::string q_values_blob_name;
+  static const std::string loss_blob_name;
+
+  static const std::string task_name;
+
+  typedef enum {none, first, all_except_last, all} batch_norm_arch;
+  struct batch_norm_type {
+    batch_norm_arch arch;
+    bool with_scale;
+    bool with_scale_bias;
+    uint max_rank;
+  };
+
+  inline batch_norm_type convertBN(uint bn, uint max_rank) {
+    batch_norm_type r;
+    r.with_scale_bias = bn & (1 << 0);
+    r.with_scale = bn & (1 << 1);
+    r.max_rank = max_rank;
+    if((bn & (1 << 2)) && (bn & (1 << 3)))
+      r.arch = batch_norm_arch::all;
+    else if((bn & (1 << 2)))
+      r.arch = batch_norm_arch::first;
+    else if((bn & (1 << 3)))
+      r.arch = batch_norm_arch::all_except_last;
+    else
+      r.arch = batch_norm_arch::none;
+#ifndef NDEBUG
+    if(r.with_scale_bias)
+      ASSERT(r.with_scale, "try to scale with bias without scaling");
+    if(r.arch == batch_norm_arch::none) {
+      ASSERT(!r.with_scale_bias, "try to scale with bias without bn");
+      ASSERT(!r.with_scale, "try to scale without bn");
+    }
+#endif
+    return r;
+  }
 
   constexpr static auto kStateInputCount = 1;
 
   MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha,
       uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false) :
     size_input_state(input), size_sensors(sensors), size_motors(size_input_state - sensors),
-    kMinibatchSize(_kMinibatchSize), weighted_sample(_weighted_sample) {
+    kMinibatchSize(_kMinibatchSize), weighted_sample(_weighted_sample), hiddens_size(hiddens.size()) {
 
     ASSERT(alpha > 0, "alpha <= 0");
     ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
     ASSERT(hidden_layer_type == 1 || hidden_layer_type == 2, "hidden_layer_type not in (1,2)");
-    ASSERT(batch_norm <= 5, "batch_norm not in {0,...,3}");
+    batch_norm_type bna = convertBN(batch_norm, hiddens.size());
+
 
     caffe::SolverParameter solver_param;
     caffe::NetParameter* net_param = solver_param.mutable_net_param();
@@ -79,15 +114,9 @@ class MLP {
       ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {"state_actions"}, boost::none, 2);
     else
       ConcatLayer(net_param_init, "concat", {states_blob_name}, {"state_actions"}, boost::none, 2);
-    std::string tower_top = Tower(net_param_init, "", "state_actions", hiddens, batch_norm, hidden_layer_type);
-    if(batch_norm ==4) {
-      std::string layer_name2 = "final_bn";
-      BatchNormLayer(net_param_init, layer_name2, {tower_top}, {layer_name2}, boost::none);
-      std::string layer_name3 = "final_sc";
-      tower_top = tower_top+"_sc";
-      ScaleLayer(net_param_init, layer_name3, {layer_name2}, {tower_top}, boost::none, 1);
-    }
-    IPLayer(net_param_init, q_values_layer_name, {tower_top}, {q_values_blob_name}, boost::none, 1);
+    std::string tower_top = Tower(net_param_init, "state_actions", hiddens, bna, hidden_layer_type);
+    BatchNormTower(net_param_init, hiddens.size(), {tower_top}, {tower_top}, boost::none, bna);
+    IPLayer(net_param_init, produce_name("ip", hiddens.size()+1), {tower_top}, {q_values_blob_name}, boost::none, 1);
     if(!weighted_sample)
       EuclideanLossLayer(net_param_init, "loss", {q_values_blob_name, targets_blob_name},
     {loss_blob_name}, boost::none);
@@ -96,6 +125,7 @@ class MLP {
       {loss_blob_name}, boost::none);
     }
 
+//     net_param_init.PrintDebugString();
     net_param->CopyFrom(net_param_init);
 
     solver_param.set_type("Adam");
@@ -115,15 +145,23 @@ class MLP {
 //       LOG_DEBUG("param critic : " <<  neural_net->params().size());
   }
 
+  inline std::string produce_name(const std::string& type, uint rank=0, uint task=0) {
+    return type + std::to_string(rank) + "_layer." + task_name + std::to_string(task);
+  }
+
+//
+// ACTOR POLICY
+//
   MLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize,
       uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false) : size_input_state(sensors),
-    size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize), add_loss_layer(loss_layer) {
+    size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize), add_loss_layer(loss_layer), 
+    hiddens_size(hiddens.size()) {
 
     ASSERT(alpha > 0, "alpha <= 0");
     ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
     ASSERT(hidden_layer_type == 1 || hidden_layer_type == 2, "hidden_layer_type not in (1,2)");
-    ASSERT(batch_norm <= 5, "batch_norm not in {0,...,3}");
+    batch_norm_type bna = convertBN(batch_norm, hiddens.size());
 
     caffe::SolverParameter solver_param;
     caffe::NetParameter* net_param = solver_param.mutable_net_param();
@@ -131,33 +169,38 @@ class MLP {
     caffe::NetParameter net_param_init;
     net_param_init.set_name("Actor");
     net_param_init.set_force_backward(true);
-    MemoryDataLayer(net_param_init, state_input_layer_name, {states_blob_name,"dummy1"},
-                    boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
-    SilenceLayer(net_param_init, "silence", {"dummy1"}, {}, boost::none);
-    std::string tower_top = Tower(net_param_init, "", states_blob_name, hiddens, batch_norm, hidden_layer_type);
-    if(batch_norm ==4) {
-      std::string layer_name2 = "final_bn";
-      BatchNormLayer(net_param_init, layer_name2, {tower_top}, {layer_name2}, boost::none);
-      std::string layer_name3 = "final_sc";
-      tower_top = tower_top+"_sc";
-      ScaleLayer(net_param_init, layer_name3, {layer_name2}, {tower_top}, boost::none, 1);
-    }
+
+    MemoryDataLayer(net_param_init, state_input_layer_name,
+    {states_blob_name, "dummy1"},
+    boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
+    if(!loss_layer)
+      SilenceLayer(net_param_init, "silence", {"dummy1"}, {}, boost::none);
+    std::string tower_top = Tower(net_param_init,
+                                  states_blob_name,
+                                  hiddens, bna, hidden_layer_type);
+    BatchNormTower(net_param_init, hiddens.size(), {tower_top}, {tower_top}, boost::none, bna);
+
+    std::string layer_name = produce_name("ip", hiddens.size()+1);
     if(last_layer_type == 0)
-      IPLayer(net_param_init, "action_layer", {tower_top}, {actions_blob_name}, boost::none, motors);
+      IPLayer(net_param_init, layer_name, {tower_top}, {actions_blob_name}, boost::none, motors);
     else if(last_layer_type == 1) {
-      IPLayer(net_param_init, "action_layer_ip", {tower_top}, {"last_relu"}, boost::none, motors);
-      ReluLayer(net_param_init, "action_layer", {"last_relu"}, {actions_blob_name}, boost::none);
+      IPLayer(net_param_init, layer_name, {tower_top}, {actions_blob_name}, boost::none, motors);
+      ReluLayer(net_param_init, produce_name("func", hiddens.size()+1), {actions_blob_name}, {actions_blob_name},
+                boost::none);
     } else if(last_layer_type == 2) {
-      IPLayer(net_param_init, "action_layer_ip", {tower_top}, {"last_tanh"}, boost::none, motors);
-      TanhLayer(net_param_init, "action_layer", {"last_tanh"}, {actions_blob_name}, boost::none);
+      IPLayer(net_param_init, layer_name, {tower_top}, {actions_blob_name}, boost::none, motors);
+      TanhLayer(net_param_init, produce_name("func", hiddens.size()+1), {actions_blob_name}, {actions_blob_name},
+                boost::none);
     }
     if(loss_layer) {
       MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy2"},
                       boost::none, {kMinibatchSize, 1, size_motors, 1});
+      SilenceLayer(net_param_init, "silence", {"dummy1", "dummy2"}, {}, boost::none);
       EuclideanLossLayer(net_param_init, "loss", {actions_blob_name, targets_blob_name},
       {loss_blob_name}, boost::none);
     }
 
+//     net_param_init.PrintDebugString();
     net_param->CopyFrom(net_param_init);
 
     solver_param.set_type("Adam");
@@ -179,7 +222,7 @@ class MLP {
   MLP(const MLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : size_input_state(
       m.size_input_state), size_sensors(m.size_sensors),
     size_motors(m.size_motors), kMinibatchSize(m.kMinibatchSize), add_loss_layer(m.add_loss_layer),
-    weighted_sample(m.weighted_sample) {
+    weighted_sample(m.weighted_sample), hiddens_size(m.hiddens_size) {
     if(!copy_solver) {
       ASSERT(_phase == ::caffe::Phase::TRAIN, "this constructor is useless");
 
@@ -229,31 +272,6 @@ class MLP {
       increase_batchsize(kMinibatchSize);
   }
 
-//   MLP(const MLP& m, bool _add_loss_layer, bool copy_solver) :
-//     size_input_state(m.size_input_state), size_sensors(m.size_sensors), size_motors(m.size_motors),
-//     kMinibatchSize(m.kMinibatchSize), add_loss_layer(_add_loss_layer), weighted_sample(m.weighted_sample) {
-//     caffe::NetParameter net_param;
-//     m.neural_net->ToProto(&net_param);
-//     net_param.set_force_backward(true);
-//     if(add_loss_layer) {
-//       MemoryDataLayer(net_param, target_input_layer_name, {targets_blob_name,"dummy2"},
-//                       boost::none, {kMinibatchSize, 1, size_motors, 1});
-//       EuclideanLossLayer(net_param, "loss", {actions_blob_name, targets_blob_name},
-//       {loss_blob_name}, boost::none);
-//     }
-//     LOG_ERROR("to be implemented");
-//     exit(1);
-//
-//     //neural_net.reset(new caffe::Net<double>(net_param));
-//     if(copy_solver) {
-//       caffe::SolverParameter solver_param(m.solver->param());
-//       solver_param.mutable_net_param()->CopyFrom(net_param);
-//       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
-//       neural_net = solver->net();
-//     } else
-//       LOG_ERROR("to be implemented");
-//   }
-
  private:
   MLP(const MLP&) {
     LOG_ERROR("should not be called");
@@ -261,9 +279,9 @@ class MLP {
 
  protected:
   MLP(unsigned int _size_input_state, uint _size_sensors, unsigned int _motors, uint _kMinibatchSize, bool loss_layer,
-      bool _weighted_sample) :
+      bool _weighted_sample, uint _hiddens_size) :
     size_input_state(_size_input_state), size_sensors(_size_sensors), size_motors(_motors),
-    kMinibatchSize(_kMinibatchSize), add_loss_layer(loss_layer), weighted_sample(_weighted_sample) {
+    kMinibatchSize(_kMinibatchSize), add_loss_layer(loss_layer), weighted_sample(_weighted_sample), hiddens_size(_hiddens_size) {
   }
 
  public:
@@ -571,6 +589,85 @@ class MLP {
     return solver;
   }
 
+protected:
+  std::string Tower(caffe::NetParameter& np,
+                    const std::string& input_blob_name,
+                    const std::vector<uint>& layer_sizes,
+                    const batch_norm_type& bna,
+                    uint hidden_layer_type,
+                    uint link_struct=0,
+                    uint task=0,
+                    bool avoid_states_input=false) {
+    std::string input_name = input_blob_name;
+    std::string layer_name;
+
+    for (uint i=1; i<layer_sizes.size()+1; ++i) {
+      BatchNormTower(np, i-1, {input_name}, {input_name}, boost::none, bna, task);
+
+      if(link_struct != 0) {
+        std::vector<std::string> bottoms;
+        bottoms.push_back(input_name);
+        uint axis_concat;
+        if(i==1)
+          axis_concat = 2;
+        else
+          axis_concat = 1;
+
+        if(link_struct & (1 << 0)) {
+          if(i==1) {
+            if(!avoid_states_input)
+              bottoms.push_back(states_blob_name+"."+task_name+std::to_string(task-1));
+          } else //if(bottoms.size() == 1)//to be precomputed
+            bottoms.push_back(produce_name("ip", i - 1, task -1));
+        }
+
+        if(link_struct & (1 << 1)) {
+          if(i==1)
+            bottoms.push_back(produce_name("rsh", i, task -1));
+          else
+            bottoms.push_back(produce_name("ip", i, task -1));
+        }
+
+        if(link_struct & (1 << 2)) {
+          if(i==1)
+            bottoms.push_back(produce_name("rsh", i+1, task -1));
+          else
+            bottoms.push_back(produce_name("ip", i+1, task -1));
+        }
+        layer_name = produce_name("cc", i, task);
+        ConcatLayer(np, layer_name, bottoms, {layer_name}, boost::none, axis_concat);
+        input_name = layer_name;
+      }
+
+      layer_name = produce_name("ip", i, task);
+      std::string top_name = produce_name("ip", i, task);
+      IPLayer(np, layer_name, {input_name}, {top_name}, boost::none, layer_sizes[i-1]);
+      layer_name = produce_name("func", i, task);
+      if(hidden_layer_type==1)
+        ReluLayer(np, layer_name, {top_name}, {top_name}, boost::none);
+      else if(hidden_layer_type==2)
+        TanhLayer(np, layer_name, {top_name}, {top_name}, boost::none);
+      else {
+        LOG_ERROR("hidden_layer_type " << hidden_layer_type << "not implemented");
+        exit(1);
+      }
+      input_name = top_name;
+    }
+    return input_name;
+  }
+  
+  int get_layer_index(const std::string& layer_name) {
+    caffe::Net<double>& net = *neural_net;
+    if (!net.has_layer(layer_name)) {
+      return -1;
+    }
+    const std::vector<std::string>& layer_names = net.layer_names();
+    int indx = std::distance(
+      layer_names.begin(),
+                             std::find(layer_names.begin(), layer_names.end(), layer_name));
+    return indx;
+  }
+
   //Network config methods, directly copied from dqn.cpp
   void PopulateLayer(caffe::LayerParameter& layer,
                      const std::string& name, const std::string& type,
@@ -585,17 +682,16 @@ class MLP {
     for (auto& top : tops) {
       layer.add_top(top);
     }
-    // PopulateLayer(layer, name, type, bottoms, tops);
     if (include_phase) {
       layer.add_include()->set_phase(*include_phase);
     }
   }
   void ReshapeLayer(caffe::NetParameter& net_param,
-                   const std::string& name,
-                   const std::vector<std::string>& bottoms,
-                   const std::vector<std::string>& tops,
-                   const boost::optional<caffe::Phase>& include_phase,
-                   const std::vector<uint>& _shape) {
+                    const std::string& name,
+                    const std::vector<std::string>& bottoms,
+                    const std::vector<std::string>& tops,
+                    const boost::optional<caffe::Phase>& include_phase,
+                    const std::vector<uint>& _shape) {
     caffe::LayerParameter& layer = *net_param.add_layer();
     PopulateLayer(layer, name, "Reshape", bottoms, tops, include_phase);
     caffe::ReshapeParameter* reshape_param = layer.mutable_reshape_param();
@@ -715,65 +811,24 @@ class MLP {
     param->set_axis(axis);
   }
 
+  void BatchNormTower(caffe::NetParameter& net_param,
+                      uint rank,
+                      const std::vector<std::string>& bottoms,
+                      const std::vector<std::string>& tops,
+                      const boost::optional<caffe::Phase>& include_phase,
+                      const batch_norm_type& bna,
+                      uint task=0) {
+    if(bna.arch == batch_norm_arch::none ||
+        (bna.arch == batch_norm_arch::first && rank > 0) ||
+        (bna.arch == batch_norm_arch::all_except_last && rank >= bna.max_rank ))
+      return;
 
-  std::string Tower(caffe::NetParameter& np,
-                    const std::string& layer_prefix,
-                    const std::string& input_blob_name,
-                    const std::vector<uint>& layer_sizes,
-                    uint batch_norm, uint hidden_layer_type, 
-                    uint link_struct=0) {
-    std::string input_name = input_blob_name;
-    for (uint i=1; i<layer_sizes.size()+1; ++i) {
-      if(link_struct != 0){
-        std::string top = input_name +"_after_concat";
-        std::vector<std::string> bottoms;
-        bottoms.push_back(input_name);
-        if(link_struct & (1 << 0)) {
-          std::string states_blob_name_old = std::string(input_name);
-          states_blob_name_old.replace(states_blob_name_old.end()-4, states_blob_name_old.end(), "_old");
-          
-          bottoms.push_back(states_blob_name_old);
-        }
-        if(link_struct & (1 << 1)) {
-          ReshapeLayer(np, "rshtest", {"ip1"}, {"ip1_rs"}, boost::none, {1,1,20,1});
-          bottoms.push_back("ip1_rs");
-        }
-        if(link_struct & (1 << 2)) {
-          ReshapeLayer(np, "rshtest2", {"ip2"}, {"ip2_rs"}, boost::none, {1,1,10,1});
-          bottoms.push_back("ip2_rs");
-        }
-        ConcatLayer(np, "concat_tower_"+std::to_string(i), bottoms, {top}, boost::none, 2);
-        input_name = top;
-      }
-      
-      if(batch_norm == 1 || batch_norm == 3 || (batch_norm == 5 && i ==1)) {
-        std::string layer_name2 = layer_prefix + "bn" + std::to_string(i);
-        BatchNormLayer(np, layer_name2, {input_name}, {layer_name2}, boost::none);
-        std::string layer_name3 = layer_prefix + "sc" + std::to_string(i);
-        input_name = input_name+"_sc";
-        ScaleLayer(np, layer_name3, {layer_name2}, {input_name}, boost::none, batch_norm);
-      } else if(batch_norm == 2) {
-        std::string input_name2 = input_name+"_bn";
-        std::string layer_name2 = layer_prefix + "bn" + std::to_string(i);
-        BatchNormLayer(np, layer_name2, {input_name}, {input_name2}, boost::none);
-        input_name = input_name2;
-      }
-
-      std::string layer_name = layer_prefix + "ip" + std::to_string(i) + "_layer";
-      std::string top_name = layer_prefix + "ip" + std::to_string(i);
-      IPLayer(np, layer_name, {input_name}, {top_name}, boost::none, layer_sizes[i-1]);
-      layer_name = layer_prefix + "ip" + std::to_string(i) + "_relu_layer";
-      if(hidden_layer_type==1)
-        ReluLayer(np, layer_name, {top_name}, {top_name}, boost::none);
-      else if(hidden_layer_type==2)
-        TanhLayer(np, layer_name, {top_name}, {top_name}, boost::none);
-      else {
-        LOG_ERROR("hidden_layer_type " << hidden_layer_type << "not implemented");
-        exit(1);
-      }
-      input_name = top_name;
+    std::string layer_name = produce_name("bn", rank, task);
+    BatchNormLayer(net_param, layer_name, bottoms, tops, include_phase);
+    if(bna.with_scale) {
+      layer_name = produce_name("sc", rank, task);
+      ScaleLayer(net_param, layer_name, tops, tops, include_phase, bna);
     }
-    return input_name;
   }
 
   void BatchNormLayer(caffe::NetParameter& net_param,
@@ -793,14 +848,15 @@ class MLP {
                   const std::vector<std::string>& bottoms,
                   const std::vector<std::string>& tops,
                   const boost::optional<caffe::Phase>& include_phase,
-                  uint batch_norm
+                  const batch_norm_type& bna
                  ) {
     caffe::LayerParameter& layer = *net_param.add_layer();
-    if(batch_norm == 3)
+    if(bna.with_scale_bias)
       layer.mutable_scale_param()->set_bias_term(true);
     PopulateLayer(layer, name, "Scale", bottoms, tops, include_phase);
   }
 
+public:
   void InputDataIntoLayers(double* states_input, double* actions_input, double* target_input) {
     caffe::Net<double>& net = *neural_net;
     if (states_input != NULL) {
@@ -861,16 +917,22 @@ class MLP {
     }
   }
 
-  int GetLayerIndex(const std::string& layer_name) {
-    caffe::Net<double>& net = *neural_net;
-    if (!net.has_layer(layer_name)) {
-      return -1;
-    }
-    const std::vector<std::string>& layer_names = net.layer_names();
-    int indx = std::distance(
-                 layer_names.begin(),
-                 std::find(layer_names.begin(), layer_names.end(), layer_name));
-    return indx;
+  void critic_backward(){
+    int layer = get_layer_index(produce_name("ip", hiddens_size+1));
+    
+    ASSERT(layer != -1 , "failed to found layer for backward");
+    
+    neural_net->BackwardFrom(layer);
+  }
+  
+  void actor_backward() {
+    int layer = get_layer_index(produce_name("func", hiddens_size+1));//try func
+    if(layer == -1)//if there is no activation function
+      layer = get_layer_index(produce_name("ip", hiddens_size+1));
+    
+    ASSERT(layer != -1 , "failed to found layer for backward");
+    
+    neural_net->BackwardFrom(layer);
   }
 
   void save(const std::string& path) {
@@ -894,8 +956,10 @@ class MLP {
   uint kMinibatchSize;
   bool add_loss_layer=false;
   bool weighted_sample;
+  uint hiddens_size;
 };
 
 #endif  // MLP_HPP
+
 
 

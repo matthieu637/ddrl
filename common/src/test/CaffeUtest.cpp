@@ -431,8 +431,8 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
           q_values_diff[q_values_blob->offset(i,0,0,0)] = -1.0f;
           q_values_diff2[q_values_blob2->offset(i,0,0,0)] = -1.0f;
         }
-        nn.getNN()->BackwardFrom(nn.GetLayerIndex(MLP::q_values_layer_name));
-        nn_test.getNN()->BackwardFrom(nn_test.GetLayerIndex(MLP::q_values_layer_name));
+        nn.critic_backward();
+        nn_test.critic_backward();
         const auto critic_action_blob = nn.getNN()->blob_by_name(MLP::actions_blob_name);
         const auto critic_action_blob2 = nn_test.getNN()->blob_by_name(MLP::actions_blob_name);
 
@@ -451,13 +451,13 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
         // Transfer input-level diffs from Critic to Actor
         const auto actor_actions_blob = actor.getNN()->blob_by_name(MLP::actions_blob_name);
         actor_actions_blob->ShareDiff(*critic_action_blob);
-        actor.getNN()->BackwardFrom(actor.GetLayerIndex("action_layer"));
+        actor.actor_backward();
         actor.getSolver()->ApplyUpdate();
         actor.getSolver()->set_iter(actor.getSolver()->iter() + 1);
 
         const auto actor_actions_blob2 = actor_test.getNN()->blob_by_name(MLP::actions_blob_name);
         actor_actions_blob2->ShareDiff(*critic_action_blob2);
-        actor_test.getNN()->BackwardFrom(actor_test.GetLayerIndex("action_layer"));
+        actor_test.actor_backward();
         actor_test.getSolver()->ApplyUpdate();
         actor_test.getSolver()->set_iter(actor_test.getSolver()->iter() + 1);
 

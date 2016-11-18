@@ -119,6 +119,11 @@ class AAgent : public ProgOptions, public CommonAE {
     LOG_ERROR("not implemented");
     exit(1);
   }
+  
+  virtual void restoreBest() {
+    LOG_ERROR("restoreBest() not implemented");
+  }
+  
  protected:
   /**
   * @brief Called only at the creation of the agent.
