@@ -182,9 +182,13 @@ class AdvancedAcrobotEnv : public arch::AEnvironment<> {
     instance->step(actuators, current_step, max_step_per_instance);
   }
 
-  void _next_instance() {
+  void _next_instance() override {
     instance->resetPositions();
     problem->reset();
+  }
+  
+  void _reset_episode() override {
+    _next_instance();
   }
 
  private:
