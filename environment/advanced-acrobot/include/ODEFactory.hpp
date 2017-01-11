@@ -31,7 +31,7 @@ class ODEFactory : public bib::Singleton<ODEFactory> {
                           double radius, double density,
                           bool linkBody = true);
 
-  ODEWorld createWorld();
+  ODEWorld createWorld(bool approx=true);
   void destroyWorld(const ODEWorld &);
 
   Mutex &wannaStep();

@@ -99,6 +99,8 @@ HalfCheetahWorld::HalfCheetahWorld(hcheetah_physics _phy) : odeworld(ODEFactory:
     internal_state.resize(18 - 4);
   else if(phy.predev == 2 || phy.predev == 11)
     internal_state.resize(18);
+  else if(phy.predev == 3 || phy.predev == 12)
+    internal_state.resize(18);
 
   update_state();
 }
@@ -407,13 +409,13 @@ void nearCallbackHalfCheetah(void* data, dGeomID o1, dGeomID o2) {
 
 void HalfCheetahWorld::step(const vector<double>& _motors) {
   std::vector<double> motors(_motors);
-  if(phy.predev == 1 || phy.predev == 2) {
+  if(phy.predev == 1 || phy.predev == 2 || phy.predev == 3) {
     motors.resize(6);
     motors[2] = 0;
     motors[3] = _motors[2];
     motors[4] = _motors[3];
     motors[5] = 0;
-  } else if (phy.predev == 10 || phy.predev == 11) {
+  } else if (phy.predev == 10 || phy.predev == 11 || phy.predev == 12) {
     motors.resize(6);
     motors[1] = 0;
     motors[2] = _motors[1];
@@ -422,12 +424,12 @@ void HalfCheetahWorld::step(const vector<double>& _motors) {
     motors[5] = _motors[3];
   }
   
-  if(phy.from_predev == 1 || phy.from_predev == 2){
+  if(phy.from_predev == 1 || phy.from_predev == 2 || phy.from_predev == 3){
     motors[2] = _motors[4];
     motors[3] = _motors[2];
     motors[4] = _motors[3];
 //     motors[5] = _motors[5];
-  } else if(phy.from_predev == 10 || phy.from_predev == 11){
+  } else if(phy.from_predev == 10 || phy.from_predev == 11 || phy.from_predev == 12){
     motors[1] = _motors[4];
     motors[2] = _motors[1];
     motors[3] = _motors[2];
@@ -575,9 +577,21 @@ void HalfCheetahWorld::update_state() {
 
   ASSERT(substate.size() == 18, "wrong indices");
 
-  if((phy.from_predev == 0 && (phy.predev == 0 || phy.predev == 2 || phy.predev == 11)) ||
-    phy.from_predev == 2 || phy.from_predev == 11) {
+  if((phy.from_predev == 0 && (phy.predev == 0 || phy.predev == 2 || phy.predev == 11 || phy.predev == 3 || phy.predev == 12)) ||
+    phy.from_predev == 2 || phy.from_predev == 11 || phy.from_predev == 3 || phy.from_predev == 12) {
     std::copy(substate.begin(), substate.end(), internal_state.begin());
+  
+    if(phy.predev == 3){
+      internal_state[17] = 0.0f;
+      internal_state[14] = 0.0f;
+      internal_state[8]  = 0.0f;
+      internal_state[5]  = 0.0f;
+    } else if(phy.predev == 12){
+      internal_state[16] = 0.0f;
+      internal_state[13] = 0.0f;
+      internal_state[7]  = 0.0f;
+      internal_state[4]  = 0.0f;
+    }
   } else {
     std::list<uint> later;
 

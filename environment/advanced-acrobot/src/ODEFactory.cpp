@@ -6,7 +6,7 @@ ODEFactory::ODEFactory() {
   dInitODE2(0);
 }
 
-ODEWorld ODEFactory::createWorld() {
+ODEWorld ODEFactory::createWorld(bool approx) {
   Mutex::scoped_lock lock(mutex);  // acquire
   //     LOG_DEBUG("call for create");
   //     dAllocateODEDataForThread(dAllocateFlagCollisionData);
@@ -14,7 +14,10 @@ ODEWorld ODEFactory::createWorld() {
   ODEWorld world;
   world.world_id = dWorldCreate();
 
-  world.space_id = dHashSpaceCreate(0);
+  if(approx)
+    world.space_id = dHashSpaceCreate(0);
+  else
+    world.space_id = dSimpleSpaceCreate(0);
   //     dSpaceSetManualCleanup(world.space_id, 0);
 
   world.contactgroup = dJointGroupCreate(0);

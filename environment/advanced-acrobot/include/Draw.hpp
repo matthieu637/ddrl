@@ -21,7 +21,7 @@ class Draw {
 //   static std::list<dGeomID> *geoms;
   static std::vector<ODEObject *>* geoms;
 
-  static void drawGeom(dGeomID g, const dReal *pos, const dReal *R);
+  static void drawGeom(dGeomID g);
 
   static void drawLoop(int);
 };

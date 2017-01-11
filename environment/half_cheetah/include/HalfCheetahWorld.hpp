@@ -30,9 +30,10 @@ struct hcheetah_physics{
   uint from_predev;
 //   PREDEV: 1 -> two low joint
 //           10 -> two middle joints
-//   +0 -> PD controller init pos
-//   +1 (2/11) -> keep sensors
-//   
+//   +0 (1/10) -> PD controller init pos (sensors removed)
+//   +1 (2/11) -> PD controller init pos (keep sensors)
+//   +2 (3/12) -> PD controller init pos (keep sensors but setted to 0)
+  
 };
 
 class HalfCheetahWorld {

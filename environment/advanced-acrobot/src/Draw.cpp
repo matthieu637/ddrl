@@ -5,11 +5,12 @@
 
 std::vector<ODEObject *> *Draw::geoms = nullptr;
 
-void Draw::drawGeom(dGeomID g, const dReal *pos, const dReal *R) {
+void Draw::drawGeom(dGeomID g) {
   if (!g) return;
-  if (!pos) pos = dGeomGetPosition(g);
-  if (!R) R = dGeomGetRotation(g);
-
+  
+  const dReal *pos = dGeomGetPosition(g);
+  const dReal *R = dGeomGetRotation(g);
+  
   int type = dGeomGetClass(g);
   if (type == dBoxClass) {
     dVector3 sides;
@@ -65,7 +66,7 @@ void Draw::drawLoop(int) {
         dsSetColor(0.7, 0.7, 0.4);
         dsSetTexture(DS_WOOD);
       }
-      drawGeom((*it)->getGeom(), 0, 0);
+      drawGeom((*it)->getGeom());
     }
   }
 }
