@@ -18,7 +18,6 @@ struct hcheetah_physics{
   uint approx;
   uint damping;
   uint control;
-  uint reward;
   double mu;
   double mu2;
   double soft_cfm;
@@ -33,7 +32,8 @@ struct hcheetah_physics{
 //   +0 (1/10) -> PD controller init pos (sensors removed)
 //   +1 (2/11) -> PD controller init pos (keep sensors)
 //   +2 (3/12) -> PD controller init pos (keep sensors but setted to 0)
-  
+  bool lower_rigid; //computed
+  bool higher_rigid;
 };
 
 class HalfCheetahWorld {

@@ -46,7 +46,6 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
     init.damping = pt->get<uint>("environment.damping");
     init.approx = pt->get<uint>("environment.approx");
     init.control = pt->get<uint>("environment.control");
-    init.reward = pt->get<uint>("environment.reward");
     init.mu = pt->get<double>("environment.mu");
     init.mu2 = pt->get<double>("environment.mu2");
     init.soft_cfm = pt->get<double>("environment.soft_cfm");
@@ -68,6 +67,9 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
     }
     
     ASSERT(init.predev == 0 || init.from_predev ==0, "for now only one dev");
+    
+    init.lower_rigid = init.control == 1 && init.predev >= 1 && init.predev <= 9;
+    init.higher_rigid = init.control == 1 && init.predev >= 10;
 
     if (visible)
       instance = new HalfCheetahWorldView("data/textures", init);
