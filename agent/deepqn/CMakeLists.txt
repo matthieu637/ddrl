@@ -31,6 +31,10 @@ target_link_libraries(ada-nfac
 add_executable(cartpole src/test/Cartpole.cpp ${all_include} ${all_sources} )
 target_link_libraries(cartpole 
   ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  
+add_executable(half-cheetah-dpmt src/test/DpmtHalfCheetah.cpp ${all_include} ${all_sources} )
+target_link_libraries(half-cheetah-dpmt 
+  ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
 
 add_executable(cp-nfac src/test/NFACCp.cpp ${all_include} ${all_sources} )
 target_link_libraries(cp-nfac

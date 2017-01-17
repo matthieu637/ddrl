@@ -11,6 +11,7 @@
 #include <boost/serialization/deque.hpp>
 
 #include "nn/MLP.hpp"
+#include "nn/DevMLP.hpp"
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
@@ -84,6 +85,7 @@ typedef struct _sample {
 
 } sample;
 
+template<typename NN = MLP>
 class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
  public:
   typedef MLP PolicyImpl;
@@ -182,13 +184,20 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
 #endif
     
-    qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm_critic);
+    qnn = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm_critic);
+    if(std::is_same<NN, DevMLP>::value)
+      qnn->exploit(pt, static_cast<DeepQNAg *>(old_ag)->qnn);
+    
     if(test_net)
       qnn_target = new MLP(*qnn, false);
     else
       qnn_target = new MLP(*qnn, true);
 
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm_actor);
+    
+    ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm_actor);
+    if(std::is_same<NN, DevMLP>::value)
+      ann->exploit(pt, static_cast<DeepQNAg *>(old_ag)->ann);
+    
     if(test_net)
       ann_target = new MLP(*ann, false);
     else
@@ -354,7 +363,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
   
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
-        return new arch::Policy<MLP>(new MLP(*ann, true) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
+    return new arch::Policy<MLP>(new MLP(*ann, true) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
   }
 
   void save(const std::string& path, bool) override {
