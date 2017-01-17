@@ -236,8 +236,10 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       to_be_restaured_ann = new MLP(*ann, false);
     }
   }
-  
+#endif
+
   void end_instance(bool learning) override {
+#ifdef POOL_FOR_TESTING
     if(!learning && best_pol_population.size() > 0){
       //restore ann
       ann = to_be_restaured_ann;
@@ -259,8 +261,33 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       } else
         delete to_be_restaured_ann;
     }
-  }
 #endif
+
+    if(!learning){
+      MLP* cann = new MLP(*ann, false);
+      MLP* cqnn = new MLP(*qnn, false);
+      best_population.insert({cann, cqnn, sum_weighted_reward});
+      
+      if(best_population.size() > 50){
+        //remove smallest
+        auto it = best_population.end();
+        --it;
+        delete it->ann;
+        delete it->qnn;
+        best_population.erase(it);
+      }
+    }
+  }
+  
+  void restoreBest() override {
+    delete ann;
+    delete qnn;
+    
+    auto it = best_population.begin();
+//     ++it;
+    ann = new MLP(*best_population.begin()->ann, false);
+    qnn = new MLP(*best_population.begin()->qnn, false);
+  }
   
   void end_episode() override {
     if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
@@ -429,7 +456,18 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
   std::deque<sample> trajectory;
   std::vector<sample> last_trajectory;
-
+  
+  struct my_pol_dpmt{
+    MLP* ann;
+    MLP* qnn;
+    double J;
+    
+    bool operator< (const my_pol_dpmt& b) const {
+      return J > b.J;
+    }
+  };
+  std::multiset<my_pol_dpmt> best_population;
+  
 #ifdef POOL_FOR_TESTING  
   struct my_pol{
     MLP* ann;
