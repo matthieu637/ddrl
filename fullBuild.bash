@@ -5,6 +5,7 @@ OUTSIDE_PATH="eclipse"
 LIB=$(dirname "${BASH_SOURCE[0]}")
 cd $LIB
 
+. scripts/os.bash
 . scripts/cpu.bash
 #check cmake if installed
 . scripts/check_program.bash
@@ -93,7 +94,7 @@ function buildDir(){
         fi
 
         here=`pwd`
-        for subdir in $(find $dir/ -name 'CMakeLists.txt' -printf '%h\n' | sort -n | grep -v old) ; do
+        for subdir in $($FIND $dir/ -name 'CMakeLists.txt' -printf '%h\n' | sort -n | grep -v old) ; do
 		
                 cd $here/$subdir
 
@@ -173,7 +174,7 @@ function buildDirOutside(){
         fi
 
         here=`pwd`
-        for subdir in $(find $dir/ -name 'CMakeLists.txt' -printf '%h\n') ; do
+        for subdir in $($FIND $dir/ -name 'CMakeLists.txt' -printf '%h\n') ; do
 		#echo "init subdir $subdir"
 		linkdepth=`echo "$subdir" | sed -e 's/^\(\([.][.]\/\)*\).*$/\1/'`
 		rsubdir="$subdir"
@@ -231,7 +232,7 @@ function buildDirOutside(){
 
 
 function merge_report(){
-	find . -name 'build.log' -type f | xargs cat > build_report.log
+	$FIND . -name 'build.log' -type f | xargs cat > build_report.log
 }
 
 function outside_prepare(){
