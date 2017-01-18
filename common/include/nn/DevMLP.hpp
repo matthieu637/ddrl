@@ -10,7 +10,7 @@
 
 //DEBUG_DEVNN : to check if the output is really the same as the previous net
 // #define DEBUG_DEVNN
-//DEBUG_DEVNN_STOP : only print 
+//DEBUG_DEVNN_STOP : only print
 // #define DEBUG_DEVNN_STOP
 
 #ifndef DEBUG_DEVNN
@@ -22,14 +22,14 @@ class DevMLP : public MLP {
 
   DevMLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha,
          uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false) :
-        MLP(input, sensors, input-sensors, _kMinibatchSize, false, _weighted_sample, hiddens.size()), policy(false) {
+    MLP(input, sensors, input-sensors, _kMinibatchSize, false, _weighted_sample, hiddens.size()), policy(false) {
     c = new constructor({hiddens, alpha, decay_v, hidden_layer_type, batch_norm, 0});
   }
 
 //   policy
   DevMLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize,
          uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false) :
-        MLP(sensors, sensors, motors, _kMinibatchSize, loss_layer, false, hiddens.size()), policy(true) {
+    MLP(sensors, sensors, motors, _kMinibatchSize, loss_layer, false, hiddens.size()), policy(true) {
     c = new constructor({hiddens, alpha, -1, hidden_layer_type, batch_norm, last_layer_type});
 
   }
@@ -47,6 +47,12 @@ class DevMLP : public MLP {
     double init_multiplier = pt->get<double>("devnn.init_multiplier");
     bool start_same = pt->get<bool>("devnn.start_same");
     uint link_structure = pt->get<uint>("devnn.link_structure");
+    
+    if(link_structure == 8 && start_same){
+      LOG_ERROR("if link_structure == 8 then start_same should be false");
+      exit(1);
+    }
+    
 #ifdef DEBUG_DEVNN
     _old = old;
     init_multiplier = 0;
@@ -131,10 +137,11 @@ class DevMLP : public MLP {
 //       string actions_blob_name_old = net_param_old.layer(layer_index).top(0)+".task0";
       string actions_blob_name_new = net_param_old.layer(layer_index).top(0)+"."+task_name+std::to_string(task);
       lp->set_top(0, lp->name());
+      
 
       std::string layer_name;
       ASSERT(old_hiddens.size() == c->hiddens.size(), "failed fusion ");
-      if(link_structure != 0) {
+      if(link_structure <= 7) {
 //         for(uint i=1; i<=old_hiddens.size(); i++) {
         uint i = 1;
         if(link_structure & (1 << 1) && i==1 ) {
@@ -146,29 +153,54 @@ class DevMLP : public MLP {
           ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i + 1, task - 1)}, {layer_name}, boost::none, {1,1,old_hiddens[i],1});
         }
 //         }
+      } else {
+        std::vector<std::string> to_be_cc = {states_blob_name_new};
+        to_be_cc.push_back(states_blob_name_old);
+        for(uint i=1; i < old_hiddens.size() + 2; i++) {
+          layer_name = produce_name("rsh", i, task - 1);
+
+          if(i - 1 < old_hiddens.size())
+            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {1,1,old_hiddens[i-1],1});
+          else
+            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {1,1,old->size_motors,1});
+
+          to_be_cc.push_back(layer_name);
+        }
+        layer_name = produce_name("cc", 1, task);
+        ConcatLayer(net_param_init, layer_name, to_be_cc, {layer_name}, boost::none, 2);
+        states_blob_name_new = layer_name;
       }
 
       batch_norm_type bna = convertBN(c->batch_norm, c->hiddens.size());
       //produce new net
       std::string tower_top = Tower(net_param_init, states_blob_name_new, c->hiddens, bna,
-                                    c->hidden_layer_type, link_structure, task, old->size_sensors == size_sensors);
+                                    c->hidden_layer_type, link_structure == 8 ? 0 : link_structure,
+                                    task, old->size_sensors == size_sensors);
       BatchNormTower(net_param_init, c->hiddens.size(), {tower_top}, {tower_top}, boost::none, bna, task);
-      //concat everything
-      std::vector<std::string> to_be_cc = {produce_name("ip", old_hiddens.size()+1, task-1), tower_top};
-      if(link_structure & (1 << 0)) {
-        to_be_cc.push_back(produce_name("ip", old_hiddens.size(), task-1));
+
+      std::vector<std::string> final_layer;
+      if(! (link_structure & (1 << 3))) { // link_structure in [0 ; 7]
+        //concat everything
+        std::vector<std::string> to_be_cc = {produce_name("ip", old_hiddens.size()+1, task-1), tower_top};
+        if(link_structure & (1 << 0)) {
+          to_be_cc.push_back(produce_name("ip", old_hiddens.size(), task-1));
+        }
+
+        ConcatLayer(net_param_init, "concat_last_layers", to_be_cc, {actions_blob_name_new}, boost::none, 1);
+        final_layer.push_back(actions_blob_name_new);
+      } else { // link_structure == 8
+        final_layer.push_back(produce_name("ip", c->hiddens.size(), task));
       }
-      ConcatLayer(net_param_init, "concat_last_layers", to_be_cc, {actions_blob_name_new}, boost::none, 1);
 
       layer_name = produce_name("ip", c->hiddens.size()+1, task);
       if(c->last_layer_type == 0)
-        IPLayer(net_param_init, layer_name, {actions_blob_name_new}, {actions_blob_name}, boost::none, size_motors);
+        IPLayer(net_param_init, layer_name, final_layer, {actions_blob_name}, boost::none, size_motors);
       else if(c->last_layer_type == 1) {
-        IPLayer(net_param_init, layer_name, {actions_blob_name_new}, {actions_blob_name}, boost::none, size_motors);
+        IPLayer(net_param_init, layer_name, final_layer, {actions_blob_name}, boost::none, size_motors);
         ReluLayer(net_param_init, produce_name("ip_func", c->hiddens.size()+1, task), {actions_blob_name}, {actions_blob_name},
                   boost::none);
       } else if(c->last_layer_type == 2) {
-        IPLayer(net_param_init, layer_name, {actions_blob_name_new}, {actions_blob_name}, boost::none, size_motors);
+        IPLayer(net_param_init, layer_name, final_layer, {actions_blob_name}, boost::none, size_motors);
         TanhLayer(net_param_init, produce_name("ip_func", c->hiddens.size()+1, task), {actions_blob_name}, {actions_blob_name},
                   boost::none);
       }

@@ -145,7 +145,7 @@ void HalfCheetahWorld::createWorld() {
 //   dWorldSetERP(odeworld.world_id, 1.);
 
 //   <compiler inertiafromgeom='true' coordinate='local' angle='radian' settotalmass='14' />
-  double density = 593.578f;//so total mass is 14
+  double density = 660.9f;//so total mass is 14
 
   //   <joint limited='true' damping='.01' armature='.1' stiffness='8' solreflimit='.02 1' solimplimit='0 .8 .03' />
 //   dWorldSetLinearDamping(odeworld.world_id, .01);
@@ -227,22 +227,31 @@ void HalfCheetahWorld::createWorld() {
   apply_armature(&m_bthigh, 0.1);
   dBodySetMass(bthigh, &m_bthigh);
 
-  //   <body name='bshin' pos='.16 0 -.25'>
-  dBodyID bshin = dBodyCreate(odeworld.world_id);
-  dBodySetPosition(bshin, .16 -.5, 0., -.25 + 0.7);
+  dBodyID bshin = nullptr;
+  dJointID j_bshin = nullptr;
+  if(!phy.higher_rigid){
+    //   <body name='bshin' pos='.16 0 -.25'>
+    bshin = dBodyCreate(odeworld.world_id);
+    dBodySetPosition(bshin, .16 -.5, 0., -.25 + 0.7);
 
-  //   <joint name='bshin' type='hinge' pos='0 0 0' axis='0 1 0' range='-.785 .785' stiffness='180' damping='4.5' />
-  dJointID j_bshin = dJointCreateHinge(odeworld.world_id, nullptr);
-  dJointAttach(j_bshin, bshin, bthigh);
-  dJointSetHingeAxis(j_bshin, 0, 1, 0);
-  dJointSetHingeParam(j_bshin, dParamLoStop, -.785);
-  dJointSetHingeParam(j_bshin, dParamHiStop, .785);
-  apply_damping(bshin, 4.5);
+    //   <joint name='bshin' type='hinge' pos='0 0 0' axis='0 1 0' range='-.785 .785' stiffness='180' damping='4.5' />
+    j_bshin = dJointCreateHinge(odeworld.world_id, nullptr);
+    dJointAttach(j_bshin, bshin, bthigh);
+    dJointSetHingeAxis(j_bshin, 0, 1, 0);
+    dJointSetHingeParam(j_bshin, dParamLoStop, -.785);
+    dJointSetHingeParam(j_bshin, dParamHiStop, .785);
+    apply_damping(bshin, 4.5);
+  }
 
   //   <geom name='bshin' type='capsule' pos='-.14 0 -.07' axisangle='0 1 0 -2.03' size='0.046 .15' rgba='0.9 0.6 0.6 1' />
   dGeomID g_bshin = dCreateCapsule(odeworld.space_id, radius, .15*length_multiplier);
-  dGeomSetBody(g_bshin, bshin);
-  dGeomSetOffsetPosition(g_bshin, -.14, 0, -.07);
+  if(!phy.higher_rigid){
+    dGeomSetBody(g_bshin, bshin);
+    dGeomSetOffsetPosition(g_bshin, -.14, 0, -.07);
+  } else {
+    dGeomSetBody(g_bshin, bthigh);
+    dGeomSetOffsetPosition(g_bshin, -.14 + .16, 0, -.07 -.25);
+  }
   dMatrix3 R_bshin;
   dRFromAxisAndAngle(R_bshin, 0, 1, 0, -2.03);
   dGeomSetOffsetRotation(g_bshin, R_bshin);
@@ -250,24 +259,41 @@ void HalfCheetahWorld::createWorld() {
   dMass m_bshin;
   dMassSetCapsule(&m_bshin, density, 3, radius, .15*length_multiplier);
   apply_armature(&m_bshin, 0.1);
-  dBodySetMass(bshin, &m_bshin);
+  if(!phy.higher_rigid)
+    dBodySetMass(bshin, &m_bshin);
+  else {
+    dMassAdd(&m_bthigh, &m_bshin);
+    dBodySetMass(bthigh, &m_bthigh);
+  }
 
   //   <body name='bfoot' pos='-.28 0 -.14'>
-  dBodyID bfoot = dBodyCreate(odeworld.world_id);
-  dBodySetPosition(bfoot, .16 -.5 -.28, 0., -.25 + 0.7 -.14);
+  dBodyID bfoot = nullptr;
+  dJointID j_bfoot = nullptr;
+  if(!phy.lower_rigid) {
+    bfoot = dBodyCreate(odeworld.world_id);
+    dBodySetPosition(bfoot, .16 -.5 -.28, 0., -.25 + 0.7 -.14);
 
-  //   <joint name='bfoot' type='hinge' pos='0 0 0' axis='0 1 0' range='-.4 .785' stiffness='120' damping='3' />
-  dJointID j_bfoot = dJointCreateHinge(odeworld.world_id, nullptr);
-  dJointAttach(j_bfoot, bfoot, bshin);
-  dJointSetHingeAxis(j_bfoot, 0, 1, 0);
-  dJointSetHingeParam(j_bfoot, dParamLoStop, -.4);
-  dJointSetHingeParam(j_bfoot, dParamHiStop, .785);
-  apply_damping(bfoot, 3.);
-
+    //   <joint name='bfoot' type='hinge' pos='0 0 0' axis='0 1 0' range='-.4 .785' stiffness='120' damping='3' />
+    j_bfoot = dJointCreateHinge(odeworld.world_id, nullptr);
+    if(!phy.higher_rigid)
+      dJointAttach(j_bfoot, bfoot, bshin);
+    else
+      dJointAttach(j_bfoot, bfoot, bthigh);
+      
+    dJointSetHingeAxis(j_bfoot, 0, 1, 0);
+    dJointSetHingeParam(j_bfoot, dParamLoStop, -.4);
+    dJointSetHingeParam(j_bfoot, dParamHiStop, .785);
+    apply_damping(bfoot, 3.);
+  }
   //   <geom name='bfoot' type='capsule' pos='.03 0 -.097' axisangle='0 1 0 -.27' size='0.046 .094' rgba='0.9 0.6 0.6 1' />
   dGeomID g_bfoot = dCreateCapsule(odeworld.space_id, radius, .094*length_multiplier);
-  dGeomSetBody(g_bfoot, bfoot);
-  dGeomSetOffsetPosition(g_bfoot, .03, 0, -.097);
+  if(!phy.lower_rigid) {
+    dGeomSetBody(g_bfoot, bfoot);
+    dGeomSetOffsetPosition(g_bfoot, .03, 0, -.097);
+  } else {
+    dGeomSetBody(g_bfoot, bshin);
+    dGeomSetOffsetPosition(g_bfoot, .03 -.28 , 0, -.097 -.14);
+  }
   dMatrix3 R_bfoot;
   dRFromAxisAndAngle(R_bfoot, 0, 1, 0, -.27);
   dGeomSetOffsetRotation(g_bfoot, R_bfoot);
@@ -275,7 +301,13 @@ void HalfCheetahWorld::createWorld() {
   dMass m_bfoot;
   dMassSetCapsule(&m_bfoot, density, 3, radius, .094*length_multiplier);
   apply_armature(&m_bfoot, 0.1);
-  dBodySetMass(bfoot, &m_bfoot);
+
+  if(!phy.lower_rigid) {
+    dBodySetMass(bfoot, &m_bfoot);
+  } else {
+    dMassAdd(&m_bshin, &m_bfoot);
+    dBodySetMass(bshin, &m_bshin);
+  }
 
   //   <body name='fthigh' pos='.5 0 0'>
   dBodyID fthigh = dBodyCreate(odeworld.world_id);
@@ -302,22 +334,31 @@ void HalfCheetahWorld::createWorld() {
   apply_armature(&m_fthigh, 0.1);
   dBodySetMass(fthigh, &m_fthigh);
 
-  //   <body name='fshin' pos='-.14 0 -.24'>
-  dBodyID fshin = dBodyCreate(odeworld.world_id);
-  dBodySetPosition(fshin, .5 -.14, 0, 0.7 -.24);
+  dBodyID fshin = nullptr;
+  dJointID j_fshin = nullptr;
+  if(!phy.higher_rigid) {
+    //   <body name='fshin' pos='-.14 0 -.24'>
+    fshin = dBodyCreate(odeworld.world_id);
+    dBodySetPosition(fshin, .5 -.14, 0, 0.7 -.24);
 
-  //   <joint name='fshin' type='hinge' pos='0 0 0' axis='0 1 0' range='-1.2 .87' stiffness='120' damping='3' />
-  dJointID j_fshin = dJointCreateHinge(odeworld.world_id, nullptr);
-  dJointAttach(j_fshin, fshin, fthigh);
-  dJointSetHingeAxis(j_fshin, 0, 1, 0);
-  dJointSetHingeParam(j_fshin, dParamLoStop, -1.2);
-  dJointSetHingeParam(j_fshin, dParamHiStop, .87);
-  apply_damping(fshin, 3.);
+    //   <joint name='fshin' type='hinge' pos='0 0 0' axis='0 1 0' range='-1.2 .87' stiffness='120' damping='3' />
+    j_fshin = dJointCreateHinge(odeworld.world_id, nullptr);
+    dJointAttach(j_fshin, fshin, fthigh);
+    dJointSetHingeAxis(j_fshin, 0, 1, 0);
+    dJointSetHingeParam(j_fshin, dParamLoStop, -1.2);
+    dJointSetHingeParam(j_fshin, dParamHiStop, .87);
+    apply_damping(fshin, 3.);
+  }
 
   //   <geom name='fshin' type='capsule' pos='.065 0 -.09' axisangle='0 1 0 -.6' size='0.046 .106' rgba='0.9 0.6 0.6 1' />
   dGeomID g_fshin = dCreateCapsule(odeworld.space_id, radius, .106*length_multiplier);
-  dGeomSetBody(g_fshin, fshin);
-  dGeomSetOffsetPosition(g_fshin, .065, 0, -.09);
+  if(!phy.higher_rigid) {
+    dGeomSetBody(g_fshin, fshin);
+    dGeomSetOffsetPosition(g_fshin, .065, 0, -.09);
+  } else {
+    dGeomSetBody(g_fshin, fthigh);
+    dGeomSetOffsetPosition(g_fshin, .065 -.14, 0, -.09 -.24);
+  }
   dMatrix3 R_fshin;
   dRFromAxisAndAngle(R_fshin, 0, 1, 0, -.6);
   dGeomSetOffsetRotation(g_fshin, R_fshin);
@@ -325,24 +366,40 @@ void HalfCheetahWorld::createWorld() {
   dMass m_fshin;
   dMassSetCapsule(&m_fshin, density, 3, radius, .106*length_multiplier);
   apply_armature(&m_fshin, 0.1);
-  dBodySetMass(fshin, &m_fshin);
+  if(!phy.higher_rigid) 
+    dBodySetMass(fshin, &m_fshin);
+  else {
+    dMassAdd(&m_fthigh, &m_fshin);
+    dBodySetMass(fthigh, &m_fthigh);
+  }
 
   //   <body name='ffoot' pos='.13 0 -.18'>
-  dBodyID ffoot = dBodyCreate(odeworld.world_id);
-  dBodySetPosition(ffoot, .5 -.14 + .13, 0, 0.7 -.24 -.18);
+  dBodyID ffoot = nullptr;
+  dJointID j_ffoot = nullptr;
+  if(!phy.lower_rigid) {
+    ffoot = dBodyCreate(odeworld.world_id);
+    dBodySetPosition(ffoot, .5 -.14 + .13, 0, 0.7 -.24 -.18);
 
-  //   <joint name='ffoot' type='hinge' pos='0 0 0' axis='0 1 0' range='-.5 .5' stiffness='60' damping='1.5' />
-  dJointID j_ffoot = dJointCreateHinge(odeworld.world_id, nullptr);
-  dJointAttach(j_ffoot, ffoot, fshin);
-  dJointSetHingeAxis(j_ffoot, 0, 1, 0);
-  dJointSetHingeParam(j_ffoot, dParamLoStop, -.5);
-  dJointSetHingeParam(j_ffoot, dParamHiStop, .5);
-  apply_damping(ffoot, 1.5);
-
+    //   <joint name='ffoot' type='hinge' pos='0 0 0' axis='0 1 0' range='-.5 .5' stiffness='60' damping='1.5' />
+    j_ffoot = dJointCreateHinge(odeworld.world_id, nullptr);
+    if(!phy.higher_rigid)
+      dJointAttach(j_ffoot, ffoot, fshin);
+    else
+      dJointAttach(j_ffoot, ffoot, fthigh);
+    dJointSetHingeAxis(j_ffoot, 0, 1, 0);
+    dJointSetHingeParam(j_ffoot, dParamLoStop, -.5);
+    dJointSetHingeParam(j_ffoot, dParamHiStop, .5);
+    apply_damping(ffoot, 1.5);
+  }
   //   <geom name='ffoot' type='capsule' pos='.045 0 -.07' axisangle='0 1 0 -.6' size='0.046 .07' rgba='0.9 0.6 0.6 1' />
   dGeomID g_ffoot = dCreateCapsule(odeworld.space_id, radius, .07*length_multiplier);
-  dGeomSetBody(g_ffoot, ffoot);
-  dGeomSetOffsetPosition(g_ffoot, .045, 0, -.07);
+  if(!phy.lower_rigid) {
+    dGeomSetBody(g_ffoot, ffoot);
+    dGeomSetOffsetPosition(g_ffoot, .045, 0, -.07);
+  } else {
+    dGeomSetBody(g_ffoot, fshin);
+    dGeomSetOffsetPosition(g_ffoot, .045+ .13, 0, -.07 -.18);
+  }
   dMatrix3 R_ffoot;
   dRFromAxisAndAngle(R_ffoot, 0, 1, 0, -.6);
   dGeomSetOffsetRotation(g_ffoot, R_ffoot);
@@ -350,7 +407,13 @@ void HalfCheetahWorld::createWorld() {
   dMass m_ffoot;
   dMassSetCapsule(&m_ffoot, density, 3, radius, .07*length_multiplier);
   apply_armature(&m_ffoot, 0.1);
-  dBodySetMass(ffoot, &m_ffoot);
+
+  if(!phy.lower_rigid)
+    dBodySetMass(ffoot, &m_ffoot);
+  else {
+    dMassAdd(&m_fshin, &m_ffoot);
+    dBodySetMass(fshin, &m_fshin);
+  }
 
   joints.push_back(j_bthigh);
   joints.push_back(j_bshin);
@@ -372,7 +435,11 @@ void HalfCheetahWorld::createWorld() {
   double mass_sum = 0;
   for(auto a : bones) {
 //     LOG_DEBUG(a->getMassValue());
-    mass_sum += a->getMassValue();
+    dMass lm;
+    if(a->getID() != nullptr) {
+      dBodyGetMass(a->getID(), &lm);
+      mass_sum += lm.mass;
+    }
   }
 //   LOG_DEBUG("");
   ASSERT(mass_sum >= 14.f - 0.001f && mass_sum <= 14.f + 0.001f, "sum mass : " << mass_sum);
@@ -423,13 +490,13 @@ void HalfCheetahWorld::step(const vector<double>& _motors) {
     motors[4] = 0;
     motors[5] = _motors[3];
   }
-  
-  if(phy.from_predev == 1 || phy.from_predev == 2 || phy.from_predev == 3){
+
+  if(phy.from_predev == 1 || phy.from_predev == 2 || phy.from_predev == 3) {
     motors[2] = _motors[4];
     motors[3] = _motors[2];
     motors[4] = _motors[3];
 //     motors[5] = _motors[5];
-  } else if(phy.from_predev == 10 || phy.from_predev == 11 || phy.from_predev == 12){
+  } else if(phy.from_predev == 10 || phy.from_predev == 11 || phy.from_predev == 12) {
     motors[1] = _motors[4];
     motors[2] = _motors[1];
     motors[3] = _motors[2];
@@ -445,93 +512,30 @@ void HalfCheetahWorld::step(const vector<double>& _motors) {
   nearCallbackDataHalfCheetah d = {this};
   dSpaceCollide(odeworld.space_id, &d, &nearCallbackHalfCheetah);
 
+  std::vector<double> p_joints(joints.size());
   unsigned int begin_index = 0;
-
-  if(phy.control == 1) {
-    begin_index = 0;
-    double f_bthigh = bib::Utils::transform(motors[begin_index++], -1, 1, -120, 120);
-    double f_bshin = bib::Utils::transform(motors[begin_index++], -1, 1, -90, 90);
-    double f_bfoot = bib::Utils::transform(motors[begin_index++], -1, 1, -60, 60);
-    double f_fthigh = bib::Utils::transform(motors[begin_index++], -1, 1, -120, 120);
-    double f_fshin = bib::Utils::transform(motors[begin_index++], -1, 1, -60, 60);
-    double f_ffoot = bib::Utils::transform(motors[begin_index++], -1, 1, -30, 30);
-
-    begin_index = 0;
-    dJointAddHingeTorque(joints[begin_index++], f_bthigh);
-    dJointAddHingeTorque(joints[begin_index++], f_bshin);
-    dJointAddHingeTorque(joints[begin_index++], f_bfoot);
-    dJointAddHingeTorque(joints[begin_index++], f_fthigh);
-    dJointAddHingeTorque(joints[begin_index++], f_fshin);
-    dJointAddHingeTorque(joints[begin_index++], f_ffoot);
-  } else if(phy.control==2 || phy.control==3) { //origin paper
-    double p_bthigh = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[0])) - 0.05 * dJointGetHingeAngleRate(
-                                           joints[0]));
-    double p_bshin = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[1])) - 0.05 * dJointGetHingeAngleRate(joints[1]));
-    double p_bfoot = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[2])) - 0.05 * dJointGetHingeAngleRate(joints[2]));
-    double p_ffthigh = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[3])) - 0.05 * dJointGetHingeAngleRate(
-                                            joints[3]));
-    double p_fshin = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[4])) - 0.05 * dJointGetHingeAngleRate(joints[4]));
-    double p_ffoot = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(joints[5])) - 0.05 * dJointGetHingeAngleRate(joints[5]));
-
-    begin_index = 0;
-    double a_bthigh = motors[begin_index++];
-    double a_bshin = motors[begin_index++];
-    double a_bfoot = motors[begin_index++];
-    double a_fthigh = motors[begin_index++];
-    double a_fshin = motors[begin_index++];
-    double a_ffoot = motors[begin_index++];
-    if(phy.control==3) {
-      a_bthigh = bib::Utils::transform(a_bthigh, -1.f, 1.f, -2.f, 2.f);
-      a_bshin = bib::Utils::transform(a_bshin, -1.f, 1.f, -2.f, 2.f);
-      a_bfoot = bib::Utils::transform(a_bfoot, -1.f, 1.f, -2.f, 2.f);
-      a_fthigh = bib::Utils::transform(a_fthigh, -1.f, 1.f, -2.f, 2.f);
-      a_fshin = bib::Utils::transform(a_fshin, -1.f, 1.f, -2.f, 2.f);
-      a_ffoot = bib::Utils::transform(a_ffoot, -1.f, 1.f, -2.f, 2.f);
-    }
-
-    double f_bthigh = 120* std::min(std::max((double)-1., p_bthigh+a_bthigh), (double)1.);
-    double f_bshin = 90*std::min(std::max((double)-1., p_bshin+a_bshin), (double)1.);
-    double f_bfoot = 60*std::min(std::max((double)-1., p_bfoot+a_bfoot), (double)1.);
-    double f_fthigh = 90*std::min(std::max((double)-1., p_ffthigh+a_fthigh), (double)1.);
-    double f_fshin = 60*std::min(std::max((double)-1., p_fshin+a_fshin), (double)1.);
-    double f_ffoot = 30*std::min(std::max((double)-1., p_ffoot+a_ffoot), (double)1.);
-
-    begin_index = 0;
-    dJointAddHingeTorque(joints[begin_index++], f_bthigh);
-    dJointAddHingeTorque(joints[begin_index++], f_bshin);
-    dJointAddHingeTorque(joints[begin_index++], f_bfoot);
-    dJointAddHingeTorque(joints[begin_index++], f_fthigh);
-    dJointAddHingeTorque(joints[begin_index++], f_fshin);
-    dJointAddHingeTorque(joints[begin_index++], f_ffoot);
-
-    if(phy.reward == 2) {
-      begin_index = 0;
-      double sub_pelnalty = 0.f;
-      sub_pelnalty += std::max(fabs(p_bthigh+motors[begin_index++]) - 1.f, (double) 0.f);
-      sub_pelnalty += std::max(fabs(p_bshin+motors[begin_index++]) - 1.f, (double) 0.f);
-      sub_pelnalty += std::max(fabs(p_bfoot+motors[begin_index++]) - 1.f, (double) 0.f);
-      sub_pelnalty += std::max(fabs(p_ffthigh+motors[begin_index++]) - 1.f, (double) 0.f);
-      sub_pelnalty += std::max(fabs(p_fshin+motors[begin_index++]) - 1.f, (double) 0.f);
-      sub_pelnalty += std::max(fabs(p_ffoot+motors[begin_index++]) - 1.f, (double) 0.f);
-      penalty += -0.05 * sub_pelnalty;
-
-//       already managed by stops
-//       sub_pelnalty = 0.f;
-//       sub_pelnalty += std::min(fabs(p_bthigh*120) , (double) 50.f);
-//       sub_pelnalty += std::min(fabs(p_bshin*90) , (double) 50.f);
-//       sub_pelnalty += std::min(fabs(p_bfoot*60) , (double) 50.f);
-//       sub_pelnalty += std::min(fabs(p_ffthigh*90) , (double) 50.f);
-//       sub_pelnalty += std::min(fabs(p_fshin*60) , (double) 50.f);
-//       sub_pelnalty += std::min(fabs(p_ffoot*30) , (double) 50.f);
-//       penalty += -0.1 * sub_pelnalty;
-    }
+  for(dJointID j : joints) {
+    if(j != nullptr)
+      p_joints[begin_index] = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(j)) - 0.05 * dJointGetHingeAngleRate(j));
+    begin_index++;
   }
 
-  if(phy.reward == 1 || phy.reward == 3) {
-    for (auto a : motors)
-      penalty += a*a;
-    penalty = - 1e-1 * 0.5 * penalty;
+  std::vector<double> f_joints(joints.size());
+  std::vector<double> gears = {120, 90, 60, 90, 60, 30};
+
+  begin_index = 0;
+  for(dJointID j : joints) {
+    if(j != nullptr) {
+      f_joints[begin_index] = gears[begin_index]* std::min(std::max((double)-1., p_joints[begin_index]+motors[begin_index]),
+                              (double)1.);
+      dJointAddHingeTorque(j, f_joints[begin_index]);
+    }
+    begin_index++;
   }
+
+  for (auto a : motors)
+    penalty += a*a;
+  penalty = - 1e-1 * 0.5 * penalty;
 
   Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
   dWorldStep(odeworld.world_id, WORLD_STEP);
@@ -559,34 +563,59 @@ void HalfCheetahWorld::update_state() {
   substate.push_back(root_pos[2]);//- rootz     slider      position (m)
   substate.push_back(s <= 0.0000001f ? root_rot[2] : root_rot[2]/s) ;// - rooty     hinge       angle (rad)
   substate.push_back(dJointGetHingeAngle(joints[0])); //- bthigh    hinge       angle (rad)
-  substate.push_back(dJointGetHingeAngle(joints[1]));
-  substate.push_back(dJointGetHingeAngle(joints[2]));
+  if(!phy.higher_rigid)
+    substate.push_back(dJointGetHingeAngle(joints[1]));
+  else
+    substate.push_back(0.);
+  if(!phy.lower_rigid)
+    substate.push_back(dJointGetHingeAngle(joints[2]));
+  else
+    substate.push_back(0.);
   substate.push_back(dJointGetHingeAngle(joints[3]));
-  substate.push_back(dJointGetHingeAngle(joints[4]));
-  substate.push_back(dJointGetHingeAngle(joints[5]));
+  if(!phy.higher_rigid)
+    substate.push_back(dJointGetHingeAngle(joints[4]));
+  else
+    substate.push_back(0.);
+  if(!phy.lower_rigid)
+    substate.push_back(dJointGetHingeAngle(joints[5]));
+  else
+    substate.push_back(0.);
 
   substate.push_back(root_vel[0]);//- rootx     slider      velocity (m/s)
   substate.push_back(root_vel[2]);//- rootz     slider      velocity (m/s)
   substate.push_back(root_angvel[1]);//- rooty     hinge       angular velocity (rad/s)
   substate.push_back(dJointGetHingeAngleRate(joints[0])); //- bthigh    hinge       angular velocity (rad/s)
-  substate.push_back(dJointGetHingeAngleRate(joints[1]));
-  substate.push_back(dJointGetHingeAngleRate(joints[2]));
+  if(!phy.higher_rigid)
+    substate.push_back(dJointGetHingeAngleRate(joints[1]));
+  else
+    substate.push_back(0.);
+  if(!phy.lower_rigid)
+    substate.push_back(dJointGetHingeAngleRate(joints[2]));
+  else
+    substate.push_back(0.);
   substate.push_back(dJointGetHingeAngleRate(joints[3]));
-  substate.push_back(dJointGetHingeAngleRate(joints[4]));
-  substate.push_back(dJointGetHingeAngleRate(joints[5]));
+  if(!phy.higher_rigid)
+    substate.push_back(dJointGetHingeAngleRate(joints[4]));
+  else
+    substate.push_back(0.);
+  if(!phy.lower_rigid)
+    substate.push_back(dJointGetHingeAngleRate(joints[5]));
+  else
+    substate.push_back(0.);
 
   ASSERT(substate.size() == 18, "wrong indices");
 
-  if((phy.from_predev == 0 && (phy.predev == 0 || phy.predev == 2 || phy.predev == 11 || phy.predev == 3 || phy.predev == 12)) ||
-    phy.from_predev == 2 || phy.from_predev == 11 || phy.from_predev == 3 || phy.from_predev == 12) {
+  if((phy.from_predev == 0 && (phy.predev == 0 || phy.predev == 2 || phy.predev == 11 || phy.predev == 3
+                               || phy.predev == 12)) ||
+      phy.from_predev == 2 || phy.from_predev == 11 || phy.from_predev == 3 || phy.from_predev == 12) {
     std::copy(substate.begin(), substate.end(), internal_state.begin());
-  
-    if(phy.predev == 3){
+
+    if(phy.predev == 3) {
       internal_state[17] = 0.0f;
       internal_state[14] = 0.0f;
       internal_state[8]  = 0.0f;
       internal_state[5]  = 0.0f;
-    } else if(phy.predev == 12){
+    } else if(phy.predev == 12) {
       internal_state[16] = 0.0f;
       internal_state[13] = 0.0f;
       internal_state[7]  = 0.0f;
@@ -638,7 +667,7 @@ void HalfCheetahWorld::update_state() {
       substate.erase(it);
       std::copy(substate.begin(), substate.end(), internal_state.begin());
     }
-    
+
     if(phy.from_predev != 0)
       std::copy(later.begin(), later.end(), internal_state.begin() + substate.size());
   }
@@ -652,18 +681,15 @@ void HalfCheetahWorld::update_state() {
 //     LOG_DEBUG("back touched");
 //   }
 
-  if(phy.reward == 2 || phy.reward == 3) {
-    if(head_touch)
-      penalty += -1;
-    if(fknee_touch)
-      penalty += -1;
-    if(bknee_touch)
-      penalty += -1;
 
-    reward = penalty + root_vel[0];
-  } else if(phy.reward == 1) {
-    reward = penalty + root_vel[0];
-  }
+  if(head_touch)
+    penalty += -1;
+  if(fknee_touch)
+    penalty += -1;
+  if(bknee_touch)
+    penalty += -1;
+
+  reward = penalty + root_vel[0];
 }
 
 const std::vector<double>& HalfCheetahWorld::state() const {
@@ -696,7 +722,8 @@ void HalfCheetahWorld::resetPositions(std::vector<double>&, const std::vector<do
   bones.clear();
 
   for(auto j : joints)
-    dJointDestroy(j);
+    if(j != nullptr)
+      dJointDestroy(j);
   joints.clear();
 
   dGeomDestroy(ground);
@@ -704,11 +731,11 @@ void HalfCheetahWorld::resetPositions(std::vector<double>&, const std::vector<do
 //   ODEFactory::getInstance()->destroyWorld(odeworld);
 
   createWorld();
-  
+
   head_touch = false;
   fknee_touch = false;
   bknee_touch = false;
   penalty = 0;
-  
+
   update_state();
 }

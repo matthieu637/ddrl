@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
   
-  arch::Simulator<HalfCheetahEnv, DeepQNAg> s;
+  arch::Simulator<HalfCheetahEnv, DeepQNAg<>> s;
   
   s.init(argc, argv);
   

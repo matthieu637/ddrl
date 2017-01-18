@@ -23,8 +23,8 @@ void parseCommandHalfCheetah(int cmd) {
     break;
   case 'd':
     inst->speed = inst->speed / 2.;
-    if(inst->speed < 0.25)
-      inst->speed = 0.25;
+    if(inst->speed < 0.0625)
+      inst->speed = 0.0625;
     LOG_DEBUG("speed : x " <<inst->speed);
     break;
   case 'a':
@@ -82,7 +82,9 @@ void threadloopHalfCheetah(const std::string& goodpath) {
   dsSetViewpoint(xyz, hpr);
 
   while (!inst->requestEnd) {
+    Mutex::scoped_lock lock(inst->mutex_reset);
     HACKdraw(&inst->fn);
+    lock.release();
     //wait time between frame draw
 //     usleep(1 * 1000);//each milisecond -> 1000fps
     usleep(10 * 1000);//each milisecond -> 100fps
@@ -159,7 +161,9 @@ void HalfCheetahWorldView::step(const std::vector<double>& motors) {
         modified_motors[i] = inst->modified_motor;
   }
 
+  Mutex::scoped_lock lock(mutex_reset);
   HalfCheetahWorld::step(modified_motors);
+  lock.release();
 
   inst->modified_motor = -2.f;
   // approximative human vision smooth

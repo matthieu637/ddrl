@@ -122,6 +122,7 @@ class AAgent : public ProgOptions, public CommonAE {
   
   virtual void restoreBest() {
     LOG_ERROR("restoreBest() not implemented");
+    exit(1);
   }
   
  protected:

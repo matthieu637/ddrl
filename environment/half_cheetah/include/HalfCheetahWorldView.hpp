@@ -27,6 +27,8 @@ class HalfCheetahWorldView : public HalfCheetahWorld {
   double speed;
   bool ignoreMotor;
   double modified_motor = -2.f;
+  
+  Mutex mutex_reset;
 };
 
 #endif  // HALTCHEETAHWORLDVIEW_HPP
