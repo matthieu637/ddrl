@@ -45,11 +45,10 @@ if(NOT DEFINED PROCESSOR_COUNT)
 
   # Mac:
   if(APPLE)
-    find_program(cmd_sys_pro "system_profiler")
+    find_program(cmd_sys_pro "sysctl")
     if(cmd_sys_pro)
-      execute_process(COMMAND ${cmd_sys_pro} OUTPUT_VARIABLE info)
-      string(REGEX REPLACE "^.*Total Number Of Cores: ([0-9]+).*$" "\\1"
-        PROCESSOR_COUNT "${info}")
+      execute_process(COMMAND ${cmd_sys_pro} machdep.cpu.thread_count OUTPUT_VARIABLE info)
+      string(REGEX MATCH "[0-9]+" PROCESSOR_COUNT "${info}")
     endif()
   endif()
 

@@ -2,7 +2,6 @@ find_package(GTest)
 
 if(NOT ${GTEST_FOUND})
         include(${ROOT_DRL_PATH}/common/cmake/Callable.cmake)
-        call_build_dir()
         if(NOT EXISTS ${ROOT_DRL_PATH}/common/build/${build_dir}/googletest-build/)
                 # Download and unpack googletest at configure time
                 configure_file(${CMAKE_SOURCE_DIR}/cmake/GTest.in googletest-download/CMakeLists.txt)
