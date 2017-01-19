@@ -15,6 +15,7 @@ endfunction()
 #-------------------
 function(enable_utest needed_sources)
   enable_testing()
+  include(${ROOT_DRL_PATH}/common/cmake/GTest.cmake)
 
   file ( GLOB all_test_sources src/test/*Utest.cpp )
   add_executable(unit-test ${all_test_sources} ${${needed_sources}})

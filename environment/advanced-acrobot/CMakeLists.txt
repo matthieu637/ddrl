@@ -9,13 +9,13 @@ endif()
 
 include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
 
-find_package(Boost 1.60 COMPONENTS serialization filesystem system program_options thread REQUIRED)
-find_package(ODE)
+find_package(Boost 1.54 COMPONENTS serialization filesystem system program_options thread REQUIRED)
 find_package(OpenGL)
 find_package(X11)
 find_package(TBB)
 find_package(Threads)
 find_package(CommonDRL)
+include(${ROOT_DRL_PATH}/common/cmake/ODEConfig.cmake)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${ODE_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/extern/drawstuff/include/ ${TBB_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS})
 
