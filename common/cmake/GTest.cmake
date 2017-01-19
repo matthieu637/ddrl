@@ -21,17 +21,19 @@ endif()
 # settings on Windows
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
-# Add googletest directly to our build. This defines
-# the gtest and gtest_main targets.
-#add_subdirectory(${CMAKE_BINARY_DIR}/googletest-src
-#                 ${CMAKE_BINARY_DIR}/googletest-build)
-
-# The gtest/gtest_main targets carry header search path
-# dependencies automatically when using CMake 2.8.11 or
-# later. Otherwise we have to add them here ourselves.
 if (CMAKE_VERSION VERSION_LESS 2.8.11)
-  include_directories("${gtest_SOURCE_DIR}/include")
+  include_directories("${CMAKE_BINARY_DIR}/googletest-src/googletest/include/")
 endif()
 
-find_package(GTest)
+set(GTEST_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/googletest-src/googletest/include/")
+find_library(GTEST_MAIN_LIBRARY NAMES gtest_main 
+        PATHS ${CMAKE_BINARY_DIR}/googletest-build/googlemock/gtest/ )
+find_library(GTEST_LIBRARY NAMES gtest
+        PATHS ${CMAKE_BINARY_DIR}/googletest-build/googlemock/gtest/ )
+set(GTEST_BOTH_LIBRARIES ${GTEST_MAIN_LIBRARY} ${GTEST_LIBRARY})
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(GTest DEFAULT_MSG GTEST_BOTH_LIBRARIES GTEST_INCLUDE_DIRS)
+mark_as_advanced(GTEST_INCLUDE_DIRS GTEST_BOTH_LIBRARIES)
+
 endif()

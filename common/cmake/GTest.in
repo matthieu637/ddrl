@@ -9,7 +9,7 @@ ExternalProject_Add(googletest
   SOURCE_DIR        "${CMAKE_BINARY_DIR}/googletest-src"
   BINARY_DIR        "${CMAKE_BINARY_DIR}/googletest-build"
   CONFIGURE_COMMAND ${CMAKE_COMMAND} -DBUILD_SHARED_LIBS=ON ../googletest-src
-  BUILD_COMMAND     make -j4
+  BUILD_COMMAND     make -j ${PROCESSOR_COUNT}
   INSTALL_COMMAND   ""
   TEST_COMMAND      ""
 )
