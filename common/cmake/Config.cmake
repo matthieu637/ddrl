@@ -27,7 +27,7 @@ endif()
 set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
 list(APPEND CMAKE_MODULE_PATH "${ROOT_DRL_PATH}/common/cmake/")
 
-include(${ROOT_DRL_PATH}/common/cmake/Callable.cmake 
+include(${ROOT_DRL_PATH}/common/cmake/Callable.cmake)
 
 #-------------------
 # Number of Thread
