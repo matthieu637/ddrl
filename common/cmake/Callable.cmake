@@ -18,6 +18,6 @@ function(enable_utest needed_sources)
 
   file ( GLOB all_test_sources src/test/*Utest.cpp )
   add_executable(unit-test ${all_test_sources} ${${needed_sources}})
-  target_link_libraries(unit-test gtest gtest_main ${ARGN})
+  target_link_libraries(unit-test ${GTEST_BOTH_LIBRARIES} ${ARGN})
   add_test(AllTests unit-test)
 endfunction()
