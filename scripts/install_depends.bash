@@ -18,14 +18,6 @@ sudo apt-get install python cmake libode-dev astyle cppcheck libtbb-dev libglew-
 
 echo "check your gcc version isn't too old ( <= 4.6 )"
 
-########################
-# gtest lib (required) #
-########################
-cd /usr/src/gtest
-sudo cmake .
-sudo make
-sudo mv libg* /usr/local/lib/
-
 ######################
 # cpplint (optional) #
 ######################
@@ -69,17 +61,6 @@ sudo apt-get install libeigen3-dev
 ##############################
 # caffe (required by deepqn) #
 ##############################
+#libatlas-dev
 sudo apt-get install nvidia-cuda-dev nvidia-cuda-toolkit libprotobuf-dev libleveldb-dev libsnappy-dev protobuf-compiler libopenblas-dev libgflags-dev libgoogle-glog-dev liblmdb-dev libhdf5-serial-dev
-
-goto_root
-cd scripts/extern
-git clone https://github.com/BVLC/caffe.git
-wget https://matthieu-zimmer.net/~matthieu/patches/caffe-git.patch
-patch -Np0 -i caffe-git.patch
-mkdir caffe/build
-cd caffe/build
-cmake ../ -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCMAKE_C_COMPILER=gcc-5 \
-                -DCMAKE_INSTALL_PREFIX=/usr/local -DCUDA_ARCH_NAME=All -DCMAKE_CXX_FLAGS="-D_FORCE_INLINES"
-make all -j4
-sudo make install
 

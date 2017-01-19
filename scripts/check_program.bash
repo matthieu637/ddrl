@@ -29,11 +29,15 @@ function check_all(){
 	checker cmake
 	checker make
 	checker g++
-	checker ode-config
-	vercomp $(ode-config --version) 0.14
-	if [ $? -eq 2 ] ; then
-		echo "ode version is too low (0.14 required)"
-		exit 1
+#	checker ode-config #if ode is not installed, we will compile it
+#	if it's here, check the version
+	which ode-config >& /dev/null
+	if [ $? -eq 0 ] ; then # installed
+		vercomp $(ode-config --version) 0.14
+		if [ $? -eq 2 ] ; then
+			echo "ode version is too low (0.14 required)"
+			exit 1
+		fi	
 	fi
 	check_all_optional
 }
