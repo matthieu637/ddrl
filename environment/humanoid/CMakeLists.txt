@@ -9,22 +9,13 @@ endif()
 
 include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
 
-find_package(Boost 1.60 COMPONENTS serialization filesystem system program_options thread REQUIRED)
-find_package(ODE)
-find_package(OpenGL)
-find_package(X11)
-find_package(TBB)
-find_package(Threads)
 find_package(CommonDRL)
-find_package(AdvancedAcrobot)
+find_package(ODEEnv)
 
-include_directories(${CMAKE_SOURCE_DIR}/include ${ODE_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/extern/drawstuff/include/ ${TBB_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} ${ADVANCED_ACROBOT_INCLUDE_DIRS})
-
+include_directories(${CMAKE_SOURCE_DIR}/include ${COMMON_DRL_INCLUDE_DIRS} ${ODE_ENV_INCLUDE_DIRS})
 
 file ( GLOB_RECURSE all_include include/*.hpp )
 file ( GLOB all_sources src/*.cpp )
-
-message(STATUS "ODE flags : " ${ODE_CFLAGS})
 
 #-------------------
 # Library Build
@@ -32,14 +23,13 @@ message(STATUS "ODE flags : " ${ODE_CFLAGS})
 set(LIBRARY_NAME "humanoid")
 rename_buildtype(LIBRARY_NAME)
 add_library(${LIBRARY_NAME} SHARED ${all_include} ${all_sources})
-message(${LIBRARY_NAME} ${ODE_LIBRARY} ${Boost_LIBRARIES} ${X11_LIBRARIES} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY_LIGHT})
-target_link_libraries(${LIBRARY_NAME} ${ODE_LIBRARY} ${Boost_LIBRARIES} ${X11_LIBRARIES} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY_LIGHT} ${ADVANCED_ACROBOT_LIBRARY})
+target_link_libraries(${LIBRARY_NAME} ${COMMON_DRL_LIBRARY_LIGHT} ${ODE_ENV_LIBRARY})
 
 #-------------------
 # Personnals Test
 #-------------------
-add_executable(humanoid-env src/test/Humanoid.cpp ${all_include} ${all_sources} ${drawstuff_src} )
-target_link_libraries(humanoid-env ${ODE_LIBRARY} ${Boost_LIBRARIES} ${X11_LIBRARIES} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY_LIGHT} ${ADVANCED_ACROBOT_LIBRARY})
+add_executable(humanoid-env src/test/Humanoid.cpp ${all_include} ${all_sources})
+target_link_libraries(humanoid-env ${COMMON_DRL_LIBRARY_LIGHT} ${ODE_ENV_LIBRARY})
 
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/humanoid/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
@@ -50,4 +40,4 @@ execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_
 # Unit Test
 #-------------------
 # set(all_test_source ${all_sources})
-# enable_utest(all_test_source ${ODE_LIBRARY} ${Boost_LIBRARIES} ${X11_LIBRARIES} ${OPENGL_LIBRARIES} ${TBB_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${COMMON_DRL_LIBRARY_LIGHT})
+# enable_utest(all_test_source ${COMMON_DRL_LIBRARY_LIGHT})
