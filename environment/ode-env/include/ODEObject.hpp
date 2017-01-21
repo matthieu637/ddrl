@@ -1,6 +1,7 @@
 #ifndef ODEOBJECT_H
 #define ODEOBJECT_H
 #include <ode/ode.h>
+#include <bib/MyType.hpp>
 
 class ODEObject {
  public:

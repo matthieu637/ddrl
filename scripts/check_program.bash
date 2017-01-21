@@ -30,7 +30,6 @@ function check_all(){
 	checker make
 	checker g++
 	checker git
-	checker libtoolize
 #	checker ode-config #if ode is not installed, we will compile it
 #	if it's here, check the version
 	which ode-config >& /dev/null
@@ -40,6 +39,8 @@ function check_all(){
 			echo "ode version is too low (0.14 required)"
 			exit 1
 		fi	
+	else #not install need libtoolize for ode building
+		checker libtoolize
 	fi
 	check_all_optional
 }
