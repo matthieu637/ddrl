@@ -20,7 +20,13 @@ include(${ROOT_DRL_PATH}/common/cmake/ODEConfig.cmake)
 include_directories(${CMAKE_SOURCE_DIR}/include ${ODE_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/extern/drawstuff/include/ ${TBB_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS})
 
 
-file ( GLOB_RECURSE drawstuff_src extern/drawstuff/src/*.cpp)
+set(drawstuff_src extern/drawstuff/src/drawstuff.cpp)
+if(APPLE)
+	set(drawstuff_src ${drawstuff_src} extern/drawstuff/src/osx.cpp)
+else()
+	set(drawstuff_src ${drawstuff_src} extern/drawstuff/src/x11.cpp)
+endif()
+
 
 file ( GLOB_RECURSE all_include include/*.hpp )
 file ( GLOB all_sources src/*.cpp )
