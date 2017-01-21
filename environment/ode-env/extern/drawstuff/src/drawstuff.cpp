@@ -1253,7 +1253,11 @@ extern "C" void dsSimulationLoop (int argc, char **argv,
 void HACKinitDs(int w, int h, dsFunctions *fn) {
   current_state = 1;
   initMotionModel();
+#ifdef __APPLE__
+  HACKinitOSX(w, h, fn);
+#else
   HACKinitX11(w, h, fn);
+#endif
 };
 
 

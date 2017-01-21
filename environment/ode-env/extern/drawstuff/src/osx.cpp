@@ -344,3 +344,21 @@ extern void dsPlatformSimLoop( int givenWindowWidth, int givenWindowHeight, dsFu
 	
     glutMainLoop();
 }
+
+void HACKinitOSX(int w, int h, dsFunctions *fn){
+	osxCreateMainWindow(w, h);
+	osxInstallEventHandlers();
+	dsStartGraphics( w, h, fn );
+	
+	if( fn -> start ) fn->start();
+}
+
+void HACKdraw(dsFunctions *fn) {
+	glutMainLoop(); 
+}
+
+void HACKclose() {
+	dsStopGraphics();
+	
+	destroyMainWindow();
+}

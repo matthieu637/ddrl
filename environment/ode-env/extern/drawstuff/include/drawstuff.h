@@ -325,7 +325,11 @@ int dsGetTextures();
 void dsSetTextures (int a);
 
 void HACKinitDs(int w, int h, dsFunctions *fn);
+#ifdef __APPLE__
+void HACKinitOSX(int w, int h, dsFunctions *fn);
+#else
 void HACKinitX11(int w, int h, dsFunctions *fn);
+#endif
 void HACKdraw(dsFunctions *fn);
 void HACKclose();
 
