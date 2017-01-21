@@ -27,7 +27,7 @@
 // Not thoroughly tested and is certain to contain deficiencies and bugs
 
 #include <ode/odeconfig.h>
-#include "config.h"
+//#include "config.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -36,9 +36,9 @@
 #include <sys/time.h>
 #endif
 
-#include <drawstuff/drawstuff.h>
-#include <drawstuff/version.h>
-#include "internal.h"
+#include <drawstuff.h>
+#include <version.h>
+//#include "internal.h"
 
 #include <OpenGL/gl.h>
 #include <GLUT/glut.h>
