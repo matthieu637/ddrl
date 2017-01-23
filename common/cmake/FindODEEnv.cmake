@@ -1,4 +1,4 @@
-find_package(ODE)
+include(${ROOT_DRL_PATH}/common/cmake/ODEConfig.cmake)
 
 message(STATUS "ODE flags : " ${ODE_CFLAGS})
 
