@@ -80,7 +80,7 @@ class MLP {
     ASSERT(alpha > 0, "alpha <= 0");
     ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
-    ASSERT(hidden_layer_type == 1 || hidden_layer_type == 2, "hidden_layer_type not in (1,2)");
+    ASSERT(hidden_layer_type >= 1 && hidden_layer_type <= 3, "hidden_layer_type not in (1,2,3)");
     batch_norm_type bna = convertBN(batch_norm, hiddens.size());
 
 
@@ -160,7 +160,9 @@ class MLP {
     ASSERT(alpha > 0, "alpha <= 0");
     ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
-    ASSERT(hidden_layer_type == 1 || hidden_layer_type == 2, "hidden_layer_type not in (1,2)");
+    ASSERT(hidden_layer_type >= 1 && hidden_layer_type <= 3, "hidden_layer_type not in (1,2,3)");
+    if(last_layer_type == 1 || last_layer_type == 3)
+    	LOG_INFO("warning : relu as last actor network is not recommanded");
     batch_norm_type bna = convertBN(batch_norm, hiddens.size());
 
     caffe::SolverParameter solver_param;
@@ -185,11 +187,15 @@ class MLP {
       IPLayer(net_param_init, layer_name, {tower_top}, {actions_blob_name}, boost::none, motors);
     else if(last_layer_type == 1) {
       IPLayer(net_param_init, layer_name, {tower_top}, {actions_blob_name}, boost::none, motors);
-      ReluLayer(net_param_init, produce_name("func", hiddens.size()+1), {actions_blob_name}, {actions_blob_name},
+      LReluLayer(net_param_init, produce_name("func", hiddens.size()+1), {actions_blob_name}, {actions_blob_name},
                 boost::none);
     } else if(last_layer_type == 2) {
       IPLayer(net_param_init, layer_name, {tower_top}, {actions_blob_name}, boost::none, motors);
       TanhLayer(net_param_init, produce_name("func", hiddens.size()+1), {actions_blob_name}, {actions_blob_name},
+                boost::none);
+    } else if(last_layer_type == 3) {
+      IPLayer(net_param_init, layer_name, {tower_top}, {actions_blob_name}, boost::none, motors);
+      ReluLayer(net_param_init, produce_name("func", hiddens.size()+1), {actions_blob_name}, {actions_blob_name},
                 boost::none);
     }
     if(loss_layer) {
@@ -644,9 +650,11 @@ protected:
       IPLayer(np, layer_name, {input_name}, {top_name}, boost::none, layer_sizes[i-1]);
       layer_name = produce_name("func", i, task);
       if(hidden_layer_type==1)
-        ReluLayer(np, layer_name, {top_name}, {top_name}, boost::none);
+        LReluLayer(np, layer_name, {top_name}, {top_name}, boost::none);
       else if(hidden_layer_type==2)
         TanhLayer(np, layer_name, {top_name}, {top_name}, boost::none);
+      else if(hidden_layer_type==3)
+        ReluLayer(np, layer_name, {top_name}, {top_name}, boost::none);
       else {
         LOG_ERROR("hidden_layer_type " << hidden_layer_type << "not implemented");
         exit(1);
@@ -731,7 +739,7 @@ protected:
     caffe::LayerParameter& layer = *net_param.add_layer();
     PopulateLayer(layer, name, "Silence", bottoms, tops, include_phase);
   }
-  void ReluLayer(caffe::NetParameter& net_param,
+  void LReluLayer(caffe::NetParameter& net_param,
                  const std::string& name,
                  const std::vector<std::string>& bottoms,
                  const std::vector<std::string>& tops,
@@ -740,6 +748,14 @@ protected:
     PopulateLayer(layer, name, "ReLU", bottoms, tops, include_phase);
     caffe::ReLUParameter* relu_param = layer.mutable_relu_param();
     relu_param->set_negative_slope(0.01);
+  }
+  void ReluLayer(caffe::NetParameter& net_param,
+                 const std::string& name,
+                 const std::vector<std::string>& bottoms,
+                 const std::vector<std::string>& tops,
+                 const boost::optional<caffe::Phase>& include_phase) {
+    caffe::LayerParameter& layer = *net_param.add_layer();
+    PopulateLayer(layer, name, "ReLU", bottoms, tops, include_phase);
   }
   void SliceLayer(caffe::NetParameter& net_param,
                   const std::string& name,
