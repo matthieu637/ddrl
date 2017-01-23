@@ -8,17 +8,13 @@ if(NOT DEFINED ROOT_DRL_PATH)
 endif()
 
 include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
-
 find_package(CommonDRL)
 find_package(ODEEnv)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${COMMON_DRL_INCLUDE_DIRS} ${ODE_ENV_INCLUDE_DIRS})
 
-
 file ( GLOB_RECURSE all_include include/*.hpp )
 file ( GLOB all_sources src/*.cpp )
-
-message(STATUS "ODE flags : " ${ODE_CFLAGS})
 
 #-------------------
 # Library Build
@@ -32,7 +28,7 @@ target_link_libraries(${LIBRARY_NAME} ${COMMON_DRL_LIBRARY_LIGHT} ${ODE_ENV_LIBR
 # Personnals Test
 #-------------------
 add_executable(internal-visu src/test/InternalView.cpp ${all_include} ${all_sources})
-target_link_libraries(internal-visu ${COMMON_DRL_LIBRARY} ${ODE_ENV_LIBRARY})
+target_link_libraries(internal-visu ${COMMON_DRL_LIBRARY_LIGHT} ${ODE_ENV_LIBRARY})
 
 add_executable(multi-instance src/test/MultiInstance.cpp ${all_include} ${all_sources})
 target_link_libraries(multi-instance ${COMMON_DRL_LIBRARY} ${ODE_ENV_LIBRARY})
@@ -48,7 +44,7 @@ execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_
 # Unit Test
 #-------------------
 set(all_test_source ${all_sources})
-enable_utest(all_test_source ${COMMON_DRL_LIBRARY} ${ODE_ENV_LIBRARY})
+enable_utest(all_test_source ${COMMON_DRL_LIBRARY_LIGHT} ${ODE_ENV_LIBRARY})
 
 # ALAIN => target etags/tags
 IF (UNIX)

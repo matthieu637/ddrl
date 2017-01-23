@@ -44,7 +44,10 @@ manage openGL state changes better
 #include <ode/ode.h>
 // #include "config.h"
 
+#ifdef __APPLE__
 #define HAVE_APPLE_OPENGL_FRAMEWORK
+#endif
+
 #ifdef HAVE_APPLE_OPENGL_FRAMEWORK
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>

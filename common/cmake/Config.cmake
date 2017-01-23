@@ -57,3 +57,15 @@ if(NOT DEFINED PROCESSOR_COUNT)
     set(PROCESSOR_COUNT "$ENV{NUMBER_OF_PROCESSORS}")
   endif()
 endif()
+
+##############
+# Build dir
+##############
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(build_dir_type "debug" CACHE STRING "")
+elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  set(build_dir_type "relwithdeb" CACHE STRING "")
+else()
+  set(build_dir_type "release" CACHE STRING "")
+endif()

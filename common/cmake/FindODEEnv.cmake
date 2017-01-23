@@ -1,6 +1,4 @@
 find_package(ODE)
-find_package(OpenGL)
-find_package(X11)
 
 message(STATUS "ODE flags : " ${ODE_CFLAGS})
 
@@ -25,4 +23,4 @@ include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(ODEEnv DEFAULT_MSG ODE_ENV_LIBRARY ODE_ENV_INCLUDE_DIRS)
 mark_as_advanced(ODE_ENV_INCLUDE_DIRS ODE_ENV_LIBRARY )
 
-set(ODE_ENV_LIBRARY ${ODE_ENV_LIBRARY} ${ODE_LIBRARY} ${X11_LIBRARIES} ${OPENGL_LIBRARIES})
+set(ODE_ENV_LIBRARY ${ODE_ENV_LIBRARY} ${ODE_LIBRARY})

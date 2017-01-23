@@ -40,7 +40,11 @@ function check_all(){
 			exit 1
 		fi	
 	else #not install need libtoolize for ode building
-		checker libtoolize
+		if [ $MAC -eq 1 ] ; then
+			checker glibtoolize
+		else
+			checker libtoolize
+		fi
 	fi
 	check_all_optional
 }

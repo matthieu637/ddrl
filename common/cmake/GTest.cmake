@@ -1,8 +1,7 @@
 find_package(GTest)
 
 if(NOT ${GTEST_FOUND})
-        include(${ROOT_DRL_PATH}/common/cmake/Callable.cmake)
-        if(NOT EXISTS ${ROOT_DRL_PATH}/common/build/${build_dir}/googletest-build/)
+        if(NOT EXISTS ${ROOT_DRL_PATH}/common/build/${build_dir_type}/googletest-build/)
                 # Download and unpack googletest at configure time
                 configure_file(${CMAKE_SOURCE_DIR}/cmake/GTest.in googletest-download/CMakeLists.txt)
                 execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -30,12 +29,12 @@ if(NOT ${GTEST_FOUND})
         find_library(GTEST_MAIN_LIBRARY NAMES gtest_main 
                 PATHS 
                         ${CMAKE_BINARY_DIR}/googletest-build/googlemock/gtest/ 
-                        ${ROOT_DRL_PATH}/common/build/${build_dir}/googletest-build/googlemock/gtest/
+                        ${ROOT_DRL_PATH}/common/build/${build_dir_type}/googletest-build/googlemock/gtest/
                 )
         find_library(GTEST_LIBRARY NAMES gtest
                 PATHS 
                         ${CMAKE_BINARY_DIR}/googletest-build/googlemock/gtest/
-                        ${ROOT_DRL_PATH}/common/build/${build_dir}/googletest-build/googlemock/gtest/
+                        ${ROOT_DRL_PATH}/common/build/${build_dir_type}/googletest-build/googlemock/gtest/
                 )
         set(GTEST_BOTH_LIBRARIES ${GTEST_MAIN_LIBRARY} ${GTEST_LIBRARY})
 

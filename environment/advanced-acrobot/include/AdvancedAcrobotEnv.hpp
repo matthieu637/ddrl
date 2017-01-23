@@ -49,10 +49,10 @@ class ReachLimitPoorInformed : public ProblemDefinition {
 class ReachLimitPoorInformedNoGamma : public ProblemDefinition {
  public:
   double performance(AdvancedAcrobotWorld* instance) {
-    if (instance->perf() > 0.99d)
-      return 1.00d;
+    if (instance->perf() > 0.99f)
+      return 1.00f;
     else
-      return -1.00d;
+      return -1.00f;
   }
   bool still_running(AdvancedAcrobotWorld* instance) const {
     return instance->perf() <= 0.99f;

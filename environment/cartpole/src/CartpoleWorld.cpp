@@ -3,6 +3,7 @@
 #include <functional>
 #include <vector>
 #include <algorithm>
+#include <cmath>
 #include "ode/ode.h"
 
 #include "bib/Utils.hpp"

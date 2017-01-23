@@ -350,7 +350,7 @@ void HACKinitOSX(int w, int h, dsFunctions *fn){
 	osxInstallEventHandlers();
 	dsStartGraphics( w, h, fn );
 	
-	if( fn -> start ) fn->start();
+	//if( fn -> start ) fn->start();
 }
 
 void HACKdraw(dsFunctions *fn) {
@@ -358,7 +358,7 @@ void HACKdraw(dsFunctions *fn) {
 }
 
 void HACKclose() {
-	dsStopGraphics();
+	//dsStopGraphics();
 	
-	destroyMainWindow();
+	//destroyMainWindow();
 }
