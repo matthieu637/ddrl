@@ -14,6 +14,10 @@ find_library( HALF_CHEETAH_LIBRARY
   "${ROOT_DRL_PATH}/environment/half_cheetah/lib"
 )
 
+find_package(ODEEnv)
+set(HALF_CHEETAH_INCLUDE_DIRS ${HALF_CHEETAH_INCLUDE_DIRS} ${ODE_ENV_INCLUDE_DIRS})
+set(HALF_CHEETAH_LIBRARY ${HALF_CHEETAH_LIBRARY} ${ODE_ENV_LIBRARY})
+
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(AdvancedAcrobot DEFAULT_MSG HALF_CHEETAH_LIBRARY HALF_CHEETAH_INCLUDE_DIRS)
 mark_as_advanced(HALF_CHEETAH_INCLUDE_DIRS HALF_CHEETAH_LIBRARY )

@@ -30,27 +30,27 @@ target_link_libraries(ada-nfac
 
 add_executable(cartpole src/test/Cartpole.cpp ${all_include} ${all_sources} )
 target_link_libraries(cartpole 
-  ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
 add_executable(half-cheetah-dpmt src/test/DpmtHalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(half-cheetah-dpmt 
-  ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
 
 add_executable(cp-nfac src/test/NFACCp.cpp ${all_include} ${all_sources} )
 target_link_libraries(cp-nfac
-  ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
 add_executable(half-cheetah src/test/HalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(half-cheetah 
-  ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
 
 add_executable(half-cheetah-nfac src/test/NFACHalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(half-cheetah-nfac
-  ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
 add_executable(half-cheetah-nfmac src/test/NFMACHalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(half-cheetah-nfmac
-  ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

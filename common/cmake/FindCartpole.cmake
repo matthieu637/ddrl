@@ -14,6 +14,10 @@ find_library( CARTPOLE_LIBRARY
   "${ROOT_DRL_PATH}/environment/cartpole/lib"
 )
 
+find_package(ODEEnv)
+set(CARTPOLE_INCLUDE_DIRS ${CARTPOLE_INCLUDE_DIRS} ${ODE_ENV_INCLUDE_DIRS})
+set(CARTPOLE_LIBRARY ${CARTPOLE_LIBRARY} ${ODE_ENV_LIBRARY})
+
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(AdvancedAcrobot DEFAULT_MSG CARTPOLE_LIBRARY CARTPOLE_INCLUDE_DIRS)
 mark_as_advanced(CARTPOLE_INCLUDE_DIRS CARTPOLE_LIBRARY )

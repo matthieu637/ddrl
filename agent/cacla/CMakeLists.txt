@@ -40,16 +40,16 @@ add_executable(adacrobot-on src/test/AdacrobotOnline.cpp ${all_include} ${all_so
 target_link_libraries(adacrobot-on ${ADVANCED_ACROBOT_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(cp-cacla-on src/test/CartpoleCacOn.cpp ${all_include} ${all_sources} )
-target_link_libraries(cp-cacla-on ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
+target_link_libraries(cp-cacla-on ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(cp-cacla-off src/test/CartpoleCacOff.cpp ${all_include} ${all_sources} )
-target_link_libraries(cp-cacla-off ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
+target_link_libraries(cp-cacla-off ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(hf-cacla-on src/test/HalfCheetahCacOn.cpp ${all_include} ${all_sources} )
-target_link_libraries(hf-cacla-on ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+target_link_libraries(hf-cacla-on ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(hf-cacla-off src/test/HalfCheetahCacOff.cpp ${all_include} ${all_sources} )
-target_link_libraries(hf-cacla-off ${ADVANCED_ACROBOT_LIBRARY} ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+target_link_libraries(hf-cacla-off ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 
 
 # add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
