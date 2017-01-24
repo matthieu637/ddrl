@@ -8,8 +8,8 @@ if(NOT DEFINED ROOT_DRL_PATH)
 endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/Config.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/GTest.cmake) #GTest must be before Caffe (depedency)
 include(${CMAKE_SOURCE_DIR}/cmake/CaffeConfig.cmake)
-include(${CMAKE_SOURCE_DIR}/cmake/GTest.cmake)
 
 #Boost library
 find_package(Boost 1.54 COMPONENTS serialization program_options thread system filesystem REQUIRED)
