@@ -40,7 +40,7 @@ function cmakeBuild(){
 		cd build/$1
 	fi
 
-	tmplog=`mktemp`
+	tmplog=`$MKTEMP`
 
 
 	if [[ "${CMAKE_ARGS[@]}" == '' ]] ; then
@@ -71,7 +71,7 @@ function cmakeBuildRecall(){
 		cd build/$directory
 	fi
 
-	tmplog=`mktemp`
+	tmplog=`$MKTEMP`
 	cmake $cmakelist >& $tmplog
 	stopOnError $? $tmplog
 	cp $tmplog cmake.log
