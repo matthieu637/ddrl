@@ -18,7 +18,7 @@ endif()
 
 find_package(Caffe QUIET)
 if(NOT DEFINED Caffe_INCLUDE_DIRS)
-       configure_file(${CMAKE_SOURCE_DIR}/cmake/Caffe.in caffe-download/CMakeLists.txt)
+       configure_file(${ROOT_DRL_PATH}/common/cmake/Caffe.in caffe-download/CMakeLists.txt)
        execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
          RESULT_VARIABLE result
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/caffe-download )
@@ -35,6 +35,8 @@ if(NOT DEFINED Caffe_INCLUDE_DIRS)
 
        include(${CMAKE_BINARY_DIR}/caffe-build/CaffeConfig.cmake)
 endif()
+
+list(REMOVE_AT Caffe_INCLUDE_DIRS 0) #remove local include of gtest
 
 if(${Caffe_CPU_ONLY})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCAFFE_CPU_ONLY ")
