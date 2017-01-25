@@ -21,11 +21,7 @@ if(NOT ${GTEST_FOUND})
         # settings on Windows
         set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
-        if (CMAKE_VERSION VERSION_LESS 2.8.11)
-                include_directories("${CMAKE_BINARY_DIR}/googletest-src/googletest/include/")
-        endif()
-
-        set(GTEST_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/googletest-src/googletest/include/")
+        set(GTEST_INCLUDE_DIRS "${ROOT_DRL_PATH}/common/build/${build_dir_type}/googletest-src/googletest/include/")
         find_library(GTEST_MAIN_LIBRARY NAMES gtest_main 
                 PATHS 
                         ${CMAKE_BINARY_DIR}/googletest-build/googlemock/gtest/ 
