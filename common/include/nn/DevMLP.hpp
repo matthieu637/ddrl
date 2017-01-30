@@ -60,10 +60,15 @@ class DevMLP : public MLP {
 #endif
     caffe::NetParameter net_param_old;
     old->getNN()->ToProto(&net_param_old);
+    
+//     net_param_old.PrintDebugString();
+//     LOG_DEBUG("########################################################################################");
 
-    if(policy) {
       caffe::NetParameter net_param_init;
-      net_param_init.set_name("Actor");
+      if(!policy)
+        net_param_init.set_name("Critic");
+      else
+        net_param_init.set_name("Actor");
       net_param_init.set_force_backward(true);
 
       //copy input layer and increase dimension
@@ -71,26 +76,62 @@ class DevMLP : public MLP {
       lp->CopyFrom(net_param_old.layer(0));
       caffe::MemoryDataParameter* mdataparam = lp->mutable_memory_data_param();
       mdataparam->set_height(size_sensors);
+      
+      int layer_index = 1; 
+      if(!policy){
+        layer_index = 3;
+        
+        //action layer
+        lp = net_param_init.add_layer();
+        lp->CopyFrom(net_param_old.layer(1));
+        mdataparam = lp->mutable_memory_data_param();
+        mdataparam->set_height(size_motors);
+        
+        //target layer
+        lp = net_param_init.add_layer();
+        lp->CopyFrom(net_param_old.layer(2));
+      }
 
       //copy silent layer
       lp = net_param_init.add_layer();
-      ASSERT(net_param_old.layer(1).type() == "Silence", "wrong fusion");
-      lp->CopyFrom(net_param_old.layer(1));
-
-      string states_blob_name_new = net_param_old.layer(2).bottom(0)+".task1";
-      string states_blob_name_old = net_param_old.layer(2).bottom(0)+".task0";
-
+      ASSERT(net_param_old.layer(layer_index).type() == "Silence", "wrong fusion 1) " << net_param_old.layer(layer_index).type());
+      lp->CopyFrom(net_param_old.layer(layer_index));
+      layer_index++;
+      
+      string states_blob_name_new = net_param_old.layer(layer_index).bottom(0)+".task1";
+      string states_blob_name_old = net_param_old.layer(layer_index).bottom(0)+".task0";
       if(old->size_sensors != size_sensors) {
         //split input
         SliceLayer(net_param_init, "slice_input", {states_blob_name}, {states_blob_name_old, states_blob_name_new},
                    boost::none, old->size_sensors);
       } else {
-        states_blob_name_new = net_param_old.layer(2).bottom(0);
+        states_blob_name_new = net_param_old.layer(layer_index).bottom(0);
         states_blob_name_old = states_blob_name_new;
       }
+      
+      string actions_blob_name_new;
+      string actions_blob_name_old;
+      
+      string state_actions_blob_name_new;
+      string state_actions_blob_name_old;
+      if(!policy){
+        actions_blob_name_new = net_param_old.layer(layer_index).bottom(1)+".task1";
+        actions_blob_name_old = net_param_old.layer(layer_index).bottom(1)+".task0";
+        
+        state_actions_blob_name_new = "state_actions.task1";
+        state_actions_blob_name_old = "state_actions.task0";
+        
+        if(old->size_motors != size_motors) {
+          //split input
+          SliceLayer(net_param_init, "slice_input2", {actions_blob_name}, {actions_blob_name_old, actions_blob_name_new},
+                     boost::none, old->size_motors);
+        } else {
+          states_blob_name_new = net_param_old.layer(layer_index).bottom(1);
+          states_blob_name_old = states_blob_name_new;
+        }
+      }
+      
       //add first inner
-      int layer_index = 2;
-//       bool layer
       while(net_param_old.layer(layer_index).type() != "InnerProduct") {
         lp = net_param_init.add_layer();
         lp->CopyFrom(net_param_old.layer(layer_index));
@@ -100,13 +141,25 @@ class DevMLP : public MLP {
         }
         lp->set_bottom(0, states_blob_name_old);
         lp->set_top(0, states_blob_name_old);
+        
+        if(!policy){
+          lp->set_bottom(1, actions_blob_name_old);
+          lp->set_top(0, state_actions_blob_name_old);
+        }
+        
         layer_index ++;
+      }
+      
+      if(!policy){
+        ConcatLayer(net_param_init, "concat2", {states_blob_name_new, actions_blob_name_new}, {state_actions_blob_name_new}, boost::none, 2);
       }
 
       ASSERT(net_param_old.layer(layer_index).type() == "InnerProduct", "wrong fusion " << net_param_old.layer(2).type());
       lp = net_param_init.add_layer();
       lp->CopyFrom(net_param_old.layer(layer_index));
       lp->set_bottom(0, states_blob_name_old);
+      if(!policy)
+        lp->set_bottom(0, state_actions_blob_name_old);
       if(fix_weights) {
         caffe::ParamSpec* lr_mult = lp->add_param();
         lr_mult->set_lr_mult(0.0f);
@@ -114,8 +167,11 @@ class DevMLP : public MLP {
       old_hiddens.push_back(lp->inner_product_param().num_output());
       layer_index++;
 
+      int last_one_layer = net_param_old.layer_size() - 1;
+      if(!policy)
+        last_one_layer--;
       //add everything else except last one
-      for(; layer_index < net_param_old.layer_size() - 1 ; layer_index++) {
+      for(; layer_index < last_one_layer ; layer_index++) {
         lp = net_param_init.add_layer();
         lp->CopyFrom(net_param_old.layer(layer_index));
         if(lp->type() == "InnerProduct") {
@@ -134,13 +190,11 @@ class DevMLP : public MLP {
       //change last output for concatenation
       lp = net_param_init.add_layer();
       lp->CopyFrom(net_param_old.layer(layer_index));
-//       string actions_blob_name_old = net_param_old.layer(layer_index).top(0)+".task0";
-      string actions_blob_name_new = net_param_old.layer(layer_index).top(0)+"."+task_name+std::to_string(task);
+      actions_blob_name_new = net_param_old.layer(layer_index).top(0)+"."+task_name+std::to_string(task);
       lp->set_top(0, lp->name());
       
-
       std::string layer_name;
-      ASSERT(old_hiddens.size() == c->hiddens.size(), "failed fusion ");
+      ASSERT(old_hiddens.size() == c->hiddens.size(), "failed fusion 2) " << old_hiddens.size() << " " << c->hiddens.size());
       if(link_structure <= 7) {
 //         for(uint i=1; i<=old_hiddens.size(); i++) {
         uint i = 1;
@@ -170,10 +224,14 @@ class DevMLP : public MLP {
         ConcatLayer(net_param_init, layer_name, to_be_cc, {layer_name}, boost::none, 2);
         states_blob_name_new = layer_name;
       }
-
+      
+      string tower_input = states_blob_name_new;
+      if(!policy)
+        tower_input = state_actions_blob_name_new;
+      
       batch_norm_type bna = convertBN(c->batch_norm, c->hiddens.size());
       //produce new net
-      std::string tower_top = Tower(net_param_init, states_blob_name_new, c->hiddens, bna,
+      std::string tower_top = Tower(net_param_init, tower_input, c->hiddens, bna,
                                     c->hidden_layer_type, link_structure == 8 ? 0 : link_structure,
                                     task, old->size_sensors == size_sensors);
       BatchNormTower(net_param_init, c->hiddens.size(), {tower_top}, {tower_top}, boost::none, bna, task);
@@ -191,28 +249,37 @@ class DevMLP : public MLP {
       } else { // link_structure == 8
         final_layer.push_back(produce_name("ip", c->hiddens.size(), task));
       }
-
+      
+      string last_layer_name = actions_blob_name;
+      uint num_output = size_motors;
+      if(!policy) {
+        last_layer_name = q_values_blob_name;
+        num_output = 1;
+      }
+      
       layer_name = produce_name("ip", c->hiddens.size()+1, task);
       if(c->last_layer_type == 0)
-        IPLayer(net_param_init, layer_name, final_layer, {actions_blob_name}, boost::none, size_motors);
+        IPLayer(net_param_init, layer_name, final_layer, {last_layer_name}, boost::none, num_output);
       else if(c->last_layer_type == 1) {
-        IPLayer(net_param_init, layer_name, final_layer, {actions_blob_name}, boost::none, size_motors);
-        ReluLayer(net_param_init, produce_name("ip_func", c->hiddens.size()+1, task), {actions_blob_name}, {actions_blob_name},
+        IPLayer(net_param_init, layer_name, final_layer, {last_layer_name}, boost::none, num_output);
+        ReluLayer(net_param_init, produce_name("ip_func", c->hiddens.size()+1, task), {last_layer_name}, {last_layer_name},
                   boost::none);
       } else if(c->last_layer_type == 2) {
-        IPLayer(net_param_init, layer_name, final_layer, {actions_blob_name}, boost::none, size_motors);
-        TanhLayer(net_param_init, produce_name("ip_func", c->hiddens.size()+1, task), {actions_blob_name}, {actions_blob_name},
+        IPLayer(net_param_init, layer_name, final_layer, {last_layer_name}, boost::none, num_output);
+        TanhLayer(net_param_init, produce_name("ip_func", c->hiddens.size()+1, task), {last_layer_name}, {last_layer_name},
                   boost::none);
       }
 
       if(add_loss_layer) {
         MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy2"},
-                        boost::none, {kMinibatchSize, 1, size_motors, 1});
-        EuclideanLossLayer(net_param_init, "loss", {actions_blob_name, targets_blob_name},
+                        boost::none, {kMinibatchSize, 1, num_output, 1});
+        EuclideanLossLayer(net_param_init, "loss", {last_layer_name, targets_blob_name},
         {loss_blob_name}, boost::none);
       }
-
-//       net_param_init.PrintDebugString();
+      if(!policy){
+        lp = net_param_init.add_layer();
+        lp->CopyFrom(net_param_old.layer(layer_index+1));
+      }
 
       caffe::SolverParameter solver_param;
       caffe::NetParameter* net_param = solver_param.mutable_net_param();
@@ -247,24 +314,38 @@ class DevMLP : public MLP {
           weights_bias[i] = weights_bias[i] * init_multiplier;
 
         uint input_last_layer = old->size_motors + c->hiddens.back();
+        if(!policy)
+          input_last_layer = 1 + c->hiddens.back();
+        
         if(link_structure & (1 << 0)) {
           input_last_layer += old_hiddens.back();
         }
-        ASSERT((uint)blob->count() == (size_motors*input_last_layer),
+#ifndef NDEBUG
+        if(policy)
+          ASSERT((uint)blob->count() == (size_motors*input_last_layer),
                "failed fusion "<< blob->count() << " " << (size_motors*input_last_layer));
-
+        else
+          ASSERT((uint)blob->count() == (1*input_last_layer),
+                 "failed fusion "<< blob->count() << " " << (1*input_last_layer));
+#endif
         uint y=0;
-        for(uint i = 0; i<old->size_motors; i++) {
-          weights[i*input_last_layer+y] = 1.f;
-          y++;
-        }
+        if(policy)
+          for(uint i = 0; i<old->size_motors; i++) {
+            weights[i*input_last_layer+y] = 1.f;
+            y++;
+          }
+        else
+          for(uint i = 0; i < 1; i++) {
+            weights[i*input_last_layer+y] = 1.f;
+            y++;
+          }
+          
 //         weights[0] = 1.f;
 //         weights[(old->size_motors + c->hiddens.back())+1] = 1.f;//15
 //         weights[3*(old->size_motors + c->hiddens.back())+2] = 1.f;//30
 //         weights[4*(old->size_motors + c->hiddens.back())+3] = 1.f;//45
 
       }
-    }
   }
 
   virtual double number_of_parameters() override {
@@ -314,6 +395,25 @@ class DevMLP : public MLP {
 //     exit(1);
 
     return ac2;
+  }
+  
+  double computeOutVF(const std::vector<double>& states_batch, const std::vector<double>& motors_batch) override {
+    std::vector<double> substate(states_batch);
+    std::vector<double> subaction(motors_batch);
+    
+    substate.pop_back();
+    substate.pop_back();
+    substate.pop_back();
+    substate.pop_back();
+    
+    subaction.pop_back();
+    subaction.pop_back();
+    
+    double q1 = _old->computeOutVF(substate, subaction);
+    double q2 = MLP::computeOutVF(states_batch, motors_batch);
+    LOG_DEBUG(q1 << " " << q2);
+    
+    return q2;
   }
 #endif
 
@@ -396,6 +496,7 @@ class DevMLP : public MLP {
 };
 
 #endif  // DevMLP_HPP
+
 
 
 

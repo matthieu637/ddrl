@@ -134,7 +134,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
     last_action.reset(next_action);
 
-
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -263,7 +262,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
 #endif
 
-    if(!learning){
+    if(learning){
       MLP* cann = new MLP(*ann, false);
       MLP* cqnn = new MLP(*qnn, false);
       best_population.insert({cann, cqnn, sum_weighted_reward});
@@ -284,9 +283,11 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     delete qnn;
     
     auto it = best_population.begin();
-//     ++it;
-    ann = new MLP(*best_population.begin()->ann, false);
-    qnn = new MLP(*best_population.begin()->qnn, false);
+    ASSERT(best_population.size() > 0, "pop empty " << best_population.size());
+    
+    ++it;
+    ann = new MLP(*it->ann, false);
+    qnn = new MLP(*it->qnn, false);
   }
   
   void end_episode() override {

@@ -397,7 +397,7 @@ class MLP {
     solver->Step(iter);
   }
 
-  double computeOutVF(const std::vector<double>& sensors, const std::vector<double>& motors) {
+  virtual double computeOutVF(const std::vector<double>& sensors, const std::vector<double>& motors) {
     std::vector<double> states_input(size_sensors * kMinibatchSize, 0.0f);
     std::copy(sensors.begin(), sensors.end(),states_input.begin());
 
