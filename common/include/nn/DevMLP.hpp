@@ -197,7 +197,6 @@ class DevMLP : public MLP {
       std::string layer_name;
       ASSERT(old_hiddens.size() == c->hiddens.size(), "failed fusion 2) " << old_hiddens.size() << " " << c->hiddens.size());
       if(link_structure <= 7) {
-//         for(uint i=1; i<=old_hiddens.size(); i++) {
         uint i = 1;
         if(link_structure & (1 << 1) && i==1 ) {
           layer_name = produce_name("rsh", i, task - 1);
@@ -207,17 +206,25 @@ class DevMLP : public MLP {
           layer_name = produce_name("rsh", i + 1, task - 1);
           ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i + 1, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old_hiddens[i],1});
         }
-//         }
       } else {
-        std::vector<std::string> to_be_cc = {states_blob_name_new};
-        to_be_cc.push_back(states_blob_name_old);
+        std::vector<std::string> to_be_cc;
+        if(policy){
+          to_be_cc.push_back(states_blob_name_new);
+          to_be_cc.push_back(states_blob_name_old);
+        } else {
+          to_be_cc.push_back(states_actions_blob_name_new);
+          to_be_cc.push_back(states_actions_blob_name_old);
+        }
+        
         for(uint i=1; i < old_hiddens.size() + 2; i++) {
           layer_name = produce_name("rsh", i, task - 1);
 
           if(i - 1 < old_hiddens.size())
             ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old_hiddens[i-1],1});
-          else
+          else if(policy)
             ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old->size_motors,1});
+          else //!policy
+            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,1,1});
 
           to_be_cc.push_back(layer_name);
         }
@@ -227,8 +234,12 @@ class DevMLP : public MLP {
       }
       
       string tower_input = states_blob_name_new;
-      if(!policy)
-        tower_input = states_actions_blob_name_new;
+      if(!policy){
+        if(link_structure <= 7)
+          tower_input = states_actions_blob_name_new;
+        else //link_structure == 8
+          tower_input = states_blob_name_new; //just edited before
+      }
       
       batch_norm_type bna = convertBN(c->batch_norm, c->hiddens.size());
       //produce new net
