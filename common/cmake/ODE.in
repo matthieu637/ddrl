@@ -4,9 +4,11 @@ project(ode-download NONE)
 
 include(ExternalProject)
 ExternalProject_Add(ode
-  URL               https://bitbucket.org/odedevs/ode/downloads/ode-0.13.1.tar.gz    
+  URL               https://bitbucket.org/odedevs/ode/downloads/ode-0.14.tar.gz
   SOURCE_DIR        "${CMAKE_BINARY_DIR}/ode-src"
   BUILD_IN_SOURCE   1
+  PATCH_COMMAND     wget https://matthieu-zimmer.net/~matthieu/patches/ode.patch
+  COMMAND	    patch -i ${CMAKE_BINARY_DIR}/ode-src/ode.patch ${CMAKE_BINARY_DIR}/ode-src/bootstrap
   UPDATE_COMMAND    ./bootstrap
   CONFIGURE_COMMAND CFLAGS=-O2 CPPFLAGS=-O2 ./configure --enable-shared --enable-libccd --enable-double-precision --disable-demos --with-drawstuff=none --disable-asserts
   BUILD_COMMAND     make -j ${PROCESSOR_COUNT}

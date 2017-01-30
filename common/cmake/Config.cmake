@@ -19,6 +19,20 @@ set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -O2 -g -DNDEBU
 if(APPLE)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -DGTEST_USE_OWN_TR1_TUPLE=1 ")
 	set(CMAKE_EXE_LINKER_FLAGS "-stdlib=libc++")
+
+        exec_program(uname ARGS -v  OUTPUT_VARIABLE DARWIN_VERSION)
+        string(REGEX MATCH "[0-9]+" DARWIN_VERSION ${DARWIN_VERSION})
+        message(STATUS "DARWIN_VERSION=${DARWIN_VERSION}")
+
+        if(${DARWIN_VERSION} VERSION_LESS 14)
+                set(CMAKE_C_COMPILER            "/usr/local/bin/clang-3.8")
+                set(CMAKE_CXX_COMPILER          "/usr/local/bin/clang++-3.8")
+                set(CMAKE_AR                    "/usr/local/bin/llvm-ar-3.8")
+                set(CMAKE_LINKER                "/usr/local/bin/llvm-link-3.8")
+                set(CMAKE_NM                    "/usr/local/bin/llvm-nm-3.8")
+                set(CMAKE_OBJDUMP               "/usr/local/bin/llvm-objdump-3.8")
+                set(CMAKE_RANLIB                "/usr/local/bin/llvm-ranlib-3.8")
+        endif()
 endif()
 
 #-------------------
