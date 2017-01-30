@@ -31,6 +31,7 @@ class MLP {
   // Blob names
   static const std::string states_blob_name;
   static const std::string actions_blob_name;
+  static const std::string states_actions_blob_name;
   static const std::string targets_blob_name;
   static const std::string wsample_blob_name;
   static const std::string q_values_blob_name;
@@ -111,10 +112,10 @@ class MLP {
       SilenceLayer(net_param_init, "silence", {"dummy1","dummy3"}, {}, boost::none);
 
     if(size_motors > 0)
-      ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {"state_actions"}, boost::none, 2);
+      ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {states_actions_blob_name}, boost::none, 2);
     else
-      ConcatLayer(net_param_init, "concat", {states_blob_name}, {"state_actions"}, boost::none, 2);
-    std::string tower_top = Tower(net_param_init, "state_actions", hiddens, bna, hidden_layer_type);
+      ConcatLayer(net_param_init, "concat", {states_blob_name}, {states_actions_blob_name}, boost::none, 2);
+    std::string tower_top = Tower(net_param_init, states_actions_blob_name, hiddens, bna, hidden_layer_type);
     BatchNormTower(net_param_init, hiddens.size(), {tower_top}, {tower_top}, boost::none, bna);
     IPLayer(net_param_init, produce_name("ip", hiddens.size()+1), {tower_top}, {q_values_blob_name}, boost::none, 1);
     if(!weighted_sample)
@@ -312,8 +313,8 @@ class MLP {
 //     MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy3"},
 //                 boost::none, {kMinibatchSize, 1, 1, 1});
 //     SilenceLayer(net_param_init, "silence", {"dummy1","dummy2","dummy3"}, {}, boost::none);
-//     ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {"state_actions"}, boost::none, 2);
-//     std::string tower_top = Tower(net_param_init, "", "state_actions", hiddens);
+//     ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {states_actions_blob_name}, boost::none, 2);
+//     std::string tower_top = Tower(net_param_init, "", states_actions_blob_name, hiddens);
 //     IPLayer(net_param_init, q_values_layer_name, {tower_top}, {q_values_blob_name}, boost::none, 1);
 //     EuclideanLossLayer(net_param_init, "loss", {q_values_blob_name, targets_blob_name},
 //                       {loss_blob_name}, boost::none);
@@ -603,7 +604,8 @@ protected:
                     uint hidden_layer_type,
                     uint link_struct=0,
                     uint task=0,
-                    bool avoid_states_input=false) {
+                    bool avoid_states_input=false, 
+                    bool policy=true) {
     std::string input_name = input_blob_name;
     std::string layer_name;
 
@@ -621,8 +623,12 @@ protected:
 
         if(link_struct & (1 << 0)) {
           if(i==1) {
-            if(!avoid_states_input)
-              bottoms.push_back(states_blob_name+"."+task_name+std::to_string(task-1));
+            if(!avoid_states_input){
+              if(policy)
+                bottoms.push_back(states_blob_name+"."+task_name+std::to_string(task-1));
+              else
+                bottoms.push_back(states_actions_blob_name+"."+task_name+std::to_string(task-1));
+            }
           } else //if(bottoms.size() == 1)//to be precomputed
             bottoms.push_back(produce_name("ip", i - 1, task -1));
         }

@@ -9,6 +9,7 @@ const std::string MLP::wsample_input_layer_name       = "wsample_input_layer";
 // Blob names
 const std::string MLP::states_blob_name               = "states";
 const std::string MLP::actions_blob_name              = "actions";
+const std::string MLP::states_actions_blob_name       = "states_actions";
 const std::string MLP::targets_blob_name              = "target";
 const std::string MLP::wsample_blob_name              = "wsample";
 const std::string MLP::q_values_blob_name             = "q_values";

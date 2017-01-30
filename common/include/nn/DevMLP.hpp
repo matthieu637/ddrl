@@ -76,6 +76,7 @@ class DevMLP : public MLP {
       lp->CopyFrom(net_param_old.layer(0));
       caffe::MemoryDataParameter* mdataparam = lp->mutable_memory_data_param();
       mdataparam->set_height(size_sensors);
+      const uint old_batch_size = mdataparam->batch_size();
       
       int layer_index = 1; 
       if(!policy){
@@ -112,14 +113,14 @@ class DevMLP : public MLP {
       string actions_blob_name_new;
       string actions_blob_name_old;
       
-      string state_actions_blob_name_new;
-      string state_actions_blob_name_old;
+      string states_actions_blob_name_new;
+      string states_actions_blob_name_old;
       if(!policy){
         actions_blob_name_new = net_param_old.layer(layer_index).bottom(1)+".task1";
         actions_blob_name_old = net_param_old.layer(layer_index).bottom(1)+".task0";
         
-        state_actions_blob_name_new = "state_actions.task1";
-        state_actions_blob_name_old = "state_actions.task0";
+        states_actions_blob_name_new = states_actions_blob_name+"."+task_name+std::to_string(task);
+        states_actions_blob_name_old = states_actions_blob_name+"."+task_name+std::to_string(task-1);
         
         if(old->size_motors != size_motors) {
           //split input
@@ -144,14 +145,14 @@ class DevMLP : public MLP {
         
         if(!policy){
           lp->set_bottom(1, actions_blob_name_old);
-          lp->set_top(0, state_actions_blob_name_old);
+          lp->set_top(0, states_actions_blob_name_old);
         }
         
         layer_index ++;
       }
       
       if(!policy){
-        ConcatLayer(net_param_init, "concat2", {states_blob_name_new, actions_blob_name_new}, {state_actions_blob_name_new}, boost::none, 2);
+        ConcatLayer(net_param_init, "concat2", {states_blob_name_new, actions_blob_name_new}, {states_actions_blob_name_new}, boost::none, 2);
       }
 
       ASSERT(net_param_old.layer(layer_index).type() == "InnerProduct", "wrong fusion " << net_param_old.layer(2).type());
@@ -159,7 +160,7 @@ class DevMLP : public MLP {
       lp->CopyFrom(net_param_old.layer(layer_index));
       lp->set_bottom(0, states_blob_name_old);
       if(!policy)
-        lp->set_bottom(0, state_actions_blob_name_old);
+        lp->set_bottom(0, states_actions_blob_name_old);
       if(fix_weights) {
         caffe::ParamSpec* lr_mult = lp->add_param();
         lr_mult->set_lr_mult(0.0f);
@@ -200,11 +201,11 @@ class DevMLP : public MLP {
         uint i = 1;
         if(link_structure & (1 << 1) && i==1 ) {
           layer_name = produce_name("rsh", i, task - 1);
-          ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {1,1,old_hiddens[i-1],1});
+          ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old_hiddens[i-1],1});
         }
         if(link_structure & (1 << 2) && i==1 ) {
           layer_name = produce_name("rsh", i + 1, task - 1);
-          ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i + 1, task - 1)}, {layer_name}, boost::none, {1,1,old_hiddens[i],1});
+          ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i + 1, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old_hiddens[i],1});
         }
 //         }
       } else {
@@ -214,9 +215,9 @@ class DevMLP : public MLP {
           layer_name = produce_name("rsh", i, task - 1);
 
           if(i - 1 < old_hiddens.size())
-            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {1,1,old_hiddens[i-1],1});
+            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old_hiddens[i-1],1});
           else
-            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {1,1,old->size_motors,1});
+            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old->size_motors,1});
 
           to_be_cc.push_back(layer_name);
         }
@@ -227,13 +228,13 @@ class DevMLP : public MLP {
       
       string tower_input = states_blob_name_new;
       if(!policy)
-        tower_input = state_actions_blob_name_new;
+        tower_input = states_actions_blob_name_new;
       
       batch_norm_type bna = convertBN(c->batch_norm, c->hiddens.size());
       //produce new net
       std::string tower_top = Tower(net_param_init, tower_input, c->hiddens, bna,
                                     c->hidden_layer_type, link_structure == 8 ? 0 : link_structure,
-                                    task, old->size_sensors == size_sensors);
+                                    task, old->size_sensors == size_sensors, policy);
       BatchNormTower(net_param_init, c->hiddens.size(), {tower_top}, {tower_top}, boost::none, bna, task);
 
       std::vector<std::string> final_layer;
@@ -280,6 +281,8 @@ class DevMLP : public MLP {
         lp = net_param_init.add_layer();
         lp->CopyFrom(net_param_old.layer(layer_index+1));
       }
+      
+//       net_param_init.PrintDebugString();
 
       caffe::SolverParameter solver_param;
       caffe::NetParameter* net_param = solver_param.mutable_net_param();
