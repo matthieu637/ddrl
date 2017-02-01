@@ -10,8 +10,8 @@ ExternalProject_Add(ode
   PATCH_COMMAND     wget https://matthieu-zimmer.net/~matthieu/patches/ode.patch
   COMMAND	    patch -i ${CMAKE_BINARY_DIR}/ode-src/ode.patch ${CMAKE_BINARY_DIR}/ode-src/bootstrap
   UPDATE_COMMAND    ./bootstrap
-  CONFIGURE_COMMAND CFLAGS=-O2 CPPFLAGS=-O2 ./configure --enable-shared --enable-libccd --enable-double-precision --disable-demos --with-drawstuff=none --disable-asserts
+  CONFIGURE_COMMAND CFLAGS=-O2 CPPFLAGS=-O2 ./configure --prefix=${ROOT_DRL_PATH}/environment/ode-env/ --enable-shared --enable-libccd --enable-double-precision --disable-demos --with-drawstuff=none --disable-asserts
   BUILD_COMMAND     make -j ${PROCESSOR_COUNT}
-  INSTALL_COMMAND   ""  
+  INSTALL_COMMAND   make install
   TEST_COMMAND      ""  
 )

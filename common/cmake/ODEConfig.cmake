@@ -19,7 +19,8 @@ if( NOT ODE_FOUND )
 	endif()
 
         set(ODE_INCLUDE_DIR "${ROOT_DRL_PATH}/environment/ode-env/build/${build_dir_type}/ode-src/include/")
-        find_library(ODE_LIBRARY NAMES ode PATHS 
+        find_library(ODE_LIBRARY NAMES ode PATHS
+		${ROOT_DRL_PATH}/environment/ode-env/
 		${CMAKE_BINARY_DIR}/ode-src/ode/src/.libs/
 		${ROOT_DRL_PATH}/environment/ode-env/build/${build_dir_type}/ode-src/ode/src/.libs/
 	)
