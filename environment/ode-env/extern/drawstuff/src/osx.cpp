@@ -345,20 +345,26 @@ extern void dsPlatformSimLoop( int givenWindowWidth, int givenWindowHeight, dsFu
     glutMainLoop();
 }
 
+static int first_time_draw;
 void HACKinitOSX(int w, int h, dsFunctions *fn){
+	functions = fn;
+	paused = false;
+
 	osxCreateMainWindow(w, h);
 	osxInstallEventHandlers();
 	dsStartGraphics( w, h, fn );
 	
-	//if( fn -> start ) fn->start();
+	if( fn -> start ) fn->start();
+	first_time_draw = true;
 }
 
 void HACKdraw(dsFunctions *fn) {
-	glutMainLoop(); 
+	if(first_time_draw){
+		glutMainLoop();
+		first_time_draw = false;
+	}
 }
 
 void HACKclose() {
-	//dsStopGraphics();
-	
-	//destroyMainWindow();
+	dsStopGraphics();
 }
