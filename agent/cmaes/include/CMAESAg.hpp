@@ -69,6 +69,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     population                  = pt->get<uint>("agent.population");
     gaussian_policy             = pt->get<bool>("agent.gaussian_policy");
     policy_stochasticity        = pt->get<double>("agent.policy_stochasticity");
+    double initial_deviation           = pt->get<double>("agent.initial_deviation");
     
     ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, 0.1, 1, actor_hidden_layer_type, actor_output_layer_type, batch_norm);
     if(std::is_same<NN, DevMLP>::value)
@@ -79,7 +80,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     double* startx  = new double[dimension];
     double* deviation  = new double[dimension];
     for(uint j=0; j< dimension; j++){
-        deviation[j] = 0.3;
+      deviation[j] = initial_deviation;
     }
     ann->copyWeightsTo(startx);
     
