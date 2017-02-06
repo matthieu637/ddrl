@@ -70,6 +70,12 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
     
     init.lower_rigid = init.control == 1 && init.predev >= 1 && init.predev <= 9;
     init.higher_rigid = init.control == 1 && init.predev >= 10;
+    
+    if((init.lower_rigid || init.higher_rigid) && (init.predev == 3 || init.predev == 12)){
+      LOG_ERROR("control = 1 with predev 3/12 is the same as control = 1 with 2/11");
+      LOG_ERROR("3/12 forces sensors to 0 when they are defined (control=0)");
+      exit(1);
+    }
 
     if (visible)
       instance = new HalfCheetahWorldView("data/textures", init);
