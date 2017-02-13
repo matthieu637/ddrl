@@ -221,6 +221,10 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     ann->load(path+".actor");
   }
 
+  MLP* getNN(){
+    return ann;
+  }
+  
  protected:
   void _display(std::ostream& out) const override {
     out << " " << std::setw(8) << std::fixed << std::setprecision(5) << sum_weighted_reward;

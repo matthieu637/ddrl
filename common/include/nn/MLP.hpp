@@ -282,6 +282,7 @@ class MLP {
  private:
   MLP(const MLP&) {
     LOG_ERROR("should not be called");
+    exit(1);
   }
 
  protected:
@@ -422,7 +423,7 @@ class MLP {
     return q_values_blob->data_at(0, 0, 0, 0);
   }
 
-  std::vector<double>* computeOutVFBatch(std::vector<double>& sensors, std::vector<double>& motors) {
+  virtual std::vector<double>* computeOutVFBatch(std::vector<double>& sensors, std::vector<double>& motors) {
     std::vector<double> target_input(kMinibatchSize, 0.0f);
     std::vector<double> target_input2(kMinibatchSize, 0.0f);
 

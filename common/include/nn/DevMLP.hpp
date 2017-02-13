@@ -63,11 +63,6 @@ class DevMLP : public MLP {
       exit(1);
     }
     
-    if(link_structure == 9 && !policy){
-      LOG_ERROR("to be implemented");
-      exit(1);
-    }
-    
     
 #ifdef DEBUG_DEVNN
     _old = old;
@@ -117,7 +112,7 @@ class DevMLP : public MLP {
       
       string states_blob_name_new = net_param_old.layer(layer_index).bottom(0)+".task1";
       string states_blob_name_old = net_param_old.layer(layer_index).bottom(0)+".task0";
-      if(old->size_sensors != size_sensors) {
+      if(old->size_sensors != size_sensors && link_structure != 9) {
         //split input
         SliceLayer(net_param_init, "slice_input", {states_blob_name}, {states_blob_name_old, states_blob_name_new},
                    boost::none, old->size_sensors);
@@ -131,7 +126,7 @@ class DevMLP : public MLP {
       
       string states_actions_blob_name_new;
       string states_actions_blob_name_old;
-      if(!policy){
+      if(!policy && link_structure != 9){
         actions_blob_name_new = net_param_old.layer(layer_index).bottom(1)+".task1";
         actions_blob_name_old = net_param_old.layer(layer_index).bottom(1)+".task0";
         
@@ -141,11 +136,17 @@ class DevMLP : public MLP {
         if(old->size_motors != size_motors) {
           //split input
           SliceLayer(net_param_init, "slice_input2", {actions_blob_name}, {actions_blob_name_old, actions_blob_name_new},
-                     boost::none, old->size_motors);
+                    boost::none, old->size_motors);
         } else {
           states_blob_name_new = net_param_old.layer(layer_index).bottom(1);
           states_blob_name_old = states_blob_name_new;
         }
+      } else if(!policy){
+        actions_blob_name_new = net_param_old.layer(layer_index).bottom(1);
+        actions_blob_name_old = net_param_old.layer(layer_index).bottom(1);
+        
+        states_actions_blob_name_new = states_actions_blob_name;
+        states_actions_blob_name_old = states_actions_blob_name;
       }
       
       //add first inner
@@ -167,7 +168,7 @@ class DevMLP : public MLP {
         layer_index ++;
       }
       
-      if(!policy){
+      if(!policy && link_structure != 9){
         ConcatLayer(net_param_init, "concat2", {states_blob_name_new, actions_blob_name_new}, {states_actions_blob_name_new}, boost::none, 2);
       }
 
@@ -181,9 +182,45 @@ class DevMLP : public MLP {
         caffe::ParamSpec* lr_mult = lp->add_param();
         lr_mult->set_lr_mult(0.0f);
       }
+      if(link_structure == 9 && size_sensors != old->size_sensors && policy){
+        lp->mutable_blobs(0)->mutable_shape()->set_dim(1, size_sensors);
+        std::vector<double> save(old->size_sensors * lp->blobs(0).shape().dim(0));
+        for(uint i=0; i < old->size_sensors * lp->blobs(0).shape().dim(0); i++){
+          save[i] = lp->blobs(0).double_data(i);
+          lp->mutable_blobs(0)->set_double_data(i, 0);
+        }
+        for(uint i=0;i < (size_sensors - old->size_sensors) * lp->blobs(0).shape().dim(0) ;i++)
+          lp->mutable_blobs(0)->add_double_data(init_multiplier * bib::Seed::gaussianRand<double>(0, lp->inner_product_param().weight_filler().std() ));
+//           lp->mutable_blobs(0)->add_double_data(0);
+        uint y=0;
+        for(uint i=0;i < size_sensors * lp->blobs(0).shape().dim(0) ;i++) {
+          if((i % size_sensors) < old->size_sensors )
+          lp->mutable_blobs(0)->set_double_data(i, save[y++]);
+        }
+      } else if(link_structure == 9 && !policy){
+        uint sum_ms = size_motors + size_sensors;
+        uint sum_ms_old = old->size_motors + old->size_sensors;
+        
+        lp->mutable_blobs(0)->mutable_shape()->set_dim(1, sum_ms);
+        std::vector<double> save(sum_ms_old * lp->blobs(0).shape().dim(0));
+        for(uint i=0; i < sum_ms_old * lp->blobs(0).shape().dim(0); i++){
+          save[i] = lp->blobs(0).double_data(i);
+          lp->mutable_blobs(0)->set_double_data(i, 0);
+        }
+        for(uint i=0;i < (sum_ms - sum_ms_old) * lp->blobs(0).shape().dim(0) ;i++)
+          lp->mutable_blobs(0)->add_double_data(init_multiplier * bib::Seed::gaussianRand<double>(0, lp->inner_product_param().weight_filler().std() ));
+//           lp->mutable_blobs(0)->add_double_data(0);
+        
+        uint y=0;
+        for(uint i=0;i < sum_ms * lp->blobs(0).shape().dim(0) ;i++) {
+          uint li = i % sum_ms;
+          if(li < old->size_sensors || (li >= size_sensors && li < (size_sensors + old->size_motors)))
+            lp->mutable_blobs(0)->set_double_data(i, save[y++]);
+        }
+      }
       old_hiddens.push_back(lp->inner_product_param().num_output());
       layer_index++;
-
+      
       int last_one_layer = net_param_old.layer_size() - 1;
       if(!policy)
         last_one_layer--;
@@ -203,7 +240,7 @@ class DevMLP : public MLP {
 //           lp->mutable_batch_norm_param()->set_use_global_stats(true); //cmaes crash
         }
       }
-
+      
       //change last output for concatenation
       lp = net_param_init.add_layer();
       lp->CopyFrom(net_param_old.layer(layer_index));
@@ -306,22 +343,25 @@ class DevMLP : public MLP {
           {loss_blob_name}, boost::none);
         }
       } else { //link_structure == 9
-        lp->mutable_inner_product_param()->set_num_output(size_motors);
-        lp->mutable_blobs(0)->mutable_shape()->set_dim(0, size_motors);
-        for(uint i=0;i < (size_motors - old->size_motors) * lp->blobs(0).shape().dim(1) ;i++)
-          lp->mutable_blobs(0)->add_double_data(init_multiplier * bib::Seed::gaussianRand<double>(0, lp->inner_product_param().weight_filler().std() ));        
-        
-        lp->mutable_blobs(1)->mutable_shape()->set_dim(0, size_motors);
-        for(uint i=0;i < size_motors - old->size_motors;i++)
-          lp->mutable_blobs(1)->add_double_data(init_multiplier * bib::Seed::gaussianRand<double>(0, lp->inner_product_param().weight_filler().std()) );
-        lp->set_top(0, actions_blob_name);
+        if(policy){
+          lp->mutable_inner_product_param()->set_num_output(size_motors);
+          lp->mutable_blobs(0)->mutable_shape()->set_dim(0, size_motors);
+          for(uint i=0;i < (size_motors - old->size_motors) * lp->blobs(0).shape().dim(1) ;i++)
+            lp->mutable_blobs(0)->add_double_data(init_multiplier * bib::Seed::gaussianRand<double>(0, lp->inner_product_param().weight_filler().std() ));        
+          
+          lp->mutable_blobs(1)->mutable_shape()->set_dim(0, size_motors);
+          for(uint i=0;i < size_motors - old->size_motors;i++)
+            lp->mutable_blobs(1)->add_double_data(init_multiplier * bib::Seed::gaussianRand<double>(0, lp->inner_product_param().weight_filler().std()) );
+          lp->set_top(0, actions_blob_name);
+        } else {
+          lp->set_top(0, q_values_blob_name);
+        }
       }
       
       if(!policy){
         lp = net_param_init.add_layer();
         lp->CopyFrom(net_param_old.layer(layer_index+1));
       }
-      
 //       net_param_old.PrintDebugString();
 //       LOG_DEBUG("#############################################");
 //       net_param_init.PrintDebugString();
@@ -340,9 +380,12 @@ class DevMLP : public MLP {
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
       neural_net = solver->net();
       LOG_INFO("nb param : "  << number_of_parameters() << " : " << link_structure );
-
-      ASSERT(neural_net->blob_by_name(states_blob_name_old)->height() == old->neural_net->blob_by_name(
+      
+#ifndef NDEBUG
+      if(link_structure != 9)
+        ASSERT(neural_net->blob_by_name(states_blob_name_old)->height() == old->neural_net->blob_by_name(
                states_blob_name)->height(), "failed fusion");
+#endif
       ASSERT(add_loss_layer == false, "to be implemented");
 
 //       adapt weight of last linear layer
@@ -419,47 +462,72 @@ class DevMLP : public MLP {
 #ifdef DEBUG_DEVNN_STOP
   std::vector<double>* computeOut(const std::vector<double>& states_batch) override {
     std::vector<double> substate(states_batch);
-//     depends on the env :
-//     substate.pop_back();
-//     substate.pop_back();
-//     substate.pop_back();
-//     substate.pop_back();
+//     depends on the env :(and predev)
+    substate.pop_back();
+    substate.pop_back();
+    substate.pop_back();
+    substate.pop_back();
 
     auto ac = _old->computeOut(substate);
-//     return ac;
-    bib::Logger::PRINT_ELEMENTS(*ac, "old action : ");
-    delete ac;
     auto ac2 = MLP::computeOut(states_batch);
-    bib::Logger::PRINT_ELEMENTS(*ac2, "new actions : ");
-
-//     auto actions_blob = neural_net->blob_by_name(produce_name("ip", c->hiddens.size()+1, 0));
-//     std::vector<double>* outputs = new std::vector<double>(actions_blob->count());
-//     for(int j=0; j < actions_blob->count(); j++)
-//       outputs->at(j) = actions_blob->data_at(0, j, 0, 0);
-//     LOG_DEBUG("");
-//     bib::Logger::PRINT_ELEMENTS(*outputs, "last layer of task0 : ");
-//     exit(1);
+//     bib::Logger::PRINT_ELEMENTS(*ac, "old action : ");
+//     delete ac;
+//     bib::Logger::PRINT_ELEMENTS(*ac2, "new actions : ");
 
     return ac2;
   }
   
   double computeOutVF(const std::vector<double>& states_batch, const std::vector<double>& motors_batch) override {
+    bib::Logger::PRINT_ELEMENTS(states_batch, "state : ");
+    bib::Logger::PRINT_ELEMENTS(motors_batch, "action : ");
+    
     std::vector<double> substate(states_batch);
     std::vector<double> subaction(motors_batch);
-    
-    substate.pop_back();
-    substate.pop_back();
-    substate.pop_back();
-    substate.pop_back();
+//     depends on the env : (and predev)
+//     substate.pop_back();
+//     substate.pop_back();
+//     substate.pop_back();
+//     substate.pop_back();
     
     subaction.pop_back();
     subaction.pop_back();
     
     double q1 = _old->computeOutVF(substate, subaction);
     double q2 = MLP::computeOutVF(states_batch, motors_batch);
-    LOG_DEBUG(q1 << " " << q2);
+    LOG_DEBUG(q1);
+    LOG_DEBUG(q2 << "\n");
     
     return q2;
+  }
+  
+  std::vector<double>* computeOutVFBatch(std::vector<double>& sensors, std::vector<double>& motors) override {
+    caffe::NetParameter net_param_old;
+    _old->neural_net->ToProto(&net_param_old);
+    net_param_old.PrintDebugString();
+    LOG_DEBUG("#############################################");
+    caffe::NetParameter net_param_old2;
+    neural_net->ToProto(&net_param_old2);
+    net_param_old2.PrintDebugString();
+    
+    
+    
+    auto outputs = new std::vector<double>(kMinibatchSize);
+    
+    for (uint n = 0; n < kMinibatchSize; ++n){
+      vector<double>::const_iterator s_fisrt = sensors.begin() + n*size_sensors;
+      vector<double>::const_iterator s_end = sensors.begin() + (n+1)*size_sensors;
+      vector<double> ns(s_fisrt, s_end);
+      
+      vector<double>::const_iterator a_fisrt = motors.begin() + n*size_motors;
+      vector<double>::const_iterator a_end = motors.begin() + (n+1)*size_motors;
+      vector<double> ac(a_fisrt, a_end);
+      
+      outputs->at(n) = this->computeOutVF(ns, ac);
+      
+      exit(1);
+    }
+    
+    return outputs;
   }
 #endif
 
