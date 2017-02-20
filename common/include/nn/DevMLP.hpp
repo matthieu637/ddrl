@@ -160,9 +160,12 @@ class DevMLP : public MLP {
         lp->set_bottom(0, states_blob_name_old);
         lp->set_top(0, states_blob_name_old);
         
-        if(!policy){
+        if(!policy && net_param_old.layer(layer_index).type() == "Concat"){
           lp->set_bottom(1, actions_blob_name_old);
           lp->set_top(0, states_actions_blob_name_old);
+        } else if(!policy){
+          lp->set_top(0, states_actions_blob_name_old);
+          lp->set_bottom(0, states_actions_blob_name_old);
         }
         
         layer_index ++;
