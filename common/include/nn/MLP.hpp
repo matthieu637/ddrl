@@ -611,7 +611,8 @@ protected:
     std::string layer_name;
 
     for (uint i=1; i<layer_sizes.size()+1; ++i) {
-      BatchNormTower(np, i-1, {input_name}, {input_name}, boost::none, bna, task);
+      if(i != 1 || !avoid_states_input || !policy)
+        BatchNormTower(np, i-1, {input_name}, {input_name}, boost::none, bna, task);
 
       if(link_struct != 0) {
         std::vector<std::string> bottoms;
