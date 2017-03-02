@@ -15,6 +15,8 @@ find_library( ODE_ENV_LIBRARY
   NAMES ${ODE_ENV_NAME}
   PATHS
   "${ROOT_DRL_PATH}/environment/ode-env/lib"
+  "${ROOT_DRL_PATH}/environment/ode-env/lib/Debug"
+  "${ROOT_DRL_PATH}/environment/ode-env/lib/Release"
 )
 
 set(ODE_ENV_INCLUDE_DIRS ${ODE_ENV_INCLUDE_DIRS} ${ODE_INCLUDE_DIR})

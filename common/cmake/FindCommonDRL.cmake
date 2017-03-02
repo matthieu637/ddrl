@@ -13,6 +13,8 @@ find_library( COMMON_DRL_LIBRARY
   NAMES ${COMMON_DRL_NAME}
   PATHS
   "${ROOT_DRL_PATH}/common/lib"
+  "${ROOT_DRL_PATH}/common/lib/Debug"
+  "${ROOT_DRL_PATH}/common/lib/Release"
 )
 
 include(FindPackageHandleStandardArgs)

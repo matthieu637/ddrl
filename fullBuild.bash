@@ -53,8 +53,10 @@ function cmakeBuild(){
 	cp $tmplog cmake.log
 	echo '' > $tmplog
 
-	make -j $CPU >& $tmplog
-	stopOnError $? $tmplog
+	if [ $XCODE -eq 0 ] ; then
+		make -j $CPU >& $tmplog
+		stopOnError $? $tmplog
+	fi
 
 	mv $tmplog build.log
 	cd ../..
@@ -77,8 +79,10 @@ function cmakeBuildRecall(){
 	cp $tmplog cmake.log
 	echo '' > $tmplog
 
-	make -j $CPU >& $tmplog
-	stopOnError $? $tmplog
+	if [ $XCODE -eq 0 ] ; then
+		make -j $CPU >& $tmplog
+		stopOnError $? $tmplog
+	fi
 
 	mv $tmplog build.log
 
@@ -246,6 +250,7 @@ function echo_usage(){
 	echo "Following options are possible : "
 	echo "codeblocks | CB : generates Codeblocks projects"
 	echo "eclipse | EC : generates Eclipse projects"
+	echo "xcode | XC : generates Xcode projects"
 	echo "--force : always remove old build without asking"
 	echo "--clear : remove old build (without build)"
 	echo "--debug : build only debug"
@@ -258,6 +263,7 @@ function echo_usage(){
 export CMAKE_ARGS=''
 export FORCE_REMOVE=''
 export CLEAR=0
+export XCODE=0
 export BUILD_DEBUG=0
 export BUILD_RELWITHDEB=0
 REPORT=0
@@ -278,6 +284,11 @@ do
 			echo "Will generate Eclipse projects"
 			export CMAKE_ARGS='-G "Eclipse CDT4 - Unix Makefiles"'
 			BUILD_OUTSIDE=1
+			;;
+		"xcode" | "XC")
+			echo "Will generate Xcode projects"
+			export CMAKE_ARGS='-G "Xcode"'
+			XCODE=1
 			;;
 		"--force")
 			export FORCE_REMOVE='1'
