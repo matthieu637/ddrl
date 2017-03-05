@@ -31,10 +31,18 @@ target_link_libraries(${LIBRARY_NAME} ${COMMON_DRL_LIBRARY_LIGHT} ${ODE_ENV_LIBR
 add_executable(humanoid-env src/test/Humanoid.cpp ${all_include} ${all_sources})
 target_link_libraries(humanoid-env ${COMMON_DRL_LIBRARY_LIGHT} ${ODE_ENV_LIBRARY})
 
+if(APPLE)
+	message(${all_sources})
+	list(REMOVE_ITEM all_sources ${CMAKE_SOURCE_DIR}/src/HumanoidWorldView.cpp)
+	message(${all_sources})
+	add_executable(humanoid-env-osx src/test/HumanoidWorldViewOSX.cpp ${all_include} ${all_sources})
+	target_link_libraries(humanoid-env-osx ${COMMON_DRL_LIBRARY_LIGHT} ${ODE_ENV_LIBRARY})
+endif()
+
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/humanoid/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
-execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/humanoid.ini config.ini)
+#execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/humanoid.ini config.ini)
 
 #-------------------
 # Unit Test

@@ -60,7 +60,7 @@ class Simulator {
   }
 
   template <typename OAgent=Agent>
-  void run(OAgent* early_stage=nullptr, uint starting_ep = 0) {
+  uint before_run(OAgent* early_stage=nullptr, uint starting_ep = 0) {
     ASSERT(well_init, "Please call init() first on Simulator");
 
     env = new Environment;
@@ -72,21 +72,25 @@ class Simulator {
     }
     agent->unique_invoke(properties, command_args);
     
-    uint fepsiode = max_episode + starting_ep;
+    uint fepisode = max_episode + starting_ep;
     if(can_continue && boost::filesystem::exists("continue.simu.data")){
       agent->load_previous_run();
       auto p = bib::XMLEngine::load<simu_state>("episode","continue.simu.data");
       starting_ep = p->episode;
-      fepsiode = max_episode;
+      fepisode = max_episode;
       delete p;
       LOG_INFO("loading previous data ... " << starting_ep);
       must_load_previous_run = true;
     }
 
+    return fepisode;
+  }
+
+  void run_loop(uint starting_ep, uint fepisode){
     Stat stat;
 
     time_spend.start();
-    for (uint episode = starting_ep; episode < fepsiode; episode++) {
+    for (uint episode = starting_ep; episode < fepisode; episode++) {
       //  learning
       run_episode(true, episode, 0, stat);
 
@@ -100,6 +104,12 @@ class Simulator {
       //  testing after learning
       run_episode(false, max_episode + starting_ep, test_episode, stat);
     }
+  }
+
+  template <typename OAgent=Agent>
+  void run(OAgent* early_stage=nullptr, uint starting_ep = 0) {
+    uint fepisode = before_run(early_stage, starting_ep);
+    run_loop(starting_ep, fepisode);
 
     env->unique_destroy();
     delete env;

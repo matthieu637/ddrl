@@ -1,5 +1,10 @@
 #!/bin/bash
 
+LIB=$(dirname "${BASH_SOURCE[0]}")
+cd $LIB
+
+. os.bash
+
 if [ $# -ne 3 ] ; then
 	echo "Usage $0 : <base> <injector> <destination>"
 	exit 1
@@ -19,7 +24,8 @@ if [ ! -e $injector ] ; then
 	exit 1
 fi
 
-tmp=`mktemp`
+
+tmp=`$MKTEMP`
 
 #
 # Read the base file and copy it to $tmp by remplacing the duplicate
@@ -116,3 +122,4 @@ do
 done < $injector
 
 mv $tmp $destination
+

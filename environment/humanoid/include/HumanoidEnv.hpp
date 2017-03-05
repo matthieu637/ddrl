@@ -20,27 +20,28 @@ class HumanoidEnv : public arch::AEnvironment<> {
     delete instance;
   }
 
-  const std::vector<double>& perceptions() const {
+  const std::vector<double>& perceptions() const override {
     return instance->state();
   }
 
-  double performance() const {
+  double performance() const override {
     return instance->performance();
   }
 
-  bool final_state() const {
+  bool final_state() const override {
     return instance->final_state();
   }
 
-  unsigned int number_of_actuators() const {
+  unsigned int number_of_actuators() const override {
     return instance->activated_motors();
   }
-  unsigned int number_of_sensors() const {
+
+  unsigned int number_of_sensors() const override {
     return instance->state().size();
   }
 
  private:
-  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* vm) {
+  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* vm) override {
     humanoid_physics init;
     init.apply_armature = pt->get<bool>("environment.apply_armature");
     init.damping = pt->get<uint>("environment.damping");
@@ -75,7 +76,7 @@ class HumanoidEnv : public arch::AEnvironment<> {
       instance = new HumanoidWorld(init);
   }
 
-  void _apply(const std::vector<double>& actuators) {
+  void _apply(const std::vector<double>& actuators) override {
     instance->step(actuators);
   }
 
