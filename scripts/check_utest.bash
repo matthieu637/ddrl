@@ -9,10 +9,10 @@ set -e
 
 function run_all_test(){
 	goto_root
-	find . -type f -name 'unit-test' | while read atest ; do
+	find . -type f -name 'unit-test' | grep -v old | while read atest ; do
 		cd $(dirname $atest)
-		#30 min timeout
-		timeout 1800 ./unit-test $@
+		#1h timeout
+		timeout 3600 ./unit-test $@
 		if [ $? -ne 0 ] ; then
 			exit 1
 		fi

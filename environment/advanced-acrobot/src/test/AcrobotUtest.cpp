@@ -33,10 +33,8 @@ TEST(AdvancedAcrobotEnv, RewardNormalized) {
 }
 
 TEST(AdvancedAcrobotEnvSimulator, MemoryCheckDummySimulation) {
-  int argc = 2;
-  char config[] = "--config";
-  char config_arg[] = "data/acrobot.utest.ini";
-  char* argv[] = { &config[0], &config_arg[0], NULL};
+  char* argv[] = {"unit-test", "--config", "data/acrobot.utest.ini", NULL};
+  int argc = sizeof(argv) / sizeof(char*) - 1;
 
   arch::Simulator<AdvancedAcrobotEnv, arch::ExampleAgent> s;
   s.init(argc, argv);
