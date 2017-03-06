@@ -13,8 +13,7 @@
 #include "HumanoidEnv.hpp"
 
 static HumanoidWorldView* inst = nullptr;
-
-void threadOSXRun();
+static std::string goodpath;
 
 void parseCommandHumanoid(int cmd) {
   static float xyz[3] = {-0.03, -0.97, 0.2};
@@ -71,11 +70,6 @@ void parseCommandHumanoid(int cmd) {
   }
 }
 
-//void stepOSXView(int u){
-//	step(TODO);
-//	Draw::drawLoop(u);
-//}
-
 void threadloopHumanoid(const std::string& goodpath) {
   ASSERT(inst != nullptr, "not instantiated " << goodpath);
   inst->fn.version = DS_VERSION;
@@ -113,7 +107,7 @@ HumanoidWorldView::HumanoidWorldView(const std::string& path, const humanoid_phy
     requestEnd(false),
     speed(1.),
     ignoreMotor(false) {
-  std::string goodpath = path;
+  goodpath = path;
 
   int n;
   for (n = 0; n < 5; n++)
@@ -145,10 +139,6 @@ HumanoidWorldView::HumanoidWorldView(const std::string& path, const humanoid_phy
 //
 //     geoms.push_back(debug1->getGeom());
 //     geoms.push_back(debug2->getGeom());
-
-  std::thread t2(threadOSXRun);
-  //threadloopHumanoid(goodpath);
-  t2.join();
 }
 
 HumanoidWorldView::~HumanoidWorldView() {
@@ -202,6 +192,10 @@ int main(int argc, char **argv) {
   s = new arch::Simulator<HumanoidEnv, arch::ExampleAgent>();
   s->init(argc, argv);
   s->before_run((arch::ExampleAgent*) nullptr, 0);
+    
+  std::thread t2(threadOSXRun);
+  threadloopHumanoid(goodpath);
+  t2.join();
 
   LOG_DEBUG("works !");
   delete s;
