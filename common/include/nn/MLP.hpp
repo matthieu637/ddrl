@@ -142,7 +142,8 @@ class MLP {
 
     solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
     neural_net = solver->net();
-
+    writeNN_struct(*net_param);
+    
 //       LOG_DEBUG("param critic : " <<  neural_net->params().size());
   }
 
@@ -222,6 +223,7 @@ class MLP {
 
     solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
     neural_net = solver->net();
+    writeNN_struct(*net_param);
 
 //       LOG_DEBUG("actor critic : " <<  neural_net->params().size());
   }
@@ -969,6 +971,15 @@ public:
     solver->set_filename(path);
     solver->Restore(rpath.c_str());
 //     neural_net->CopyTrainedLayersFrom(path);
+  }
+  
+  static void writeNN_struct(const caffe::NetParameter& param, uint task=0){
+    std::string path = param.name() + ".struct.data";
+    if(task != 0)
+      path = param.name() + "." + std::to_string(task) + ".struct.data";
+    std::ofstream ofs (path, std::ofstream::out);
+    ofs << param.DebugString();
+    ofs.close();
   }
 
  protected:

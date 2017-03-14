@@ -368,6 +368,7 @@ class DevMLP : public MLP {
 //       net_param_old.PrintDebugString();
 //       LOG_DEBUG("#############################################");
 //       net_param_init.PrintDebugString();
+      writeNN_struct(net_param_init, task);
 
       caffe::SolverParameter solver_param;
       caffe::NetParameter* net_param = solver_param.mutable_net_param();
@@ -382,7 +383,10 @@ class DevMLP : public MLP {
 
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
       neural_net = solver->net();
-      LOG_INFO("nb param : "  << number_of_parameters() << " : " << link_structure );
+      if(policy)
+        LOG_INFO("nb param pol: "  << number_of_parameters() << " : " << link_structure );
+      else
+        LOG_INFO("nb param cri: "  << number_of_parameters() << " : " << link_structure );
       
 #ifndef NDEBUG
       if(link_structure != 9)
