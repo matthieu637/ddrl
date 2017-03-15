@@ -17,7 +17,7 @@ if(NOT DEFINED CUDA_TOOLKIT_ROOT_DIR)
 endif()
 
 find_package(Caffe QUIET)
-if(NOT DEFINED Caffe_INCLUDE_DIRS)
+if(NOT DEFINED Caffe_LIBRARIES)
        configure_file(${ROOT_DRL_PATH}/common/cmake/Caffe.in caffe-download/CMakeLists.txt)
        execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
          RESULT_VARIABLE result
@@ -36,13 +36,13 @@ if(NOT DEFINED Caffe_INCLUDE_DIRS)
        include(${CMAKE_BINARY_DIR}/caffe-build/CaffeConfig.cmake)
 endif()
 
-list(REMOVE_AT Caffe_INCLUDE_DIRS 0) #remove local include of gtest
+#list(REMOVE_AT Caffe_INCLUDE_DIRS 0) #remove local include of gtest
 
 if(${Caffe_CPU_ONLY})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCAFFE_CPU_ONLY ")
 endif()
 
 set(CAFFE_ALL_INCLUDE 
-  ${Caffe_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${GLOG_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+  ${CUDA_INCLUDE_DIRS} ${GLOG_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 set(CAFFE_ALL_LIBRARIES 
   ${Caffe_LIBRARIES} ${CUDA_LIBRARIES} ${PROTOBUF_LIBRARIES} ${GLOG_LIBRARIES} ${Boost_LIBRARIES})

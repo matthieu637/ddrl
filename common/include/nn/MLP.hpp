@@ -267,14 +267,20 @@ class MLP {
             net_param->mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(true);
         }
       }
+      
+      solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
+      neural_net = solver->net();
 #ifndef NDEBUG
       if(NetNeedsUpgrade(*net_param)) {
-        LOG_DEBUG("network need update");
+        LOG_ERROR("network need update");
+        exit(1);
+      }
+      
+      if(number_of_parameters() != m.number_of_parameters()){
+        LOG_ERROR("number of param differs");
         exit(1);
       }
 #endif
-      solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
-      neural_net = solver->net();
     }
 
     if((uint)neural_net->blob_by_name(MLP::states_blob_name)->num() != kMinibatchSize)
@@ -378,26 +384,37 @@ class MLP {
     }
   }
 
-  void learn(std::vector<double>& sensors, std::vector<double>& motors) {
-    InputDataIntoLayers(sensors.data(), nullptr, motors.data());
+  void learn(const std::vector<double>& sensors, const std::vector<double>& motors) {
+    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
+    std::vector<double> motors_(motors);
+    InputDataIntoLayers(sensors_.data(), nullptr, motors_.data());
     solver->Step(1);
   }
 
-  void learn(std::vector<double>& sensors, std::vector<double>& motors, double q) {
+  void learn(const std::vector<double>& sensors, const std::vector<double>& motors, double q) {
     double target[] = {q};
-    InputDataIntoLayers(sensors.data(), motors.data(), target);
+    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
+    std::vector<double> motors_(motors);
+    InputDataIntoLayers(sensors_.data(), motors_.data(), target);
     solver->Step(1);
   }
 
-  void learn_batch(std::vector<double>& sensors, std::vector<double>& motors, std::vector<double>& q, uint iter) {
-    InputDataIntoLayers(sensors.data(), motors.data(), q.data());
+  void learn_batch(const std::vector<double>& sensors, const std::vector<double>& motors, const std::vector<double>& q, uint iter) {
+    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
+    std::vector<double> motors_(motors);
+    std::vector<double> q_(q);
+    InputDataIntoLayers(sensors_.data(), motors_.data(), q_.data());
     solver->Step(iter);
   }
 
-  void learn_batch_lw(std::vector<double>& sensors, std::vector<double>& motors, std::vector<double>& q,
-                      std::vector<double>& lw, uint iter) {
-    InputDataIntoLayers(sensors.data(), motors.data(), q.data());
-    setWeightedSampleVector(lw.data());
+  void learn_batch_lw(const std::vector<double>& sensors, const std::vector<double>& motors, const std::vector<double>& q,
+                      const std::vector<double>& lw, uint iter) {
+    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
+    std::vector<double> motors_(motors);
+    std::vector<double> q_(q);
+    std::vector<double> lw_(lw);
+    InputDataIntoLayers(sensors_.data(), motors_.data(), q_.data());
+    setWeightedSampleVector(lw_.data());
     solver->Step(iter);
   }
 
@@ -425,11 +442,13 @@ class MLP {
     return q_values_blob->data_at(0, 0, 0, 0);
   }
 
-  virtual std::vector<double>* computeOutVFBatch(std::vector<double>& sensors, std::vector<double>& motors) {
+  virtual std::vector<double>* computeOutVFBatch(const std::vector<double>& sensors, const std::vector<double>& motors) {
     std::vector<double> target_input(kMinibatchSize, 0.0f);
     std::vector<double> target_input2(kMinibatchSize, 0.0f);
 
-    InputDataIntoLayers(sensors.data(), motors.data(), target_input.data());
+    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
+    std::vector<double> motors_(motors);
+    InputDataIntoLayers(sensors_.data(), motors_.data(), target_input.data());
     if(weighted_sample)
       setWeightedSampleVector(target_input2.data());
     neural_net->Forward(nullptr);
@@ -468,8 +487,9 @@ class MLP {
     return outputs;
   }
 
-  std::vector<double>* computeOutBatch(std::vector<double>& in) {
-    InputDataIntoLayers(in.data(), NULL, NULL);
+  std::vector<double>* computeOutBatch(const std::vector<double>& in) {
+    std::vector<double> in_(in);//copy cause of InputDataIntoLayers
+    InputDataIntoLayers(in_.data(), NULL, NULL);
     neural_net->Forward(nullptr);
 
     auto outputs = new std::vector<double>(kMinibatchSize * size_motors);
@@ -510,7 +530,7 @@ class MLP {
     return sum;
   }
 
-  virtual double number_of_parameters() {
+  virtual uint number_of_parameters() const {
     uint n = 0;
 
     caffe::Net<double>& net = *neural_net;
@@ -522,7 +542,7 @@ class MLP {
     return n;
   }
 
-  virtual void copyWeightsTo(double* startx) {
+  virtual void copyWeightsTo(double* startx) const {
     uint index = 0;
 
     caffe::Net<double>& net = *neural_net;

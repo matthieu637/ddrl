@@ -444,7 +444,7 @@ class DevMLP : public MLP {
       }
   }
 
-  virtual double number_of_parameters() override {
+  virtual uint number_of_parameters() const override {
     uint n = 0;
     caffe::Net<double>& net = *neural_net;
     ASSERT(net.learnable_params().size() == net.params_lr().size(), "failed");
@@ -567,7 +567,7 @@ class DevMLP : public MLP {
   }
 #endif
 
-  virtual void copyWeightsTo(double* startx) override {
+  virtual void copyWeightsTo(double* startx) const override {
     uint index = 0;
 
     caffe::Net<double>& net = *neural_net;
