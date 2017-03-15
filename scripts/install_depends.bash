@@ -14,7 +14,13 @@ goto_root
 #####################
 # GENERAL PACKAGES  #
 #####################
-sudo apt-get install python cmake libode-dev astyle cppcheck libtbb-dev libglew-dev libgtest-dev unzip libboost-all-dev doxygen valgrind
+sudo apt-get install python cmake libode-dev astyle cppcheck libtbb-dev libglew-dev libgtest-dev unzip libboost-all-dev doxygen valgrind libtool
+
+##############################
+# caffe required #
+##############################
+#libatlas-dev
+sudo apt-get install nvidia-cuda-dev nvidia-cuda-toolkit libprotobuf-dev libleveldb-dev libsnappy-dev protobuf-compiler libopenblas-dev libgflags-dev libgoogle-glog-dev liblmdb-dev libhdf5-serial-dev
 
 echo "check your gcc version isn't too old ( <= 4.6 )"
 
@@ -24,6 +30,17 @@ echo "check your gcc version isn't too old ( <= 4.6 )"
 wget https://google-styleguide.googlecode.com/svn/trunk/cpplint/cpplint.py
 sudo mv cpplint.py /usr/local/bin/cpplint
 sudo chmod ugo+rx /usr/local/bin/cpplint
+
+#################################
+# eigen (required by dmp-power) #
+#################################
+sudo apt-get install libeigen3-dev
+
+#################################################################################
+############################## DEPRECATED #######################################
+#################################################################################
+
+exit 0
 
 #######################################################
 # fann (required by agents : qlearning, cacla, cmaes) #
@@ -38,7 +55,7 @@ make
 sudo make install
 
 ########################################################
-# opt++ (required by agents : qlearning, cacla, cmaes) #
+# opt++ (optional by agents : qlearning, cacla, cmaes) #
 ########################################################
 sudo apt-get install gfortran libblas-dev
 
@@ -53,14 +70,4 @@ patch -Np1 -i ../optpp-2.4.patch
 make
 sudo make install
 
-#################################
-# eigen (required by dmp-power) #
-#################################
-sudo apt-get install libeigen3-dev
-
-##############################
-# caffe (required by deepqn) #
-##############################
-#libatlas-dev
-sudo apt-get install nvidia-cuda-dev nvidia-cuda-toolkit libprotobuf-dev libleveldb-dev libsnappy-dev protobuf-compiler libopenblas-dev libgflags-dev libgoogle-glog-dev liblmdb-dev libhdf5-serial-dev
 

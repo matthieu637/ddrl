@@ -41,7 +41,7 @@ $COMMAND $ARGS >& /dev/null
 for file in *.struct.data ; do
 	python2 $CAFFE_PATH/python/draw_net.py $file $file.pdf
 #	python2 $CAFFE_PATH/python/draw_net.py $file $file.dot
-#	python2 $CAFFE_PATH/python/draw_net_old.py $file $file.old.dot
+#	python2 $CAFFE_PATH/python/draw_net_old.py $file $file.old.pdf
 done
 
 #xdot Actor.struct.data.dot

@@ -362,7 +362,7 @@ TEST(MLP, CaffeCopyActor) {
 TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
   std::vector<uint> batch_norms = {0,4,6,7,8,10,11,12,14,15};
   for(uint batch_norm : batch_norms) {
-    for(uint hidden_layer = 1; hidden_layer <=2 ; hidden_layer++) {
+    for(uint hidden_layer = 1; hidden_layer <=3 ; hidden_layer++) {
       //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
       uint batch_size = 400; //must be a squared number
       MLP nn(2, 1, {50,10}, 0.001f, batch_size, -1, hidden_layer, batch_norm);//learning

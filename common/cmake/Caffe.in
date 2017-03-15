@@ -8,8 +8,9 @@ ExternalProject_Add(caffe
   GIT_TAG           master
   SOURCE_DIR        "${CMAKE_BINARY_DIR}/caffe-src"
   BINARY_DIR        "${CMAKE_BINARY_DIR}/caffe-build"
-  CONFIGURE_COMMAND ${CMAKE_COMMAND} -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCPU_ONLY=On ../caffe-src
+  INSTALL_DIR	    "${CMAKE_BINARY_DIR}/caffe-install"
+  CONFIGURE_COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCPU_ONLY=On -DCMAKE_INSTALL_PREFIX=../caffe-install ../caffe-src
   BUILD_COMMAND     make -j ${PROCESSOR_COUNT}
-  INSTALL_COMMAND   ""
+  INSTALL_COMMAND   make install
   TEST_COMMAND      ""
 )

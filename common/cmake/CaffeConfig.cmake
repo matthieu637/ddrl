@@ -18,31 +18,34 @@ endif()
 
 find_package(Caffe QUIET)
 if(NOT DEFINED Caffe_LIBRARIES)
-       configure_file(${ROOT_DRL_PATH}/common/cmake/Caffe.in caffe-download/CMakeLists.txt)
-       execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-         RESULT_VARIABLE result
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/caffe-download )
+	if(NOT EXISTS ${ROOT_DRL_PATH}/common/build/${build_dir_type}/caffe-install/)
+	       configure_file(${ROOT_DRL_PATH}/common/cmake/Caffe.in caffe-download/CMakeLists.txt)
+	       execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} .
+	         RESULT_VARIABLE result
+	         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/caffe-download )
+	
+	       if(result)
+	         message(FATAL_ERROR "CMake step for caffe failed: ${result}")
+	       endif()
+	       execute_process(COMMAND ${CMAKE_COMMAND} --build .
+	         RESULT_VARIABLE result
+	         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/caffe-download )
+	       if(result)
+	         message(FATAL_ERROR "Build step for caffe failed: ${result}")
+	       endif()
+	       #remove wrong config files for debug building
+	   	file(REMOVE ${CMAKE_BINARY_DIR}/caffe-build/CaffeTargets.cmake)
+	    	file(REMOVE ${CMAKE_BINARY_DIR}/caffe-build/CaffeConfig.cmake)
+	    	file(REMOVE ${CMAKE_BINARY_DIR}/caffe-build/cmake/CaffeConfig.cmake)
 
-       if(result)
-         message(FATAL_ERROR "CMake step for caffe failed: ${result}")
-       endif()
-       execute_process(COMMAND ${CMAKE_COMMAND} --build .
-         RESULT_VARIABLE result
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/caffe-download )
-       if(result)
-         message(FATAL_ERROR "Build step for caffe failed: ${result}")
-       endif()
-
-       include(${CMAKE_BINARY_DIR}/caffe-build/CaffeConfig.cmake)
+	endif()
+	include(${ROOT_DRL_PATH}/common/build/${build_dir_type}/caffe-install/share/Caffe/CaffeConfig.cmake)
+	#correct caffe include dir when not installed
+	set_target_properties(caffe PROPERTIES 
+	 	INTERFACE_INCLUDE_DIRECTORIES ${ROOT_DRL_PATH}/common/build/${build_dir_type}/caffe-install/include )
 endif()
-
-#list(REMOVE_AT Caffe_INCLUDE_DIRS 0) #remove local include of gtest
 
 if(${Caffe_CPU_ONLY})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCAFFE_CPU_ONLY ")
 endif()
 
-set(CAFFE_ALL_INCLUDE 
-  ${CUDA_INCLUDE_DIRS} ${GLOG_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
-set(CAFFE_ALL_LIBRARIES 
-  ${Caffe_LIBRARIES} ${CUDA_LIBRARIES} ${PROTOBUF_LIBRARIES} ${GLOG_LIBRARIES} ${Boost_LIBRARIES})
