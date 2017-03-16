@@ -14,7 +14,7 @@ goto_root
 #####################
 # GENERAL PACKAGES  #
 #####################
-sudo apt-get install python cmake libode-dev astyle cppcheck libtbb-dev libglew-dev libgtest-dev unzip libboost-all-dev doxygen valgrind libtool
+sudo apt-get install python cmake libode-dev astyle cppcheck libtbb-dev libglew-dev libgtest-dev unzip libboost-all-dev doxygen valgrind libtool automake
 
 ##############################
 # caffe required #
