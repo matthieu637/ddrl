@@ -371,7 +371,7 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
       std::vector<double> actions(batch_size);
       std::vector<double> qvalues(batch_size);
 
-      for(uint forced = 0; forced < 500 ; forced++) {
+      for(uint forced = 0; forced < 50 ; forced++) {
         uint n = 0;
         auto iter = [&](const std::vector<double>& x) {
           sensors[n] = x[0];
@@ -396,7 +396,7 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
       MLP actor(1, {8}, 1, 0.01f, batch_size, hidden_layer, 2, batch_norm);
       MLP actor_test(actor, true);
 
-      for(uint forced = 0; forced < 150 ; forced++) {
+      for(uint forced = 0; forced < 50 ; forced++) {
 //         LOG_DEBUG("forced  "<< forced);
         uint n = 0;
         auto iter = [&](const std::vector<double>& x) {
@@ -468,6 +468,7 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
       //       Test
       double ac1_error = 0;
       double ac2_error = 0;
+      double q_error = 0;
       for (uint n = 0; n < 100 ; n++) {
         double x1 = bib::Utils::rand01()*2 -1;
 
@@ -480,38 +481,25 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
         std::vector<double> ac(1);
         ac[0]= out;
 
-        if(fabs(nn.computeOutVF(sens, ac) - qout) > 0.1)
-          break;
-
-        EXPECT_GT(nn.computeOutVF(sens, ac), qout - 0.2);
-        EXPECT_LT(nn.computeOutVF(sens, ac), qout + 0.2);
-
-        std::vector<double> * ac_return = nullptr;
-
-        if(batch_norm != 0) {
-          ac_return = actor_test.computeOut(sens);
-          EXPECT_GT(ac_return->at(0), out - 0.2);
-          EXPECT_LT(ac_return->at(0), out + 0.2);
-          delete ac_return;
-        } else if(hidden_layer != 2){
-          ac_return = actor.computeOut(sens);
-          EXPECT_GT(ac_return->at(0), out - 0.2);
-          EXPECT_LT(ac_return->at(0), out + 0.2);
-          delete ac_return;
-        }
-
         LOG_FILE("OptimizeNNTroughGradientOfAnotherNNFann.data", x1 << " " << actor.computeOut(sens)->at(0) << " " <<
                  actor_test.computeOut(sens)->at(0)<< " " << out);
 //clear all;close all;X=load('OptimizeNNTroughGradientOfAnotherNNFann.data');plot(X(:,1),X(:,2), '.');hold on;plot(X(:,1),X(:,3), 'r.');plot(X(:,1),X(:,4), 'go');
         ac1_error += fabs(out - actor.computeOut(sens)->at(0));
         ac2_error += fabs(out - actor_test.computeOut(sens)->at(0));
+        q_error += fabs(nn.computeOutVF(sens, ac) - qout);
       }
 
-      ac1_error /= 100;
-      ac2_error /= 100;
+      ac1_error /= 100.f;
+      ac2_error /= 100.f;
+      q_error /= 100.f;
+      
+      //if critic well learned
+      if(q_error < 0.1){
+        EXPECT_LT(ac1_error, 0.15);
+        EXPECT_LT(ac2_error, 0.22);
+      }
 
-//       LOG_DEBUG("bn " << batch_norm << " hiddenl " << hidden_layer << " " << ac1_error << " " << ac2_error);
-//       exit(1);
+      LOG_DEBUG("bn " << batch_norm << " hiddenl " << hidden_layer << " " << ac1_error << " " << ac2_error << " " << q_error);
     }
   }
 }

@@ -3,11 +3,13 @@
 
 #include <thread>
 #include <random>
+#include "bib/Logger.hpp"
+#include "caffe/caffe.hpp"
 
 namespace bib {
 
 class Seed {
- public:
+public:
 
   /**
    * [0; max]
@@ -35,12 +37,24 @@ class Seed {
     std::normal_distribution<Real> dis(mean, sigma);
     return dis(engine);
   }
+  
+  static void setFixedSeedUTest(){
+    LOG_INFO("WARNING: FIXED SEED SET");
+    engine.seed(0);
+    caffe::Caffe::set_random_seed(0);
+  }
 
   static std::mt19937* random_engine() {
     return &engine;
   }
- private:
+  
+private:
+  Seed(){
+    caffe::Caffe::set_random_seed(engine());
+  }
+private:
   thread_local static std::mt19937 engine;
+  static Seed seed_instance;
 };
 
 }  // namespace bib
