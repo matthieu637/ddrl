@@ -330,8 +330,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       }
       
       //Update critic
-      qnn->InputDataIntoLayers(all_states.data(), all_actions.data(), q_targets->data());
-      qnn->getSolver()->Step(1);
+      qnn->stepCritic(all_states, all_actions, *q_targets);
       
       //Update actor
       qnn->ZeroGradParameters();

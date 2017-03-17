@@ -555,10 +555,10 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       }
 
       //Update critic
-      _qnn->InputDataIntoLayers(all_states.data(), all_actions.data(), q_targets->data());
       if(weighting_strategy != 0)
-        _qnn->setWeightedSampleVector(q_targets_weights->data());
-      _qnn->getSolver()->Step(iter);
+        _qnn->stepCritic(all_states, all_actions, *q_targets, iter, q_targets_weights);
+      else
+        _qnn->stepCritic(all_states, all_actions, *q_targets, iter);
 
       delete q_targets;
       if(weighting_strategy != 0) {
@@ -718,10 +718,10 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
       }
       
       //Update critic
-      _qnn->InputDataIntoLayers(all_states.data(), all_actions.data(), q_targets_final.data());
       if(weighting_strategy != 0)
-        _qnn->setWeightedSampleVector(q_targets_weights_final.data());
-      _qnn->getSolver()->Step(iter);
+        _qnn->stepCritic(all_states, all_actions, q_targets_final, iter, &q_targets_weights_final);
+      else
+        _qnn->stepCritic(all_states, all_actions, q_targets_final, iter);
       
       for(uint p=0;p < _ann.size(); p++){
         delete q_targets[p];

@@ -902,7 +902,7 @@ protected:
     PopulateLayer(layer, name, "Scale", bottoms, tops, include_phase);
   }
 
-public:
+  //keep me private because I can change my inputs
   void InputDataIntoLayers(double* states_input, double* actions_input, double* target_input) {
     caffe::Net<double>& net = *neural_net;
     if (states_input != NULL) {
@@ -938,6 +938,22 @@ public:
     CHECK(wsample_input_layer);
     wsample_input_layer->Reset(wsample_input, wsample_input,
                                wsample_input_layer->batch_size());
+  }
+  
+public:
+  void stepCritic(const std::vector<double>& sensors, const std::vector<double>& motors, 
+                  const std::vector<double>& q, uint iter=1, const std::vector<double>* lw = nullptr){
+    
+    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
+    std::vector<double> motors_(motors);
+    std::vector<double> q_(q);
+    InputDataIntoLayers(sensors_.data(), motors_.data(), q_.data());
+    if(lw != nullptr){
+      std::vector<double> lw_(*lw);
+      setWeightedSampleVector(lw_.data());
+    }
+    
+    solver->Step(iter);
   }
 
   void ZeroGradParameters() {

@@ -612,14 +612,14 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         }
       }
 
-      //Update critic
-      qnn->InputDataIntoLayers(all_states.data(), all_actions.data(), q_targets->data());
-      if(weighting_strategy != 0)
-        qnn->setWeightedSampleVector(q_targets_weights->data());
+      uint steptoproceed = iter;
       if(minibatcher != 0)
-        qnn->getSolver()->Step(1);
+        steptoproceed = 1;
+      //Update critic
+      if(weighting_strategy != 0)
+        qnn->stepCritic(all_states, all_actions, *q_targets, iter, q_targets_weights);
       else
-        qnn->getSolver()->Step(iter);
+        qnn->stepCritic(all_states, all_actions, *q_targets, iter);
 
       delete q_targets;
       if(weighting_strategy != 0) {
