@@ -69,7 +69,8 @@ extern "C" {
     DS_WOOD,
     DS_CHECKERED,
     DS_GROUND,
-    DS_SKY
+    DS_SKY,
+    DS_CHECKERED2
   };
 
 /* draw modes */

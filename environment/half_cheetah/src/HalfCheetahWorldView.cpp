@@ -119,24 +119,19 @@ HalfCheetahWorldView::HalfCheetahWorldView(const std::string& path, const hcheet
     exit(1);
   }
   inst = this;
-
-//   for (ODEObject * b : bones)
-//     geoms.push_back(b->getGeom());
-
-//     ODEObject* debug1= ODEFactory::getInstance()->createBox(
-//                         odeworld, 0.5, 0, 0.5/2.f, BONE_LARGER, BONE_LARGER, 0.5,
-//                         BONE_DENSITY, BONE_MASS, false);
-//     ODEObject* debug2= ODEFactory::getInstance()->createBox(
-//                         odeworld, 1., 0, 1.1/2.f, BONE_LARGER, BONE_LARGER, 1.1,
-//                         BONE_DENSITY, BONE_MASS, false);
-//
-//     dGeomSetPosition(debug1->getGeom(), debug1->getX(), debug1->getY(), debug1->getZ());
-//     dGeomSetPosition(debug2->getGeom(), debug2->getX(), debug2->getY(), debug2->getZ());
-//
-//     geoms.push_back(debug1->getGeom());
-//     geoms.push_back(debug2->getGeom());
-
+  
   eventThread = new tbb::tbb_thread(threadloopHalfCheetah, goodpath);
+}
+
+void HalfCheetahWorldView::createWorld(){
+  HalfCheetahWorld::createWorld();
+  if(phy.predev > 0 && phy.predev <= 9){
+    bones[3]->setColorMode(1);
+    bones[3+3]->setColorMode(2);
+  } else if(phy.predev >= 10) {
+    bones[2]->setColorMode(1);
+    bones[2+3]->setColorMode(2);
+  }
 }
 
 HalfCheetahWorldView::~HalfCheetahWorldView() {

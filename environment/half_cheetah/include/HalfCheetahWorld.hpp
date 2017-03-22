@@ -52,7 +52,7 @@ class HalfCheetahWorld {
   unsigned int activated_motors() const;
 
  protected:
-  void createWorld();
+  virtual void createWorld();
   void update_state();
   void apply_armature(dMass* m, double k);
   void apply_damping(dBodyID body, double v);

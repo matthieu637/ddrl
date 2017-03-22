@@ -42,7 +42,7 @@ manage openGL state changes better
 #endif
 
 #include <ode/ode.h>
-// #include "config.h"
+#include <boost/filesystem.hpp>
 
 #ifdef __APPLE__
 #define HAVE_APPLE_OPENGL_FRAMEWORK
@@ -869,8 +869,9 @@ static Texture *sky_texture = 0;
 static Texture *ground_texture = 0;
 static Texture *wood_texture = 0;
 static Texture *checkered_texture = 0;
+static Texture *checkered2_texture = 0;
 
-static Texture *texture[4 + 1]; // +1 since index 0 is not used
+static Texture *texture[5 + 1]; // +1 since index 0 is not used
 
 
 
@@ -897,27 +898,12 @@ void dsStartGraphics (int , int , dsFunctions *fn) {
   strcpy (s, prefix);
   strcat (s, "/checkered.ppm");
   texture[DS_CHECKERED] = checkered_texture = new Texture (s);
-}
-
-#else // macintosh
-
-void dsStartGraphics (int width, int height, dsFunctions *fn) {
-
-  // All examples build into the same dir
-  char *prefix = "::::drawstuff:textures";
-  char *s = (char*) alloca (strlen(prefix) + 20);
-
+  
   strcpy (s, prefix);
-  strcat (s, ":sky.ppm");
-  sky_texture = new Texture (s);
-
-  strcpy (s, prefix);
-  strcat (s, ":ground.ppm");
-  ground_texture = new Texture (s);
-
-  strcpy (s, prefix);
-  strcat (s, ":wood.ppm");
-  wood_texture = new Texture (s);
+  strcat (s, "/checkered2.ppm");
+  if(boost::filesystem::exists(s)){
+    texture[DS_CHECKERED2] = checkered2_texture = new Texture (s);
+  }
 }
 
 #endif
