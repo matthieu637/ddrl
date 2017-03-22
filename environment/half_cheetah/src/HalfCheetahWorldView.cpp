@@ -94,6 +94,8 @@ void threadloopHalfCheetah(const std::string& goodpath) {
     xyz[0] = x - 1.43;
     dsSetViewpoint(xyz, hpr);
   }
+  
+  HACKclose();
 }
 
 HalfCheetahWorldView::HalfCheetahWorldView(const std::string& path, const hcheetah_physics phy)
@@ -147,7 +149,6 @@ HalfCheetahWorldView::~HalfCheetahWorldView() {
   requestEnd = true;
   eventThread->join();
   delete eventThread;
-  HACKclose();
 }
 
 void HalfCheetahWorldView::step(const std::vector<double>& motors) {

@@ -18,9 +18,6 @@ class CommonAE {
     return out;
   }
 
-  virtual void unique_invoke(boost::property_tree::ptree *,
-                             boost::program_options::variables_map *) {}
-
  protected:
   virtual void _display(std::ostream &) const {}
 

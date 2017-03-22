@@ -96,7 +96,8 @@ class ARLAgent : public AAgent<ProgOptions> {
   }
   
   void unique_invoke(boost::property_tree::ptree* inifile,
-                     boost::program_options::variables_map* command_args) override {
+                     boost::program_options::variables_map* command_args,
+                     bool forbidden_load) override {
     gamma                 = inifile->get<double>("agent.gamma");
     decision_each         = inifile->get<int>("agent.decision_each");
     
@@ -108,7 +109,7 @@ class ARLAgent : public AAgent<ProgOptions> {
     }
     
     _unique_invoke(inifile, command_args);
-    if (command_args->count("load"))
+    if (command_args->count("load") && !forbidden_load)
       this->load((*command_args)["load"].as<std::string>());
   }
   

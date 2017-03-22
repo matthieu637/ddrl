@@ -70,7 +70,7 @@ class Simulator {
     if(early_stage != nullptr) {
       agent->provide_early_development(early_stage);
     }
-    agent->unique_invoke(properties, command_args);
+    agent->unique_invoke(properties, command_args, pass_this_sim);
     
     uint fepisode = max_episode + starting_ep;
     if(can_continue && boost::filesystem::exists("continue.simu.data")){
@@ -83,6 +83,11 @@ class Simulator {
       must_load_previous_run = true;
     }
 
+    if(pass_this_sim){
+      LOG_INFO("WARNING: Ignore simulator " << config_file_index);
+      fepisode=0;
+    }
+    
     return fepisode;
   }
 
@@ -251,6 +256,7 @@ class Simulator {
     ("config", po::value<std::vector<string>>(), "set the config file to load [default : config.ini]")
     ("save-best", "save only best params")
     ("continue", "process can be killed and run again")
+    ("dpmt-sim", po::value<uint>(), "load n th simulator (only used with load and dpmt at the same time)")
     ("help", "produce help message");
 
     command_args = new po::variables_map;
@@ -271,6 +277,11 @@ class Simulator {
     save_best_agent = false;
     if (command_args->count("save-best")) {
       save_best_agent = true;
+    }
+    
+    if(command_args->count("load") && command_args->count("dpmt-sim") &&
+      (*command_args)["dpmt-sim"].as<uint>() != config_file_index){
+      pass_this_sim = true;
     }
 
     can_continue = command_args->count("continue") > 0;
@@ -319,6 +330,7 @@ class Simulator {
 
   bool display_learning, save_best_agent, can_continue;
   bool must_load_previous_run = false;
+  bool pass_this_sim = false;
 
  protected:
   uint config_file_index;
