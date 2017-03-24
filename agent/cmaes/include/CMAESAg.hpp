@@ -76,13 +76,13 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
       ann->exploit(pt, static_cast<CMAESAg *>(old_ag)->ann);
 
 //     const uint dimension = (nb_sensors+1)*hidden_unit_a->at(0) + (hidden_unit_a->at(0)+1)*nb_motors;
-    const uint dimension = ann->number_of_parameters();
+    const uint dimension = ann->number_of_parameters(true);
     double* startx  = new double[dimension];
     double* deviation  = new double[dimension];
     for(uint j=0; j< dimension; j++){
       deviation[j] = initial_deviation;
     }
-    ann->copyWeightsTo(startx);
+    ann->copyWeightsTo(startx, true);
     
     evo = new cmaes_t;
     arFunvals = cmaes_init(evo, dimension, startx, deviation, 0, population, NULL/*"config.cmaes.ini"*/);
@@ -236,7 +236,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
 private:
   void loadPolicyParameters(const double* parameters){
-      ann->copyWeightsFrom(parameters);
+      ann->copyWeightsFrom(parameters, true);
   }
   
 private:  

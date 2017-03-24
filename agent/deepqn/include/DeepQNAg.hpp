@@ -279,12 +279,15 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
   
   void restoreBest() override {
+    if(best_population.size() == 0){
+      LOG_INFO("WARNING: pop empty (random NN given as best )" << best_population.size());
+      return;
+    }
+    
     delete ann;
     delete qnn;
     
     auto it = best_population.begin();
-    ASSERT(best_population.size() > 0, "pop empty " << best_population.size());
-    
     ++it;
     ann = new MLP(*it->ann, false);
     qnn = new MLP(*it->qnn, false);

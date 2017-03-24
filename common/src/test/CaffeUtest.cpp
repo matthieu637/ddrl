@@ -20,7 +20,7 @@ TEST(MLP, ConsistentActivationFunction) {
 
   EXPECT_DOUBLE_EQ(nn.number_of_parameters(), 4);
   double weights[] = {1,0,1,0};
-  nn.copyWeightsFrom(weights);
+  nn.copyWeightsFrom(weights, false);
 
   std::vector<double> sens(1);
   std::vector<double> ac(0);
@@ -29,7 +29,7 @@ TEST(MLP, ConsistentActivationFunction) {
   EXPECT_DOUBLE_EQ(nn.computeOutVF(sens, ac), tanh(1.));
 
   MLP nn2(1, 1, {1}, 0.01f, 1, -1, 1, 0);
-  nn2.copyWeightsFrom(weights);
+  nn2.copyWeightsFrom(weights, false);
 
   EXPECT_DOUBLE_EQ(nn2.computeOutVF(sens, ac), 1);
   sens[0] = -1;
@@ -37,12 +37,12 @@ TEST(MLP, ConsistentActivationFunction) {
   EXPECT_LE(nn2.computeOutVF(sens, ac), -0.01 + 0.001);//leaky relu
 
   double weights2[] = {0,0,0,5};
-  nn2.copyWeightsFrom(weights2);
+  nn2.copyWeightsFrom(weights2, false);
 
   EXPECT_DOUBLE_EQ(nn2.computeOutVF(sens, ac), 5.f);
 
   double weights3[] = {0.2,0.4,0.6, 0.8};
-  nn.copyWeightsFrom(weights3);
+  nn.copyWeightsFrom(weights3, false);
 
   EXPECT_GE(nn.computeOutVF(sens, ac), (tanh((-1. * 0.2f + 0.4f)) * 0.6f + 0.8f) - 0.0001);
   EXPECT_LE(nn.computeOutVF(sens, ac), (tanh((-1. * 0.2f + 0.4f)) * 0.6f + 0.8f) + 0.0001);
@@ -51,7 +51,7 @@ TEST(MLP, ConsistentActivationFunction) {
 TEST(MLP, LearnOpposite) {
   MLP nn(1, 1, {1}, 0.01f, 1, -1, 2, 0);
   double weights[] = {-1,0.,1. / tanh(1.), 0};
-  nn.copyWeightsFrom(weights);
+  nn.copyWeightsFrom(weights, false);
 
   // Test
   for (uint n = 0; n < 100 ; n++) {
@@ -326,6 +326,7 @@ TEST(MLP, CaffeCopyActor) {
       MLP actor_test(actor, true);//train
       MLP actor_test2(actor, false);//test
       MLP actor_test3(actor, true, ::caffe::Phase::TEST);//test
+      MLP actor_test4(actor_test2, false);//test
 
       uint n = 0;
       auto iter = [&](const std::vector<double>& x) {
@@ -344,9 +345,11 @@ TEST(MLP, CaffeCopyActor) {
         auto all_actions_outputs2 = actor_test.computeOutBatch(sensors);//batch norm learns
         auto all_actions_outputs3 = actor_test2.computeOutBatch(sensors);
         auto all_actions_outputs4 = actor_test3.computeOutBatch(sensors);
+        auto all_actions_outputs5 = actor_test4.computeOutBatch(sensors);
         for (uint i =0; i < batch_size; i++) {
           EXPECT_DOUBLE_EQ(all_actions_outputs->at(i), all_actions_outputs2->at(i));
           EXPECT_DOUBLE_EQ(all_actions_outputs4->at(i), all_actions_outputs3->at(i));
+          EXPECT_DOUBLE_EQ(all_actions_outputs4->at(i), all_actions_outputs5->at(i));
           if(batch_norm == 0) //is not the same because batch norm is not learning
             EXPECT_DOUBLE_EQ(all_actions_outputs2->at(i), all_actions_outputs3->at(i));
         }
@@ -354,6 +357,7 @@ TEST(MLP, CaffeCopyActor) {
         delete all_actions_outputs2;
         delete all_actions_outputs3;
         delete all_actions_outputs4;
+        delete all_actions_outputs5;
       }
     }
   }

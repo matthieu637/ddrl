@@ -18,6 +18,7 @@
 
 //depends on CAFFE_CPU_ONLY
 
+
 class MLP {
  public:
   friend class DevMLP;
@@ -241,12 +242,13 @@ class MLP {
       net_param.mutable_state()->set_phase(::caffe::Phase::TEST);
       for(int i =0; i < net_param.layer_size(); i++) {
         if(net_param.layer(i).has_batch_norm_param()) {
-          net_param.mutable_layer(i)->clear_param();
+//           net_param.mutable_layer(i)->clear_param();
           net_param.mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(true);
         }
       }
+      UpgradeNetBatchNorm(&net_param);
 #ifndef NDEBUG
-      if(NetNeedsUpgrade(net_param)) {
+      if(MyNetNeedsUpgrade(net_param)) {
         LOG_DEBUG("network need update");
         exit(1);
       }
@@ -258,9 +260,10 @@ class MLP {
       m.neural_net->ToProto(solver_param.mutable_net_param());
       caffe::NetParameter* net_param = solver_param.mutable_net_param();
       net_param->mutable_state()->set_phase(_phase);
+      UpgradeNetBatchNorm(net_param);
       for(int i =0; i < net_param->layer_size(); i++) {
         if(net_param->layer(i).has_batch_norm_param()) {
-          net_param->mutable_layer(i)->clear_param();
+//           net_param->mutable_layer(i)->clear_param();
           if(_phase == ::caffe::Phase::TRAIN)
             net_param->mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(false);
           else
@@ -271,13 +274,8 @@ class MLP {
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
       neural_net = solver->net();
 #ifndef NDEBUG
-      if(NetNeedsUpgrade(*net_param)) {
+      if(MyNetNeedsUpgrade(*net_param)) {
         LOG_ERROR("network need update");
-        exit(1);
-      }
-      
-      if(number_of_parameters() != m.number_of_parameters()){
-        LOG_ERROR("number of param differs");
         exit(1);
       }
 #endif
@@ -285,6 +283,13 @@ class MLP {
 
     if((uint)neural_net->blob_by_name(MLP::states_blob_name)->num() != kMinibatchSize)
       increase_batchsize(kMinibatchSize);
+    
+    if(number_of_parameters() != m.number_of_parameters()){
+      LOG_ERROR("number of param differs");
+      LOG_DEBUG(number_of_parameters() << " " << m.number_of_parameters());
+      ASSERT(number_of_parameters() == m.number_of_parameters(), "gettrace");
+      exit(1);
+    }
   }
 
  private:
@@ -529,69 +534,73 @@ class MLP {
 
     return sum;
   }
-
-  virtual uint number_of_parameters() const {
+  
+  uint number_of_parameters(bool ignore_null_lr=false) const {
     uint n = 0;
-
     caffe::Net<double>& net = *neural_net;
-    for (uint i = 0; i < net.learnable_params().size(); ++i) {
-      auto blob = net.learnable_params()[i];
-      n += blob->count();
-    }
+    ASSERT(net.learnable_params().size() == net.params_lr().size(), "failed");
+    for (uint i = 0; i < net.learnable_params().size(); ++i) 
+      if(net.params_lr()[i] != 0.0f && !ignore_null_lr) {
+        auto blob = net.learnable_params()[i];
+        n += blob->count();
+      }
 
     return n;
   }
 
-  virtual void copyWeightsTo(double* startx) const {
+  void copyWeightsTo(double* startx, bool ignore_null_lr) const {
     uint index = 0;
-
+    
     caffe::Net<double>& net = *neural_net;
     const double* weights;
     for (uint i = 0; i < net.learnable_params().size(); ++i) {
-      auto blob = net.learnable_params()[i];
+      if(net.params_lr()[i] != 0.0f && !ignore_null_lr) {
+        auto blob = net.learnable_params()[i];
 #ifdef CAFFE_CPU_ONLY
-      weights = blob->cpu_data();
-#else
-      switch (caffe::Caffe::mode()) {
-      case caffe::Caffe::CPU:
         weights = blob->cpu_data();
-        break;
-      case caffe::Caffe::GPU:
-        weights = blob->gpu_data();
-        break;
-      }
+#else
+        switch (caffe::Caffe::mode()) {
+          case caffe::Caffe::CPU:
+            weights = blob->cpu_data();
+            break;
+          case caffe::Caffe::GPU:
+            weights = blob->gpu_data();
+            break;
+        }
 #endif
-      for(int n=0; n < blob->count(); n++) {
-        startx[index] = weights[n];
-        index++;
+        for(int n=0; n < blob->count(); n++) {
+          startx[index] = weights[n];
+          index++;
+        }
       }
     }
   }
 
-  virtual void copyWeightsFrom(const double* startx) {
+  virtual void copyWeightsFrom(const double* startx, bool ignore_null_lr) {
     uint index = 0;
 
     caffe::Net<double>& net = *neural_net;
     double* weights;
-    for (uint i = 0; i < net.learnable_params().size(); ++i) {
-      auto blob = net.learnable_params()[i];
+    for (uint i = 0; i < net.learnable_params().size(); ++i) 
+      if(net.params_lr()[i] != 0.0f && !ignore_null_lr) {
+        auto blob = net.learnable_params()[i];
 #ifdef CAFFE_CPU_ONLY
-      weights = blob->mutable_cpu_data();
-#else
-      switch (caffe::Caffe::mode()) {
-      case caffe::Caffe::CPU:
         weights = blob->mutable_cpu_data();
-        break;
-      case caffe::Caffe::GPU:
-        weights = blob->mutable_gpu_data();
-        break;
-      }
+#else
+        switch (caffe::Caffe::mode()) {
+        case caffe::Caffe::CPU:
+          weights = blob->mutable_cpu_data();
+          break;
+        case caffe::Caffe::GPU:
+          weights = blob->mutable_gpu_data();
+          break;
+        }
 #endif
-      for(int n=0; n < blob->count(); n++) {
-        weights[n] = startx[index];
-        index++;
+        for(int n=0; n < blob->count(); n++) {
+          weights[n] = startx[index];
+          index++;
+        }
       }
-    }
   }
 
   double error() {
@@ -938,6 +947,12 @@ protected:
     CHECK(wsample_input_layer);
     wsample_input_layer->Reset(wsample_input, wsample_input,
                                wsample_input_layer->batch_size());
+  }
+  
+  bool MyNetNeedsUpgrade(const caffe::NetParameter& net_param) {
+    return NetNeedsV0ToV1Upgrade(net_param) || NetNeedsV1ToV2Upgrade(net_param)
+    || NetNeedsDataUpgrade(net_param) || NetNeedsInputUpgrade(net_param);
+//     || NetNeedsBatchNormUpgrade(net_param); test wrong written by caffe
   }
   
 public:

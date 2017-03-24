@@ -595,9 +595,9 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       if(reset_qnn && (stop_reset ? episode < 1000 : true)) {
         double* weights = nullptr;
         if(keep_weights_wr){
-          uint dim = qnn->number_of_parameters();
+          uint dim = qnn->number_of_parameters(false);
           weights = new double[dim];
-          qnn->copyWeightsTo(weights);
+          qnn->copyWeightsTo(weights, false);
         }
         delete qnn;
         qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
@@ -607,7 +607,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
                       hidden_layer_type, batch_norm,
                       weighting_strategy > 0);
         if(keep_weights_wr){
-          qnn->copyWeightsFrom(weights);
+          qnn->copyWeightsFrom(weights, false);
           delete[] weights;
         }
       }
@@ -766,14 +766,14 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       if(reset_ann && (stop_reset ? episode < 1000 : true)) {
         double* weights = nullptr;
         if(keep_weights_wr){
-          uint dim = ann->number_of_parameters();
+          uint dim = ann->number_of_parameters(false);
           weights = new double[dim];
-          ann->copyWeightsTo(weights);
+          ann->copyWeightsTo(weights, false);
         }
         delete ann;
         ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, hidden_layer_type, last_layer_actor, batch_norm);
         if(keep_weights_wr){
-          ann->copyWeightsFrom(weights);
+          ann->copyWeightsFrom(weights, false);
           delete[] weights;
         }
       }

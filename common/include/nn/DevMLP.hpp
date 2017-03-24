@@ -72,6 +72,13 @@ class DevMLP : public MLP {
     caffe::NetParameter net_param_old;
     old->getNN()->ToProto(&net_param_old);
     
+    UpgradeNetBatchNorm(&net_param_old);
+#ifndef NDEBUG
+    if(MyNetNeedsUpgrade(net_param_old)) {
+      LOG_ERROR("network need update");
+      exit(1);
+    }
+#endif
 //     net_param_old.PrintDebugString();
 //     LOG_DEBUG("########################################################################################");
 
@@ -384,10 +391,10 @@ class DevMLP : public MLP {
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
       neural_net = solver->net();
       if(policy)
-        LOG_INFO("nb param pol: "  << number_of_parameters() << " : " << link_structure );
+        LOG_INFO("nb param pol: "  << number_of_parameters(true) << " : " << link_structure );
       else
-        LOG_INFO("nb param cri: "  << number_of_parameters() << " : " << link_structure );
-      
+        LOG_INFO("nb param cri: "  << number_of_parameters(true) << " : " << link_structure );
+
 #ifndef NDEBUG
       if(link_structure != 9)
         ASSERT(neural_net->blob_by_name(states_blob_name_old)->height() == old->neural_net->blob_by_name(
@@ -444,26 +451,11 @@ class DevMLP : public MLP {
       }
   }
 
-  virtual uint number_of_parameters() const override {
-    uint n = 0;
-    caffe::Net<double>& net = *neural_net;
-    ASSERT(net.learnable_params().size() == net.params_lr().size(), "failed");
-
-    for (uint i = 0; i < net.learnable_params().size(); ++i) {
-      if(net.params_lr()[i] != 0.0f) {
-        auto blob = net.learnable_params()[i];
-        n += blob->count();
-      }
-    }
-
-    return n;
-  }
-
 #ifdef DEBUG_DEVNN
 #warning DEBUG_DEVNN
   MLP* _old;
 
-  void copyWeightsFrom(const double*) override {
+  void copyWeightsFrom(const double*, bool) override {
   }
 
 #ifdef DEBUG_DEVNN_STOP
@@ -537,63 +529,7 @@ class DevMLP : public MLP {
     return outputs;
   }
 #endif
-
-#else
-  virtual void copyWeightsFrom(const double* startx) override {
-    uint index = 0;
-
-    caffe::Net<double>& net = *neural_net;
-    double* weights;
-    for (uint i = 0; i < net.learnable_params().size(); ++i)
-      if(net.params_lr()[i] != 0.0f) {
-        auto blob = net.learnable_params()[i];
-#ifdef CAFFE_CPU_ONLY
-        weights = blob->mutable_cpu_data();
-#else
-        switch (caffe::Caffe::mode()) {
-        case caffe::Caffe::CPU:
-          weights = blob->mutable_cpu_data();
-          break;
-        case caffe::Caffe::GPU:
-          weights = blob->mutable_gpu_data();
-          break;
-        }
 #endif
-        for(int n=0; n < blob->count(); n++) {
-          weights[n] = startx[index];
-          index++;
-        }
-      }
-  }
-#endif
-
-  virtual void copyWeightsTo(double* startx) const override {
-    uint index = 0;
-
-    caffe::Net<double>& net = *neural_net;
-    const double* weights;
-    for (uint i = 0; i < net.learnable_params().size(); ++i) {
-      if(net.params_lr()[i] != 0.0f) {
-        auto blob = net.learnable_params()[i];
-#ifdef CAFFE_CPU_ONLY
-        weights = blob->cpu_data();
-#else
-        switch (caffe::Caffe::mode()) {
-        case caffe::Caffe::CPU:
-          weights = blob->cpu_data();
-          break;
-        case caffe::Caffe::GPU:
-          weights = blob->gpu_data();
-          break;
-        }
-#endif
-        for(int n=0; n < blob->count(); n++) {
-          startx[index] = weights[n];
-          index++;
-        }
-      }
-    }
-  }
 
  public:
   virtual ~DevMLP() {
