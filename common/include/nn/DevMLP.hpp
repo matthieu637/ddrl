@@ -17,6 +17,8 @@
 #undef DEBUG_DEVNN_STOP
 #endif
 
+using std::string;
+
 class DevMLP : public MLP {
  public:
 
@@ -385,7 +387,10 @@ class DevMLP : public MLP {
       solver_param.set_max_iter(10000000);
       solver_param.set_base_lr(c->alpha);
       solver_param.set_lr_policy("fixed");
-      solver_param.set_snapshot_prefix("actor");
+      if(policy)
+        solver_param.set_snapshot_prefix("actor");
+      else
+        solver_param.set_snapshot_prefix("critic");
       solver_param.set_clip_gradients(10);
 
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);

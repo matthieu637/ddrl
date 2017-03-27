@@ -540,7 +540,7 @@ class MLP {
     caffe::Net<double>& net = *neural_net;
     ASSERT(net.learnable_params().size() == net.params_lr().size(), "failed");
     for (uint i = 0; i < net.learnable_params().size(); ++i) 
-      if(net.params_lr()[i] != 0.0f && !ignore_null_lr) {
+      if(!ignore_null_lr || net.params_lr()[i] != 0.0f) {
         auto blob = net.learnable_params()[i];
         n += blob->count();
       }
@@ -554,7 +554,7 @@ class MLP {
     caffe::Net<double>& net = *neural_net;
     const double* weights;
     for (uint i = 0; i < net.learnable_params().size(); ++i) {
-      if(net.params_lr()[i] != 0.0f && !ignore_null_lr) {
+      if(!ignore_null_lr || net.params_lr()[i] != 0.0f) {
         auto blob = net.learnable_params()[i];
 #ifdef CAFFE_CPU_ONLY
         weights = blob->cpu_data();
@@ -582,7 +582,7 @@ class MLP {
     caffe::Net<double>& net = *neural_net;
     double* weights;
     for (uint i = 0; i < net.learnable_params().size(); ++i) 
-      if(net.params_lr()[i] != 0.0f && !ignore_null_lr) {
+      if(!ignore_null_lr || net.params_lr()[i] != 0.0f) {
         auto blob = net.learnable_params()[i];
 #ifdef CAFFE_CPU_ONLY
         weights = blob->mutable_cpu_data();
