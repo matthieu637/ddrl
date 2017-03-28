@@ -935,3 +935,111 @@ TEST(MLP, DevelopmentalLayerSharedParameters) {
   }
 }
 
+TEST(MLP, DevelopmentalLayerScalingControl) {
+  std::vector<uint> batch_norms = {0};
+  for(uint batch_norm : batch_norms) {
+    for(uint hidden_layer = 1; hidden_layer <=3 ; hidden_layer++) {
+      //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
+      uint batch_size = 343; //must be a power3 number
+      std::vector<double> sensors(batch_size*3);
+      
+      MLP actor(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
+      DODevMLP actor2(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
+      std::string config="[devnn]\nscale=true\nprobabilistic=true\nst_control=1:2\nac_control=1:2\n";
+      boost::property_tree::ptree properties;
+      boost::iostreams::stream<boost::iostreams::array_source> stream(config.c_str(), config.size());
+      boost::property_tree::ini_parser::read_ini(stream, properties);
+      actor2.exploit(&properties, nullptr);
+      
+      EXPECT_EQ(actor2.number_of_parameters(true) - (3-1) - (4-2), actor.number_of_parameters(true));
+      uint n = 0;
+      auto iter = [&](const std::vector<double>& x) {
+        sensors[n] = x[0];
+        if(bib::Utils::rand01() < 0.4)
+          sensors[n] = bib::Utils::rand01()*2 -1;
+        n++;
+        
+        sensors[n] = x[1];
+        if(bib::Utils::rand01() < 0.4)
+          sensors[n] = bib::Utils::rand01()*2 -1;
+        n++;
+        
+        sensors[n] = x[2];
+        if(bib::Utils::rand01() < 0.4)
+          sensors[n] = bib::Utils::rand01()*2 -1;
+        n++;
+      };
+      
+      //copy param of actor to actor2
+      double* weights = new double[actor.number_of_parameters(true)];
+      actor.copyWeightsTo(weights, true);
+      double* weights2 = new double[actor2.number_of_parameters(true)];
+      actor2.copyWeightsTo(weights2, true);
+      for(uint i=0;i<3-1;i++)
+        weights2[i]=1.f;
+      for(uint i=3-1;i< actor.number_of_parameters(true); i++)
+        weights2[i]=weights[i-(3-1)];
+      for(uint i=actor.number_of_parameters(true); i < actor2.number_of_parameters(true)-(3-1);i++)
+        weights2[i+(3-1)]=1.f;
+      actor2.copyWeightsFrom(weights2, true);
+      bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
+      CHECK_EQ(n, batch_size*3);
+      
+      for(uint forced=0;forced<5;forced++){
+        auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
+        auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
+        for (uint i =0; i < batch_size; i++) {
+          EXPECT_DOUBLE_EQ(all_actions_outputs->at(i), all_actions_outputs2->at(i));
+        }
+        delete all_actions_outputs;
+        delete all_actions_outputs2;
+      }
+      
+      weights2[actor2.number_of_parameters(true)-2] = 0.4f;
+      weights2[actor2.number_of_parameters(true)-1] = 0.6f;
+      actor2.copyWeightsFrom(weights2, true);
+      
+      delete[] weights;
+      delete[] weights2;
+      
+      for(uint forced=0;forced<5;forced++){
+        auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
+        auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
+ 
+        uint y=0;
+        uint fit0=0;
+        uint fit1=0;
+        uint fit2=0;
+        uint fit3=0;
+        for (uint i =0; i < batch_size; i++) {
+          for(uint j=0;j<4;j++){
+            if(j==0 && all_actions_outputs->at(y) == all_actions_outputs2->at(y))
+              fit0++;
+            else if(j==1 && std::fabs(all_actions_outputs->at(y)*(1./0.4) - all_actions_outputs2->at(y)) <= 1e-10 )
+              fit1++;
+            else if(j==2 && std::fabs(all_actions_outputs->at(y)*(1./0.6) - all_actions_outputs2->at(y)) <= 1e-10 )
+              fit2++;
+            else if(all_actions_outputs->at(y) == all_actions_outputs2->at(y))
+              fit3++;
+            y++;
+          }
+        }
+        delete all_actions_outputs;
+        delete all_actions_outputs2;
+        double proba0 = (((float)fit0)/((float)batch_size));
+        double proba1 = (((float)fit1)/((float)batch_size));
+        double proba2 = (((float)fit2)/((float)batch_size));
+        double proba3 = (((float)fit3)/((float)batch_size));
+        double std_=0.09;
+        EXPECT_GE(proba0, 1.-std_);
+        EXPECT_LE(proba0, 1.+std_);
+        EXPECT_GE(proba1, 0.4-std_);
+        EXPECT_LE(proba1, 0.4+std_);
+        EXPECT_GE(proba2, 0.6-std_);
+        EXPECT_LE(proba2, 0.6+std_);
+        EXPECT_GE(proba3, 1.-std_);
+        EXPECT_LE(proba3, 1.+std_);
+      }
+    }
+  }
+}
