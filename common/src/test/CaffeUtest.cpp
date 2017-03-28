@@ -631,7 +631,7 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
       for(uint i=actor.number_of_parameters(true); i < actor2.number_of_parameters(true)-3;i++)
         weights2[i+3]=1.f;
       actor2.copyWeightsFrom(weights2, true);
-      bib::Combinaison::continuous<>(iter, 3, -1, 1, std::pow(batch_size, 1./3.));
+      bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
       CHECK_EQ(n, batch_size*3);
       
       for(uint forced=0;forced<5;forced++){
@@ -649,6 +649,9 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
       weights2[actor2.number_of_parameters(true)-2] = 0.4f;
       weights2[actor2.number_of_parameters(true)-1] = 0.6f;
       actor2.copyWeightsFrom(weights2, true);
+      
+      delete[] weights;
+      delete[] weights2;
       
       for(uint forced=0;forced<5;forced++){
         auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
@@ -679,7 +682,7 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
         double proba1 = (((float)fit1)/((float)batch_size));
         double proba2 = (((float)fit2)/((float)batch_size));
         double proba3 = (((float)fit3)/((float)batch_size));
-        double std_=0.08;
+        double std_=0.09;
         EXPECT_GE(proba0, 0.1-std_);
         EXPECT_LE(proba0, 0.1+std_);
         EXPECT_GE(proba1, 0.8-std_);
@@ -740,7 +743,7 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
       for(uint i=actor.number_of_parameters(true); i < actor2.number_of_parameters(true)-(3-1);i++)
         weights2[i+(3-1)]=1.f;
       actor2.copyWeightsFrom(weights2, true);
-      bib::Combinaison::continuous<>(iter, 3, -1, 1, std::pow(batch_size, 1./3.));
+      bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
       CHECK_EQ(n, batch_size*3);
       
       for(uint forced=0;forced<5;forced++){
@@ -756,6 +759,9 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
       weights2[actor2.number_of_parameters(true)-2] = 0.4f;
       weights2[actor2.number_of_parameters(true)-1] = 0.6f;
       actor2.copyWeightsFrom(weights2, true);
+      
+      delete[] weights;
+      delete[] weights2;
       
       for(uint forced=0;forced<5;forced++){
         auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
@@ -891,7 +897,7 @@ TEST(MLP, DevelopmentalLayerSharedParameters) {
           EXPECT_DOUBLE_EQ(weights2[i], weights3[i]);//copy constructor for DODEVMLP
         }
       }
-      bib::Combinaison::continuous<>(iter, 3, -1, 1, std::pow(batch_size, 1./3.));
+      bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
       CHECK_EQ(n, batch_size*3);
       
       for(uint forced=0;forced<5;forced++){
