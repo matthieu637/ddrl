@@ -17,6 +17,7 @@
 #include <bib/Combinaison.hpp>
 #include "nn/MLP.hpp"
 #include "nn/DevMLP.hpp"
+#include "nn/DODevMLP.hpp"
 #include "cmaes_interface.h"
 
 template<typename NN = MLP>
@@ -74,6 +75,8 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, 0.1, 1, actor_hidden_layer_type, actor_output_layer_type, batch_norm);
     if(std::is_same<NN, DevMLP>::value)
       ann->exploit(pt, static_cast<CMAESAg *>(old_ag)->ann);
+    else if(std::is_same<NN, DODevMLP>::value)
+      ann->exploit(pt, nullptr);
 
 //     const uint dimension = (nb_sensors+1)*hidden_unit_a->at(0) + (hidden_unit_a->at(0)+1)*nb_motors;
     const uint dimension = ann->number_of_parameters(true);

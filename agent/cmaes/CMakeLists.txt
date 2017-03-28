@@ -34,6 +34,9 @@ target_link_libraries(half-cheetah ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 add_executable(dpmt-half-cheetah src/test/DpmtHalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(dpmt-half-cheetah ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 
+add_executable(dodev-half-cheetah src/test/DODevHalfCheetah.cpp ${all_include} ${all_sources} )
+target_link_libraries(dodev-half-cheetah ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+
 
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
