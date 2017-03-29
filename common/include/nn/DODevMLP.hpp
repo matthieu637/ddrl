@@ -17,8 +17,15 @@ class DODevMLP : public MLP {
     std::vector<uint>* st_control = bib::to_array<uint>(pt->get<std::string>("devnn.st_control"));
     std::vector<uint>* ac_control = bib::to_array<uint>(pt->get<std::string>("devnn.ac_control"));
     uint heuristic = 0;
+    bool disable_st_control = false;
     try {
       heuristic = pt->get<uint>("devnn.heuristic");
+    } catch(boost::exception const& ) {
+    }
+    
+    try {
+      if(st_control->size() == 0 && pt->get<std::string>("devnn.st_control") == "None")
+        disable_st_control = true;
     } catch(boost::exception const& ) {
     }
 
@@ -52,7 +59,7 @@ class DODevMLP : public MLP {
       uint b=0;
       bool state_capted_bottom = false;
       for(const std::string& bot : lp.bottom()) {
-        if(bot == MLP::states_blob_name) {
+        if(bot == MLP::states_blob_name && !disable_st_control) {
           *lp.mutable_bottom(b) = "devnn.states";
           nb_state_layer++;
           state_capted_bottom = true;
@@ -70,7 +77,7 @@ class DODevMLP : public MLP {
           ASSERT(!input_action, "action both in input and output mode");
           input_action=false;
           nb_action_layer++;
-        } else if(top == MLP::states_blob_name && state_capted_bottom){
+        } else if(top == MLP::states_blob_name && state_capted_bottom && !disable_st_control){
           *lp.mutable_top(b) = "devnn.states";
         }
         b++;
@@ -106,7 +113,9 @@ class DODevMLP : public MLP {
         action_dev_inserted = true;
       }
     }
-    ASSERT(nb_state_layer >= 1, "check nb of state layer " << nb_state_layer);
+    
+    if(!disable_st_control)
+      ASSERT(nb_state_layer >= 1, "check nb of state layer " << nb_state_layer);
     ASSERT(nb_action_layer >= 1, "check nb of action layer " << nb_action_layer);
 
 //     net_param_new.PrintDebugString();
