@@ -14,6 +14,8 @@ std::vector<T>* to_array(const std::string& s) {
   if(s.find(separator) == std::string::npos)
     separator = ',';
   std::vector<T>* result = new std::vector<T>;
+  if(s == "None")
+    return result;
   std::stringstream ss(s);
   std::string item;
   while (std::getline(ss, item, separator))

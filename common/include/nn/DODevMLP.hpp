@@ -10,13 +10,20 @@ class DODevMLP : public MLP {
   using MLP::MLP;
 
   virtual void exploit(boost::property_tree::ptree* pt, MLP* actor) override {
-    bool scale = pt->get<bool>("devnn.scale");
-    bool probabilistic = pt->get<bool>("devnn.probabilistic");
+    bool st_scale = pt->get<bool>("devnn.st_scale");
+    bool ac_scale = pt->get<bool>("devnn.ac_scale");    
+    uint st_probabilistic = pt->get<uint>("devnn.st_probabilistic");
+    uint ac_probabilistic = pt->get<uint>("devnn.ac_probabilistic");
     std::vector<uint>* st_control = bib::to_array<uint>(pt->get<std::string>("devnn.st_control"));
     std::vector<uint>* ac_control = bib::to_array<uint>(pt->get<std::string>("devnn.ac_control"));
+    uint heuristic = 0;
+    try {
+      heuristic = pt->get<uint>("devnn.heuristic");
+    } catch(boost::exception const& ) {
+    }
 
-    if(scale && !probabilistic) {
-      LOG_ERROR("if not probabilistic then why scale of how much?");
+    if((ac_scale && ac_probabilistic != 0) || (st_scale && st_probabilistic != 0)) {
+      LOG_ERROR("if not probabilistic then why scaling? of how much?");
       exit(1);
     }
 
@@ -70,18 +77,18 @@ class DODevMLP : public MLP {
       }
       
       if(nb_state_layer > 0 && !state_dev_inserted){
-        caffe::DevelopmentalParameter* dp = addDevState(net_param_new);
-        dp->set_scale(scale);
-        dp->set_probabilist(probabilistic);
+        caffe::DevelopmentalParameter* dp = addDevState(net_param_new, heuristic);
+        dp->set_scale(st_scale);
+        dp->set_probabilist(st_probabilistic);
         for (uint c : *st_control)
           dp->add_control(c);
         state_dev_inserted = true;
       }
       
       if(nb_action_layer > 0 && input_action && !action_dev_inserted){
-        caffe::DevelopmentalParameter* dp = addDevAction(net_param_new, input_action);
-        dp->set_scale(scale);
-        dp->set_probabilist(probabilistic);
+        caffe::DevelopmentalParameter* dp = addDevAction(net_param_new, input_action, heuristic);
+        dp->set_scale(ac_scale);
+        dp->set_probabilist(ac_probabilistic);
         for (uint c : *ac_control)
           dp->add_control(c);
         action_dev_inserted = true;
@@ -91,9 +98,9 @@ class DODevMLP : public MLP {
       lpc->CopyFrom(lp);
       
       if(nb_action_layer > 0 && !input_action && !action_dev_inserted){
-        caffe::DevelopmentalParameter* dp = addDevAction(net_param_new, input_action);
-        dp->set_scale(scale);
-        dp->set_probabilist(probabilistic);
+        caffe::DevelopmentalParameter* dp = addDevAction(net_param_new, input_action, heuristic);
+        dp->set_scale(ac_scale);
+        dp->set_probabilist(ac_probabilistic);
         for (uint c : *ac_control)
           dp->add_control(c);
         action_dev_inserted = true;
@@ -128,18 +135,28 @@ class DODevMLP : public MLP {
   }
 
  private:
-   caffe::DevelopmentalParameter* addDevState(caffe::NetParameter& net_param) {
+   caffe::DevelopmentalParameter* addDevState(caffe::NetParameter& net_param, uint heuristic) {
     caffe::LayerParameter& layer = *net_param.add_layer();
     PopulateLayer(layer, "devnn_states", "Developmental", {MLP::states_blob_name}, {"devnn.states"}, boost::none);
+    if(heuristic != 0){
+      caffe::ParamSpec* fixed_param_spec = layer.add_param();
+      fixed_param_spec->set_lr_mult(0.f);
+      fixed_param_spec->set_decay_mult(0.f);
+    }
     return layer.mutable_developmental_param();
   }
 
-  caffe::DevelopmentalParameter* addDevAction(caffe::NetParameter& net_param, bool input_action) {
+  caffe::DevelopmentalParameter* addDevAction(caffe::NetParameter& net_param, bool input_action, uint heuristic) {
     caffe::LayerParameter& layer = *net_param.add_layer();
     if(input_action)
       PopulateLayer(layer, "devnn_actions", "Developmental", {MLP::actions_blob_name}, {"devnn.actions"}, boost::none);
     else
       PopulateLayer(layer, "devnn_actions", "Developmental", {"devnn.actions"}, {MLP::actions_blob_name}, boost::none);
+    if(heuristic != 0){
+      caffe::ParamSpec* fixed_param_spec = layer.add_param();
+      fixed_param_spec->set_lr_mult(0.f);
+      fixed_param_spec->set_decay_mult(0.f);
+    }
     return layer.mutable_developmental_param();
   }
 };
