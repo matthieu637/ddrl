@@ -180,7 +180,9 @@ void HumanoidWorldView::step(const std::vector<double>& motors) {
 }
 
 
-static arch::Simulator<HumanoidEnv, arch::ExampleAgent>* s;
+//static arch::Simulator<HumanoidEnv, arch::ExampleAgent>* s;
+static arch::Simulator<HumanoidEnv, arch::ZeroAgent>* s;
+
 void threadOSXRun(){
   LOG_DEBUG("threadOSX start");
   sleep(2);
@@ -189,7 +191,8 @@ void threadOSXRun(){
 }
 
 int main(int argc, char **argv) {
-  s = new arch::Simulator<HumanoidEnv, arch::ExampleAgent>();
+  //s = new arch::Simulator<HumanoidEnv, arch::ExampleAgent>();
+  s = new arch::Simulator<HumanoidEnv, arch::ZeroAgent>();
   s->init(argc, argv);
   s->before_run((arch::ExampleAgent*) nullptr, 0);
     
