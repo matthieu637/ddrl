@@ -10,7 +10,7 @@
 static HumanoidWorldView* inst = nullptr;
 
 void parseCommandHumanoid(int cmd) {
-  static float xyz[3] = {-0.03, -0.97, 0.2};
+  static float xyz[3] = {-0.07, -2.83, 0.81};
   static float hpr[3] = {90, 0, 0};
   std::vector<double> qq;
 

@@ -73,13 +73,6 @@ class HumanoidWorld {
   double reward;
 
   std::vector<double> internal_state;
-  
-#ifndef NDEBUG
-  uint debug_step = 0;
-  std::vector<double> factors;
-  uint target_motor = 0;
-  uint target_joint = 0;
-#endif
 };
 
 struct nearCallbackDataHumanoid {
