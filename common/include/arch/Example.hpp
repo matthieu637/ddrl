@@ -71,7 +71,7 @@ public:
   virtual ~ZeroAgent() {
   }
   
-  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
+  void _unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) override {
     for (unsigned int i = 0; i < actuator.size(); i++)
       actuator[i] = 0;
   }

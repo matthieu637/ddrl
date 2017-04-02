@@ -8,19 +8,36 @@ class DODevMLP : public MLP {
  public:
 
   using MLP::MLP;
+  
+  virtual ~DODevMLP(){
+    delete st_control;
+    delete ac_control;
+  }
 
   virtual void exploit(boost::property_tree::ptree* pt, MLP* actor) override {
     bool st_scale = pt->get<bool>("devnn.st_scale");
     bool ac_scale = pt->get<bool>("devnn.ac_scale");    
     uint st_probabilistic = pt->get<uint>("devnn.st_probabilistic");
     uint ac_probabilistic = pt->get<uint>("devnn.ac_probabilistic");
-    std::vector<uint>* st_control = bib::to_array<uint>(pt->get<std::string>("devnn.st_control"));
-    std::vector<uint>* ac_control = bib::to_array<uint>(pt->get<std::string>("devnn.ac_control"));
-    uint heuristic = 0;
-    bool disable_st_control = false;
+    st_control = bib::to_array<uint>(pt->get<std::string>("devnn.st_control"));
+    ac_control = bib::to_array<uint>(pt->get<std::string>("devnn.ac_control"));
+    heuristic = 0;
     try {
       heuristic = pt->get<uint>("devnn.heuristic");
+      if((heuristic == 1 && st_probabilistic != 1) || (heuristic == 1 && ac_probabilistic != 1)){
+        LOG_INFO("heuristic is 1 so probabilistic should be 1");
+        exit(1);
+      }
     } catch(boost::exception const& ) {
+    }
+    
+    if(heuristic == 1){
+      try {
+        heuristic_devpoints.reset(bib::to_array<uint>(pt->get<std::string>("devnn.heuristic_devpoints")));
+        ASSERT((st_control->size() + ac_control->size()) <= heuristic_devpoints->size(), "st " << st_control->size() 
+          << " " << ac_control->size() << " " << heuristic_devpoints->size() );
+      } catch(boost::exception const& ) {
+      }
     }
     
     try {
@@ -139,8 +156,21 @@ class DODevMLP : public MLP {
       neural_net->layer_by_name("devnn_states")->blobs()[0]->ShareDiff(*actor->getNN()->layer_by_name("devnn_states")->blobs()[0]);
     }
     
-    delete st_control;
-    delete ac_control;
+    if(heuristic == 1){
+      auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
+      uint count = blob_ac->count();
+      auto data = blob_ac->mutable_cpu_data();
+      for(uint i=0;i<count;i++)
+        data[i] = -1.f;
+      
+      if(!disable_st_control){
+        blob_ac = neural_net->layer_by_name("devnn_states")->blobs()[0];
+        count = blob_ac->count();
+        data = blob_ac->mutable_cpu_data();
+        for(uint i=0;i<count;i++)
+          data[i] = -1.f;
+      }
+    }
   }
 
  private:
@@ -168,6 +198,40 @@ class DODevMLP : public MLP {
     }
     return layer.mutable_developmental_param();
   }
+  
+public:
+  virtual void copyWeightsFrom(const double* startx, bool ignore_null_lr) override {
+    if(heuristic == 1)
+      while(heuristic_devpoints_index < heuristic_devpoints->size() && episode == heuristic_devpoints->at(heuristic_devpoints_index)){
+        if(heuristic_devpoints_index < st_control->size()){
+          auto blob_ac = neural_net->layer_by_name("devnn_states")->blobs()[0];
+          auto data = blob_ac->mutable_cpu_data();
+          data[heuristic_devpoints_index] = 1.f;
+        } else {
+          auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
+          auto data = blob_ac->mutable_cpu_data();
+          data[heuristic_devpoints_index - st_control->size()] = 1.f;
+        }
+
+        heuristic_devpoints_index++;
+      }
+    
+    MLP::copyWeightsFrom(startx, ignore_null_lr);
+    episode++;
+  }
+  
+private:
+  bool disable_st_control = false;
+  uint heuristic = 0;
+  uint episode = 0;
+  uint heuristic_devpoints_index = 0;
+  boost::shared_ptr<std::vector<uint>> heuristic_devpoints;
+  std::vector<uint>* st_control;
+  std::vector<uint>* ac_control;
 };
 
 #endif
+
+
+
+
