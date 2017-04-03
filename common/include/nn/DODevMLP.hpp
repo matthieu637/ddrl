@@ -8,6 +8,11 @@ class DODevMLP : public MLP {
  public:
 
   using MLP::MLP;
+
+  DODevMLP(const DODevMLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : MLP(m, copy_solver, _phase) {
+    st_control = new std::vector<uint>(*m.st_control);
+    ac_control = new std::vector<uint>(*m.ac_control);
+  }
   
   virtual ~DODevMLP(){
     if(st_control != nullptr)
@@ -209,10 +214,12 @@ public:
           auto blob_ac = neural_net->layer_by_name("devnn_states")->blobs()[0];
           auto data = blob_ac->mutable_cpu_data();
           data[heuristic_devpoints_index] = 1.f;
-        } else {
+          LOG_INFO("dev point st " << st_control->at(heuristic_devpoints_index) );
+        } else if(heuristic_devpoints_index < st_control->size() + ac_control->size()) {
           auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
           auto data = blob_ac->mutable_cpu_data();
           data[heuristic_devpoints_index - st_control->size()] = 1.f;
+          LOG_INFO("dev point ac " << ac_control->at(heuristic_devpoints_index - st_control->size()) );
         }
 
         heuristic_devpoints_index++;
