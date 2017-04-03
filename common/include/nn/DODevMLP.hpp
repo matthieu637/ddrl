@@ -10,8 +10,10 @@ class DODevMLP : public MLP {
   using MLP::MLP;
   
   virtual ~DODevMLP(){
-    delete st_control;
-    delete ac_control;
+    if(st_control != nullptr)
+      delete st_control;
+    if(ac_control != nullptr)
+      delete ac_control;
   }
 
   virtual void exploit(boost::property_tree::ptree* pt, MLP* actor) override {
@@ -226,8 +228,8 @@ private:
   uint episode = 0;
   uint heuristic_devpoints_index = 0;
   boost::shared_ptr<std::vector<uint>> heuristic_devpoints;
-  std::vector<uint>* st_control;
-  std::vector<uint>* ac_control;
+  std::vector<uint>* st_control = nullptr;
+  std::vector<uint>* ac_control = nullptr;
 };
 
 #endif
