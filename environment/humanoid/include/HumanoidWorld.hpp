@@ -15,12 +15,16 @@
 // <option integrator="RK4" iterations="50" solver="PGS" timestep="0.003">
 #define WORLD_STEP 0.003
 
+// mujoco_env.MujocoEnv.__init__(self, 'humanoid.xml', 5)
+#define FRAME_SKIP 5
+
+#define ALIVE_BONUS 5.0
+
 struct humanoid_physics{
   bool apply_armature;
   uint approx;
   uint damping;
   uint control;
-  uint reward;
   double mu;
   double mu2;
   double soft_cfm;
@@ -28,14 +32,7 @@ struct humanoid_physics{
   double slip2;
   double soft_erp;
   double bounce;
-  uint predev;
-  uint from_predev;
-//   PREDEV: 1 -> two low joint
-//           10 -> two middle joints
-//   +0 (1/10) -> PD controller init pos (sensors removed)
-//   +1 (2/11) -> PD controller init pos (keep sensors)
-//   +2 (3/12) -> PD controller init pos (keep sensors but setted to 0)
-  
+  bool additional_sensors;
 };
 
 class HumanoidWorld {
@@ -58,6 +55,8 @@ class HumanoidWorld {
   void update_state();
   void apply_armature(dMass* m, double k);
   void apply_damping(dBodyID body, double v);
+//   void copy_inertia(dMass* m, uint i);
+  double mass_center();
 
  public:
   ODEWorld odeworld;
@@ -65,14 +64,17 @@ class HumanoidWorld {
   dGeomID ground;
   humanoid_physics phy;
   dContact contact[2];
-  bool head_touch, fknee_touch, bknee_touch;
+  
+//   static const std::vector<double> mujoco_inertia;
   
  protected:
   std::vector<dJointID> joints;
-  double penalty;
   double reward;
-
   std::vector<double> internal_state;
+  std::vector<double> body_mass;
+  std::vector<double> qfrc_actuator;
+  double mass_sum;
+  double pos_before;
 };
 
 struct nearCallbackDataHumanoid {

@@ -94,6 +94,8 @@ void threadloopHumanoid(const std::string& goodpath) {
 //     xyz[0] = x - 1.43;
 //     dsSetViewpoint(xyz, hpr);
   }
+  
+  HACKclose();
 }
 
 HumanoidWorldView::HumanoidWorldView(const std::string& path, const humanoid_physics phy)
@@ -147,7 +149,6 @@ HumanoidWorldView::~HumanoidWorldView() {
   requestEnd = true;
   eventThread->join();
   delete eventThread;
-  HACKclose();
 }
 
 void HumanoidWorldView::step(const std::vector<double>& motors) {

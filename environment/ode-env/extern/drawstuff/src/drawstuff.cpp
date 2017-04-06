@@ -873,10 +873,6 @@ static Texture *checkered2_texture = 0;
 
 static Texture *texture[5 + 1]; // +1 since index 0 is not used
 
-
-
-#if !defined(macintosh) || defined(ODE_PLATFORM_OSX)
-
 void dsStartGraphics (int , int , dsFunctions *fn) {
 
   const char *prefix = DEFAULT_PATH_TO_TEXTURES;
@@ -906,16 +902,23 @@ void dsStartGraphics (int , int , dsFunctions *fn) {
   }
 }
 
-#endif
-
-
 void dsStopGraphics() {
-  delete sky_texture;
-  delete ground_texture;
-  delete wood_texture;
+  if(sky_texture != 0)
+    delete sky_texture;
+  if(ground_texture != 0)
+    delete ground_texture;
+  if(wood_texture != 0)
+    delete wood_texture;
+  if(checkered_texture != 0)
+    delete checkered_texture;
+  if(checkered2_texture != 0)
+    delete checkered2_texture;
+  
   sky_texture = 0;
   ground_texture = 0;
   wood_texture = 0;
+  checkered_texture = 0;
+  checkered2_texture = 0;
 }
 
 

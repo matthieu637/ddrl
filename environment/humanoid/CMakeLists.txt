@@ -29,7 +29,7 @@ target_link_libraries(${LIBRARY_NAME} ${COMMON_DRL_LIBRARY_LIGHT} ${ODE_ENV_LIBR
 # Personnals Test
 #-------------------
 add_executable(humanoid-env src/test/Humanoid.cpp ${all_include} ${all_sources})
-target_link_libraries(humanoid-env ${COMMON_DRL_LIBRARY_LIGHT} ${ODE_ENV_LIBRARY})
+target_link_libraries(humanoid-env ${COMMON_DRL_LIBRARY} ${ODE_ENV_LIBRARY})
 
 if(APPLE)
 	message(${all_sources})
@@ -40,7 +40,7 @@ if(APPLE)
 endif()
 
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
-file(COPY ${ROOT_DRL_PATH}/environment/humanoid/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+file(COPY ${ROOT_DRL_PATH}/environment/ode-env/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
 #execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/humanoid.ini config.ini)
 

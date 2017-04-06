@@ -47,7 +47,6 @@ class HumanoidEnv : public arch::AEnvironment<> {
     init.damping = pt->get<uint>("environment.damping");
     init.approx = pt->get<uint>("environment.approx");
     init.control = pt->get<uint>("environment.control");
-    init.reward = pt->get<uint>("environment.reward");
     init.mu = pt->get<double>("environment.mu");
     init.mu2 = pt->get<double>("environment.mu2");
     init.soft_cfm = pt->get<double>("environment.soft_cfm");
@@ -55,21 +54,10 @@ class HumanoidEnv : public arch::AEnvironment<> {
     init.slip2 = pt->get<double>("environment.slip2");
     init.soft_erp = pt->get<double>("environment.soft_erp");
     init.bounce = pt->get<double>("environment.bounce");
+    init.additional_sensors = pt->get<bool>("environment.additional_sensors");
     visible     = vm->count("view");
     
-    init.predev = 0;
-    try {
-      init.predev = pt->get<uint>("environment.predev");
-    } catch(boost::exception const& ) {
-    }
-    init.from_predev = 0;
-    try {
-      init.from_predev = pt->get<uint>("environment.from_predev");
-    } catch(boost::exception const& ) {
-    }
     
-    ASSERT(init.predev == 0 || init.from_predev ==0, "for now only one dev");
-
     if (visible)
       instance = new HumanoidWorldView("data/textures", init);
     else
