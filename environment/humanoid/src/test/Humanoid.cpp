@@ -3,7 +3,7 @@
 #include "arch/Example.hpp"
 #include "HumanoidEnv.hpp"
 #include <google/protobuf/stubs/common.h>
-#include <gflags/gflags.h>
+// #include <gflags/gflags.h>
 
 int main(int argc, char **argv) {
   arch::Simulator<HumanoidEnv, arch::ExampleAgent> s;
@@ -15,6 +15,6 @@ int main(int argc, char **argv) {
   LOG_DEBUG("works !");
   
   google::protobuf::ShutdownProtobufLibrary();
-  gflags::ShutDownCommandLineFlags();
+//   gflags::ShutDownCommandLineFlags();
   return 0;
 }
