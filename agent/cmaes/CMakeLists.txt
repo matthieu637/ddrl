@@ -14,9 +14,11 @@ find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(Cartpole)
 find_package(HalfCheetah)
+find_package(Humanoid)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${COMMON_DRL_INCLUDE_DIRS} 
-  ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${HALF_CHEETAH_INCLUDE_DIRS})
+  ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} 
+  ${HALF_CHEETAH_INCLUDE_DIRS} ${HUMANOID_INCLUDE_DIRS})
 
 set(BASE_LIBRARIES ${COMMON_DRL_LIBRARY} )
 file ( GLOB_RECURSE all_include include/*.hpp include/*.h)
@@ -30,6 +32,9 @@ target_link_libraries(cartpole ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES})
 
 add_executable(half-cheetah src/test/HalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(half-cheetah ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+
+add_executable(humanoid src/test/Humanoid.cpp ${all_include} ${all_sources} )
+target_link_libraries(humanoid ${HUMANOID_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(dpmt-half-cheetah src/test/DpmtHalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(dpmt-half-cheetah ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
