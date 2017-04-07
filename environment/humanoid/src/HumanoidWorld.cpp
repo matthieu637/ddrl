@@ -145,6 +145,13 @@ void HumanoidWorld::apply_damping(dBodyID body, double v) {
     dBodySetLinearDamping(body, v);
   else if(phy.damping == 4)
     dBodySetAngularDamping(body, v);
+  else if(phy.damping == 5){
+    dBodySetLinearDamping(body, v);
+    dBodySetLinearDampingThreshold(body, v);
+  } else if(phy.damping == 6) {
+    dBodySetAngularDamping(body, v);
+    dBodySetAngularDampingThreshold(body, v);
+  }
 }
 
 void HumanoidWorld::createWorld() {
@@ -156,17 +163,7 @@ void HumanoidWorld::createWorld() {
 //   <compiler angle="degree" inertiafromgeom="true"/>
   double density = 943;  // so mass sum = 39.645
 
-//   <joint limited='true' damping='.01' armature='.1' stiffness='8' solreflimit='.02 1' solimplimit='0 .8 .03' />
 //   <joint armature="1" damping="1" limited="true"/>
-//   dWorldSetLinearDamping(odeworld.world_id, .01);
-  if(phy.damping == 1)
-    dWorldSetLinearDampingThreshold(odeworld.world_id, 1);
-  else if(phy.damping == 2)
-    dWorldSetAngularDampingThreshold(odeworld.world_id, 1);
-  else if(phy.damping == 3)
-    dWorldSetLinearDamping(odeworld.world_id, 1);
-  else if(phy.damping == 4)
-    dWorldSetAngularDamping(odeworld.world_id, 1);
 
 //   armature
 //     Armature inertia (or rotor inertia) of all degrees of freedom created by this joint. These are constants added to the diagonal of the inertia matrix in generalized coordinates. They make the simulation more stable, and often increase physical realism. This is because when a motor is attached to the system with a transmission that amplifies the motor force by c, the inertia of the rotor (i.e. the moving part of the motor) is amplified by c*c. The same holds for gears in the early stages of planetary gear boxes. These extra inertias often dominate the inertias of the robot parts that are represented explicitly in the model, and the armature attribute is the way to model them.
@@ -285,7 +282,7 @@ void HumanoidWorld::createWorld() {
   dJointSetHingeParam(j_abdomen_x, dParamLoStop, -35*M_PI/180.f);
   dJointSetHingeParam(j_abdomen_x, dParamHiStop, 35*M_PI/180.f);
   dJointSetHingeAnchor(j_abdomen_x, old_body_pos[0], old_body_pos[1], old_body_pos[2] + 0.1f);
-  apply_damping(pelvis, 6);
+  apply_damping(pelvis, 5);
   
 //   <body name="right_thigh" pos="0 -0.1 -0.04">
   dBodyID right_thigh = dBodyCreate(odeworld.world_id);
@@ -334,12 +331,14 @@ void HumanoidWorld::createWorld() {
   dJointSetAMotorParam(j_right_hip_xyz, dParamHiStop, 20*M_PI/180.f);
   dJointSetAMotorParam(j_right_hip_xyz, dParamLoStop2, -60*M_PI/180.f);
   dJointSetAMotorParam(j_right_hip_xyz, dParamHiStop2, 35*M_PI/180.f);
+  apply_damping(right_thigh, 5);
 
 //   <body name="right_shin" pos="0 0.01 -0.403">
   dBodyID right_shin = dBodyCreate(odeworld.world_id);
   old_body_pos[1] += 0.01;
   old_body_pos[2] += -0.403;
   dBodySetPosition(right_shin, old_body_pos[0], old_body_pos[1], old_body_pos[2]);
+  apply_damping(right_shin, 1);
 
 //   <geom fromto="0 0 0 0 0 -.3" name="right_shin1" size="0.049" type="capsule"/>
   dGeomID g_right_shin1 = dCreateCapsule(odeworld.space_id, 0.049f, .3);
@@ -411,12 +410,14 @@ void HumanoidWorld::createWorld() {
   dJointSetAMotorParam(j_left_hip_xyz, dParamHiStop, 20*M_PI/180.f);
   dJointSetAMotorParam(j_left_hip_xyz, dParamLoStop2, -60*M_PI/180.f);
   dJointSetAMotorParam(j_left_hip_xyz, dParamHiStop2, 35*M_PI/180.f);
+  apply_damping(left_thigh, 5);
 
 //   <body name="left_shin" pos="0 -0.01 -0.403">
   dBodyID left_shin = dBodyCreate(odeworld.world_id);
   old_body_pos[1] += -0.01;
   old_body_pos[2] += -0.403;
   dBodySetPosition(left_shin, old_body_pos[0], old_body_pos[1], old_body_pos[2]);
+  apply_damping(left_shin, 1);
 
 //   <geom fromto="0 0 0 0 0 -.3" name="left_shin1" size="0.049" type="capsule"/>
   dGeomID g_left_shin1 = dCreateCapsule(odeworld.space_id, 0.049f, .3);
@@ -455,6 +456,7 @@ void HumanoidWorld::createWorld() {
   old_body_pos[1] += -0.17;
   old_body_pos[2] += 0.06;
   dBodySetPosition(right_upper_arm, old_body_pos[0], old_body_pos[1], old_body_pos[2]);
+  apply_damping(right_upper_arm, 1);
 
 //   <geom fromto="0 0 0 .16 -.16 -.16" name="right_uarm1" size="0.04 0.16" type="capsule"/>
 //   dGeomID g_right_uarm1 = dCreateCapsule(odeworld.space_id, 0.04f, .16*2.);
@@ -489,6 +491,7 @@ void HumanoidWorld::createWorld() {
   old_body_pos[1] += -0.18;
   old_body_pos[2] += -0.18;
   dBodySetPosition(right_lower_arm, old_body_pos[0], old_body_pos[1], old_body_pos[2]);
+  apply_damping(right_lower_arm, 1);
 
 //   <geom fromto="0.01 0.01 0.01 .17 .17 .17" name="right_larm" size="0.031" type="capsule"/>
   dGeomID g_right_larm = dCreateCapsule(odeworld.space_id, 0.031f, sqrt(.16*.16*3.));
@@ -529,6 +532,7 @@ void HumanoidWorld::createWorld() {
   old_body_pos[1] += 0.17;
   old_body_pos[2] += 0.06;
   dBodySetPosition(left_upper_arm, old_body_pos[0], old_body_pos[1], old_body_pos[2]);
+  apply_damping(left_upper_arm, 1);
 
   //   <geom fromto="0 0 0 .16 .16 -.16" name="left_uarm1" size="0.04 0.16" type="capsule"/>
   dGeomID g_left_uarm1 = dCreateCapsule(odeworld.space_id, 0.04f, sqrt(3*0.16*0.16));
@@ -562,6 +566,7 @@ void HumanoidWorld::createWorld() {
   old_body_pos[1] += 0.18;
   old_body_pos[2] += -0.18;
   dBodySetPosition(left_lower_arm, old_body_pos[0], old_body_pos[1], old_body_pos[2]);
+  apply_damping(left_lower_arm, 1);
 
 //   <geom fromto="0.01 -0.01 0.01 .17 -.17 .17" name="left_larm" size="0.031" type="capsule"/>
   dGeomID g_left_larm = dCreateCapsule(odeworld.space_id, 0.031f, sqrt(.16*.16*3.));
