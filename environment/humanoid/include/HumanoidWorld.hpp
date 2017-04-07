@@ -1,5 +1,5 @@
-#ifndef HALTCHEETAHWORLD_HPP
-#define HALTCHEETAHWORLD_HPP
+#ifndef HUMANOIDWORLD_HPP
+#define HUMANOIDWORLD_HPP
 
 #include <vector>
 #include "ode/ode.h"
@@ -40,7 +40,7 @@ class HumanoidWorld {
   HumanoidWorld(const humanoid_physics phy);
   virtual ~HumanoidWorld();
 
-  void resetPositions(std::vector<double> &, const std::vector<double>& given_stoch);
+  virtual void resetPositions(std::vector<double> &, const std::vector<double>& given_stoch);
   
   bool final_state() const;
   

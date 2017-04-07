@@ -1,5 +1,5 @@
-#ifndef HALTCHEETAHENV_H
-#define HALTCHEETAHENV_H
+#ifndef HUMANOIDENV_H
+#define HUMANOIDENV_H
 
 #include <string>
 #include <vector>

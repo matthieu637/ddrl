@@ -173,3 +173,9 @@ void HumanoidWorldView::step(const std::vector<double>& motors) {
 
   usleep(3*WORLD_STEP / speed * 1000 * 1000);  // needed to don't be faster than the view
 }
+
+void HumanoidWorldView::resetPositions(std::vector<double> & result_stoch, const std::vector<double>& given_stoch) {
+  Mutex::scoped_lock lock(mutex_reset);
+  HumanoidWorld::resetPositions(result_stoch, given_stoch);
+  lock.release();
+}
