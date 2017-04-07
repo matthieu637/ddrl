@@ -15,7 +15,7 @@ class HumanoidWorldView : public HumanoidWorld {
   ~HumanoidWorldView();
   void step(const std::vector<double> &motors) override;
   void resetPositions(std::vector<double> & result_stoch, const std::vector<double>& given_stoch) override;
-
+  void resetPositionsView();
  public:
   //     std::list<dGeomID> geoms;
   //     std::list<ODEObject*> delete_me_later;
