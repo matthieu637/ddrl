@@ -12,6 +12,7 @@
 
 #include "nn/MLP.hpp"
 #include "nn/DevMLP.hpp"
+#include "nn/DODevMLP.hpp"
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
@@ -212,6 +213,13 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     last_pure_action = nullptr;
     
     learning = _learning;
+    
+    if(std::is_same<NN, DODevMLP>::value){
+      static_cast<DODevMLP *>(qnn)->inform(episode);
+      static_cast<DODevMLP *>(ann)->inform(episode);
+      static_cast<DODevMLP *>(qnn_target)->inform(episode);
+      static_cast<DODevMLP *>(ann_target)->inform(episode);
+    }
   }
   
   void sample_transition(std::vector<sample>& traj, const std::deque<sample>& from){
@@ -294,6 +302,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
   
   void end_episode() override {
+    episode++;
+    
     if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
       return;
     
@@ -459,6 +469,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
   std::deque<sample> trajectory;
   std::vector<sample> last_trajectory;
+  
+  uint episode = 0;
   
   struct my_pol_dpmt{
     MLP* ann;
