@@ -18,7 +18,6 @@ static std::string goodpath;
 void parseCommandHumanoid(int cmd) {
   static float xyz[3] = {-0.03, -0.97, 0.2};
   static float hpr[3] = {90, 0, 0};
-  std::vector<double> qq;
 
   switch (cmd) {
   case 'f':
@@ -56,7 +55,7 @@ void parseCommandHumanoid(int cmd) {
               << vhpr[2]);
     break;
   case 'r':
-    inst->resetPositions(qq, qq);
+    inst->resetPositionsView();
     LOG_DEBUG("resetPositions should not be used");
     break;
   case 'x':
@@ -179,6 +178,16 @@ void HumanoidWorldView::step(const std::vector<double>& motors) {
   LOG_DEBUG("step");
 }
 
+void HumanoidWorldView::resetPositions(std::vector<double> & result_stoch, const std::vector<double>& given_stoch) {
+  Mutex::scoped_lock lock(mutex_reset);
+  HumanoidWorld::resetPositions(result_stoch, given_stoch);
+  lock.release();
+}
+
+void HumanoidWorldView::resetPositionsView() {
+  std::vector<double> qq;
+  HumanoidWorld::resetPositions(qq, qq);
+}
 
 //static arch::Simulator<HumanoidEnv, arch::ExampleAgent>* s;
 static arch::Simulator<HumanoidEnv, arch::ZeroAgent>* s;
