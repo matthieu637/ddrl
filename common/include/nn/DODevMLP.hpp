@@ -11,10 +11,11 @@ class DODevMLP : public MLP {
 
   DODevMLP(const DODevMLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : 
     MLP(m, copy_solver, _phase), disable_st_control(m.disable_st_control), heuristic(m.heuristic) ,
-    episode(m.episode), heuristic_devpoints_index(m.heuristic_devpoints_index), 
-    heuristic_devpoints(m.heuristic_devpoints), heuristic_linearcoef(m.heuristic_linearcoef) {
+    episode(m.episode), heuristic_devpoints_index(m.heuristic_devpoints_index) {
     st_control = new std::vector<uint>(*m.st_control);
     ac_control = new std::vector<uint>(*m.ac_control);
+    heuristic_devpoints = new std::vector<uint>(*m.heuristic_devpoints);
+    heuristic_linearcoef = new std::vector<double>(*m.heuristic_linearcoef);
   }
   
   virtual ~DODevMLP(){
@@ -22,6 +23,10 @@ class DODevMLP : public MLP {
       delete st_control;
     if(ac_control != nullptr)
       delete ac_control;
+    if(heuristic_devpoints != nullptr)
+      delete heuristic_devpoints;
+    if(heuristic_linearcoef != nullptr)
+      delete heuristic_linearcoef;
   }
 
   virtual void exploit(boost::property_tree::ptree* pt, MLP* actor) override {
@@ -44,14 +49,14 @@ class DODevMLP : public MLP {
     
     if(heuristic == 1){
       try {
-        heuristic_devpoints.reset(bib::to_array<uint>(pt->get<std::string>("devnn.heuristic_devpoints")));
+        heuristic_devpoints = bib::to_array<uint>(pt->get<std::string>("devnn.heuristic_devpoints"));
         ASSERT((st_control->size() + ac_control->size()) <= heuristic_devpoints->size(), "st " << st_control->size() 
           << " " << ac_control->size() << " " << heuristic_devpoints->size() );
       } catch(boost::exception const& ) {
       }
     } else if(heuristic == 2){
       try {
-        heuristic_linearcoef.reset(bib::to_array<double>(pt->get<std::string>("devnn.heuristic_linearcoef")));
+        heuristic_linearcoef = bib::to_array<double>(pt->get<std::string>("devnn.heuristic_linearcoef"));
         ASSERT((st_control->size() + ac_control->size()) <= heuristic_linearcoef->size(), "st " << st_control->size() 
         << " " << ac_control->size() << " " << heuristic_linearcoef->size() );
       } catch(boost::exception const& ) {
@@ -169,11 +174,14 @@ class DODevMLP : public MLP {
 
     if(actor != nullptr){
       ASSERT(net_param_new.name() == "Critic", "net is not a critic " << net_param_new.name());
+      ASSERT(actor->getNN()->name() == "Actor", "net is not an actor " << actor->getNN()->name());
       neural_net->layer_by_name("devnn_actions")->blobs()[0]->ShareData(*actor->getNN()->layer_by_name("devnn_actions")->blobs()[0]);
       neural_net->layer_by_name("devnn_actions")->blobs()[0]->ShareDiff(*actor->getNN()->layer_by_name("devnn_actions")->blobs()[0]);
       
-      neural_net->layer_by_name("devnn_states")->blobs()[0]->ShareData(*actor->getNN()->layer_by_name("devnn_states")->blobs()[0]);
-      neural_net->layer_by_name("devnn_states")->blobs()[0]->ShareDiff(*actor->getNN()->layer_by_name("devnn_states")->blobs()[0]);
+      if(!disable_st_control){
+        neural_net->layer_by_name("devnn_states")->blobs()[0]->ShareData(*actor->getNN()->layer_by_name("devnn_states")->blobs()[0]);
+        neural_net->layer_by_name("devnn_states")->blobs()[0]->ShareDiff(*actor->getNN()->layer_by_name("devnn_states")->blobs()[0]);
+      }
     }
     
     if(heuristic != 0){
@@ -269,8 +277,8 @@ private:
   uint heuristic = 0;
   uint episode = 0;
   uint heuristic_devpoints_index = 0;
-  boost::shared_ptr<std::vector<uint>> heuristic_devpoints;
-  boost::shared_ptr<std::vector<double>> heuristic_linearcoef;
+  std::vector<uint>* heuristic_devpoints = nullptr;
+  std::vector<double>* heuristic_linearcoef = nullptr;
   std::vector<uint>* st_control = nullptr;
   std::vector<uint>* ac_control = nullptr;
 };

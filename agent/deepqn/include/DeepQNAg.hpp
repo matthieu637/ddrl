@@ -184,24 +184,27 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
 #endif
     
-    qnn = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm_critic);
-    if(std::is_same<NN, DevMLP>::value)
-      qnn->exploit(pt, static_cast<DeepQNAg *>(old_ag)->qnn);
-    
-    if(test_net)
-      qnn_target = new MLP(*qnn, false);
-    else
-      qnn_target = new MLP(*qnn, true);
-
-    
     ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm_actor);
     if(std::is_same<NN, DevMLP>::value)
       ann->exploit(pt, static_cast<DeepQNAg *>(old_ag)->ann);
+    else if(std::is_same<NN, DODevMLP>::value)
+      ann->exploit(pt, nullptr);
     
     if(test_net)
-      ann_target = new MLP(*ann, false);
+      ann_target = new NN(*ann, false);
     else
-      ann_target = new MLP(*ann, true);
+      ann_target = new NN(*ann, true);
+    
+    qnn = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm_critic);
+    if(std::is_same<NN, DevMLP>::value)
+      qnn->exploit(pt, static_cast<DeepQNAg *>(old_ag)->qnn);
+    else if(std::is_same<NN, DODevMLP>::value)
+      qnn->exploit(pt, ann);
+    
+    if(test_net)
+      qnn_target = new NN(*qnn, false);
+    else
+      qnn_target = new NN(*qnn, true);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool _learning) override {
