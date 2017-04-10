@@ -245,10 +245,12 @@ class DODevMLP : public MLP {
         heuristic_devpoints_index++;
       }
     } else if(heuristic == 2) {
-      auto blob_st = neural_net->layer_by_name("devnn_states")->blobs()[0];
-      auto data_st = blob_st->mutable_cpu_data();
-      for(uint i=0; i < st_control->size() ; i++){
-        data_st[i] = ((double)episode) * heuristic_linearcoef->at(i);
+      if(!disable_st_control){
+        auto blob_st = neural_net->layer_by_name("devnn_states")->blobs()[0];
+        auto data_st = blob_st->mutable_cpu_data();
+        for(uint i=0; i < st_control->size() ; i++){
+          data_st[i] = ((double)episode) * heuristic_linearcoef->at(i);
+        }
       }
       
       auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
