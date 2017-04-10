@@ -287,6 +287,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         best_population.erase(it);
       }
     }
+    
+    episode++;
   }
   
   void restoreBest() override {
@@ -305,7 +307,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
   
   void end_episode() override {
-    episode++;
     
     if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
       return;
