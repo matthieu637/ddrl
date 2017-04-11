@@ -14,8 +14,10 @@ class DODevMLP : public MLP {
     episode(m.episode), heuristic_devpoints_index(m.heuristic_devpoints_index) {
     st_control = new std::vector<uint>(*m.st_control);
     ac_control = new std::vector<uint>(*m.ac_control);
-    heuristic_devpoints = new std::vector<uint>(*m.heuristic_devpoints);
-    heuristic_linearcoef = new std::vector<double>(*m.heuristic_linearcoef);
+    if(heuristic == 1)
+      heuristic_devpoints = new std::vector<uint>(*m.heuristic_devpoints);
+    else if(heuristic == 2)
+      heuristic_linearcoef = new std::vector<double>(*m.heuristic_linearcoef);
   }
   
   virtual ~DODevMLP(){
