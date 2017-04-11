@@ -7,8 +7,23 @@
 class DODevMLP : public MLP {
  public:
 
-  using MLP::MLP;
+   DODevMLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha,
+            uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false) :
+    MLP(input, sensors, hiddens, alpha, _kMinibatchSize, decay_v, hidden_layer_type, batch_norm, _weighted_sample) {
 
+  }
+    
+  //   policy
+  DODevMLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize,
+            uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false) :
+    MLP(sensors, hiddens, motors, alpha, _kMinibatchSize, hidden_layer_type, last_layer_type, batch_norm, loss_layer) {
+    
+  }
+
+  DODevMLP(const MLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : 
+    DODevMLP(static_cast<const DODevMLP&>(m), copy_solver, _phase) {
+  }
+  
   DODevMLP(const DODevMLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : 
     MLP(m, copy_solver, _phase), disable_st_control(m.disable_st_control), heuristic(m.heuristic) ,
     episode(m.episode), heuristic_devpoints_index(m.heuristic_devpoints_index) {
@@ -264,16 +279,37 @@ class DODevMLP : public MLP {
   }
   
 public:
-  virtual void copyWeightsFrom(const double* startx, bool ignore_null_lr) override {
+//   Used by CMA-ES
+  void copyWeightsFrom(const double* startx, bool ignore_null_lr) override {
     develop();
     
     MLP::copyWeightsFrom(startx, ignore_null_lr);
     episode++;
   }
   
+//   Used by others
   void inform(uint episode_){
     episode = episode_;
     develop();
+  }
+  
+  void soft_update(const MLP& from, double tau) override {
+    auto net_from = from.neural_net;
+    auto net_to = neural_net;
+    
+    const auto& from_params = net_from->params();
+    const auto& to_params = net_to->params();
+    CHECK_EQ(from_params.size(), to_params.size());
+    CHECK_EQ(neural_net->params_lr().size(), to_params.size());
+    
+    for (uint i = 0; i < from_params.size(); ++i) {
+      if(neural_net->params_lr()[i] != 0.0f){
+        auto& from_blob = from_params[i];
+        auto& to_blob = to_params[i];
+        caffe::caffe_cpu_axpby(from_blob->count(), tau, from_blob->cpu_data(),
+                              (1.f-tau), to_blob->mutable_cpu_data());
+      }
+    }
   }
   
 private:

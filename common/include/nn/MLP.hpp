@@ -22,6 +22,7 @@
 class MLP {
  public:
   friend class DevMLP;
+  friend class DODevMLP;
 
   // Layer Names
   static const std::string state_input_layer_name;
@@ -373,7 +374,7 @@ class MLP {
     neural_net->Reshape();
   }
 
-  void soft_update(const MLP& from, double tau) {
+  virtual void soft_update(const MLP& from, double tau) {
     auto net_from = from.neural_net;
     auto net_to = neural_net;
     // TODO: Test if learnable_params() is sufficient for soft update
