@@ -72,6 +72,7 @@ class HumanoidWorld {
   double reward;
   std::vector<double> internal_state;
   std::vector<double> body_mass;
+  std::vector<double> gears;
   std::vector<double> qfrc_actuator;
   double mass_sum;
   double pos_before;

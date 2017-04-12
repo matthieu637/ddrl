@@ -11,7 +11,7 @@
 // #define DEBUG_MOTOR_BY_MOTOR
 
 HumanoidWorld::HumanoidWorld(humanoid_physics _phy) : odeworld(ODEFactory::getInstance()->createWorld(false)),
-  phy(_phy), body_mass(11), qfrc_actuator(17, 0.f) {
+  phy(_phy), body_mass(11), qfrc_actuator(17, 0.f), gears(17) {
 
   dWorldSetGravity(odeworld.world_id, 0, 0.0, GRAVITY);
 
@@ -75,12 +75,54 @@ HumanoidWorld::HumanoidWorld(humanoid_physics _phy) : odeworld(ODEFactory::getIn
   contact[1].surface.slip2 = phy.slip2;
   contact[1].surface.soft_erp = phy.soft_erp;
   contact[1].surface.bounce = phy.bounce;
+  
+  //   <motor ctrllimited="true" ctrlrange="-.4 .4"/>
+  const double gear_abdomen_y = 100 * 0.4f;
+  const double gear_abdomen_z = 100 * 0.4f;
+  const double gear_abdomen_x = 100 * 0.4f;
+  const double gear_right_hip_x = 100 * 0.4f;
+  const double gear_right_hip_z = 100 * 0.4f;
+  const double gear_right_hip_y = 300 * 0.4f;
+  const double gear_right_knee = 200 * 0.4f;
+  const double gear_left_hip_x = 100 * 0.4f;
+  const double gear_left_hip_z = 100 * 0.4f;
+  const double gear_left_hip_y = 300 * 0.4f;
+  const double gear_left_knee = 200 * 0.4f;
+  const double gear_right_shoulder1 = 25 * 0.4f;
+  const double gear_right_shoulder2 = 25 * 0.4f;
+  const double gear_right_elbow = 25 * 0.4f;
+  const double gear_left_shoulder1 = 25 * 0.4f;
+  const double gear_left_shoulder2 = 25 * 0.4f;
+  const double gear_left_elbow = 25 * 0.4f;
+  
+  unsigned int begin_index = 0;
+  gears[begin_index++] = gear_abdomen_z;
+  gears[begin_index++] = gear_abdomen_y;
+  gears[begin_index++] = gear_abdomen_x;
+  //amotor order changes
+  gears[begin_index++] = gear_right_hip_y;
+  gears[begin_index++] = gear_right_hip_z;
+  gears[begin_index++] = gear_right_hip_x;
+  //--
+  gears[begin_index++] = gear_right_knee;
+  //amotor order changes
+  gears[begin_index++] = gear_left_hip_y;
+  gears[begin_index++] = gear_left_hip_z;
+  gears[begin_index++] = gear_left_hip_x;
+  //--
+  gears[begin_index++] = gear_left_knee;
+  gears[begin_index++] = gear_right_shoulder1;
+  gears[begin_index++] = gear_right_shoulder2;
+  gears[begin_index++] = gear_right_elbow;
+  gears[begin_index++] = gear_left_shoulder1;
+  gears[begin_index++] = gear_left_shoulder2;
+  gears[begin_index++] = gear_left_elbow;
 
   createWorld();
   
   mass_sum = 0.f;
   
-  uint begin_index = 0;
+  begin_index = 0;
   for(auto a : bones) {
     if(a->getID() != nullptr){
       body_mass[begin_index++] = a->getMassValue();
@@ -673,51 +715,7 @@ void HumanoidWorld::step(const vector<double>& _motors) {
   
   for(uint i=0; i < 17; i++)
     motors[i] = std::min(std::max((double)-1., motors[i]), (double)1.);
-
-  //   <motor ctrllimited="true" ctrlrange="-.4 .4"/>
-  const double gear_abdomen_y = 100 * 0.4f;
-  const double gear_abdomen_z = 100 * 0.4f;
-  const double gear_abdomen_x = 100 * 0.4f;
-  const double gear_right_hip_x = 100 * 0.4f;
-  const double gear_right_hip_z = 100 * 0.4f;
-  const double gear_right_hip_y = 300 * 0.4f;
-  const double gear_right_knee = 200 * 0.4f;
-  const double gear_left_hip_x = 100 * 0.4f;
-  const double gear_left_hip_z = 100 * 0.4f;
-  const double gear_left_hip_y = 300 * 0.4f;
-  const double gear_left_knee = 200 * 0.4f;
-  const double gear_right_shoulder1 = 25 * 0.4f;
-  const double gear_right_shoulder2 = 25 * 0.4f;
-  const double gear_right_elbow = 25 * 0.4f;
-  const double gear_left_shoulder1 = 25 * 0.4f;
-  const double gear_left_shoulder2 = 25 * 0.4f;
-  const double gear_left_elbow = 25 * 0.4f;
-
-  unsigned int begin_index = 0;
-  std::vector<double> gears(17);
-  gears[begin_index++] = gear_abdomen_z;
-  gears[begin_index++] = gear_abdomen_y;
-  gears[begin_index++] = gear_abdomen_x;
-  //amotor order changes
-  gears[begin_index++] = gear_right_hip_y;
-  gears[begin_index++] = gear_right_hip_z;
-  gears[begin_index++] = gear_right_hip_x;
-  //--
-  gears[begin_index++] = gear_right_knee;
-  //amotor order changes
-  gears[begin_index++] = gear_left_hip_y;
-  gears[begin_index++] = gear_left_hip_z;
-  gears[begin_index++] = gear_left_hip_x;
-  //--
-  gears[begin_index++] = gear_left_knee;
-  gears[begin_index++] = gear_right_shoulder1;
-  gears[begin_index++] = gear_right_shoulder2;
-  gears[begin_index++] = gear_right_elbow;
-  gears[begin_index++] = gear_left_shoulder1;
-  gears[begin_index++] = gear_left_shoulder2;
-  gears[begin_index++] = gear_left_elbow;
   
-  //double
   if(phy.control == 0) {
     for(uint i=0; i < 17 ; i++)
       qfrc_actuator[i] = bib::Utils::transform(motors[i], -1, 1, -gears[i], gears[i]);
@@ -725,57 +723,57 @@ void HumanoidWorld::step(const vector<double>& _motors) {
     std::vector<double> p_motor(17);
     for(uint i=0; i < 17 ; i++)
       p_motor[i] = 2.0f/M_PI * atan(-2.0f*internal_state[5+i] - 0.05 * internal_state[22+6+i]);
-
+    
     for(uint i=0; i < 17; i++)
       qfrc_actuator[i] = gears[i] * std::min(std::max((double)-1., p_motor[i]+motors[i]), (double)1.);
   }
-
-  dJointAddUniversalTorques(joints[0], qfrc_actuator[0], qfrc_actuator[1]);
-  dJointAddHingeTorque(joints[1], qfrc_actuator[2]);
-  dJointAddAMotorTorques(joints[2], qfrc_actuator[3], qfrc_actuator[4], qfrc_actuator[5]);
-  dJointAddHingeTorque(joints[4], qfrc_actuator[6]);
-  dJointAddAMotorTorques(joints[5], qfrc_actuator[7], qfrc_actuator[8], qfrc_actuator[9]);
-  dJointAddHingeTorque(joints[7], qfrc_actuator[10]);
-  dJointAddUniversalTorques(joints[8], qfrc_actuator[11], qfrc_actuator[12]);
-  dJointAddHingeTorque(joints[9], qfrc_actuator[13]);
-  dJointAddUniversalTorques(joints[10], qfrc_actuator[14], qfrc_actuator[15]);
-  dJointAddHingeTorque(joints[11], qfrc_actuator[16]);
+  
+  for(uint i=0;i<FRAME_SKIP;i++){
+    dJointAddUniversalTorques(joints[0], qfrc_actuator[0], qfrc_actuator[1]);
+    dJointAddHingeTorque(joints[1], qfrc_actuator[2]);
+    dJointAddAMotorTorques(joints[2], qfrc_actuator[3], qfrc_actuator[4], qfrc_actuator[5]);
+    dJointAddHingeTorque(joints[4], qfrc_actuator[6]);
+    dJointAddAMotorTorques(joints[5], qfrc_actuator[7], qfrc_actuator[8], qfrc_actuator[9]);
+    dJointAddHingeTorque(joints[7], qfrc_actuator[10]);
+    dJointAddUniversalTorques(joints[8], qfrc_actuator[11], qfrc_actuator[12]);
+    dJointAddHingeTorque(joints[9], qfrc_actuator[13]);
+    dJointAddUniversalTorques(joints[10], qfrc_actuator[14], qfrc_actuator[15]);
+    dJointAddHingeTorque(joints[11], qfrc_actuator[16]);
 
 #ifdef DEBUG_MOTOR_BY_MOTOR
-  std::vector<double> factors(17);
-  for(uint i=0;i<gears.size();i++)
-      factors[i] = 0;
+    std::vector<double> factors(17);
+    for(uint i=0;i<gears.size();i++)
+        factors[i] = 0;
+      
+    uint index_c = 3;
+    double factor_ = -1.f;
+    factors[index_c] = factor_;
+  //   factors[3+4] = 1;
     
-  uint index_c = 3;
-  double factor_ = -1.f;
-  factors[index_c] = factor_;
-//   factors[3+4] = 1;
-  
-  for(uint i=0; i<gears.size(); i++)
-    gears[i] = gears[i] * factors[i];
+    for(uint i=0; i<gears.size(); i++)
+      gears[i] = gears[i] * factors[i];
 
-  dJointAddUniversalTorques(joints[0], gears[0], gears[1]);
-  dJointAddHingeTorque(joints[1], gears[2]);
-  dJointAddAMotorTorques(joints[2], gears[3], gears[4], gears[5]);
-  dJointAddHingeTorque(joints[4], gears[6]);
-  dJointAddAMotorTorques(joints[5], gears[7], gears[8], gears[9]);
-  dJointAddHingeTorque(joints[7], gears[10]);
-  dJointAddUniversalTorques(joints[8], gears[11], gears[12]);
-  dJointAddHingeTorque(joints[9], gears[13]);
-  dJointAddUniversalTorques(joints[10], gears[14], gears[15]);
-  dJointAddHingeTorque(joints[11], gears[16]);
+    dJointAddUniversalTorques(joints[0], gears[0], gears[1]);
+    dJointAddHingeTorque(joints[1], gears[2]);
+    dJointAddAMotorTorques(joints[2], gears[3], gears[4], gears[5]);
+    dJointAddHingeTorque(joints[4], gears[6]);
+    dJointAddAMotorTorques(joints[5], gears[7], gears[8], gears[9]);
+    dJointAddHingeTorque(joints[7], gears[10]);
+    dJointAddUniversalTorques(joints[8], gears[11], gears[12]);
+    dJointAddHingeTorque(joints[9], gears[13]);
+    dJointAddUniversalTorques(joints[10], gears[14], gears[15]);
+    dJointAddHingeTorque(joints[11], gears[16]);
 #endif
 
-  Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
-
-  for(uint i=0;i<FRAME_SKIP;i++){
+    Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
     nearCallbackDataHumanoid d = {this};
     dSpaceCollide(odeworld.space_id, &d, &nearCallbackHumanoid);
     dWorldStep(odeworld.world_id, WORLD_STEP);
 
     dJointGroupEmpty(odeworld.contactgroup);
+    lock.release();
   }
-  lock.release();
+
 
   update_state();
 }
@@ -888,9 +886,27 @@ void HumanoidWorld::update_state() {
   lin_vel_cost = (pos_after - pos_before) / WORLD_STEP;
   pos_before = pos_after;
   
-  lin_vel_cost = lin_vel_cost * 0.25;
-  
+//   it doesn't move enough and looks for a static rest
+//   so remove factor 0.25
+//   lin_vel_cost = lin_vel_cost * 0.25;
   reward = reward + lin_vel_cost;
+  
+//   Another reward possibility?
+//   std::vector<double> mc(body_mass.size());
+//   begin_index = 0;
+//   for(auto a : bones) {
+//     if(a->getID() != nullptr){
+//       auto pos = dBodyGetLinearVel(a->getID());
+//       mc[begin_index] = pos[0] * body_mass[begin_index];
+//       begin_index++;
+//     }
+//   }
+//   
+//   double np_sum = 0;
+//   for(uint i=0;i < body_mass.size();i++)
+//     np_sum += mc[i];
+//   
+//   reward = reward + (np_sum / mass_sum) * 0.25f;
 }
 
 double HumanoidWorld::mass_center(){

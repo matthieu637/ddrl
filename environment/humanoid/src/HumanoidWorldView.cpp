@@ -100,7 +100,7 @@ void threadloopHumanoid(const std::string& goodpath) {
 HumanoidWorldView::HumanoidWorldView(const std::string& path, const humanoid_physics phy)
   : HumanoidWorld(phy),
     requestEnd(false),
-    speed(1.),
+    speed(0.0625),
     ignoreMotor(false) {
   std::string goodpath = path;
 
