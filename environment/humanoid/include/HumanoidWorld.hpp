@@ -18,7 +18,8 @@
 // mujoco_env.MujocoEnv.__init__(self, 'humanoid.xml', 5)
 #define FRAME_SKIP 5
 
-#define ALIVE_BONUS 5.0
+// in ODE the agent can found static position and waits
+#define ALIVE_BONUS 1.0
 
 struct humanoid_physics{
   bool apply_armature;

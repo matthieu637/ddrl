@@ -710,7 +710,9 @@ void HumanoidWorld::step(const vector<double>& _motors) {
   
   for (auto a : motors)
     quad_ctrl_cost += a*a;
-  quad_ctrl_cost = 0.1f * quad_ctrl_cost;
+  quad_ctrl_cost = 0.05f * quad_ctrl_cost;
+  //quad_ctrl_cost in [0 ; 0.85]
+  //0.85 <= ALIVE_BONUS (=1) so it's always better to have a high cost control but stay alive
   reward = ALIVE_BONUS - quad_ctrl_cost;
   
   for(uint i=0; i < 17; i++)
