@@ -890,7 +890,7 @@ void HumanoidWorld::update_state() {
   
 //   it doesn't move enough and looks for a static rest
 //   so remove factor 0.25
-//   lin_vel_cost = lin_vel_cost * 0.25;
+  lin_vel_cost = lin_vel_cost * phy.reward_scale_lvc;
   reward = reward + lin_vel_cost;
   
 //   Another reward possibility?

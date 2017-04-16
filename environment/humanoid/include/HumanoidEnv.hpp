@@ -55,6 +55,7 @@ class HumanoidEnv : public arch::AEnvironment<> {
     init.soft_erp = pt->get<double>("environment.soft_erp");
     init.bounce = pt->get<double>("environment.bounce");
     init.additional_sensors = pt->get<bool>("environment.additional_sensors");
+    init.reward_scale_lvc = pt->get<double>("environment.reward_scale_lvc");
     visible     = vm->count("view");
     
     

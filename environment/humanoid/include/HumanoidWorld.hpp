@@ -34,6 +34,7 @@ struct humanoid_physics{
   double soft_erp;
   double bounce;
   bool additional_sensors;
+  double reward_scale_lvc;
 };
 
 class HumanoidWorld {
