@@ -3,10 +3,14 @@
 
 int main(int argc, char **argv) {
   FLAGS_minloglevel = 2;
-  google::InitGoogleLogging(argv[0]);
-  google::InstallFailureSignalHandler();
   
-  bib::Seed::setFixedSeedUTest();
   ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+  caffe::GlobalInit(&argc, &argv);
+  bib::Seed::setFixedSeedUTest();
+  
+  uint r = RUN_ALL_TESTS();
+  
+  google::protobuf::ShutdownProtobufLibrary();
+  gflags::ShutDownCommandLineFlags();
+  return r;
 }
