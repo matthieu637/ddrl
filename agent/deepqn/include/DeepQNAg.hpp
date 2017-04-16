@@ -106,6 +106,11 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     delete hidden_unit_q;
     delete hidden_unit_a;
     
+    for (auto i: best_population){
+      delete i.ann;
+      delete i.qnn;
+    }
+    
 #ifdef POOL_FOR_TESTING
     for (auto i : best_pol_population)
       delete i.ann;

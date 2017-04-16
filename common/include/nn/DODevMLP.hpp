@@ -180,6 +180,8 @@ class DODevMLP : public MLP {
 //     net_param_new.PrintDebugString();
 //     LOG_DEBUG("########################################################################################");
 
+    net_param_new.set_force_backward(true);//mandatory for algorithm based on gradient (DDPG, ...)
+    
     caffe::SolverParameter solver_param(solver->param());
     solver_param.clear_net_param();
     caffe::NetParameter* net_param = solver_param.mutable_net_param();

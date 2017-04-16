@@ -369,6 +369,87 @@ TEST(MLP, CaffeCopyActor) {
   }
 }
 
+TEST(MLP, BackwardActor) {//valgrind test only
+  std::vector<uint> batch_norms = {0,4,6,7,8,10,11,12,14,15};
+  for(uint batch_norm : batch_norms) {
+    for(uint hidden_layer = 1; hidden_layer <= 3 ; hidden_layer++) {
+      LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
+      uint batch_size = 400; //must be a squared number
+      
+      std::vector<double> sensors(batch_size);
+      
+      MLP actor(1, {8}, 1, 0.01f, batch_size, hidden_layer, 2, batch_norm);
+      
+      for(uint forced = 0; forced < 5 ; forced++) {
+        uint n = 0;
+        auto iter = [&](const std::vector<double>& x) {
+          sensors[n] = x[0];
+          
+          if(bib::Utils::rand01() < 0.4) {
+            sensors[n] = bib::Utils::rand01()*2 -1;
+          }
+          n++;
+        };
+        
+        bib::Combinaison::continuous<>(iter, 2, -1, 1, sqrt(batch_size)-1);
+        
+        auto all_actions_outputs = actor.computeOutBatch(sensors);
+        
+        //call to forward needed
+        actor.actor_backward();
+        delete all_actions_outputs;
+        
+        caffe::Blob<double> diff({400,1});
+        all_actions_outputs = actor.computeOutBatch(sensors);
+        const auto actor_actions_blob = actor.getNN()->blob_by_name(MLP::actions_blob_name);
+        actor_actions_blob->ShareDiff(diff);
+        actor.actor_backward();
+        actor.getSolver()->ApplyUpdate();
+        actor.getSolver()->set_iter(actor.getSolver()->iter() + 1);
+        delete all_actions_outputs;
+      }
+    }
+  }
+}
+
+TEST(MLP, BackwardCritic) {//valgrind test only
+  std::vector<uint> batch_norms = {0,4,6,7,8,10,11,12,14,15};
+  for(uint batch_norm : batch_norms) {
+    for(uint hidden_layer = 1; hidden_layer <= 3 ; hidden_layer++) {
+      LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
+      uint batch_size = 400; //must be a squared number
+      
+      std::vector<double> sensors(batch_size);
+      std::vector<double> actions(batch_size);
+      
+      MLP nn(2, 1, {50,10}, 0.001f, batch_size, -1, hidden_layer, batch_norm);
+      
+      for(uint forced = 0; forced < 5 ; forced++) {
+        uint n = 0;
+        auto iter = [&](const std::vector<double>& x) {
+          sensors[n] = x[0];
+          actions[n] = x[1];
+
+          if(bib::Utils::rand01() < 0.75) {
+            sensors[n] = bib::Utils::rand01()*2 -1;
+            actions[n] = bib::Utils::rand01()*2 -1;
+          }
+          n++;
+        };
+
+        bib::Combinaison::continuous<>(iter, 2, -1, 1, sqrt(batch_size)-1);
+
+        auto all_q = nn.computeOutVFBatch(sensors, actions);
+        
+        //call to forward needed
+        nn.critic_backward();
+        delete all_q;
+      }
+      
+    }
+  }
+}
+
 TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
   std::vector<uint> batch_norms = {0,4,6,7,8,10,11,12,14,15};
   for(uint batch_norm : batch_norms) {
@@ -491,12 +572,17 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
         std::vector<double> ac(1);
         ac[0]= out;
 
-        LOG_FILE("OptimizeNNTroughGradientOfAnotherNNFann.data", x1 << " " << actor.computeOut(sens)->at(0) << " " <<
-                 actor_test.computeOut(sens)->at(0)<< " " << out);
+        auto actor1_out = actor.computeOut(sens);
+        auto actor2_out = actor_test.computeOut(sens);
+        LOG_FILE("OptimizeNNTroughGradientOfAnotherNNFann.data", x1 << " " << actor1_out->at(0) << " " <<
+        actor2_out->at(0)<< " " << out);
 //clear all;close all;X=load('OptimizeNNTroughGradientOfAnotherNNFann.data');plot(X(:,1),X(:,2), '.');hold on;plot(X(:,1),X(:,3), 'r.');plot(X(:,1),X(:,4), 'go');
-        ac1_error += fabs(out - actor.computeOut(sens)->at(0));
-        ac2_error += fabs(out - actor_test.computeOut(sens)->at(0));
+        ac1_error += fabs(out - actor1_out->at(0));
+        ac2_error += fabs(out - actor2_out->at(0));
         q_error += fabs(nn.computeOutVF(sens, ac) - qout);
+        
+        delete actor1_out;
+        delete actor2_out;
       }
 
       ac1_error /= 100.f;
@@ -580,6 +666,9 @@ TEST(MLP, DevelopmentalLayer) {
         EXPECT_GE(proba, 0.53);
         EXPECT_LE(proba, 0.67);
       }
+      
+      delete[] weights;
+      delete[] weights2;
     }
   }
 }
@@ -896,6 +985,10 @@ TEST(MLP, DevelopmentalLayerSharedParameters) {
           EXPECT_DOUBLE_EQ(weights[i], weights2[i+2]);
           EXPECT_DOUBLE_EQ(weights2[i], weights3[i]);//copy constructor for DODEVMLP
         }
+        
+        delete[] weights;
+        delete[] weights2;
+        delete[] weights3;
       }
       bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
       CHECK_EQ(n, batch_size*3);
@@ -1042,4 +1135,52 @@ TEST(MLP, DevelopmentalLayerScalingControl) {
       }
     }
   }
+}
+
+TEST(MLP, DevelopmentalLayerBackward) {
+  std::vector<uint> batch_norms = {0};
+  for(uint batch_norm : batch_norms)
+    for(uint hidden_layer = 1; hidden_layer <=3 ; hidden_layer++)
+      for(uint probabilistic = 0; probabilistic <=3 ; probabilistic++){
+        uint batch_size = 343; //must be a power3 number
+        std::vector<double> sensors(batch_size*3);
+        
+        DODevMLP actor(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
+        std::string config="[devnn]\nst_scale=false\nst_probabilistic=";
+        config += std::to_string(probabilistic);
+        config += "\nac_scale=false\nac_probabilistic=";
+        config += std::to_string(probabilistic);
+        config += "\nst_control=1:2\nac_control=1:2\n";
+        boost::property_tree::ptree properties;
+        boost::iostreams::stream<boost::iostreams::array_source> stream(config.c_str(), config.size());
+        boost::property_tree::ini_parser::read_ini(stream, properties);
+        actor.exploit(&properties, nullptr);
+        
+        uint n = 0;
+        auto iter = [&](const std::vector<double>& x) {
+          sensors[n] = x[0];
+          if(bib::Utils::rand01() < 0.4)
+            sensors[n] = bib::Utils::rand01()*2 -1;
+          n++;
+          
+          sensors[n] = x[1];
+          if(bib::Utils::rand01() < 0.4)
+            sensors[n] = bib::Utils::rand01()*2 -1;
+          n++;
+          
+          sensors[n] = x[2];
+          if(bib::Utils::rand01() < 0.4)
+            sensors[n] = bib::Utils::rand01()*2 -1;
+          n++;
+        };
+        
+        bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
+        CHECK_EQ(n, batch_size*3);
+        
+        for(uint forced=0;forced<5;forced++){
+          auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
+          actor.actor_backward();
+          delete all_actions_outputs;
+        }
+      }
 }

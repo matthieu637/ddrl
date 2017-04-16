@@ -261,6 +261,7 @@ class MLP {
       m.neural_net->ToProto(solver_param.mutable_net_param());
       caffe::NetParameter* net_param = solver_param.mutable_net_param();
       net_param->mutable_state()->set_phase(_phase);
+      net_param->set_force_backward(true);
       UpgradeNetBatchNorm(net_param);
       for(int i =0; i < net_param->layer_size(); i++) {
         if(net_param->layer(i).has_batch_norm_param()) {
@@ -391,55 +392,43 @@ class MLP {
   }
 
   void learn(const std::vector<double>& sensors, const std::vector<double>& motors) {
-    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
-    std::vector<double> motors_(motors);
-    InputDataIntoLayers(sensors_.data(), nullptr, motors_.data());
+    InputDataIntoLayers(&sensors, nullptr, &motors);
     solver->Step(1);
   }
 
   void learn(const std::vector<double>& sensors, const std::vector<double>& motors, double q) {
-    double target[] = {q};
-    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
-    std::vector<double> motors_(motors);
-    InputDataIntoLayers(sensors_.data(), motors_.data(), target);
+    std::vector<double> target({q});
+    InputDataIntoLayers(&sensors, &motors, &target);
     solver->Step(1);
   }
 
   void learn_batch(const std::vector<double>& sensors, const std::vector<double>& motors, const std::vector<double>& q, uint iter) {
-    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
-    std::vector<double> motors_(motors);
-    std::vector<double> q_(q);
-    InputDataIntoLayers(sensors_.data(), motors_.data(), q_.data());
+    InputDataIntoLayers(&sensors, &motors, &q);
     solver->Step(iter);
   }
 
   void learn_batch_lw(const std::vector<double>& sensors, const std::vector<double>& motors, const std::vector<double>& q,
                       const std::vector<double>& lw, uint iter) {
-    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
-    std::vector<double> motors_(motors);
-    std::vector<double> q_(q);
-    std::vector<double> lw_(lw);
-    InputDataIntoLayers(sensors_.data(), motors_.data(), q_.data());
-    setWeightedSampleVector(lw_.data());
+    InputDataIntoLayers(&sensors, &motors, &q);
+    setWeightedSampleVector(&lw, false);
     solver->Step(iter);
   }
 
   virtual double computeOutVF(const std::vector<double>& sensors, const std::vector<double>& motors) {
     std::vector<double> states_input(size_sensors * kMinibatchSize, 0.0f);
-    std::copy(sensors.begin(), sensors.end(),states_input.begin());
+    std::copy(sensors.begin(), sensors.end(), states_input.begin());
 
-    std::vector<double> target_input(kMinibatchSize, 0.0f);
     if(weighted_sample)
-      setWeightedSampleVector(target_input.data());
+      setWeightedSampleVector(nullptr, false);
 
     if(size_motors > 0) {
       std::vector<double> actions_input(size_motors * kMinibatchSize, 0.0f);
-      std::copy(motors.begin(), motors.end(),actions_input.begin());
+      std::copy(motors.begin(), motors.end(), actions_input.begin());
 
-      InputDataIntoLayers(states_input.data(), actions_input.data(), target_input.data());
+      InputDataIntoLayers(&states_input, &actions_input, nullptr, true);
       neural_net->Forward(nullptr); //actions_input will be erase so let me here
     } else {
-      InputDataIntoLayers(states_input.data(), nullptr, target_input.data());
+      InputDataIntoLayers(&states_input, nullptr, nullptr, true);
       neural_net->Forward(nullptr);
     }
 
@@ -449,14 +438,9 @@ class MLP {
   }
 
   virtual std::vector<double>* computeOutVFBatch(const std::vector<double>& sensors, const std::vector<double>& motors) {
-    std::vector<double> target_input(kMinibatchSize, 0.0f);
-    std::vector<double> target_input2(kMinibatchSize, 0.0f);
-
-    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
-    std::vector<double> motors_(motors);
-    InputDataIntoLayers(sensors_.data(), motors_.data(), target_input.data());
+    InputDataIntoLayers(&sensors, &motors, nullptr, true);
     if(weighted_sample)
-      setWeightedSampleVector(target_input2.data());
+      setWeightedSampleVector(nullptr, true);
     neural_net->Forward(nullptr);
 
     const auto q_values_blob = neural_net->blob_by_name(q_values_blob_name);
@@ -476,9 +460,9 @@ class MLP {
 
     if(add_loss_layer) {
       target_input = new std::vector<double>(size_motors * kMinibatchSize, 0.0f);
-      InputDataIntoLayers(states_input.data(), NULL, target_input->data());
+      InputDataIntoLayers(&states_input, NULL, target_input);
     } else
-      InputDataIntoLayers(states_input.data(), NULL, NULL);
+      InputDataIntoLayers(&states_input, NULL, NULL);
     neural_net->Forward(nullptr);
 
     if(add_loss_layer)
@@ -494,8 +478,7 @@ class MLP {
   }
 
   std::vector<double>* computeOutBatch(const std::vector<double>& in) {
-    std::vector<double> in_(in);//copy cause of InputDataIntoLayers
-    InputDataIntoLayers(in_.data(), NULL, NULL);
+    InputDataIntoLayers(&in, NULL, NULL);
     neural_net->Forward(nullptr);
 
     auto outputs = new std::vector<double>(kMinibatchSize * size_motors);
@@ -912,42 +895,40 @@ protected:
     PopulateLayer(layer, name, "Scale", bottoms, tops, include_phase);
   }
 
+  typedef caffe::MemoryDataLayer<double> mdatal;
   //keep me private because I can change my inputs
-  void InputDataIntoLayers(double* states_input, double* actions_input, double* target_input) {
-    caffe::Net<double>& net = *neural_net;
-    if (states_input != NULL) {
-      const auto state_input_layer =
-        boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(net.layer_by_name(state_input_layer_name));
-//       LOG_DEBUG(state_input_layer->batch_size() << " " << state_input_layer->channels()<< " " << state_input_layer->height()<< " " << state_input_layer->width()<< " " );
+  void InputDataIntoLayers(const std::vector<double>* states_input, 
+                           const std::vector<double>* actions_input, 
+                           const std::vector<double>* target_input,
+                           bool local_initizialition_target=false) {
+    if (states_input != nullptr) {
+      copy_states.reset(new std::vector<double>(*states_input));
+      auto layer = neural_net->layer_by_name(state_input_layer_name);
+      auto state_input_layer = boost::dynamic_pointer_cast<mdatal>(layer);
       CHECK(state_input_layer);
-
-      state_input_layer->Reset(states_input, states_input, state_input_layer->batch_size());
+      ASSERT(copy_states->size() == state_input_layer->batch_size() * size_sensors,
+             "size pb " << copy_states->size() << " " << state_input_layer->batch_size());
+      state_input_layer->Reset(copy_states->data(), copy_states->data(), state_input_layer->batch_size());
     }
-    if (actions_input != NULL) {
-      const auto action_input_layer =
-        boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(
-          net.layer_by_name(action_input_layer_name));
+    if (actions_input != nullptr) {
+      copy_actions.reset(new std::vector<double>(*actions_input));
+      auto layer = neural_net->layer_by_name(action_input_layer_name);
+      auto action_input_layer = boost::dynamic_pointer_cast<mdatal>(layer);
       CHECK(action_input_layer);
-      action_input_layer->Reset(actions_input, actions_input,
-                                action_input_layer->batch_size());
+      ASSERT(copy_actions->size() == action_input_layer->batch_size() * size_motors, "size pb");
+      action_input_layer->Reset(copy_actions->data(), copy_actions->data(), action_input_layer->batch_size());
     }
-    if (target_input != NULL) {
-      const auto target_input_layer =
-        boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(
-          net.layer_by_name(target_input_layer_name));
+    if (target_input != nullptr || local_initizialition_target) {
+      if(!local_initizialition_target)
+        copy_q_values.reset(new std::vector<double>(*target_input));
+      else
+        copy_q_values.reset(new std::vector<double>(kMinibatchSize, 0.0f));
+      auto layer = neural_net->layer_by_name(target_input_layer_name);
+      auto target_input_layer = boost::dynamic_pointer_cast<mdatal>(layer);
       CHECK(target_input_layer);
-      target_input_layer->Reset(target_input, target_input,
-                                target_input_layer->batch_size());
+      ASSERT((int)copy_q_values->size() == target_input_layer->batch_size(), "size pb");
+      target_input_layer->Reset(copy_q_values->data(), copy_q_values->data(), target_input_layer->batch_size());
     }
-  }
-
-  void setWeightedSampleVector(double *wsample_input) {
-    caffe::Net<double>& net = *neural_net;
-    const auto wsample_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(
-                                       net.layer_by_name(wsample_input_layer_name));
-    CHECK(wsample_input_layer);
-    wsample_input_layer->Reset(wsample_input, wsample_input,
-                               wsample_input_layer->batch_size());
   }
   
   bool MyNetNeedsUpgrade(const caffe::NetParameter& net_param) {
@@ -956,18 +937,24 @@ protected:
 //     || NetNeedsBatchNormUpgrade(net_param); test wrong written by caffe
   }
   
+  void setWeightedSampleVector(const std::vector<double> *wsample_input, bool local_initilization) {
+    if(!local_initilization)
+      copy_label_weights.reset(new std::vector<double>(*wsample_input));
+    else
+      copy_label_weights.reset(new std::vector<double>(kMinibatchSize, 0.f));
+    auto layer = neural_net->layer_by_name(wsample_input_layer_name);
+    auto wsample_input_layer = boost::dynamic_pointer_cast<mdatal>(layer);
+    CHECK(wsample_input_layer);
+    ASSERT((int)copy_label_weights->size() == wsample_input_layer->batch_size(), "size pb");
+    wsample_input_layer->Reset(copy_label_weights->data(), copy_label_weights->data(), wsample_input_layer->batch_size());
+  }
+  
 public:
   void stepCritic(const std::vector<double>& sensors, const std::vector<double>& motors, 
                   const std::vector<double>& q, uint iter=1, const std::vector<double>* lw = nullptr){
-    
-    std::vector<double> sensors_(sensors);//copy cause of InputDataIntoLayers
-    std::vector<double> motors_(motors);
-    std::vector<double> q_(q);
-    InputDataIntoLayers(sensors_.data(), motors_.data(), q_.data());
-    if(lw != nullptr){
-      std::vector<double> lw_(*lw);
-      setWeightedSampleVector(lw_.data());
-    }
+    InputDataIntoLayers(&sensors, &motors, &q);
+    if(lw != nullptr)
+      setWeightedSampleVector(lw, false);
     
     solver->Step(iter);
   }
@@ -1044,6 +1031,11 @@ public:
   bool add_loss_layer=false;
   bool weighted_sample;
   uint hiddens_size;
+//   internal copy of inputs/outputs
+  boost::shared_ptr<std::vector<double>> copy_states;
+  boost::shared_ptr<std::vector<double>> copy_actions;
+  boost::shared_ptr<std::vector<double>> copy_q_values;
+  boost::shared_ptr<std::vector<double>> copy_label_weights;
 };
 
 #endif  // MLP_HPP
