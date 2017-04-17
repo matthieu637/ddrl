@@ -881,7 +881,7 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
         double proba1 = (((float)fit1)/((float)batch_size));
         double proba2 = (((float)fit2)/((float)batch_size));
         double proba3 = (((float)fit3)/((float)batch_size));
-        double std_=0.09;
+        double std_=0.11;
         EXPECT_GE(proba0, 1.-std_);
         EXPECT_LE(proba0, 1.+std_);
         EXPECT_GE(proba1, 0.4-std_);

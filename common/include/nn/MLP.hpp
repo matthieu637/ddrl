@@ -398,7 +398,10 @@ class MLP {
 
   void learn(const std::vector<double>& sensors, const std::vector<double>& motors, double q) {
     std::vector<double> target({q});
-    InputDataIntoLayers(&sensors, &motors, &target);
+    if(size_motors > 0)
+      InputDataIntoLayers(&sensors, &motors, &target);
+    else
+      InputDataIntoLayers(&sensors, nullptr, &target);
     solver->Step(1);
   }
 
@@ -409,7 +412,10 @@ class MLP {
 
   void learn_batch_lw(const std::vector<double>& sensors, const std::vector<double>& motors, const std::vector<double>& q,
                       const std::vector<double>& lw, uint iter) {
-    InputDataIntoLayers(&sensors, &motors, &q);
+    if(size_motors > 0)
+      InputDataIntoLayers(&sensors, &motors, &q);
+    else 
+      InputDataIntoLayers(&sensors, nullptr, &q);
     setWeightedSampleVector(&lw, false);
     solver->Step(iter);
   }
@@ -419,7 +425,7 @@ class MLP {
     std::copy(sensors.begin(), sensors.end(), states_input.begin());
 
     if(weighted_sample)
-      setWeightedSampleVector(nullptr, false);
+      setWeightedSampleVector(nullptr, true);
 
     if(size_motors > 0) {
       std::vector<double> actions_input(size_motors * kMinibatchSize, 0.0f);
