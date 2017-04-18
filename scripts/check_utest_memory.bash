@@ -14,12 +14,12 @@ function run_all_test(){
 		tmp=`mktemp`
 		#30 min timeout
 		echo "testing $atest"
-		timeout 14400 valgrind --tool=memcheck --leak-check=full --show-reachable=yes --track-origins=yes --leak-resolution=high ./unit-test >& $tmp
-		if [ $? -ne 0 ] ; then
-			cat $tmp
-			rm $tmp
-			exit 1
-		fi
+		valgrind --tool=memcheck --leak-check=full --show-reachable=yes --track-origins=yes --leak-resolution=high ./unit-test >& $tmp
+		#if [ $? -ne 0 ] ; then
+		#	cat $tmp
+		#	rm $tmp
+		#	exit 1
+		#fi
 		if [ `cat $tmp |& grep ERROR |& grep '0 errors' | wc -l` -ne 1 ] ; then
 			cat $tmp
 			echo "more than 0 errors"
