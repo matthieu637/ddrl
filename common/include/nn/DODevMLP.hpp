@@ -115,24 +115,25 @@ class DODevMLP : public MLP {
     for(caffe::LayerParameter& lp : *net_param_init.mutable_layer()) {
       uint b=0;
       bool state_capted_bottom = false;
+      bool action_capted_bottom = false;
       for(const std::string& bot : lp.bottom()) {
         if(bot == MLP::states_blob_name && !disable_st_control) {
           *lp.mutable_bottom(b) = "devnn.states";
           nb_state_layer++;
           state_capted_bottom = true;
         } else if (bot == MLP::actions_blob_name && lp.name() != MLP::loss_blob_name) {
-          *lp.mutable_bottom(b) = "devnn.actions";
-          input_action = true;
-          nb_action_layer++;
+         *lp.mutable_bottom(b) = "devnn.actions";//change concat input
+          action_capted_bottom = true;
         }
         b++;
       }
       b=0;
       for(const std::string& top : lp.top()) {
         if(top == MLP::actions_blob_name) {
-          *lp.mutable_top(b) = "devnn.actions";
-          ASSERT(!input_action, "action both in input and output mode");
-          input_action=false;
+          if(!input_action)
+            input_action = lp.type() == "MemoryData";
+          if(action_capted_bottom || !input_action)
+            *lp.mutable_top(b) = "devnn.actions";
           nb_action_layer++;
         } else if(top == MLP::states_blob_name && state_capted_bottom && !disable_st_control){
           *lp.mutable_top(b) = "devnn.states";
@@ -149,19 +150,10 @@ class DODevMLP : public MLP {
         state_dev_inserted = true;
       }
       
-      if(nb_action_layer > 0 && input_action && !action_dev_inserted){
-        caffe::DevelopmentalParameter* dp = addDevAction(net_param_new, input_action, heuristic);
-        dp->set_scale(ac_scale);
-        dp->set_probabilist(ac_probabilistic);
-        for (uint c : *ac_control)
-          dp->add_control(c);
-        action_dev_inserted = true;
-      }
-      
       caffe::LayerParameter* lpc = net_param_new.add_layer();
       lpc->CopyFrom(lp);
       
-      if(nb_action_layer > 0 && !input_action && !action_dev_inserted){
+      if(nb_action_layer > 0 && !action_dev_inserted && input_action){
         caffe::DevelopmentalParameter* dp = addDevAction(net_param_new, input_action, heuristic);
         dp->set_scale(ac_scale);
         dp->set_probabilist(ac_probabilistic);
@@ -169,6 +161,15 @@ class DODevMLP : public MLP {
           dp->add_control(c);
         action_dev_inserted = true;
       }
+    }
+    
+    if(nb_action_layer > 0 && !action_dev_inserted && !input_action){
+      caffe::DevelopmentalParameter* dp = addDevAction(net_param_new, input_action, heuristic);
+      dp->set_scale(ac_scale);
+      dp->set_probabilist(ac_probabilistic);
+      for (uint c : *ac_control)
+        dp->add_control(c);
+      action_dev_inserted = true;
     }
     
 #ifndef NDEBUG
@@ -181,6 +182,7 @@ class DODevMLP : public MLP {
 //     LOG_DEBUG("########################################################################################");
 
     net_param_new.set_force_backward(true);//mandatory for algorithm based on gradient (DDPG, ...)
+    MLP::writeNN_struct(net_param_new, 1);
     
     caffe::SolverParameter solver_param(solver->param());
     solver_param.clear_net_param();
@@ -312,6 +314,14 @@ public:
                               (1.f-tau), to_blob->mutable_cpu_data());
       }
     }
+  }
+  
+  virtual void actor_backward() override {
+    int layer = get_layer_index("devnn_actions");
+    
+    ASSERT(layer != -1 , "failed to found layer for backward");
+    
+    neural_net->BackwardFrom(layer);
   }
   
 private:

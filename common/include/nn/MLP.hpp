@@ -316,6 +316,7 @@ class MLP {
 
   virtual void exploit(boost::property_tree::ptree*, MLP*) {
     LOG_ERROR("should not be called");
+    exit(1);
   }
 //   void randomizeWeights(const std::vector<uint>& hiddens){
 //     //TODO: better
@@ -996,7 +997,7 @@ public:
     neural_net->BackwardFrom(layer);
   }
   
-  void actor_backward() {
+  virtual void actor_backward() {
     int layer = get_layer_index(produce_name("func", hiddens_size+1));//try func
     if(layer == -1)//if there is no activation function
       layer = get_layer_index(produce_name("ip", hiddens_size+1));
