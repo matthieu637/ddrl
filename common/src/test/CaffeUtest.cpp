@@ -1184,3 +1184,52 @@ TEST(MLP, DevelopmentalLayerBackward) {
         }
       }
 }
+
+
+TEST(MLP, DevelopmentalLayerBackwardDiffCompute) {
+  std::vector<uint> batch_norms = {0};
+  for(uint batch_norm : batch_norms)
+    for(uint hidden_layer = 1; hidden_layer <=3 ; hidden_layer++)
+      for(uint probabilistic = 0; probabilistic <=3 ; probabilistic++){
+        uint batch_size = 343; //must be a power3 number
+        std::vector<double> sensors(batch_size*3);
+        
+        DODevMLP actor(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
+        std::string config="[devnn]\ncompute_diff_backward=true\nst_scale=false\nst_probabilistic=";
+        config += std::to_string(probabilistic);
+        config += "\nac_scale=false\nac_probabilistic=";
+        config += std::to_string(probabilistic);
+        config += "\nst_control=1:2\nac_control=1:2\n";
+        boost::property_tree::ptree properties;
+        boost::iostreams::stream<boost::iostreams::array_source> stream(config.c_str(), config.size());
+        boost::property_tree::ini_parser::read_ini(stream, properties);
+        actor.exploit(&properties, nullptr);
+        
+        uint n = 0;
+        auto iter = [&](const std::vector<double>& x) {
+          sensors[n] = x[0];
+          if(bib::Utils::rand01() < 0.4)
+            sensors[n] = bib::Utils::rand01()*2 -1;
+          n++;
+          
+          sensors[n] = x[1];
+          if(bib::Utils::rand01() < 0.4)
+            sensors[n] = bib::Utils::rand01()*2 -1;
+          n++;
+          
+          sensors[n] = x[2];
+          if(bib::Utils::rand01() < 0.4)
+            sensors[n] = bib::Utils::rand01()*2 -1;
+          n++;
+        };
+        
+        bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
+        CHECK_EQ(n, batch_size*3);
+        
+        for(uint forced=0;forced<5;forced++){
+          auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
+          actor.actor_backward();
+          delete all_actions_outputs;
+        }
+      }
+}
