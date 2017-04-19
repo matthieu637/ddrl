@@ -26,7 +26,8 @@ class DODevMLP : public MLP {
   
   DODevMLP(const DODevMLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : 
     MLP(m, copy_solver, _phase), disable_st_control(m.disable_st_control), heuristic(m.heuristic) ,
-    episode(m.episode), heuristic_devpoints_index(m.heuristic_devpoints_index) {
+    heuristic_devpoints_index(m.heuristic_devpoints_index) ,
+    reset_learning_algo(m.reset_learning_algo) {
     st_control = new std::vector<uint>(*m.st_control);
     ac_control = new std::vector<uint>(*m.ac_control);
     if(heuristic == 1)
@@ -51,6 +52,7 @@ class DODevMLP : public MLP {
     bool ac_scale = pt->get<bool>("devnn.ac_scale");    
     uint st_probabilistic = pt->get<uint>("devnn.st_probabilistic");
     uint ac_probabilistic = pt->get<uint>("devnn.ac_probabilistic");
+    bool compute_diff_backward = false;
     st_control = bib::to_array<uint>(pt->get<std::string>("devnn.st_control"));
     ac_control = bib::to_array<uint>(pt->get<std::string>("devnn.ac_control"));
     heuristic = 0;
@@ -85,9 +87,34 @@ class DODevMLP : public MLP {
         disable_st_control = true;
     } catch(boost::exception const& ) {
     }
+    
+    try {
+      compute_diff_backward = pt->get<bool>("devnn.compute_diff_backward");
+    } catch(boost::exception const& ) {
+    }
+    
+    try {
+      reset_learning_algo = pt->get<bool>("devnn.reset_learning_algo");
+    } catch(boost::exception const& ) {
+    }
 
     if((ac_scale && ac_probabilistic != 0) || (st_scale && st_probabilistic != 0)) {
       LOG_ERROR("if not probabilistic then why scaling? of how much?");
+      exit(1);
+    }
+    
+    if(heuristic == 2 && reset_learning_algo) {
+      LOG_ERROR("when sould I reset ? I'm progressive");
+      exit(1);
+    }
+    
+    if(heuristic == 0 && reset_learning_algo) {
+      LOG_ERROR("when sould I reset, I'm learning alone all my parameters");
+      exit(1);
+    }
+    
+    if(heuristic != 0 && compute_diff_backward) {
+      LOG_ERROR("why do you compute diff if you don't use local solver?");
       exit(1);
     }
 
@@ -157,6 +184,7 @@ class DODevMLP : public MLP {
         caffe::DevelopmentalParameter* dp = addDevAction(net_param_new, input_action, heuristic);
         dp->set_scale(ac_scale);
         dp->set_probabilist(ac_probabilistic);
+        dp->set_diff_compute(compute_diff_backward);
         for (uint c : *ac_control)
           dp->add_control(c);
         action_dev_inserted = true;
@@ -167,6 +195,7 @@ class DODevMLP : public MLP {
       caffe::DevelopmentalParameter* dp = addDevAction(net_param_new, input_action, heuristic);
       dp->set_scale(ac_scale);
       dp->set_probabilist(ac_probabilistic);
+      dp->set_diff_compute(compute_diff_backward);
       for (uint c : *ac_control)
         dp->add_control(c);
       action_dev_inserted = true;
@@ -248,7 +277,8 @@ class DODevMLP : public MLP {
     return layer.mutable_developmental_param();
   }
   
-  void develop(){
+  bool develop(uint episode){
+    bool catch_change = false;
     if(heuristic == 1){
       while(heuristic_devpoints_index < heuristic_devpoints->size() && episode == heuristic_devpoints->at(heuristic_devpoints_index)){
         if(heuristic_devpoints_index < st_control->size()){
@@ -256,16 +286,19 @@ class DODevMLP : public MLP {
           auto data = blob_st->mutable_cpu_data();
           data[heuristic_devpoints_index] = 1.f;
           LOG_INFO("dev point st " << st_control->at(heuristic_devpoints_index) );
+          catch_change = true;
         } else if(heuristic_devpoints_index < st_control->size() + ac_control->size()) {
           auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
           auto data = blob_ac->mutable_cpu_data();
           data[heuristic_devpoints_index - st_control->size()] = 1.f;
           LOG_INFO("dev point ac " << ac_control->at(heuristic_devpoints_index - st_control->size()) );
+          catch_change = true;
         }
         
         heuristic_devpoints_index++;
       }
     } else if(heuristic == 2) {
+      catch_change = true;
       if(!disable_st_control){
         auto blob_st = neural_net->layer_by_name("devnn_states")->blobs()[0];
         auto data_st = blob_st->mutable_cpu_data();
@@ -280,21 +313,16 @@ class DODevMLP : public MLP {
         data[i] = ((double)episode) * heuristic_linearcoef->at(i + st_control->size());
       }
     }
+    
+    return catch_change;
   }
   
 public:
-//   Used by CMA-ES
-  void copyWeightsFrom(const double* startx, bool ignore_null_lr) override {
-    develop();
-    
-    MLP::copyWeightsFrom(startx, ignore_null_lr);
-    episode++;
-  }
-  
 //   Used by others
-  void inform(uint episode_){
-    episode = episode_;
-    develop();
+  bool inform(uint episode_){
+    bool changed = develop(episode_);
+    
+    return reset_learning_algo && changed;
   }
   
   void soft_update(const MLP& from, double tau) override {
@@ -327,12 +355,12 @@ public:
 private:
   bool disable_st_control = false;
   uint heuristic = 0;
-  uint episode = 0;
   uint heuristic_devpoints_index = 0;
   std::vector<uint>* heuristic_devpoints = nullptr;
   std::vector<double>* heuristic_linearcoef = nullptr;
   std::vector<uint>* st_control = nullptr;
   std::vector<uint>* ac_control = nullptr;
+  bool reset_learning_algo = false;
 };
 
 #endif

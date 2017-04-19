@@ -223,8 +223,14 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     learning = _learning;
     
     if(std::is_same<NN, DODevMLP>::value){
-      static_cast<DODevMLP *>(qnn)->inform(episode);
-      static_cast<DODevMLP *>(ann)->inform(episode);
+      if(static_cast<DODevMLP *>(qnn)->inform(episode)){
+        LOG_INFO("reset learning catched");
+        trajectory.clear();
+      }
+      if(static_cast<DODevMLP *>(ann)->inform(episode)){
+        LOG_INFO("reset learning catched");
+        trajectory.clear();
+      }
       static_cast<DODevMLP *>(qnn_target)->inform(episode);
       static_cast<DODevMLP *>(ann_target)->inform(episode);
     }
@@ -477,7 +483,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::vector<double> last_state;
 
   std::deque<sample> trajectory;
-  std::vector<sample> last_trajectory;
   
   uint episode = 0;
   
