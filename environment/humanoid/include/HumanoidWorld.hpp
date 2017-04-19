@@ -35,6 +35,7 @@ struct humanoid_physics{
   double bounce;
   bool additional_sensors;
   double reward_scale_lvc;
+  double reward_penalty_dead;
 };
 
 class HumanoidWorld {

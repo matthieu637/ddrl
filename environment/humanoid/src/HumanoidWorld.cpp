@@ -948,6 +948,8 @@ bool HumanoidWorld::final_state() const {
 }
 
 double HumanoidWorld::performance() const {
+  if(final_state())
+    return phy.reward_penalty_dead;
   return reward;
 }
 

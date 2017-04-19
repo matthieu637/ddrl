@@ -56,6 +56,7 @@ class HumanoidEnv : public arch::AEnvironment<> {
     init.bounce = pt->get<double>("environment.bounce");
     init.additional_sensors = pt->get<bool>("environment.additional_sensors");
     init.reward_scale_lvc = pt->get<double>("environment.reward_scale_lvc");
+    init.reward_penalty_dead = pt->get<double>("environment.reward_penalty_dead");
     visible     = vm->count("view");
     
     
