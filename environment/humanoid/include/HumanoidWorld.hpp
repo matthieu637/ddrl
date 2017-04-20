@@ -52,6 +52,7 @@ class HumanoidWorld {
   virtual void step(const std::vector<double> &motors);
   const std::vector<double> &state() const;
   unsigned int activated_motors() const;
+  double mass_center();
 
  protected:
   void createWorld();
@@ -59,7 +60,6 @@ class HumanoidWorld {
   void apply_armature(dMass* m, double k);
   void apply_damping(dBodyID body, double v);
 //   void copy_inertia(dMass* m, uint i);
-  double mass_center();
 
  public:
   ODEWorld odeworld;

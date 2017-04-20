@@ -9,6 +9,10 @@
 #include "HumanoidWorld.hpp"
 #include "HumanoidWorldView.hpp"
 
+//optimize dynamics of environment with CMAES
+//gamma sould be set to 1
+#define OPTIMIZE_ENV
+
 class HumanoidEnv : public arch::AEnvironment<> {
  public:
   HumanoidEnv() {
@@ -25,7 +29,13 @@ class HumanoidEnv : public arch::AEnvironment<> {
   }
 
   double performance() const override {
+#ifdef OPTIMIZE_ENV
+    if(current_step == max_step_per_instance || instance->final_state())
+      return instance->mass_center();
+    return 0.;
+#else
     return instance->performance();
+#endif
   }
 
   bool final_state() const override {
