@@ -14,7 +14,7 @@ function run_all_test(){
 		tmp=`mktemp`
 		#30 min timeout
 		echo "testing $atest"
-		valgrind --tool=memcheck --leak-check=full --show-reachable=yes --track-origins=yes --leak-resolution=high ./unit-test >& $tmp
+		valgrind --tool=memcheck --leak-check=full --show-reachable=yes --track-origins=yes --leak-resolution=high ./unit-test -valgrind >& $tmp
 		#if [ $? -ne 0 ] ; then
 		#	cat $tmp
 		#	rm $tmp

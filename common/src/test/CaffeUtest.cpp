@@ -1,6 +1,6 @@
 #include <boost/iostreams/stream.hpp>
 
-#include "gtest/gtest.h"
+#include "bib/UTest.hpp"
 #include "nn/MLP.hpp"
 #include "nn/DODevMLP.hpp"
 #include "bib/Combinaison.hpp"
@@ -248,43 +248,41 @@ TEST(MLP, CaffeSaveLoad) {
     for(uint hidden_layer = 1; hidden_layer <=3 ; hidden_layer++) {
 //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
       uint batch_size = 400; //must be a squared number
-      MLP nn(2, 1, {50,10}, 0.005f, batch_size, -1, hidden_layer, batch_norm);
+      MLP nn(2, 1, {20,10}, 0.005f, batch_size, -1, hidden_layer, batch_norm);
 
       std::vector<double> sensors(batch_size);
       std::vector<double> actions(batch_size);
       std::vector<double> qvalues(batch_size);
 
-      for(uint forced = 0; forced < 1 ; forced++) {
-        uint n = 0;
-        auto iter = [&](const std::vector<double>& x) {
-          sensors[n] = x[0];
-          actions[n] = x[1];
+      uint n = 0;
+      auto iter = [&](const std::vector<double>& x) {
+        sensors[n] = x[0];
+        actions[n] = x[1];
 
-          if(bib::Utils::rand01() < 0.4) {
-            sensors[n] = bib::Utils::rand01()*2 -1;
-            actions[n] = bib::Utils::rand01()*2 -1;
-          }
-          qvalues[n] = -(actions[n]*actions[n]-(sensors[n]*sensors[n]));
+        if(bib::Utils::rand01() < 0.4) {
+          sensors[n] = bib::Utils::rand01()*2 -1;
+          actions[n] = bib::Utils::rand01()*2 -1;
+        }
+        qvalues[n] = -(actions[n]*actions[n]-(sensors[n]*sensors[n]));
 
-          n++;
-        };
+        n++;
+      };
 
-        bib::Combinaison::continuous<>(iter, 2, -1, 1, sqrt(batch_size)-1);
+      bib::Combinaison::continuous<>(iter, 2, -1, 1, sqrt(batch_size)-1);
 
-        EXPECT_EQ(n, batch_size);
-        nn.learn_batch(sensors, actions, qvalues, 50);
-      }
+      EXPECT_EQ(n, batch_size);
+      nn.learn_batch(sensors, actions, qvalues, 5);
 
       nn.save("CaffeSaveLoad.cache");
       MLP nn_test(nn, false);
 
-      MLP nn2(2, 1, {50,10}, 0.005f, batch_size, -1, hidden_layer, batch_norm);
+      MLP nn2(2, 1, {20,10}, 0.005f, batch_size, -1, hidden_layer, batch_norm);
       nn2.load("CaffeSaveLoad.cache");
 
       MLP nn3(nn2, false);
       MLP nn4(nn2, true);//learning net
 
-      for (uint n = 0; n < 100 ; n++) {
+      for (n = 0; n < VALGRIND_REDUCE(100, 3) ; n++) {
         double x0 = bib::Utils::rand01()*2 -1;
         double x1 = bib::Utils::rand01()*2 -1;
 
@@ -462,7 +460,7 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
       std::vector<double> actions(batch_size);
       std::vector<double> qvalues(batch_size);
 
-      for(uint forced = 0; forced < 50 ; forced++) {
+      for(uint forced = 0; forced < VALGRIND_REDUCE(50,2) ; forced++) {
         uint n = 0;
         auto iter = [&](const std::vector<double>& x) {
           sensors[n] = x[0];
@@ -480,14 +478,14 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
         bib::Combinaison::continuous<>(iter, 2, -1, 1, sqrt(batch_size)-1);
 
         EXPECT_EQ(n, batch_size);
-        nn.learn_batch(sensors, actions, qvalues, 50);
+        nn.learn_batch(sensors, actions, qvalues, VALGRIND_REDUCE(50,2));
       }
 
       MLP nn_test(nn, false);//testing
       MLP actor(1, {8}, 1, 0.01f, batch_size, hidden_layer, 2, batch_norm);
       MLP actor_test(actor, true);
 
-      for(uint forced = 0; forced < 50 ; forced++) {
+      for(uint forced = 0; forced < VALGRIND_REDUCE(50,2) ; forced++) {
 //         LOG_DEBUG("forced  "<< forced);
         uint n = 0;
         auto iter = [&](const std::vector<double>& x) {
@@ -560,7 +558,7 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
       double ac1_error = 0;
       double ac2_error = 0;
       double q_error = 0;
-      for (uint n = 0; n < 100 ; n++) {
+      for (uint n = 0; n < VALGRIND_REDUCE(100, 5) ; n++) {
         double x1 = bib::Utils::rand01()*2 -1;
 
         double out = (x1 * x1)/2;
@@ -574,8 +572,8 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
 
         auto actor1_out = actor.computeOut(sens);
         auto actor2_out = actor_test.computeOut(sens);
-        LOG_FILE("OptimizeNNTroughGradientOfAnotherNNFann.data", x1 << " " << actor1_out->at(0) << " " <<
-        actor2_out->at(0)<< " " << out);
+        VALGRIND_SKIP(LOG_FILE("OptimizeNNTroughGradientOfAnotherNNFann.data", x1 << " " << actor1_out->at(0) << " " <<
+        actor2_out->at(0)<< " " << out));
 //clear all;close all;X=load('OptimizeNNTroughGradientOfAnotherNNFann.data');plot(X(:,1),X(:,2), '.');hold on;plot(X(:,1),X(:,3), 'r.');plot(X(:,1),X(:,4), 'go');
         ac1_error += fabs(out - actor1_out->at(0));
         ac2_error += fabs(out - actor2_out->at(0));
@@ -591,8 +589,8 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
       
       //if critic well learned
       if(q_error < 0.1){
-        EXPECT_LT(ac1_error, 0.15);
-        EXPECT_LT(ac2_error, 0.22);
+        VALGRIND_SKIP(EXPECT_LT(ac1_error, 0.15));
+        VALGRIND_SKIP(EXPECT_LT(ac2_error, 0.22));
       }
 
       LOG_DEBUG("bn " << batch_norm << " hiddenl " << hidden_layer << " " << ac1_error << " " << ac2_error << " " << q_error);
@@ -771,7 +769,7 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
         double proba1 = (((float)fit1)/((float)batch_size));
         double proba2 = (((float)fit2)/((float)batch_size));
         double proba3 = (((float)fit3)/((float)batch_size));
-        double std_=0.095;
+        double std_=0.1;
         EXPECT_GE(proba0, 0.1-std_);
         EXPECT_LE(proba0, 0.1+std_);
         EXPECT_GE(proba1, 0.8-std_);
