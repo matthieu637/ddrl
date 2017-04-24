@@ -67,6 +67,7 @@ HumanoidWorld::HumanoidWorld(humanoid_physics _phy) : odeworld(ODEFactory::getIn
   contact[0].surface.slip2 = phy.slip2;
   contact[0].surface.soft_erp = phy.soft_erp;
   contact[0].surface.bounce = phy.bounce;
+  contact[0].surface.bounce_vel = phy.bounce_vel;
 
   contact[1].surface.mu = phy.mu;
   contact[1].surface.mu2 = phy.mu2;
@@ -75,6 +76,7 @@ HumanoidWorld::HumanoidWorld(humanoid_physics _phy) : odeworld(ODEFactory::getIn
   contact[1].surface.slip2 = phy.slip2;
   contact[1].surface.soft_erp = phy.soft_erp;
   contact[1].surface.bounce = phy.bounce;
+  contact[1].surface.bounce_vel = phy.bounce_vel;
   
   //   <motor ctrllimited="true" ctrlrange="-.4 .4"/>
   const double gear_abdomen_y = 100 * 0.4f;
@@ -694,10 +696,11 @@ void nearCallbackHumanoid(void* data, dGeomID o1, dGeomID o2) {
   if (b1 && b2 && dAreConnected(b1, b2)){
     return;
   }
-
+  
   if (int numc = dCollide (o1,o2,2,&inst->contact[0].geom,sizeof(dContact))) {
+    ASSERT(numc <= 2, "more than 2 contact points");
     for (int i=0; i<numc; i++) {
-      dJointID c = dJointCreateContact (inst->odeworld.world_id,inst->odeworld.contactgroup,&inst->contact[i]);
+      dJointID c = dJointCreateContact (inst->odeworld.world_id, inst->odeworld.contactgroup, &inst->contact[i]);
       dJointAttach (c, dGeomGetBody(o1), dGeomGetBody(o2));
     }
   }

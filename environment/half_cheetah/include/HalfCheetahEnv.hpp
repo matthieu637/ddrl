@@ -53,6 +53,9 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
     init.slip2 = pt->get<double>("environment.slip2");
     init.soft_erp = pt->get<double>("environment.soft_erp");
     init.bounce = pt->get<double>("environment.bounce");
+    init.bounce_vel = 0;
+    if (init.bounce >= 0.0000f)
+      init.bounce_vel = pt->get<double>("environment.bounce_vel");
     visible     = vm->count("view");
     
     init.predev = 0;

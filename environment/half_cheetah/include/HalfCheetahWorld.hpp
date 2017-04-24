@@ -25,6 +25,7 @@ struct hcheetah_physics{
   double slip2;
   double soft_erp;
   double bounce;
+  double bounce_vel;
   uint predev;
   uint from_predev;
 //   PREDEV: 1 -> two low joint

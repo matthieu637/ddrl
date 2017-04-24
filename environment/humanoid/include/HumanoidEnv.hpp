@@ -64,6 +64,7 @@ class HumanoidEnv : public arch::AEnvironment<> {
     init.slip2 = pt->get<double>("environment.slip2");
     init.soft_erp = pt->get<double>("environment.soft_erp");
     init.bounce = pt->get<double>("environment.bounce");
+    init.bounce_vel = pt->get<double>("environment.bounce_vel");
     init.additional_sensors = pt->get<bool>("environment.additional_sensors");
     init.reward_scale_lvc = pt->get<double>("environment.reward_scale_lvc");
     init.reward_penalty_dead = pt->get<double>("environment.reward_penalty_dead");

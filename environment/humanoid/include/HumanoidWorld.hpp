@@ -33,6 +33,7 @@ struct humanoid_physics{
   double slip2;
   double soft_erp;
   double bounce;
+  double bounce_vel;
   bool additional_sensors;
   double reward_scale_lvc;
   double reward_penalty_dead;
