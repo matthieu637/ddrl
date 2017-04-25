@@ -74,6 +74,8 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     
     check_feasible = true;
     ignore_null_lr = true;
+    racing = false;
+    error_count = 0;
     try {
       check_feasible = pt->get<bool>("agent.check_feasible");
     } catch(boost::exception const& ) {
@@ -83,6 +85,12 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
       ignore_null_lr = pt->get<bool>("agent.ignore_null_lr");
     } catch(boost::exception const& ) {
     }
+    
+    try {
+      racing = pt->get<bool>("agent.racing");
+    } catch(boost::exception const& ) {
+    }
+    
     episode = 0;
     
     ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, 0.1, 1, actor_hidden_layer_type, actor_output_layer_type, batch_norm);
@@ -126,8 +134,15 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
   
   void new_population(){
     const char * terminate =  cmaes_TestForTermination(evo);
-    if(terminate)
+    if(terminate){
       LOG_INFO("mismatch "<< terminate);
+      error_count++;
+      
+      if(error_count > 20 && racing){
+        LOG_FILE(DEFAULT_END_FILE, "-1");
+        exit(0);
+      }
+    }
     //ASSERT(!cmaes_TestForTermination(evo), "mismatch "<< cmaes_TestForTermination(evo));
     
     current_individual = 0;
@@ -306,6 +321,8 @@ private:
   double initial_deviation;
   bool check_feasible;
   bool ignore_null_lr;
+  bool racing;
+  uint error_count;
 };
 
 #endif
