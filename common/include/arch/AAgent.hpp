@@ -101,10 +101,11 @@ class AAgent : public ProgOptions, public CommonAE {
   virtual void load(const std::string&) {}
 
 
-  void unique_invoke(boost::property_tree::ptree* inifile,
-                     boost::program_options::variables_map* command_args) override {
+  virtual void unique_invoke(boost::property_tree::ptree* inifile,
+                     boost::program_options::variables_map* command_args,
+                     bool forbidden_load) {
     _unique_invoke(inifile, command_args);
-    if (command_args->count("load"))
+    if (command_args->count("load") && !forbidden_load)
       load((*command_args)["load"].as<std::string>());
   }
   

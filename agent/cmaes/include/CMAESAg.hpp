@@ -17,6 +17,7 @@
 #include <bib/Combinaison.hpp>
 #include "nn/MLP.hpp"
 #include "nn/DevMLP.hpp"
+#include "nn/DODevMLP.hpp"
 #include "cmaes_interface.h"
 
 template<typename NN = MLP>
@@ -69,20 +70,43 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     population                  = pt->get<uint>("agent.population");
     gaussian_policy             = pt->get<bool>("agent.gaussian_policy");
     policy_stochasticity        = pt->get<double>("agent.policy_stochasticity");
-    double initial_deviation           = pt->get<double>("agent.initial_deviation");
+    initial_deviation           = pt->get<double>("agent.initial_deviation");
+    
+    check_feasible = true;
+    ignore_null_lr = true;
+    racing = false;
+    error_count = 0;
+    try {
+      check_feasible = pt->get<bool>("agent.check_feasible");
+    } catch(boost::exception const& ) {
+    }
+    
+    try {
+      ignore_null_lr = pt->get<bool>("agent.ignore_null_lr");
+    } catch(boost::exception const& ) {
+    }
+    
+    try {
+      racing = pt->get<bool>("agent.racing");
+    } catch(boost::exception const& ) {
+    }
+    
+    episode = 0;
     
     ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, 0.1, 1, actor_hidden_layer_type, actor_output_layer_type, batch_norm);
     if(std::is_same<NN, DevMLP>::value)
       ann->exploit(pt, static_cast<CMAESAg *>(old_ag)->ann);
+    else if(std::is_same<NN, DODevMLP>::value)
+      ann->exploit(pt, nullptr);
 
 //     const uint dimension = (nb_sensors+1)*hidden_unit_a->at(0) + (hidden_unit_a->at(0)+1)*nb_motors;
-    const uint dimension = ann->number_of_parameters();
+    const uint dimension = ann->number_of_parameters(ignore_null_lr);
     double* startx  = new double[dimension];
     double* deviation  = new double[dimension];
     for(uint j=0; j< dimension; j++){
       deviation[j] = initial_deviation;
     }
-    ann->copyWeightsTo(startx);
+    ann->copyWeightsTo(startx, ignore_null_lr);
     
     evo = new cmaes_t;
     arFunvals = cmaes_init(evo, dimension, startx, deviation, 0, population, NULL/*"config.cmaes.ini"*/);
@@ -110,28 +134,62 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
   
   void new_population(){
     const char * terminate =  cmaes_TestForTermination(evo);
-    if(terminate)
+    if(terminate){
       LOG_INFO("mismatch "<< terminate);
+      error_count++;
+      
+      if(error_count > 20 && racing){
+        LOG_FILE(DEFAULT_END_FILE, "-1");
+        exit(0);
+      }
+    }
     //ASSERT(!cmaes_TestForTermination(evo), "mismatch "<< cmaes_TestForTermination(evo));
     
     current_individual = 0;
     pop = cmaes_SamplePopulation(evo);
     
-    //check that the population is feasible
-    bool allfeasible = true;
-    for (int i = 0; i < cmaes_Get(evo, "popsize"); ++i)
-      while (!is_feasible(pop[i])){
-        cmaes_ReSampleSingle(evo, i);
-        allfeasible = false;
-      }
-      
-    if(!allfeasible)
-      LOG_INFO("non feasible solution produced");
+    if(check_feasible){
+      //check that the population is feasible
+      bool allfeasible = true;
+      for (int i = 0; i < cmaes_Get(evo, "popsize"); ++i)
+        while (!is_feasible(pop[i])){
+          cmaes_ReSampleSingle(evo, i);
+          allfeasible = false;
+        }
+        
+      if(!allfeasible)
+        LOG_INFO("non feasible solution produced");
+    }
   }
 
   void start_instance(bool learning) override {
     last_action = nullptr;
     scores.clear();
+    
+    if(std::is_same<NN, DODevMLP>::value)
+      if(static_cast<DODevMLP *>(ann)->inform(episode)){
+        LOG_INFO("reset learning catched");
+        const double* parameters = nullptr;
+        parameters = cmaes_GetPtr(evo, "xbestever");
+        loadPolicyParameters(parameters);
+        
+        cmaes_exit(evo);
+        delete evo;
+        
+        const uint dimension = ann->number_of_parameters(ignore_null_lr);
+        double* startx  = new double[dimension];
+        double* deviation  = new double[dimension];
+        for(uint j=0; j< dimension; j++){
+          deviation[j] = initial_deviation;
+        }
+        ann->copyWeightsTo(startx, ignore_null_lr);
+        
+        evo = new cmaes_t;
+        arFunvals = cmaes_init(evo, dimension, startx, deviation, 0, population, NULL/*"config.cmaes.ini"*/);
+        delete[] startx;
+        delete[] deviation;
+        new_population();
+      }
     
     if(!justLoaded){
       //put individual into NN
@@ -143,6 +201,8 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
       
       loadPolicyParameters(parameters);
     }
+    
+    episode++;
     //LOG_FILE("policy_exploration", ann->hash());
   }
   
@@ -236,7 +296,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
 private:
   void loadPolicyParameters(const double* parameters){
-      ann->copyWeightsFrom(parameters);
+    ann->copyWeightsFrom(parameters, ignore_null_lr);
   }
   
 private:  
@@ -257,6 +317,12 @@ private:
   bool justLoaded = false;
   bool cmaes_UpdateDistribution_done_once = false;
   uint current_individual;
+  uint episode;
+  double initial_deviation;
+  bool check_feasible;
+  bool ignore_null_lr;
+  bool racing;
+  uint error_count;
 };
 
 #endif

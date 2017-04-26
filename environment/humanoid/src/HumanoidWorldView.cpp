@@ -10,9 +10,8 @@
 static HumanoidWorldView* inst = nullptr;
 
 void parseCommandHumanoid(int cmd) {
-  static float xyz[3] = {-0.03, -0.97, 0.2};
+  static float xyz[3] = {-0.07, -2.83, 0.81};
   static float hpr[3] = {90, 0, 0};
-  std::vector<double> qq;
 
   switch (cmd) {
   case 'f':
@@ -50,7 +49,7 @@ void parseCommandHumanoid(int cmd) {
               << vhpr[2]);
     break;
   case 'r':
-    inst->resetPositions(qq, qq);
+    inst->resetPositionsView();
     LOG_DEBUG("resetPositions should not be used");
     break;
   case 'x':
@@ -94,12 +93,14 @@ void threadloopHumanoid(const std::string& goodpath) {
 //     xyz[0] = x - 1.43;
 //     dsSetViewpoint(xyz, hpr);
   }
+  
+  HACKclose();
 }
 
 HumanoidWorldView::HumanoidWorldView(const std::string& path, const humanoid_physics phy)
   : HumanoidWorld(phy),
     requestEnd(false),
-    speed(1.),
+    speed(0.0625),
     ignoreMotor(false) {
   std::string goodpath = path;
 
@@ -147,7 +148,6 @@ HumanoidWorldView::~HumanoidWorldView() {
   requestEnd = true;
   eventThread->join();
   delete eventThread;
-  HACKclose();
 }
 
 void HumanoidWorldView::step(const std::vector<double>& motors) {
@@ -171,4 +171,15 @@ void HumanoidWorldView::step(const std::vector<double>& motors) {
   
 
   usleep(3*WORLD_STEP / speed * 1000 * 1000);  // needed to don't be faster than the view
+}
+
+void HumanoidWorldView::resetPositions(std::vector<double> & result_stoch, const std::vector<double>& given_stoch) {
+  Mutex::scoped_lock lock(mutex_reset);
+  HumanoidWorld::resetPositions(result_stoch, given_stoch);
+  lock.release();
+}
+
+void HumanoidWorldView::resetPositionsView() {
+  std::vector<double> qq;
+  HumanoidWorld::resetPositions(qq, qq);
 }

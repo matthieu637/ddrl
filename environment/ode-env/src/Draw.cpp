@@ -62,6 +62,9 @@ void Draw::drawLoop(int) {
       if ((*it)->getColorMode() == 1) {
         dsSetTexture(DS_CHECKERED);
         dsSetColor(255, 0., 0.);
+      } else if ((*it)->getColorMode() == 2) {
+        dsSetTexture(DS_CHECKERED2);
+        dsSetColor(255, 0., 0.);
       } else {
         dsSetColor(0.7, 0.7, 0.4);
         dsSetTexture(DS_WOOD);

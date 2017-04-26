@@ -15,6 +15,9 @@ class HalfCheetahWorldView : public HalfCheetahWorld {
   ~HalfCheetahWorldView();
   void step(const std::vector<double> &motors) override;
 
+protected:
+  virtual void createWorld() override;
+  
  public:
   //     std::list<dGeomID> geoms;
   //     std::list<ODEObject*> delete_me_later;

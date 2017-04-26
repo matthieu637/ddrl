@@ -36,6 +36,10 @@ add_executable(half-cheetah-dpmt src/test/DpmtHalfCheetah.cpp ${all_include} ${a
 target_link_libraries(half-cheetah-dpmt 
   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
 
+add_executable(half-cheetah-dodev src/test/DodevHalfCheetah.cpp ${all_include} ${all_sources} )
+target_link_libraries(half-cheetah-dodev 
+  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  
 add_executable(cp-nfac src/test/NFACCp.cpp ${all_include} ${all_sources} )
 target_link_libraries(cp-nfac
   ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )

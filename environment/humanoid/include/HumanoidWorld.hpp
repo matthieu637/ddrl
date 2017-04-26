@@ -1,5 +1,5 @@
-#ifndef HALTCHEETAHWORLD_HPP
-#define HALTCHEETAHWORLD_HPP
+#ifndef HUMANOIDWORLD_HPP
+#define HUMANOIDWORLD_HPP
 
 #include <vector>
 #include "ode/ode.h"
@@ -15,12 +15,17 @@
 // <option integrator="RK4" iterations="50" solver="PGS" timestep="0.003">
 #define WORLD_STEP 0.003
 
+// mujoco_env.MujocoEnv.__init__(self, 'humanoid.xml', 5)
+#define FRAME_SKIP 5
+
+// in ODE the agent can found static position and waits
+#define ALIVE_BONUS 1.0
+
 struct humanoid_physics{
   bool apply_armature;
   uint approx;
   uint damping;
   uint control;
-  uint reward;
   double mu;
   double mu2;
   double soft_cfm;
@@ -28,14 +33,10 @@ struct humanoid_physics{
   double slip2;
   double soft_erp;
   double bounce;
-  uint predev;
-  uint from_predev;
-//   PREDEV: 1 -> two low joint
-//           10 -> two middle joints
-//   +0 (1/10) -> PD controller init pos (sensors removed)
-//   +1 (2/11) -> PD controller init pos (keep sensors)
-//   +2 (3/12) -> PD controller init pos (keep sensors but setted to 0)
-  
+  double bounce_vel;
+  bool additional_sensors;
+  double reward_scale_lvc;
+  double reward_penalty_dead;
 };
 
 class HumanoidWorld {
@@ -43,7 +44,7 @@ class HumanoidWorld {
   HumanoidWorld(const humanoid_physics phy);
   virtual ~HumanoidWorld();
 
-  void resetPositions(std::vector<double> &, const std::vector<double>& given_stoch);
+  virtual void resetPositions(std::vector<double> &, const std::vector<double>& given_stoch);
   
   bool final_state() const;
   
@@ -52,12 +53,14 @@ class HumanoidWorld {
   virtual void step(const std::vector<double> &motors);
   const std::vector<double> &state() const;
   unsigned int activated_motors() const;
+  double mass_center();
 
  protected:
   void createWorld();
   void update_state();
   void apply_armature(dMass* m, double k);
   void apply_damping(dBodyID body, double v);
+//   void copy_inertia(dMass* m, uint i);
 
  public:
   ODEWorld odeworld;
@@ -65,21 +68,18 @@ class HumanoidWorld {
   dGeomID ground;
   humanoid_physics phy;
   dContact contact[2];
-  bool head_touch, fknee_touch, bknee_touch;
+  
+//   static const std::vector<double> mujoco_inertia;
   
  protected:
   std::vector<dJointID> joints;
-  double penalty;
   double reward;
-
   std::vector<double> internal_state;
-  
-#ifndef NDEBUG
-  uint debug_step = 0;
-  std::vector<double> factors;
-  uint target_motor = 0;
-  uint target_joint = 0;
-#endif
+  std::vector<double> body_mass;
+  std::vector<double> gears;
+  std::vector<double> qfrc_actuator;
+  double mass_sum;
+  double pos_before;
 };
 
 struct nearCallbackDataHumanoid {

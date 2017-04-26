@@ -18,7 +18,6 @@ static std::string goodpath;
 void parseCommandHumanoid(int cmd) {
   static float xyz[3] = {-0.03, -0.97, 0.2};
   static float hpr[3] = {90, 0, 0};
-  std::vector<double> qq;
 
   switch (cmd) {
   case 'f':
@@ -56,7 +55,7 @@ void parseCommandHumanoid(int cmd) {
               << vhpr[2]);
     break;
   case 'r':
-    inst->resetPositions(qq, qq);
+    inst->resetPositionsView();
     LOG_DEBUG("resetPositions should not be used");
     break;
   case 'x':
@@ -179,8 +178,20 @@ void HumanoidWorldView::step(const std::vector<double>& motors) {
   LOG_DEBUG("step");
 }
 
+void HumanoidWorldView::resetPositions(std::vector<double> & result_stoch, const std::vector<double>& given_stoch) {
+  Mutex::scoped_lock lock(mutex_reset);
+  HumanoidWorld::resetPositions(result_stoch, given_stoch);
+  lock.release();
+}
 
-static arch::Simulator<HumanoidEnv, arch::ExampleAgent>* s;
+void HumanoidWorldView::resetPositionsView() {
+  std::vector<double> qq;
+  HumanoidWorld::resetPositions(qq, qq);
+}
+
+//static arch::Simulator<HumanoidEnv, arch::ExampleAgent>* s;
+static arch::Simulator<HumanoidEnv, arch::ZeroAgent>* s;
+
 void threadOSXRun(){
   LOG_DEBUG("threadOSX start");
   sleep(2);
@@ -189,7 +200,8 @@ void threadOSXRun(){
 }
 
 int main(int argc, char **argv) {
-  s = new arch::Simulator<HumanoidEnv, arch::ExampleAgent>();
+  //s = new arch::Simulator<HumanoidEnv, arch::ExampleAgent>();
+  s = new arch::Simulator<HumanoidEnv, arch::ZeroAgent>();
   s->init(argc, argv);
   s->before_run((arch::ExampleAgent*) nullptr, 0);
     

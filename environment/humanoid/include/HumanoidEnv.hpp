@@ -1,5 +1,5 @@
-#ifndef HALTCHEETAHENV_H
-#define HALTCHEETAHENV_H
+#ifndef HUMANOIDENV_H
+#define HUMANOIDENV_H
 
 #include <string>
 #include <vector>
@@ -8,6 +8,10 @@
 #include "arch/AEnvironment.hpp"
 #include "HumanoidWorld.hpp"
 #include "HumanoidWorldView.hpp"
+
+//optimize dynamics of environment with CMAES
+//gamma sould be set to 1
+#define OPTIMIZE_ENV
 
 class HumanoidEnv : public arch::AEnvironment<> {
  public:
@@ -25,7 +29,13 @@ class HumanoidEnv : public arch::AEnvironment<> {
   }
 
   double performance() const override {
+#ifdef OPTIMIZE_ENV
+    if(current_step == max_step_per_instance || instance->final_state())
+      return instance->mass_center();
+    return 0.;
+#else
     return instance->performance();
+#endif
   }
 
   bool final_state() const override {
@@ -47,7 +57,6 @@ class HumanoidEnv : public arch::AEnvironment<> {
     init.damping = pt->get<uint>("environment.damping");
     init.approx = pt->get<uint>("environment.approx");
     init.control = pt->get<uint>("environment.control");
-    init.reward = pt->get<uint>("environment.reward");
     init.mu = pt->get<double>("environment.mu");
     init.mu2 = pt->get<double>("environment.mu2");
     init.soft_cfm = pt->get<double>("environment.soft_cfm");
@@ -55,21 +64,13 @@ class HumanoidEnv : public arch::AEnvironment<> {
     init.slip2 = pt->get<double>("environment.slip2");
     init.soft_erp = pt->get<double>("environment.soft_erp");
     init.bounce = pt->get<double>("environment.bounce");
+    init.bounce_vel = pt->get<double>("environment.bounce_vel");
+    init.additional_sensors = pt->get<bool>("environment.additional_sensors");
+    init.reward_scale_lvc = pt->get<double>("environment.reward_scale_lvc");
+    init.reward_penalty_dead = pt->get<double>("environment.reward_penalty_dead");
     visible     = vm->count("view");
     
-    init.predev = 0;
-    try {
-      init.predev = pt->get<uint>("environment.predev");
-    } catch(boost::exception const& ) {
-    }
-    init.from_predev = 0;
-    try {
-      init.from_predev = pt->get<uint>("environment.from_predev");
-    } catch(boost::exception const& ) {
-    }
     
-    ASSERT(init.predev == 0 || init.from_predev ==0, "for now only one dev");
-
     if (visible)
       instance = new HumanoidWorldView("data/textures", init);
     else

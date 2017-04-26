@@ -25,6 +25,7 @@ struct hcheetah_physics{
   double slip2;
   double soft_erp;
   double bounce;
+  double bounce_vel;
   uint predev;
   uint from_predev;
 //   PREDEV: 1 -> two low joint
@@ -52,7 +53,7 @@ class HalfCheetahWorld {
   unsigned int activated_motors() const;
 
  protected:
-  void createWorld();
+  virtual void createWorld();
   void update_state();
   void apply_armature(dMass* m, double k);
   void apply_damping(dBodyID body, double v);

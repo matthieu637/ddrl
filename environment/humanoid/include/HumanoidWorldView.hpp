@@ -1,5 +1,5 @@
-#ifndef HALTCHEETAHWORLDVIEW_HPP
-#define HALTCHEETAHWORLDVIEW_HPP
+#ifndef HUMANOIDWORLDVIEW_HPP
+#define HUMANOIDWORLDVIEW_HPP
 
 #include <string>
 #include <list>
@@ -14,7 +14,8 @@ class HumanoidWorldView : public HumanoidWorld {
   HumanoidWorldView(const std::string &path, const humanoid_physics phy);
   ~HumanoidWorldView();
   void step(const std::vector<double> &motors) override;
-
+  void resetPositions(std::vector<double> & result_stoch, const std::vector<double>& given_stoch) override;
+  void resetPositionsView();
  public:
   //     std::list<dGeomID> geoms;
   //     std::list<ODEObject*> delete_me_later;
@@ -31,4 +32,4 @@ class HumanoidWorldView : public HumanoidWorld {
   Mutex mutex_reset;
 };
 
-#endif  // HALTCHEETAHWORLDVIEW_HPP
+#endif  // HUMANOIDWORLDVIEW_HPP

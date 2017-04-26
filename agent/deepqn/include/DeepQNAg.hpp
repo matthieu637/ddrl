@@ -12,6 +12,7 @@
 
 #include "nn/MLP.hpp"
 #include "nn/DevMLP.hpp"
+#include "nn/DODevMLP.hpp"
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
@@ -105,6 +106,11 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     delete hidden_unit_q;
     delete hidden_unit_a;
     
+    for (auto i: best_population){
+      delete i.ann;
+      delete i.qnn;
+    }
+    
 #ifdef POOL_FOR_TESTING
     for (auto i : best_pol_population)
       delete i.ann;
@@ -183,24 +189,27 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
 #endif
     
-    qnn = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm_critic);
-    if(std::is_same<NN, DevMLP>::value)
-      qnn->exploit(pt, static_cast<DeepQNAg *>(old_ag)->qnn);
-    
-    if(test_net)
-      qnn_target = new MLP(*qnn, false);
-    else
-      qnn_target = new MLP(*qnn, true);
-
-    
     ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm_actor);
     if(std::is_same<NN, DevMLP>::value)
       ann->exploit(pt, static_cast<DeepQNAg *>(old_ag)->ann);
+    else if(std::is_same<NN, DODevMLP>::value)
+      ann->exploit(pt, nullptr);
     
     if(test_net)
-      ann_target = new MLP(*ann, false);
+      ann_target = new NN(*ann, false);
     else
-      ann_target = new MLP(*ann, true);
+      ann_target = new NN(*ann, true);
+    
+    qnn = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm_critic);
+    if(std::is_same<NN, DevMLP>::value)
+      qnn->exploit(pt, static_cast<DeepQNAg *>(old_ag)->qnn);
+    else if(std::is_same<NN, DODevMLP>::value)
+      qnn->exploit(pt, ann);
+    
+    if(test_net)
+      qnn_target = new NN(*qnn, false);
+    else
+      qnn_target = new NN(*qnn, true);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool _learning) override {
@@ -212,6 +221,19 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     last_pure_action = nullptr;
     
     learning = _learning;
+    
+    if(std::is_same<NN, DODevMLP>::value){
+      if(static_cast<DODevMLP *>(qnn)->inform(episode)){
+        LOG_INFO("reset learning catched");
+        trajectory.clear();
+      }
+      if(static_cast<DODevMLP *>(ann)->inform(episode)){
+        LOG_INFO("reset learning catched");
+        trajectory.clear();
+      }
+      static_cast<DODevMLP *>(qnn_target)->inform(episode);
+      static_cast<DODevMLP *>(ann_target)->inform(episode);
+    }
   }
   
   void sample_transition(std::vector<sample>& traj, const std::deque<sample>& from){
@@ -276,21 +298,27 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         best_population.erase(it);
       }
     }
+    
+    episode++;
   }
   
   void restoreBest() override {
+    if(best_population.size() == 0){
+      LOG_INFO("WARNING: pop empty (random NN given as best )" << best_population.size());
+      return;
+    }
+    
     delete ann;
     delete qnn;
     
     auto it = best_population.begin();
-    ASSERT(best_population.size() > 0, "pop empty " << best_population.size());
-    
     ++it;
     ann = new MLP(*it->ann, false);
     qnn = new MLP(*it->qnn, false);
   }
   
   void end_episode() override {
+    
     if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
       return;
     
@@ -330,8 +358,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       }
       
       //Update critic
-      qnn->InputDataIntoLayers(all_states.data(), all_actions.data(), q_targets->data());
-      qnn->getSolver()->Step(1);
+      qnn->stepCritic(all_states, all_actions, *q_targets);
       
       //Update actor
       qnn->ZeroGradParameters();
@@ -456,7 +483,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::vector<double> last_state;
 
   std::deque<sample> trajectory;
-  std::vector<sample> last_trajectory;
+  
+  uint episode = 0;
   
   struct my_pol_dpmt{
     MLP* ann;

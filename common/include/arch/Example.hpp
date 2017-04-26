@@ -61,6 +61,23 @@ class ExampleAgent : public arch::AAgent<> {
   std::vector<double> actuator;
 };
 
+class ZeroAgent : public arch::AAgent<> {
+public:
+  ZeroAgent(unsigned int nb_motors, unsigned int) : actuator(nb_motors) {}
+  const std::vector<double>& run(double, const std::vector<double>&, bool, bool) override {
+    return actuator;
+  }
+  
+  virtual ~ZeroAgent() {
+  }
+  
+  void _unique_invoke(boost::property_tree::ptree*, boost::program_options::variables_map*) override {
+    for (unsigned int i = 0; i < actuator.size(); i++)
+      actuator[i] = 0;
+  }
+  std::vector<double> actuator;
+};
+
 template <typename T>
 T gaussian(T x, T m, T s)
 {

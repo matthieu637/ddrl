@@ -9,7 +9,7 @@ set -e
 
 function run_all_test(){
 	goto_root
-	find . -type f -name 'unit-test' | grep -v old | while read atest ; do
+	find {common,agent,environment} -type f -name 'unit-test' | grep -v old | while read atest ; do
 		cd $(dirname $atest)
 		#1h timeout
 		timeout 3600 ./unit-test $@

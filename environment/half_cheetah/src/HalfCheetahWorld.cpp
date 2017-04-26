@@ -77,6 +77,7 @@ HalfCheetahWorld::HalfCheetahWorld(hcheetah_physics _phy) : odeworld(ODEFactory:
   contact[0].surface.slip2 = phy.slip2;
   contact[0].surface.soft_erp = phy.soft_erp;
   contact[0].surface.bounce = phy.bounce;
+  contact[0].surface.bounce = phy.bounce_vel;
 
   contact[1].surface.mu = phy.mu;
   contact[1].surface.mu2 = phy.mu2;
@@ -85,6 +86,7 @@ HalfCheetahWorld::HalfCheetahWorld(hcheetah_physics _phy) : odeworld(ODEFactory:
   contact[1].surface.slip2 = phy.slip2;
   contact[1].surface.soft_erp = phy.soft_erp;
   contact[1].surface.bounce = phy.bounce;
+  contact[1].surface.bounce = phy.bounce_vel;
 
   createWorld();
 
