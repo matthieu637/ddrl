@@ -60,7 +60,7 @@ class Simulator {
   }
 
   template <typename OAgent=Agent>
-  uint before_run(OAgent* early_stage=nullptr, uint starting_ep = 0) {
+  uint before_run(uint* starting_ep, OAgent* early_stage=nullptr) {
     ASSERT(well_init, "Please call init() first on Simulator");
 
     env = new Environment;
@@ -72,14 +72,14 @@ class Simulator {
     }
     agent->unique_invoke(properties, command_args, pass_this_sim);
     
-    uint fepisode = max_episode + starting_ep;
+    uint fepisode = max_episode + *starting_ep;
     if(can_continue && boost::filesystem::exists("continue.simu.data")){
       agent->load_previous_run();
       auto p = bib::XMLEngine::load<simu_state>("episode","continue.simu.data");
-      starting_ep = p->episode;
+      *starting_ep = p->episode;
       fepisode = max_episode;
       delete p;
-      LOG_INFO("loading previous data ... " << starting_ep);
+      LOG_INFO("loading previous data ... " << *starting_ep);
       must_load_previous_run = true;
     }
 
@@ -113,7 +113,7 @@ class Simulator {
 
   template <typename OAgent=Agent>
   void run(OAgent* early_stage=nullptr, uint starting_ep = 0) {
-    uint fepisode = before_run(early_stage, starting_ep);
+    uint fepisode = before_run(&starting_ep, early_stage);
     run_loop(starting_ep, fepisode);
 
     env->unique_destroy();
@@ -175,7 +175,7 @@ class Simulator {
       
       dump_and_display(lepisode, instance, tepisode, all_rewards, env, agent, learning, step);
       
-      if(can_continue && lepisode % DEFAULT_AGENT_SAVE_EACH_CONTINUE == 0 && lepisode > 0 && !must_load_previous_run) {
+      if(can_continue && lepisode % continue_save_each == 0 && lepisode > 0 && !must_load_previous_run) {
         std::string source_path = learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :
                                   std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE;
         std::string destination_path = learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :
@@ -189,7 +189,7 @@ class Simulator {
     agent->end_instance(learning);
     
     if(can_continue){
-      if(lepisode % DEFAULT_AGENT_SAVE_EACH_CONTINUE == 0 && !must_load_previous_run && lepisode > 0){
+      if(lepisode % continue_save_each == 0 && !must_load_previous_run && lepisode > 0){
         agent->save_run();
         bib::XMLEngine::save<simu_state>({lepisode+1}, "episode", "continue.simu.data");
       }
@@ -304,6 +304,13 @@ class Simulator {
     } catch(boost::exception const& ) {
       display_learning            = true;
     }
+    
+    continue_save_each          = DEFAULT_AGENT_SAVE_EACH_CONTINUE;
+    try {
+      continue_save_each        = properties->get<unsigned int>("simulation.continue_save_each");
+      LOG_INFO("catch continue_save_each " << continue_save_each);
+    } catch(boost::exception const& ) {
+    }
 
 #ifndef NDEBUG
     well_init = true;
@@ -329,6 +336,7 @@ class Simulator {
   unsigned int save_agent_each;
 
   bool display_learning, save_best_agent, can_continue;
+  uint continue_save_each;
   bool must_load_previous_run = false;
   bool pass_this_sim = false;
 

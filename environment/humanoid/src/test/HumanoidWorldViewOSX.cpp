@@ -203,7 +203,8 @@ int main(int argc, char **argv) {
   //s = new arch::Simulator<HumanoidEnv, arch::ExampleAgent>();
   s = new arch::Simulator<HumanoidEnv, arch::ZeroAgent>();
   s->init(argc, argv);
-  s->before_run((arch::ExampleAgent*) nullptr, 0);
+  uint ep = 0;
+  s->before_run(ep, (arch::ExampleAgent*) nullptr);
     
   std::thread t2(threadOSXRun);
   threadloopHumanoid(goodpath);

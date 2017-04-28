@@ -62,7 +62,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
   }
 
 
-  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
+  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* vm) override {
     hidden_unit_a               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     actor_hidden_layer_type     = pt->get<uint>("agent.actor_hidden_layer_type");
     actor_output_layer_type     = pt->get<uint>("agent.actor_output_layer_type");
@@ -76,6 +76,8 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     ignore_null_lr = true;
     racing = false;
     error_count = 0;
+    xbestever_score = std::numeric_limits<double>::max();
+    
     try {
       check_feasible = pt->get<bool>("agent.check_feasible");
     } catch(boost::exception const& ) {
@@ -121,6 +123,21 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     LOG_DEBUG(cmaes_Get(evo, "lambda") << " " << dimension << " " << population << " " << cmaes_Get(evo, "N"));
     if (population < 2)
       LOG_DEBUG("population too small, changed to : " << (4+(int)(3*log((double)dimension))));
+    
+#ifndef NDEBUG
+    if(vm->count("continue") > 0){
+      uint continue_save_each          = DEFAULT_AGENT_SAVE_EACH_CONTINUE;
+      try {
+        continue_save_each            = pt->get<uint>("simulation.continue_save_each");
+      } catch(boost::exception const& ) {
+      }
+      
+      if(continue_save_each % (int) cmaes_Get(evo, "lambda") != 0){
+        LOG_ERROR("continue_save_each must be a multiple of the population size !");
+        exit(1);
+      }
+    }
+#endif
   }
   
   bool is_feasible(const double* parameters){
@@ -170,7 +187,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
       if(static_cast<DODevMLP *>(ann)->inform(episode)){
         LOG_INFO("reset learning catched");
         const double* parameters = nullptr;
-        parameters = cmaes_GetPtr(evo, "xbestever");
+        parameters = getBestSolution();
         loadPolicyParameters(parameters);
         
         cmaes_exit(evo);
@@ -197,17 +214,18 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
       if(learning || !cmaes_UpdateDistribution_done_once)
         parameters = pop[current_individual];
       else
-        parameters = cmaes_GetPtr(evo, "xbestever");
+        parameters = getBestSolution();
       
       loadPolicyParameters(parameters);
     }
     
     episode++;
+    if(episode > 1405) exit(1); //TODO:RM ME
     //LOG_FILE("policy_exploration", ann->hash());
   }
   
   void restoreBest() override {
-    const double* parameters = cmaes_GetPtr(evo, "xbestever");
+    const double* parameters = getBestSolution();
     loadPolicyParameters(parameters);
   }
 
@@ -268,7 +286,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
       ann->save(path+".actor");
     } else {
       NN* to_be_restaured = new NN(*ann, true);
-      const double* parameters = cmaes_GetPtr(evo, "xbestever");
+      const double* parameters = getBestSolution();
       loadPolicyParameters(parameters);
       ann->save(path+".actor");
       delete ann;
@@ -279,6 +297,36 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
   void load(const std::string& path) override {
     justLoaded = true;
     ann->load(path+".actor");
+  }
+  
+  void save_run() override {
+    if(current_individual == 1){
+      const double* xbptr_ = getBestSolution();
+      std::vector<double> xbestever_((int)cmaes_Get(evo, "N"));
+      xbestever_.assign(xbptr_, xbptr_ + (int)cmaes_Get(evo, "N"));
+      double bs = getBestScore();
+      
+      struct algo_state st = {scores, justLoaded, cmaes_UpdateDistribution_done_once, 
+        current_individual, episode, error_count, bs, xbestever_};
+      bib::XMLEngine::save(st, "algo_state", "continue.algo_state.data");
+      cmaes_WriteToFile(evo, "resume", "continue.cmaes.data");
+    }
+  }
+  
+  void load_previous_run() override {
+    auto algo_state_ = bib::XMLEngine::load<struct algo_state>("algo_state", "continue.algo_state.data");
+    scores = algo_state_->scores;
+    justLoaded = algo_state_->justLoaded;
+    cmaes_UpdateDistribution_done_once = algo_state_->cmaes_UpdateDistribution_done_once;
+    current_individual = algo_state_->current_individual;
+    episode = algo_state_->episode;
+    error_count = algo_state_->error_count;
+    xbestever_score = algo_state_->xbestever_score;
+    xbestever_ptr = algo_state_->xbestever_ptr;
+    delete algo_state_;
+    char file_[] = "continue.cmaes.data";
+    cmaes_resume_distribution(evo, file_);
+    new_population();
   }
 
   MLP* getNN(){
@@ -299,30 +347,69 @@ private:
     ann->copyWeightsFrom(parameters, ignore_null_lr);
   }
   
-private:  
-  std::vector<uint>* hidden_unit_a;
+  const double* getBestSolution(){
+    if(cmaes_Get(evo, "fbestever") < xbestever_score)
+      return cmaes_GetPtr(evo, "xbestever");
+    else
+      return xbestever_ptr.data();
+  }
+  
+  double getBestScore(){
+    return std::min(cmaes_Get(evo, "fbestever"), xbestever_score);
+  }
+  
+private:
+  //initilized by constructor
   uint nb_sensors;
+  
+  //initialized by invoke
+  std::vector<uint>* hidden_unit_a;
   double policy_stochasticity;
   uint population, actor_hidden_layer_type, actor_output_layer_type, batch_norm;
   bool gaussian_policy;
-
-  std::shared_ptr<std::vector<double>> last_action;
-  
-  std::list<double> scores;
-
-  MLP* ann;
-  cmaes_t* evo;
-  double *const *pop;
-  double *arFunvals;
-  bool justLoaded = false;
-  bool cmaes_UpdateDistribution_done_once = false;
-  uint current_individual;
-  uint episode;
   double initial_deviation;
   bool check_feasible;
   bool ignore_null_lr;
   bool racing;
+  MLP* ann;
+  cmaes_t* evo;
+  double *arFunvals;
+
+  //internal mecanisms
+  std::shared_ptr<std::vector<double>> last_action;
+  std::list<double> scores;
+  double *const *pop;
+  bool justLoaded = false;
+  bool cmaes_UpdateDistribution_done_once = false;
+  uint current_individual;
+  uint episode;
   uint error_count;
+  double xbestever_score;
+  std::vector<double> xbestever_ptr;
+  
+  struct algo_state {
+    std::list<double> scores;
+    bool justLoaded;
+    bool cmaes_UpdateDistribution_done_once;
+    uint current_individual;
+    uint episode;
+    uint error_count;
+    double xbestever_score;
+    std::vector<double> xbestever_ptr;
+    
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive& ar, const unsigned int) {
+      ar& BOOST_SERIALIZATION_NVP(scores);
+      ar& BOOST_SERIALIZATION_NVP(justLoaded);
+      ar& BOOST_SERIALIZATION_NVP(cmaes_UpdateDistribution_done_once);
+      ar& BOOST_SERIALIZATION_NVP(current_individual);
+      ar& BOOST_SERIALIZATION_NVP(episode);
+      ar& BOOST_SERIALIZATION_NVP(error_count);
+      ar& BOOST_SERIALIZATION_NVP(xbestever_score);
+      ar& BOOST_SERIALIZATION_NVP(xbestever_ptr);
+    }
+  };
 };
 
 #endif
