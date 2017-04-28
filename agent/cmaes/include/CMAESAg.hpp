@@ -220,7 +220,6 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     }
     
     episode++;
-    if(episode > 1405) exit(1); //TODO:RM ME
     //LOG_FILE("policy_exploration", ann->hash());
   }
   
