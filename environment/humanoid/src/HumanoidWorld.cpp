@@ -946,7 +946,7 @@ unsigned int HumanoidWorld::activated_motors() const {
 
 bool HumanoidWorld::final_state() const {
   //0.8 instead of 1.0 because of soft cfm
-  return internal_state[0] < 0.8 || internal_state[0] > 2.1;
+  return internal_state[0] < 0.8 || internal_state[0] >= 1.7;
 //   return false;
 }
 
