@@ -204,7 +204,7 @@ int main(int argc, char **argv) {
   s = new arch::Simulator<HumanoidEnv, arch::ZeroAgent>();
   s->init(argc, argv);
   uint ep = 0;
-  s->before_run(ep, (arch::ExampleAgent*) nullptr);
+  s->before_run(&ep, (arch::ExampleAgent*) nullptr);
     
   std::thread t2(threadOSXRun);
   threadloopHumanoid(goodpath);
