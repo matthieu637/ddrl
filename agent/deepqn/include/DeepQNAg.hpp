@@ -312,7 +312,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     delete qnn;
     
     auto it = best_population.begin();
-    ++it;
     ann = new MLP(*it->ann, false);
     qnn = new MLP(*it->qnn, false);
   }
@@ -421,10 +420,15 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     return new arch::Policy<MLP>(new MLP(*ann, true) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
   }
 
-  void save(const std::string& path, bool) override {
-     ann->save(path+".actor");
-     qnn->save(path+".critic");
-//      bib::XMLEngine::save<>(trajectory, "trajectory", "trajectory.data");
+  void save(const std::string& path, bool save_best) override {
+    if(save_best && best_population.size() > 0){
+      auto it = best_population.begin();
+      it->ann->save(path+".actor");
+      it->qnn->save(path+".critic");
+    } else {
+      ann->save(path+".actor");
+      qnn->save(path+".critic");
+    }
   }
 
   void load(const std::string& path) override {
@@ -436,6 +440,37 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     qnn_target = new MLP(*qnn, false);
     ann_target = new MLP(*ann, false);
+  }
+  
+  void save_run() override {
+#ifdef POOL_FOR_TESTING
+    LOG_DEBUG("not implemented");
+    exit(1);
+#endif
+    ann->save("continue.actor");
+    qnn->save("continue.critic");
+    ann_target->save("continue.actor_target");
+    qnn_target->save("continue.critic_target");
+    bib::XMLEngine::save(trajectory, "trajectory", "continue.trajectory.data");
+    struct algo_state st = {episode};
+    bib::XMLEngine::save(st, "algo_state", "continue.algo_state.data");
+  }
+  
+  void load_previous_run() override {
+#ifdef POOL_FOR_TESTING
+    LOG_DEBUG("not implemented");
+    exit(1);
+#endif
+    ann->load("continue.actor");
+    qnn->load("continue.critic");
+    ann_target->load("continue.actor_target");
+    qnn_target->load("continue.critic_target");
+    auto p1 = bib::XMLEngine::load<std::deque<sample>>("trajectory", "continue.trajectory.data");
+    trajectory = *p1;
+    delete p1;
+    auto p3 = bib::XMLEngine::load<struct algo_state>("algo_state", "continue.algo_state.data");
+    episode = p3->episode;
+    delete p3;
   }
 
  protected:
@@ -513,6 +548,16 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   
   MLP* ann, *ann_target;
   MLP* qnn, *qnn_target;
+  
+  struct algo_state {
+    uint episode;
+    
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive& ar, const unsigned int) {
+      ar& BOOST_SERIALIZATION_NVP(episode);
+    }
+  };
 };
 
 #endif
