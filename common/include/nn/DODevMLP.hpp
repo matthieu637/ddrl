@@ -26,7 +26,6 @@ class DODevMLP : public MLP {
   
   DODevMLP(const DODevMLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : 
     MLP(m, copy_solver, _phase), disable_st_control(m.disable_st_control), heuristic(m.heuristic) ,
-    heuristic_devpoints_index(m.heuristic_devpoints_index) ,
     reset_learning_algo(m.reset_learning_algo) {
     st_control = new std::vector<uint>(*m.st_control);
     ac_control = new std::vector<uint>(*m.ac_control);
@@ -280,23 +279,22 @@ class DODevMLP : public MLP {
   bool develop(uint episode){
     bool catch_change = false;
     if(heuristic == 1){
-      while(heuristic_devpoints_index < heuristic_devpoints->size() && episode == heuristic_devpoints->at(heuristic_devpoints_index)){
-        if(heuristic_devpoints_index < st_control->size()){
-          auto blob_st = neural_net->layer_by_name("devnn_states")->blobs()[0];
-          auto data = blob_st->mutable_cpu_data();
-          data[heuristic_devpoints_index] = 1.f;
-          LOG_INFO("dev point st " << st_control->at(heuristic_devpoints_index) );
-          catch_change = true;
-        } else if(heuristic_devpoints_index < st_control->size() + ac_control->size()) {
-          auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
-          auto data = blob_ac->mutable_cpu_data();
-          data[heuristic_devpoints_index - st_control->size()] = 1.f;
-          LOG_INFO("dev point ac " << ac_control->at(heuristic_devpoints_index - st_control->size()) );
-          catch_change = true;
+      for(uint heuristic_devpoints_index=0; heuristic_devpoints_index < heuristic_devpoints->size() ; heuristic_devpoints_index++)
+        if(episode == heuristic_devpoints->at(heuristic_devpoints_index)){
+          if(heuristic_devpoints_index < st_control->size()){
+            auto blob_st = neural_net->layer_by_name("devnn_states")->blobs()[0];
+            auto data = blob_st->mutable_cpu_data();
+            data[heuristic_devpoints_index] = 1.f;
+            LOG_INFO("dev point st " << st_control->at(heuristic_devpoints_index) );
+            catch_change = true;
+          } else if(heuristic_devpoints_index < st_control->size() + ac_control->size()) {
+            auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
+            auto data = blob_ac->mutable_cpu_data();
+            data[heuristic_devpoints_index - st_control->size()] = 1.f;
+            LOG_INFO("dev point ac " << ac_control->at(heuristic_devpoints_index - st_control->size()) );
+            catch_change = true;
+          }
         }
-        
-        heuristic_devpoints_index++;
-      }
     } else if(heuristic == 2) {
       catch_change = true;
       if(!disable_st_control){
@@ -355,7 +353,6 @@ public:
 private:
   bool disable_st_control = false;
   uint heuristic = 0;
-  uint heuristic_devpoints_index = 0;
   std::vector<uint>* heuristic_devpoints = nullptr;
   std::vector<double>* heuristic_linearcoef = nullptr;
   std::vector<uint>* st_control = nullptr;
