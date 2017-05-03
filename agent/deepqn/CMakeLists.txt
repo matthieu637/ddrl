@@ -13,9 +13,11 @@ find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(Cartpole)
 find_package(HalfCheetah)
+find_package(Humanoid)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${COMMON_DRL_INCLUDE_DIRS}
-  ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${HALF_CHEETAH_INCLUDE_DIRS})
+  ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS}
+  ${HALF_CHEETAH_INCLUDE_DIRS} ${HUMANOID_INCLUDE_DIRS})
 
 file ( GLOB_RECURSE all_include include/*.hpp include/*.h)
 file ( GLOB all_sources src/*.cpp src/*.c)
@@ -56,6 +58,10 @@ add_executable(half-cheetah-nfmac src/test/NFMACHalfCheetah.cpp ${all_include} $
 target_link_libraries(half-cheetah-nfmac
   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
+add_executable(humanoid src/test/Humanoid.cpp ${all_include} ${all_sources} )
+target_link_libraries(humanoid 
+  ${HUMANOID_LIBRARY} ${COMMON_DRL_LIBRARY} )
+
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
