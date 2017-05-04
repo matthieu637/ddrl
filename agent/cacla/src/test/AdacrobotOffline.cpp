@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
   FLAGS_minloglevel = 2;
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
-  arch::Simulator<AdvancedAcrobotEnv, OfflineCaclaAg> s;
+  arch::Simulator<AdvancedAcrobotEnv, OfflineCaclaAg<>> s;
 
   s.init(argc, argv);
 

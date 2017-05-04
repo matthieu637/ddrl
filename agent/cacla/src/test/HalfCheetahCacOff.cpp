@@ -9,7 +9,7 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
   
-  arch::Simulator<HalfCheetahEnv, OfflineCaclaAg> s;
+  arch::Simulator<HalfCheetahEnv, OfflineCaclaAg<>> s;
   s.init(argc, argv);
   
   s.run();

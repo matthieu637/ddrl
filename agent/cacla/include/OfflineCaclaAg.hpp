@@ -13,6 +13,7 @@
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 #include "nn/MLP.hpp"
+#include "nn/DODevMLP.hpp"
 
 typedef struct _sample {
   std::vector<double> s;
@@ -49,12 +50,13 @@ typedef struct _sample {
 
 } sample;
 
-class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
+template<typename NN = MLP>
+class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
  public:
-  typedef MLP PolicyImpl;
+  typedef NN PolicyImpl;
 
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<MLP, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0) {
+    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0) {
 
   }
 
@@ -106,15 +108,20 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     update_critic_first     = pt->get<bool>("agent.update_critic_first");
     number_fitted_iteration = pt->get<uint>("agent.number_fitted_iteration");
     stoch_iter              = pt->get<uint>("agent.stoch_iter");
-    batch_norm              = pt->get<uint>("agent.batch_norm");
+    batch_norm_actor        = pt->get<uint>("agent.batch_norm_actor");
+    batch_norm_critic       = pt->get<uint>("agent.batch_norm_critic");
     actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
     hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
 
-    vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm);
-
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm, true);
+    ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true);
+    if(std::is_same<NN, DODevMLP>::value)
+      ann->exploit(pt, nullptr);
+    
+    vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic);
+    if(std::is_same<NN, DODevMLP>::value)
+      vnn->exploit(pt, ann);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool) override {
@@ -126,6 +133,11 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     last_pure_action = nullptr;
 
     trajectory.clear();
+    
+    if(std::is_same<NN, DODevMLP>::value){
+      static_cast<DODevMLP *>(vnn)->inform(episode);
+      static_cast<DODevMLP *>(ann)->inform(episode);
+    }
   }
 
   void update_critic() {
@@ -149,7 +161,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
           double delta = it.r;
           if (!it.goal_reached) {
             double nextV = all_nextV->at(li);
-            delta += gamma * nextV;
+            delta += this->gamma * nextV;
           }
 
           v_target[li] = delta;
@@ -159,7 +171,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         ASSERT(li == trajectory.size(), "");
         if(vnn_from_scratch){
           delete vnn;
-          vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, trajectory.size(), -1, hidden_layer_type, batch_norm);
+          vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, trajectory.size(), -1, hidden_layer_type, batch_norm_critic);
         }
         vnn->learn_batch(all_states, empty_action, v_target, stoch_iter);
         
@@ -182,7 +194,7 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
     if (trajectory.size() > 0) {
       std::vector<double> sensors(trajectory.size() * nb_sensors);
-      std::vector<double> actions(trajectory.size() * nb_motors);
+      std::vector<double> actions(trajectory.size() * this->nb_motors);
 
       std::vector<double> all_states(trajectory.size() * nb_sensors);
       std::vector<double> all_next_states(trajectory.size() * nb_sensors);
@@ -208,18 +220,18 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
         if (!sm.goal_reached) {
 //           double nextV = vnn->computeOutVF(sm.next_s, {});
           double nextV = all_nextV->at(li);
-          target += gamma * nextV;
+          target += this->gamma * nextV;
         }
 //         mine = vnn->computeOutVF(sm.s, {});
         mine = all_mine->at(li);
 
         if(target > mine) {
           std::copy(it->s.begin(), it->s.end(), sensors.begin() + n * nb_sensors);
-          std::copy(it->a.begin(), it->a.end(), actions.begin() + n * nb_motors);
+          std::copy(it->a.begin(), it->a.end(), actions.begin() + n * this->nb_motors);
           n++;
         } else if(update_delta_neg) {
           std::copy(it->s.begin(), it->s.end(), sensors.begin() + n * nb_sensors);
-          std::copy(it->pure_a.begin(), it->pure_a.end(), actions.begin() + n * nb_motors);
+          std::copy(it->pure_a.begin(), it->pure_a.end(), actions.begin() + n * this->nb_motors);
           n++;
         }
         li++;
@@ -227,6 +239,8 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
 
       if(n > 0) {
         ann->increase_batchsize(n);
+        sensors.resize(n * nb_sensors);//shrink useless part of vector
+        actions.resize(n * this->nb_motors);
         ann->learn_batch(sensors, empty_action, actions, stoch_iter);
       }
 
@@ -237,6 +251,10 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     if(!update_critic_first){
       update_critic();
     }
+  }
+  
+  void end_instance(bool) override {
+    episode++;
   }
 
   void save(const std::string& path, bool) override {
@@ -255,31 +273,32 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
     return 0;
   }
 
-  arch::Policy<MLP>* getCopyCurrentPolicy() override {
+  arch::Policy<NN>* getCopyCurrentPolicy() override {
 //         return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
     return nullptr;
   }
 
  protected:
   void _display(std::ostream& out) const override {
-    out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward << " " << std::setw(
+    out << std::setw(12) << std::fixed << std::setprecision(10) << this->sum_weighted_reward << " " << std::setw(
           8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << trajectory.size();
   }
 
   void _dump(std::ostream& out) const override {
     out <<" " << std::setw(25) << std::fixed << std::setprecision(22) <<
-        sum_weighted_reward << " " << std::setw(8) << std::fixed <<
+    this->sum_weighted_reward << " " << std::setw(8) << std::fixed <<
         std::setprecision(5) << vnn->error() << " " << trajectory.size() ;
   }
 
  private:
   uint nb_sensors;
+  uint episode = 0;
 
   double noise;
   bool gaussian_policy, vnn_from_scratch, update_critic_first,
        update_delta_neg;
   uint number_fitted_iteration, stoch_iter;
-  uint batch_norm, actor_output_layer_type, hidden_layer_type;
+  uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
@@ -289,12 +308,12 @@ class OfflineCaclaAg : public arch::AACAgent<MLP, arch::AgentProgOptions> {
   std::set<sample> trajectory;
 //     std::list<sample> trajectory;
 
-  MLP* ann;
-  MLP* vnn;
+  NN* ann;
+  NN* vnn;
 
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
-  std::vector<double> empty_action;
+  std::vector<double> empty_action; //dummy action cause c++ cannot accept null reference
 };
 
 #endif
