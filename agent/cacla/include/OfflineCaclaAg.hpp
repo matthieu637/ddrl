@@ -260,12 +260,26 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   void save(const std::string& path, bool) override {
     ann->save(path+".actor");
     vnn->save(path+".critic");
-    bib::XMLEngine::save<>(trajectory, "trajectory", path+".trajectory");
+  }
+  
+  void save_run() override {
+    ann->save("continue.actor");
+    vnn->save("continue.critic");
+    struct algo_state st = {episode};
+    bib::XMLEngine::save(st, "algo_state", "continue.algo_state.data");
   }
 
   void load(const std::string& path) override {
     ann->load(path+".actor");
     vnn->load(path+".critic");
+  }
+  
+  void load_previous_run() override {
+    ann->load("continue.actor");
+    vnn->load("continue.critic");
+    auto p3 = bib::XMLEngine::load<struct algo_state>("algo_state", "continue.algo_state.data");
+    episode = p3->episode;
+    delete p3;
   }
 
   double criticEval(const std::vector<double>&, const std::vector<double>&) override {
@@ -314,6 +328,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
   std::vector<double> empty_action; //dummy action cause c++ cannot accept null reference
+  
+  struct algo_state {
+    uint episode;
+    
+    friend class boost::serialization::access;
+    template <typename Archive>
+    void serialize(Archive& ar, const unsigned int) {
+      ar& BOOST_SERIALIZATION_NVP(episode);
+    }
+  };
 };
 
 #endif
