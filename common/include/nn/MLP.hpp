@@ -147,6 +147,7 @@ class MLP {
     writeNN_struct(*net_param);
     
 //       LOG_DEBUG("param critic : " <<  neural_net->params().size());
+    ASSERT(add_loss_layer == false, "only for actor, check please");
   }
 
   inline std::string produce_name(const std::string& type, uint rank=0, uint task=0) {
@@ -407,7 +408,10 @@ class MLP {
   }
 
   void learn_batch(const std::vector<double>& sensors, const std::vector<double>& motors, const std::vector<double>& q, uint iter) {
-    InputDataIntoLayers(&sensors, &motors, &q);
+    if(size_motors > 0 && !add_loss_layer)
+      InputDataIntoLayers(&sensors, &motors, &q);
+    else
+      InputDataIntoLayers(&sensors, nullptr, &q);
     solver->Step(iter);
   }
 
@@ -445,7 +449,11 @@ class MLP {
   }
 
   virtual std::vector<double>* computeOutVFBatch(const std::vector<double>& sensors, const std::vector<double>& motors) {
-    InputDataIntoLayers(&sensors, &motors, nullptr, true);
+    if(size_motors > 0)
+      InputDataIntoLayers(&sensors, &motors, nullptr, true);
+    else 
+      InputDataIntoLayers(&sensors, nullptr, nullptr, true);
+    
     if(weighted_sample)
       setWeightedSampleVector(nullptr, true);
     neural_net->Forward(nullptr);
@@ -463,17 +471,9 @@ class MLP {
   virtual std::vector<double>* computeOut(const std::vector<double>& states_batch) {
     std::vector<double> states_input(size_input_state * kMinibatchSize, 0.0f);
     std::copy(states_batch.begin(), states_batch.end(),states_input.begin());
-    std::vector<double>* target_input = nullptr;
 
-    if(add_loss_layer) {
-      target_input = new std::vector<double>(size_motors * kMinibatchSize, 0.0f);
-      InputDataIntoLayers(&states_input, NULL, target_input);
-    } else
-      InputDataIntoLayers(&states_input, NULL, NULL);
+    InputDataIntoLayers(&states_input, NULL, NULL, add_loss_layer);
     neural_net->Forward(nullptr);
-
-    if(add_loss_layer)
-      delete target_input;
 
     std::vector<double>* outputs = new std::vector<double>(size_motors);
     const auto actions_blob = neural_net->blob_by_name(actions_blob_name);
@@ -914,7 +914,7 @@ protected:
       auto state_input_layer = boost::dynamic_pointer_cast<mdatal>(layer);
       CHECK(state_input_layer);
       ASSERT(copy_states->size() == state_input_layer->batch_size() * size_sensors,
-             "size pb " << copy_states->size() << " " << state_input_layer->batch_size());
+             "size pb " << copy_states->size() << " " << state_input_layer->batch_size() * size_sensors);
       state_input_layer->Reset(copy_states->data(), copy_states->data(), state_input_layer->batch_size());
     }
     if (actions_input != nullptr) {
@@ -928,12 +928,20 @@ protected:
     if (target_input != nullptr || local_initizialition_target) {
       if(!local_initizialition_target)
         copy_q_values.reset(new std::vector<double>(*target_input));
+      else if(add_loss_layer) //called by actor if he have a loss
+        copy_q_values.reset(new std::vector<double>(kMinibatchSize * size_motors, 0.0f));
       else
         copy_q_values.reset(new std::vector<double>(kMinibatchSize, 0.0f));
       auto layer = neural_net->layer_by_name(target_input_layer_name);
       auto target_input_layer = boost::dynamic_pointer_cast<mdatal>(layer);
       CHECK(target_input_layer);
-      ASSERT((int)copy_q_values->size() == target_input_layer->batch_size(), "size pb");
+#ifndef NDEBUG
+      if(add_loss_layer) //called by actor if he have a loss or a value function V
+        ASSERT((uint)copy_q_values->size() == target_input_layer->batch_size() * size_motors, 
+               "size pb " << copy_q_values->size() << " " << target_input_layer->batch_size() * size_motors);
+      else
+        ASSERT((int)copy_q_values->size() == target_input_layer->batch_size(), "size pb");
+#endif
       target_input_layer->Reset(copy_q_values->data(), copy_q_values->data(), target_input_layer->batch_size());
     }
   }
@@ -1036,7 +1044,7 @@ public:
   uint size_motors;
   uint kMinibatchSize;
   bool add_loss_layer=false;
-  bool weighted_sample;
+  bool weighted_sample=false;
   uint hiddens_size;
 //   internal copy of inputs/outputs
   boost::shared_ptr<std::vector<double>> copy_states;

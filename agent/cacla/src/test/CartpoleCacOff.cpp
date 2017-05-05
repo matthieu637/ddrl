@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
   
-  arch::Simulator<CartpoleEnv, OfflineCaclaAg> s;
+  arch::Simulator<CartpoleEnv, OfflineCaclaAg<>> s;
 //   arch::Simulator<CartpoleEnv, HardCoddedController> s;
 //   arch::Simulator<CartpoleEnv, arch::ExampleAgent> s;
   
