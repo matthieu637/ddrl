@@ -15,68 +15,100 @@ HumanoidWorld::HumanoidWorld(humanoid_physics _phy) : odeworld(ODEFactory::getIn
 
   dWorldSetGravity(odeworld.world_id, 0, 0.0, GRAVITY);
 
-//   dContact contact[2];          // up to 3 contacts
-  contact[0].surface.mode = dContactApprox0;
-  contact[1].surface.mode = dContactApprox0;
+  //     <default>
+  //     <geom conaffinity="1" condim="1" contype="1" margin="0.001" material="geom" rgba="0.8 0.6 .4 1"/>
+  //     </default>
+  //     condim=1 means frictionless contact
+  //     <geom condim="3" friction="1 .1 .1" 
+  contact_ground[0].surface.mode = dContactApprox0;
+  contact_ground[1].surface.mode = dContactApprox0;
+  
+  contact_body[0].surface.mode = dContactApprox0;
+  contact_body[1].surface.mode = dContactApprox0;
 
-  if (phy.approx == 1) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1;
-    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1;
-  } else if (phy.approx == 2) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1_1;
-    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1_1;
-  } else if (phy.approx == 3) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1_N;
-    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1_N;
+  if (phy.approx_ground == 1) {
+    contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactApprox1;
+    contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactApprox1;
+  } else if (phy.approx_ground == 2) {
+    contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactApprox1_1;
+    contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactApprox1_1;
+  } else if (phy.approx_ground == 3) {
+    contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactApprox1_N;
+    contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactApprox1_N;
   }
 
-  if (phy.mu2 >= 0.0000f) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactMu2;
-    contact[1].surface.mode = contact[1].surface.mode | dContactMu2;
-  }
+//   if (phy.mu2 >= 0.0000f) {
+//     contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactMu2
 
   if (phy.soft_cfm >= 0.0000f) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactSoftCFM;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSoftCFM;
+    contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactSoftCFM;
+    contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactSoftCFM;
+    
+    contact_body[0].surface.mode = contact_body[0].surface.mode | dContactSoftCFM;
+    contact_body[1].surface.mode = contact_body[1].surface.mode | dContactSoftCFM;
   }
 
   if (phy.slip1 >= 0.0000f) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactSlip1;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSlip1;
+    contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactSlip1;
+    contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactSlip1;
+    
+    contact_body[0].surface.mode = contact_body[0].surface.mode | dContactSlip1;
+    contact_body[1].surface.mode = contact_body[1].surface.mode | dContactSlip1;
   }
 
   if (phy.slip2 >= 0.0000f) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactSlip2;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSlip2;
+    contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactSlip2;
+    contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactSlip2;
+    
+    contact_body[0].surface.mode = contact_body[0].surface.mode | dContactSlip2;
+    contact_body[1].surface.mode = contact_body[1].surface.mode | dContactSlip2;
   }
 
   if (phy.soft_erp >= 0.0000f) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactSoftERP;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSoftERP;
+    contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactSoftERP;
+    contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactSoftERP;
+    
+    contact_body[0].surface.mode = contact_body[0].surface.mode | dContactSoftERP;
+    contact_body[1].surface.mode = contact_body[1].surface.mode | dContactSoftERP;
   }
 
-  if (phy.bounce >= 0.0000f) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactBounce;
-    contact[1].surface.mode = contact[1].surface.mode | dContactBounce;
+  if (phy.bounce_ground >= 0.0000f) {
+    contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactBounce;
+    contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactBounce;
   }
+  
+  contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactRolling;
+  contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactRolling;
 
-  contact[0].surface.mu = phy.mu;
-  contact[0].surface.mu2 = phy.mu2;
-  contact[0].surface.soft_cfm = phy.soft_cfm;
-  contact[0].surface.slip1 = phy.slip1;
-  contact[0].surface.slip2 = phy.slip2;
-  contact[0].surface.soft_erp = phy.soft_erp;
-  contact[0].surface.bounce = phy.bounce;
-  contact[0].surface.bounce_vel = phy.bounce_vel;
+  contact_ground[0].surface.mu = 1;
+  contact_ground[0].surface.soft_cfm = phy.soft_cfm;
+  contact_ground[0].surface.slip1 = phy.slip1;
+  contact_ground[0].surface.slip2 = phy.slip2;
+  contact_ground[0].surface.soft_erp = phy.soft_erp;
+  contact_ground[0].surface.bounce = phy.bounce_ground;
+  contact_ground[0].surface.bounce_vel = phy.bounce_vel;
+  contact_ground[0].surface.rho = 0.1;
 
-  contact[1].surface.mu = phy.mu;
-  contact[1].surface.mu2 = phy.mu2;
-  contact[1].surface.soft_cfm = phy.soft_cfm;
-  contact[1].surface.slip1 = phy.slip1;
-  contact[1].surface.slip2 = phy.slip2;
-  contact[1].surface.soft_erp = phy.soft_erp;
-  contact[1].surface.bounce = phy.bounce;
-  contact[1].surface.bounce_vel = phy.bounce_vel;
+  contact_ground[1].surface.mu = 1;
+  contact_ground[1].surface.soft_cfm = phy.soft_cfm;
+  contact_ground[1].surface.slip1 = phy.slip1;
+  contact_ground[1].surface.slip2 = phy.slip2;
+  contact_ground[1].surface.soft_erp = phy.soft_erp;
+  contact_ground[1].surface.bounce = phy.bounce_ground;
+  contact_ground[1].surface.bounce_vel = phy.bounce_vel;
+  contact_ground[1].surface.rho = 0.1;
+  
+  contact_body[0].surface.mu = 0.;
+  contact_body[0].surface.soft_cfm = phy.soft_cfm;
+  contact_body[0].surface.slip1 = phy.slip1;
+  contact_body[0].surface.slip2 = phy.slip2;
+  contact_body[0].surface.soft_erp = phy.soft_erp;
+  
+  contact_body[1].surface.mu = 0.;
+  contact_body[1].surface.soft_cfm = phy.soft_cfm;
+  contact_body[1].surface.slip1 = phy.slip1;
+  contact_body[1].surface.slip2 = phy.slip2;
+  contact_body[1].surface.soft_erp = phy.soft_erp;
   
   //   <motor ctrllimited="true" ctrlrange="-.4 .4"/>
   const double gear_abdomen_y = 100 * 0.4f;
@@ -195,6 +227,8 @@ void HumanoidWorld::apply_damping(dBodyID body, double v) {
   } else if(phy.damping == 6) {
     dBodySetAngularDamping(body, v);
     dBodySetAngularDampingThreshold(body, v);
+  } else if(phy.damping == 7) {
+    dBodySetLinearDamping(body, 1 - v);
   }
 }
 
@@ -215,10 +249,6 @@ void HumanoidWorld::createWorld() {
 //   A positive value generates a spring force (linear in position) acting along the tendon. The equilibrium length of the spring corresponds to the tendon length when the model is in its initial configuration.
 //   solreflimit, solimplimit
 //   Constraint solver parameters for simulating tendon limits. See Solver parameters.
-
-//   <geom condim="3" friction="1 .1 .1" material="MatPlane" name="floor" pos="0 0 0" rgba="0.8 0.9 0.8 1" size="20 20 0.125" type="plane"/>
-//   <geom conaffinity="1" condim="1" contype="1" margin="0.001" material="geom" rgba="0.8 0.6 .4 1"/>
-//   done in collision
 
   double old_body_pos[3] = {0, 0, 0};
 //   <body name="torso" pos="0 0 1.4">
@@ -690,18 +720,29 @@ void nearCallbackHumanoid(void* data, dGeomID o1, dGeomID o2) {
   // only collide things with the ground | only to debug with humanoid
 //   if(o1 != inst->ground && o2 != inst->ground)
 //     return;
-  
+
   dBodyID b1 = dGeomGetBody(o1);
   dBodyID b2 = dGeomGetBody(o2);
   if (b1 && b2 && dAreConnected(b1, b2)){
     return;
   }
   
-  if (int numc = dCollide (o1,o2,2,&inst->contact[0].geom,sizeof(dContact))) {
-    ASSERT(numc <= 2, "more than 2 contact points");
-    for (int i=0; i<numc; i++) {
-      dJointID c = dJointCreateContact (inst->odeworld.world_id, inst->odeworld.contactgroup, &inst->contact[i]);
-      dJointAttach (c, dGeomGetBody(o1), dGeomGetBody(o2));
+  bool groundCollide = (o1 == inst->ground || o2 == inst->ground);
+  if(groundCollide){
+    if (int numc = dCollide (o1,o2,2,&inst->contact_ground[0].geom,sizeof(dContact))) {
+      ASSERT(numc <= 2, "more than 2 contact points");
+      for (int i=0; i<numc; i++) {
+        dJointID c = dJointCreateContact (inst->odeworld.world_id, inst->odeworld.contactgroup, &inst->contact_ground[i]);
+        dJointAttach (c, dGeomGetBody(o1), dGeomGetBody(o2));
+      }
+    }
+  } else {
+    if (int numc = dCollide (o1,o2,2,&inst->contact_body[0].geom,sizeof(dContact))) {
+      ASSERT(numc <= 2, "more than 2 contact points");
+      for (int i=0; i<numc; i++) {
+        dJointID c = dJointCreateContact (inst->odeworld.world_id, inst->odeworld.contactgroup, &inst->contact_body[i]);
+        dJointAttach (c, dGeomGetBody(o1), dGeomGetBody(o2));
+      }
     }
   }
 }

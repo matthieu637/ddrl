@@ -53,17 +53,16 @@ class HumanoidEnv : public arch::AEnvironment<> {
  private:
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* vm) override {
     humanoid_physics init;
+    
     init.apply_armature = pt->get<bool>("environment.apply_armature");
     init.damping = pt->get<uint>("environment.damping");
-    init.approx = pt->get<uint>("environment.approx");
+    init.approx_ground = pt->get<uint>("environment.approx_ground");
     init.control = pt->get<uint>("environment.control");
-    init.mu = pt->get<double>("environment.mu");
-    init.mu2 = pt->get<double>("environment.mu2");
     init.soft_cfm = pt->get<double>("environment.soft_cfm");
     init.slip1 = pt->get<double>("environment.slip1");
     init.slip2 = pt->get<double>("environment.slip2");
     init.soft_erp = pt->get<double>("environment.soft_erp");
-    init.bounce = pt->get<double>("environment.bounce");
+    init.bounce_ground = pt->get<double>("environment.bounce_ground");
     init.bounce_vel = pt->get<double>("environment.bounce_vel");
     init.additional_sensors = pt->get<bool>("environment.additional_sensors");
     init.reward_scale_lvc = pt->get<double>("environment.reward_scale_lvc");

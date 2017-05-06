@@ -23,16 +23,14 @@
 
 struct humanoid_physics{
   bool apply_armature;
-  uint approx;
+  uint approx_ground;
   uint damping;
   uint control;
-  double mu;
-  double mu2;
   double soft_cfm;
   double slip1;
   double slip2;
   double soft_erp;
-  double bounce;
+  double bounce_ground;
   double bounce_vel;
   bool additional_sensors;
   double reward_scale_lvc;
@@ -67,7 +65,8 @@ class HumanoidWorld {
   std::vector<ODEObject *> bones;
   dGeomID ground;
   humanoid_physics phy;
-  dContact contact[2];
+  dContact contact_ground[2];
+  dContact contact_body[2];
   
 //   static const std::vector<double> mujoco_inertia;
   
@@ -76,8 +75,8 @@ class HumanoidWorld {
   double reward;
   std::vector<double> internal_state;
   std::vector<double> body_mass;
-  std::vector<double> gears;
   std::vector<double> qfrc_actuator;
+  std::vector<double> gears;
   double mass_sum;
   double pos_before;
 };
