@@ -514,12 +514,14 @@ void HalfCheetahWorld::step(const vector<double>& _motors) {
   nearCallbackDataHalfCheetah d = {this};
   dSpaceCollide(odeworld.space_id, &d, &nearCallbackHalfCheetah);
 
-  std::vector<double> p_joints(joints.size());
+  std::vector<double> p_joints(joints.size(), 0.f);
   unsigned int begin_index = 0;
-  for(dJointID j : joints) {
-    if(j != nullptr)
-      p_joints[begin_index] = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(j)) - 0.05 * dJointGetHingeAngleRate(j));
-    begin_index++;
+  if(phy.pd_controller){
+    for(dJointID j : joints) {
+      if(j != nullptr)
+        p_joints[begin_index] = (2.0f/M_PI) * atan(-2.0f*(dJointGetHingeAngle(j)) - 0.05 * dJointGetHingeAngleRate(j));
+      begin_index++;
+    }
   }
 
   std::vector<double> f_joints(joints.size());
@@ -549,8 +551,6 @@ void HalfCheetahWorld::step(const vector<double>& _motors) {
 }
 
 void HalfCheetahWorld::update_state() {
-  uint begin_index = 0;
-
   dBodyID torso = bones[1]->getID();
   const dReal* root_pos = dBodyGetPosition(torso);
   const dReal* root_vel = dBodyGetLinearVel(torso);

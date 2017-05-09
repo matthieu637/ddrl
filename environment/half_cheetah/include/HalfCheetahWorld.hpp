@@ -18,6 +18,7 @@ struct hcheetah_physics{
   uint approx;
   uint damping;
   uint control;
+  bool pd_controller;
   double mu;
   double mu2;
   double soft_cfm;
