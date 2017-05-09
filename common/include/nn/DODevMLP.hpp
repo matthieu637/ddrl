@@ -25,7 +25,8 @@ class DODevMLP : public MLP {
   }
   
   DODevMLP(const DODevMLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : 
-    MLP(m, copy_solver, _phase), disable_st_control(m.disable_st_control), heuristic(m.heuristic) ,
+    MLP(m, copy_solver, _phase), disable_st_control(m.disable_st_control), 
+    disable_ac_control(m.disable_ac_control), heuristic(m.heuristic), 
     reset_learning_algo(m.reset_learning_algo) {
     st_control = new std::vector<uint>(*m.st_control);
     ac_control = new std::vector<uint>(*m.ac_control);
@@ -131,10 +132,19 @@ class DODevMLP : public MLP {
     }
 #endif
 
+    uint nb_action_layer = 0;
+    for(caffe::LayerParameter& lp : *net_param_init.mutable_layer())
+      for(const std::string& top : lp.top())
+        if(top == MLP::actions_blob_name)
+          nb_action_layer++;
+      
+    if(nb_action_layer == 0)
+      disable_ac_control = true;
+
 //     net_param_init.PrintDebugString();
 //     LOG_DEBUG("########################################################################################");
     uint nb_state_layer = 0;
-    uint nb_action_layer = 0;
+    nb_action_layer = 0;
     bool input_action = false;
     bool state_dev_inserted = false;
     bool action_dev_inserted = false;
@@ -176,6 +186,16 @@ class DODevMLP : public MLP {
         state_dev_inserted = true;
       }
       
+      if(lp.name() == MLP::loss_blob_name && !action_dev_inserted && !disable_ac_control){
+        caffe::DevelopmentalParameter* dp = addDevAction(net_param_new, input_action, heuristic);
+        dp->set_scale(ac_scale);
+        dp->set_probabilist(ac_probabilistic);
+        dp->set_diff_compute(compute_diff_backward);
+        for (uint c : *ac_control)
+          dp->add_control(c);
+        action_dev_inserted = true;
+      }
+      
       caffe::LayerParameter* lpc = net_param_new.add_layer();
       lpc->CopyFrom(lp);
       
@@ -203,9 +223,10 @@ class DODevMLP : public MLP {
 #ifndef NDEBUG
     if(!disable_st_control)
       ASSERT(nb_state_layer >= 1, "check nb of state layer " << nb_state_layer);
+    //not true for vnn
+    if(!disable_ac_control)
+      ASSERT(nb_action_layer >= 1, "check nb of action layer " << nb_action_layer);
 #endif
-    ASSERT(nb_action_layer >= 1, "check nb of action layer " << nb_action_layer);
-
 //     net_param_new.PrintDebugString();
 //     LOG_DEBUG("########################################################################################");
 
@@ -224,8 +245,10 @@ class DODevMLP : public MLP {
     if(actor != nullptr){
       ASSERT(net_param_new.name() == "Critic", "net is not a critic " << net_param_new.name());
       ASSERT(actor->getNN()->name() == "Actor", "net is not an actor " << actor->getNN()->name());
-      neural_net->layer_by_name("devnn_actions")->blobs()[0]->ShareData(*actor->getNN()->layer_by_name("devnn_actions")->blobs()[0]);
-      neural_net->layer_by_name("devnn_actions")->blobs()[0]->ShareDiff(*actor->getNN()->layer_by_name("devnn_actions")->blobs()[0]);
+      if(!disable_ac_control) {
+        neural_net->layer_by_name("devnn_actions")->blobs()[0]->ShareData(*actor->getNN()->layer_by_name("devnn_actions")->blobs()[0]);
+        neural_net->layer_by_name("devnn_actions")->blobs()[0]->ShareDiff(*actor->getNN()->layer_by_name("devnn_actions")->blobs()[0]);
+      }
       
       if(!disable_st_control){
         neural_net->layer_by_name("devnn_states")->blobs()[0]->ShareData(*actor->getNN()->layer_by_name("devnn_states")->blobs()[0]);
@@ -234,17 +257,19 @@ class DODevMLP : public MLP {
     }
     
     if(heuristic != 0){
-      auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
-      uint count = blob_ac->count();
-      auto data = blob_ac->mutable_cpu_data();
-      for(uint i=0;i<count;i++)
-        data[i] = 0.0f;
+      if(!disable_ac_control){
+        auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
+        auto count = blob_ac->count();
+        auto data = blob_ac->mutable_cpu_data();
+        for(int i=0;i<count;i++)
+          data[i] = 0.0f;
+      }
       
       if(!disable_st_control){
-        blob_ac = neural_net->layer_by_name("devnn_states")->blobs()[0];
-        count = blob_ac->count();
-        data = blob_ac->mutable_cpu_data();
-        for(uint i=0;i<count;i++)
+        auto blob_ac = neural_net->layer_by_name("devnn_states")->blobs()[0];
+        auto count = blob_ac->count();
+        auto data = blob_ac->mutable_cpu_data();
+        for(int i=0;i<count;i++)
           data[i] = 0.0f;
       }
     }
@@ -287,7 +312,7 @@ class DODevMLP : public MLP {
             data[heuristic_devpoints_index] = 1.f;
             LOG_INFO("dev point st " << st_control->at(heuristic_devpoints_index) );
             catch_change = true;
-          } else if(heuristic_devpoints_index < st_control->size() + ac_control->size()) {
+          } else if(heuristic_devpoints_index < st_control->size() + ac_control->size() && !disable_ac_control) {
             auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
             auto data = blob_ac->mutable_cpu_data();
             data[heuristic_devpoints_index - st_control->size()] = 1.f;
@@ -305,10 +330,12 @@ class DODevMLP : public MLP {
         }
       }
       
-      auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
-      auto data = blob_ac->mutable_cpu_data();
-      for(uint i=0; i < ac_control->size() ; i++){
-        data[i] = ((double)episode) * heuristic_linearcoef->at(i + st_control->size());
+      if(!disable_ac_control){
+        auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
+        auto data = blob_ac->mutable_cpu_data();
+        for(uint i=0; i < ac_control->size() ; i++){
+          data[i] = ((double)episode) * heuristic_linearcoef->at(i + st_control->size());
+        }
       }
     }
     
@@ -352,6 +379,7 @@ public:
   
 private:
   bool disable_st_control = false;
+  bool disable_ac_control = false; //for vnn
   uint heuristic = 0;
   std::vector<uint>* heuristic_devpoints = nullptr;
   std::vector<double>* heuristic_linearcoef = nullptr;

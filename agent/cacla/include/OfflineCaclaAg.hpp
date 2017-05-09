@@ -122,6 +122,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic);
     if(std::is_same<NN, DODevMLP>::value)
       vnn->exploit(pt, ann);
+    
+    if(std::is_same<NN, DODevMLP>::value){
+      try {
+        if(pt->get<bool>("devnn.reset_learning_algo")){
+          LOG_ERROR("NFAC cannot reset anything with DODevMLP");
+          exit(1);
+        }
+      } catch(boost::exception const& ) {
+      }
+    }
   }
 
   void _start_episode(const std::vector<double>& sensors, bool) override {
