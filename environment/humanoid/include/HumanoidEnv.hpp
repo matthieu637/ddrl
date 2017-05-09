@@ -31,7 +31,7 @@ class HumanoidEnv : public arch::AEnvironment<> {
   double performance() const override {
 #ifdef OPTIMIZE_ENV
     if(current_step == max_step_per_instance || instance->final_state())
-      return instance->mass_center();
+      return current_max_reward;
     return 0.;
 #else
     return instance->performance();
@@ -67,8 +67,19 @@ class HumanoidEnv : public arch::AEnvironment<> {
     init.additional_sensors = pt->get<bool>("environment.additional_sensors");
     init.reward_scale_lvc = pt->get<double>("environment.reward_scale_lvc");
     init.reward_penalty_dead = pt->get<double>("environment.reward_penalty_dead");
+    init.reapply_motors = pt->get<bool>("environment.reapply_motors");
+    init.reupdate_state = pt->get<bool>("environment.reupdate_state");
     visible     = vm->count("view");
     
+    if(init.control==0 && init.reupdate_state){
+      LOG_INFO("control doesn't depends on state");
+      exit(1);
+    }
+    
+    if(!init.reapply_motors && init.reupdate_state){
+      LOG_INFO("control doesn't depends on state on each iteration");
+      exit(1);
+    }
     
     if (visible)
       instance = new HumanoidWorldView("data/textures", init);
@@ -78,6 +89,9 @@ class HumanoidEnv : public arch::AEnvironment<> {
 
   void _apply(const std::vector<double>& actuators) override {
     instance->step(actuators);
+#ifdef OPTIMIZE_ENV
+    current_max_reward = std::max(current_max_reward, instance->mass_center());
+#endif
   }
 
   void _reset_episode(bool learning) override {
@@ -85,6 +99,9 @@ class HumanoidEnv : public arch::AEnvironment<> {
     if(!learning)
       given_stoch.clear();
     instance->resetPositions(first_state_stochasticity, given_stoch);
+#ifdef OPTIMIZE_ENV
+    current_max_reward = 0;
+#endif
   }
   
   void _reset_episode_choose(const std::vector<double>& given_stoch) override {
@@ -96,6 +113,9 @@ class HumanoidEnv : public arch::AEnvironment<> {
     if(!learning)
       given_stoch.clear();
     instance->resetPositions(first_state_stochasticity, given_stoch);
+#ifdef OPTIMIZE_ENV
+    current_max_reward = 0;
+#endif
   }
   
   void _next_instance_choose(const std::vector<double>& given_stoch) override {
@@ -106,6 +126,9 @@ class HumanoidEnv : public arch::AEnvironment<> {
   bool visible = false;
   HumanoidWorld* instance;
   std::vector<double> internal_state;
+#ifdef OPTIMIZE_ENV
+  double current_max_reward = 0;
+#endif
 };
 
 #endif  // ADVANCEDACROBOTENV_H

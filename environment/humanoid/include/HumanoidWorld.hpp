@@ -35,6 +35,8 @@ struct humanoid_physics{
   bool additional_sensors;
   double reward_scale_lvc;
   double reward_penalty_dead;
+  bool reapply_motors;
+  bool reupdate_state;
 };
 
 class HumanoidWorld {

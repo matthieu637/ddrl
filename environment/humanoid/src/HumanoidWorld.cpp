@@ -35,6 +35,9 @@ HumanoidWorld::HumanoidWorld(humanoid_physics _phy) : odeworld(ODEFactory::getIn
   } else if (phy.approx_ground == 3) {
     contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactApprox1_N;
     contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactApprox1_N;
+  } else if (phy.approx_ground == 4) {
+    contact_ground[0].surface.mode = contact_ground[0].surface.mode | dContactApprox1_1 | dContactApprox1_2;
+    contact_ground[1].surface.mode = contact_ground[1].surface.mode | dContactApprox1_1 | dContactApprox1_2;
   }
 
 //   if (phy.mu2 >= 0.0000f) {
@@ -765,7 +768,7 @@ void HumanoidWorld::step(const vector<double>& _motors) {
   if(phy.control == 0) {
     for(uint i=0; i < 17 ; i++)
       qfrc_actuator[i] = bib::Utils::transform(motors[i], -1, 1, -gears[i], gears[i]);
-  } else if(phy.control==1) {
+  } else if(phy.control==1 && !phy.reupdate_state) {
     std::vector<double> p_motor(17);
     for(uint i=0; i < 17 ; i++)
       p_motor[i] = 2.0f/M_PI * atan(-2.0f*internal_state[5+i] - 0.05 * internal_state[22+6+i]);
@@ -774,7 +777,7 @@ void HumanoidWorld::step(const vector<double>& _motors) {
       qfrc_actuator[i] = gears[i] * std::min(std::max((double)-1., p_motor[i]+motors[i]), (double)1.);
   }
   
-  for(uint i=0;i<FRAME_SKIP;i++){
+  if(!phy.reapply_motors){
     dJointAddUniversalTorques(joints[0], qfrc_actuator[0], qfrc_actuator[1]);
     dJointAddHingeTorque(joints[1], qfrc_actuator[2]);
     dJointAddAMotorTorques(joints[2], qfrc_actuator[3], qfrc_actuator[4], qfrc_actuator[5]);
@@ -785,6 +788,30 @@ void HumanoidWorld::step(const vector<double>& _motors) {
     dJointAddHingeTorque(joints[9], qfrc_actuator[13]);
     dJointAddUniversalTorques(joints[10], qfrc_actuator[14], qfrc_actuator[15]);
     dJointAddHingeTorque(joints[11], qfrc_actuator[16]);
+  }
+  
+  for(uint i=0;i<FRAME_SKIP;i++){
+    if(phy.control==1 && phy.reupdate_state && phy.reapply_motors) {
+      std::vector<double> p_motor(17);
+      for(uint i=0; i < 17 ; i++)
+        p_motor[i] = 2.0f/M_PI * atan(-2.0f*internal_state[5+i] - 0.05 * internal_state[22+6+i]);
+      
+      for(uint i=0; i < 17; i++)
+        qfrc_actuator[i] = gears[i] * std::min(std::max((double)-1., p_motor[i]+motors[i]), (double)1.);
+    }
+    
+    if(phy.reapply_motors){
+      dJointAddUniversalTorques(joints[0], qfrc_actuator[0], qfrc_actuator[1]);
+      dJointAddHingeTorque(joints[1], qfrc_actuator[2]);
+      dJointAddAMotorTorques(joints[2], qfrc_actuator[3], qfrc_actuator[4], qfrc_actuator[5]);
+      dJointAddHingeTorque(joints[4], qfrc_actuator[6]);
+      dJointAddAMotorTorques(joints[5], qfrc_actuator[7], qfrc_actuator[8], qfrc_actuator[9]);
+      dJointAddHingeTorque(joints[7], qfrc_actuator[10]);
+      dJointAddUniversalTorques(joints[8], qfrc_actuator[11], qfrc_actuator[12]);
+      dJointAddHingeTorque(joints[9], qfrc_actuator[13]);
+      dJointAddUniversalTorques(joints[10], qfrc_actuator[14], qfrc_actuator[15]);
+      dJointAddHingeTorque(joints[11], qfrc_actuator[16]);
+    }
 
 #ifdef DEBUG_MOTOR_BY_MOTOR
     std::vector<double> factors(17);
@@ -818,10 +845,13 @@ void HumanoidWorld::step(const vector<double>& _motors) {
 
     dJointGroupEmpty(odeworld.contactgroup);
     lock.release();
+    
+    if(phy.reupdate_state)
+      update_state();
   }
 
-
-  update_state();
+  if(!phy.reupdate_state)
+    update_state();
 }
 
 void HumanoidWorld::update_state() {
