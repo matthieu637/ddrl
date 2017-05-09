@@ -429,8 +429,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   void save(const std::string& path, bool save_best) override {
     if(save_best && best_population.size() > 0){
       auto it = best_population.begin();
-      it->ann->save(path+".actor");
-      it->qnn->save(path+".critic");
+      bib::XMLEngine::save(it->trajectory_a, "trajectory_a", "best_trajectory_a.data");
     } else {
       ann->save(path+".actor");
       qnn->save(path+".critic");
