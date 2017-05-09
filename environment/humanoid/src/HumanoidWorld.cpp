@@ -172,7 +172,7 @@ HumanoidWorld::HumanoidWorld(humanoid_physics _phy) : odeworld(ODEFactory::getIn
   ASSERT(mass_sum >= 39.645f - 0.001f && mass_sum <= 39.645f + 0.001f, "sum mass : " << mass_sum);
 #endif
 
-  reward = ALIVE_BONUS;
+  reward = phy.reward_alive_bonus;
   pos_before = mass_center();
 
   if(!phy.additional_sensors)
@@ -752,18 +752,19 @@ void nearCallbackHumanoid(void* data, dGeomID o1, dGeomID o2) {
 
 void HumanoidWorld::step(const vector<double>& _motors) {
   std::vector<double> motors(_motors);
+  
+  for(uint i=0; i < 17; i++)
+    motors[i] = std::min(std::max((double)-1., motors[i]), (double)1.);
 
   double quad_ctrl_cost = 0.f;
   
   for (auto a : motors)
     quad_ctrl_cost += a*a;
   quad_ctrl_cost = 0.05f * quad_ctrl_cost;
-  //quad_ctrl_cost in [0 ; 0.85]
-  //0.85 <= ALIVE_BONUS (=1) so it's always better to have a high cost control but stay alive
-  reward = ALIVE_BONUS - quad_ctrl_cost;
+  //quad_ctrl_cost in [0 ; 0.85 = 17 *0.05]
+  //0.85 <= reward_alive_bonus (=1) so it's always better to have a high cost control but stay alive
+  reward = phy.reward_alive_bonus - quad_ctrl_cost;
   
-  for(uint i=0; i < 17; i++)
-    motors[i] = std::min(std::max((double)-1., motors[i]), (double)1.);
   
   if(phy.control == 0) {
     for(uint i=0; i < 17 ; i++)
@@ -1048,7 +1049,7 @@ void HumanoidWorld::resetPositions(std::vector<double>&, const std::vector<doubl
 
   createWorld();
 
-  reward = ALIVE_BONUS;
+  reward = phy.reward_alive_bonus;
   pos_before = mass_center();
 
   std::fill(internal_state.begin(), internal_state.end(), 0.f);

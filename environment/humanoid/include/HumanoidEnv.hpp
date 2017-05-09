@@ -11,7 +11,7 @@
 
 //optimize dynamics of environment with CMAES
 //gamma sould be set to 1
-#define OPTIMIZE_ENV
+// #define OPTIMIZE_ENV
 
 class HumanoidEnv : public arch::AEnvironment<> {
  public:
@@ -67,6 +67,7 @@ class HumanoidEnv : public arch::AEnvironment<> {
     init.additional_sensors = pt->get<bool>("environment.additional_sensors");
     init.reward_scale_lvc = pt->get<double>("environment.reward_scale_lvc");
     init.reward_penalty_dead = pt->get<double>("environment.reward_penalty_dead");
+    init.reward_alive_bonus = pt->get<double>("environment.reward_alive_bonus");
     init.reapply_motors = pt->get<bool>("environment.reapply_motors");
     init.reupdate_state = pt->get<bool>("environment.reupdate_state");
     visible     = vm->count("view");
