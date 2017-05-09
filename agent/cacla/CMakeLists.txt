@@ -15,12 +15,14 @@ find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(Cartpole)
 find_package(HalfCheetah)
+find_package(Humanoid)
 # find_package(TBB)
 # find_package(OPTPP)
 find_package(Threads REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} 
-  ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${HALF_CHEETAH_INCLUDE_DIRS})
+  ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${HALF_CHEETAH_INCLUDE_DIRS}
+  ${HUMANOID_INCLUDE_DIRS})
 
 set(BASE_LIBRARIES ${COMMON_DRL_LIBRARY} ${Boost_LIBRARIES} )
 file ( GLOB_RECURSE all_include include/*.hpp)
@@ -53,6 +55,9 @@ target_link_libraries(hf-cacla-off ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 
 add_executable(hf-cacla-off-dodev src/test/HalfCheetahCacOffDodev.cpp ${all_include} ${all_sources} )
 target_link_libraries(hf-cacla-off-dodev ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+
+add_executable(hum-cacla-off src/test/HumanoidCacOff.cpp ${all_include} ${all_sources} )
+target_link_libraries(hum-cacla-off ${HUMANOID_LIBRARY} ${BASE_LIBRARIES} )
 
 # add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
 # target_link_libraries(ada-nfac ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
