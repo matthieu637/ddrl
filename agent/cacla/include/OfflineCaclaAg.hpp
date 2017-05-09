@@ -309,7 +309,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   }
 
   void _dump(std::ostream& out) const override {
-    out <<" " << std::setw(25) << std::fixed << std::setprecision(22) <<
+    out << std::setw(25) << std::fixed << std::setprecision(22) <<
     this->sum_weighted_reward << " " << std::setw(8) << std::fixed <<
         std::setprecision(5) << vnn->error() << " " << trajectory.size() ;
   }

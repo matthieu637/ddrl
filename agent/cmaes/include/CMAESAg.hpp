@@ -334,11 +334,11 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
   
  protected:
   void _display(std::ostream& out) const override {
-    out << " " << std::setw(8) << std::fixed << std::setprecision(5) << sum_weighted_reward;
+    out << std::setw(8) << std::fixed << std::setprecision(5) << sum_weighted_reward;
   }
 
   void _dump(std::ostream& out) const override {
-    out << " " << std::setw(8) << std::fixed << std::setprecision(5) << sum_weighted_reward;
+    out << std::setw(8) << std::fixed << std::setprecision(5) << sum_weighted_reward;
   }
 
 private:

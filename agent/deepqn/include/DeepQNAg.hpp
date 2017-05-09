@@ -144,6 +144,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
+    last_trajectory_a.push_back(*next_action);
+    
     return *next_action;
   }
 
@@ -222,6 +224,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     learning = _learning;
     
+    last_trajectory_a.clear();
+    
     if(std::is_same<NN, DODevMLP>::value){
       if(static_cast<DODevMLP *>(qnn)->inform(episode)){
         LOG_INFO("reset learning catched");
@@ -287,9 +291,9 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     if(learning){
       MLP* cann = new MLP(*ann, false);
       MLP* cqnn = new MLP(*qnn, false);
-      best_population.insert({cann, cqnn, sum_weighted_reward});
+      best_population.insert({cann, cqnn, sum_weighted_reward, last_trajectory_a});
       
-      if(best_population.size() > 50){
+      if(best_population.size() > 5){
         //remove smallest
         auto it = best_population.end();
         --it;
@@ -307,6 +311,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       LOG_INFO("WARNING: pop empty (random NN given as best )" << best_population.size());
       return;
     }
+    
+    LOG_INFO("WARNING : hard to restoreBest because of online updates");
     
     delete ann;
     delete qnn;
@@ -452,7 +458,18 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     ann_target->save("continue.actor_target");
     qnn_target->save("continue.critic_target");
     bib::XMLEngine::save(trajectory, "trajectory", "continue.trajectory.data");
-    struct algo_state st = {episode};
+    
+    double best_J = 0;
+    const std::deque<std::vector<double>>* best_trajectory_a_;
+    if(best_population.size() == 0){
+      best_J = best_population.begin()->J;
+      best_trajectory_a_ = &best_population.begin()->trajectory_a;
+    } else {
+      best_J = sum_weighted_reward;
+      best_trajectory_a_ = &last_trajectory_a;
+    }
+    
+    struct algo_state st = {episode, best_J, *best_trajectory_a_};
     bib::XMLEngine::save(st, "algo_state", "continue.algo_state.data");
   }
   
@@ -470,6 +487,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     delete p1;
     auto p3 = bib::XMLEngine::load<struct algo_state>("algo_state", "continue.algo_state.data");
     episode = p3->episode;
+    best_population.insert({nullptr, nullptr, p3->J, p3->best_trajectory_a});
     delete p3;
   }
 
@@ -487,7 +505,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
 
   void _dump(std::ostream& out) const override {
-    out <<" " << std::setw(25) << std::fixed << std::setprecision(22) <<
+    out << std::setw(25) << std::fixed << std::setprecision(22) <<
         sum_weighted_reward << " " << std::setw(8) << std::fixed <<
         std::setprecision(5) << trajectory.size() ;
   }
@@ -518,6 +536,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::vector<double> last_state;
 
   std::deque<sample> trajectory;
+  std::deque<std::vector<double>> last_trajectory_a;
   
   uint episode = 0;
   
@@ -525,6 +544,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     MLP* ann;
     MLP* qnn;
     double J;
+    std::deque<std::vector<double>> trajectory_a;
     
     bool operator< (const my_pol_dpmt& b) const {
       return J > b.J;
@@ -551,11 +571,15 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   
   struct algo_state {
     uint episode;
+    double J;
+    std::deque<std::vector<double>> best_trajectory_a;
     
     friend class boost::serialization::access;
     template <typename Archive>
     void serialize(Archive& ar, const unsigned int) {
       ar& BOOST_SERIALIZATION_NVP(episode);
+      ar& BOOST_SERIALIZATION_NVP(J);
+      ar& BOOST_SERIALIZATION_NVP(best_trajectory_a);
     }
   };
 };
