@@ -57,7 +57,7 @@ class HumanoidWorld {
 
  protected:
   void createWorld();
-  void update_state();
+  void update_state(bool updateReward);
   void apply_armature(dMass* m, double k);
   void apply_damping(dBodyID body, double v);
 //   void copy_inertia(dMass* m, uint i);

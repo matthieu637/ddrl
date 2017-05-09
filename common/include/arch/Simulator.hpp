@@ -223,7 +223,7 @@ class Simulator {
                  << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.max
                  << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.min
                  << std::left << std::setw(7) << std::fixed << step
-                 << " " << env_dump << " " << agent_dump);
+                 << " " << agent_dump << " " << env_dump);
       }
 
       if (dump) {
@@ -232,7 +232,7 @@ class Simulator {
         LOG_FILE(learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :
                  std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE,
                  episode << " " << reward_stats.mean << " " << reward_stats.var << " " <<
-                 reward_stats.max << " " << reward_stats.min << " " << step << env_dump << agent_dump);
+                 reward_stats.max << " " << reward_stats.min << " " << step << " " << agent_dump << " " << env_dump);
       }
     }
   }

@@ -173,7 +173,7 @@ HumanoidWorld::HumanoidWorld(humanoid_physics _phy) : odeworld(ODEFactory::getIn
 #endif
 
   reward = ALIVE_BONUS;
-  pos_before = 0.f;
+  pos_before = mass_center();
 
   if(!phy.additional_sensors)
     internal_state.resize(22+23);
@@ -182,7 +182,7 @@ HumanoidWorld::HumanoidWorld(humanoid_physics _phy) : odeworld(ODEFactory::getIn
   
   std::fill(internal_state.begin(), internal_state.end(), 0.f);
 
-  update_state();
+  update_state(true);
 }
 
 HumanoidWorld::~HumanoidWorld() {
@@ -790,7 +790,7 @@ void HumanoidWorld::step(const vector<double>& _motors) {
     dJointAddHingeTorque(joints[11], qfrc_actuator[16]);
   }
   
-  for(uint i=0;i<FRAME_SKIP;i++){
+  for(uint frame=0;frame<FRAME_SKIP;frame++){
     if(phy.control==1 && phy.reupdate_state && phy.reapply_motors) {
       std::vector<double> p_motor(17);
       for(uint i=0; i < 17 ; i++)
@@ -847,14 +847,14 @@ void HumanoidWorld::step(const vector<double>& _motors) {
     lock.release();
     
     if(phy.reupdate_state)
-      update_state();
+      update_state(frame + 1 == FRAME_SKIP);
   }
 
   if(!phy.reupdate_state)
-    update_state();
+    update_state(true);
 }
 
-void HumanoidWorld::update_state() {
+void HumanoidWorld::update_state(bool updateReward) {
   uint begin_index = 0;
   
   std::vector<double> qpos(1 + 4 + 17);
@@ -917,7 +917,7 @@ void HumanoidWorld::update_state() {
   std::copy(qpos.begin(), qpos.end(), internal_state.begin());
   std::copy(qvel.begin(), qvel.end(), internal_state.begin() + qpos.size());
   
-  if(phy.additional_sensors){
+  if(phy.additional_sensors && updateReward){
     begin_index=0;
     std::vector<double> cinert(10*11);
     for(auto m : body_mass)
@@ -957,15 +957,17 @@ void HumanoidWorld::update_state() {
               internal_state.begin() + qpos.size() + qvel.size() + cinert.size() + cvel.size());
   }
 
-  double lin_vel_cost = 0;
-  double pos_after = mass_center();
-  lin_vel_cost = (pos_after - pos_before) / WORLD_STEP;
-  pos_before = pos_after;
-  
-//   it doesn't move enough and looks for a static rest
-//   so remove factor 0.25
-  lin_vel_cost = lin_vel_cost * phy.reward_scale_lvc;
-  reward = reward + lin_vel_cost;
+  if(updateReward){
+    double lin_vel_cost = 0;
+    double pos_after = mass_center();
+    lin_vel_cost = (pos_after - pos_before) / WORLD_STEP;
+    pos_before = pos_after;
+    
+  //   it doesn't move enough and looks for a static rest
+  //   so remove factor 0.25
+    lin_vel_cost = lin_vel_cost * phy.reward_scale_lvc;
+    reward = reward + lin_vel_cost;
+  }
   
 //   Another reward possibility?
 //   std::vector<double> mc(body_mass.size());
@@ -1047,10 +1049,10 @@ void HumanoidWorld::resetPositions(std::vector<double>&, const std::vector<doubl
   createWorld();
 
   reward = ALIVE_BONUS;
-  pos_before = 0.;
+  pos_before = mass_center();
 
   std::fill(internal_state.begin(), internal_state.end(), 0.f);
-  update_state();
+  update_state(true);
 
 //   LOG_DEBUG("endResetPositions");
 }

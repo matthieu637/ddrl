@@ -31,7 +31,7 @@ class HumanoidEnv : public arch::AEnvironment<> {
   double performance() const override {
 #ifdef OPTIMIZE_ENV
     if(current_step == max_step_per_instance || instance->final_state())
-      return current_max_reward;
+      return current_max_x;
     return 0.;
 #else
     return instance->performance();
@@ -89,9 +89,7 @@ class HumanoidEnv : public arch::AEnvironment<> {
 
   void _apply(const std::vector<double>& actuators) override {
     instance->step(actuators);
-#ifdef OPTIMIZE_ENV
-    current_max_reward = std::max(current_max_reward, instance->mass_center());
-#endif
+    current_max_x = std::max(current_max_x, instance->mass_center());
   }
 
   void _reset_episode(bool learning) override {
@@ -99,13 +97,12 @@ class HumanoidEnv : public arch::AEnvironment<> {
     if(!learning)
       given_stoch.clear();
     instance->resetPositions(first_state_stochasticity, given_stoch);
-#ifdef OPTIMIZE_ENV
-    current_max_reward = 0;
-#endif
+    current_max_x = 0;
   }
   
   void _reset_episode_choose(const std::vector<double>& given_stoch) override {
     instance->resetPositions(first_state_stochasticity, given_stoch);
+    current_max_x = 0;
   }
   
     void _next_instance(bool learning) override {
@@ -113,22 +110,27 @@ class HumanoidEnv : public arch::AEnvironment<> {
     if(!learning)
       given_stoch.clear();
     instance->resetPositions(first_state_stochasticity, given_stoch);
-#ifdef OPTIMIZE_ENV
-    current_max_reward = 0;
-#endif
+    current_max_x = 0;
   }
   
   void _next_instance_choose(const std::vector<double>& given_stoch) override {
     instance->resetPositions(first_state_stochasticity, given_stoch);
+    current_max_x = 0;
+  }
+  
+  void _display(std::ostream& out) const override {
+    out << std::setw(12) << std::fixed << std::setprecision(10) << current_max_x;
+  }
+  
+  void _dump(std::ostream& out) const override {
+    out << std::setw(25) << std::fixed << std::setprecision(22) << current_max_x;
   }
 
  private:
   bool visible = false;
   HumanoidWorld* instance;
   std::vector<double> internal_state;
-#ifdef OPTIMIZE_ENV
-  double current_max_reward = 0;
-#endif
+  double current_max_x = 0;
 };
 
 #endif  // ADVANCEDACROBOTENV_H
