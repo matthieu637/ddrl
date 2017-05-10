@@ -69,12 +69,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                  bool learning, bool goal_reached, bool last) {
+                                  bool learning, bool goal_reached, bool) {
 
     vector<double>* next_action = ann->computeOut(sensors);
 
     if (last_action.get() != nullptr && learning)
-      trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || last});
+      trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {

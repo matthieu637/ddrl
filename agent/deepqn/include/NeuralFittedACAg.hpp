@@ -120,7 +120,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                  bool learning, bool goal_reached, bool last) override {
+                                  bool learning, bool goal_reached, bool) override {
 
     vector<double>* next_action = ann->computeOut(sensors);
 
@@ -130,7 +130,7 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         p0 *= bib::Proba<double>::truncatedGaussianDensity(last_action->at(i), last_pure_action->at(i), noise);
       }
 
-      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || last, p0, 0., false};
+      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0, 0., false};
       if(goal_reached && reward > rmax) {
         rmax = reward;
         rmax_labeled = true;
