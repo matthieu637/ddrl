@@ -14,6 +14,7 @@ class HalfCheetahWorldView : public HalfCheetahWorld {
   HalfCheetahWorldView(const std::string &path, const hcheetah_physics phy);
   ~HalfCheetahWorldView();
   void step(const std::vector<double> &motors) override;
+  void step_core(const std::vector<double> &motors) override;
 
 protected:
   virtual void createWorld() override;

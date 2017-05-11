@@ -9,22 +9,19 @@
 #include "ODEFactory.hpp"
 
 #define GRAVITY -9.81
-#define DAMPING 0.1
-#define ARMATURE 0.1
 #define WORLD_STEP 0.01
+// instead of frame skip, reduce precision
+// mujoco_env.MujocoEnv.__init__(self, 'half_cheetah.xml', 5)
+// #define WORLD_STEP 0.0125
+// #define FRAME_SKIP 4
+#define FRAME_SKIP 5
 
 struct hcheetah_physics{
   bool apply_armature;
-  uint approx;
   uint damping;
   uint control;
   bool pd_controller;
-  double mu;
-  double mu2;
   double soft_cfm;
-  double slip1;
-  double slip2;
-  double soft_erp;
   double bounce;
   double bounce_vel;
   uint predev;
@@ -50,6 +47,7 @@ class HalfCheetahWorld {
   double performance() const;
 
   virtual void step(const std::vector<double> &motors);
+  virtual void step_core(const std::vector<double> &motors);
   const std::vector<double> &state() const;
   unsigned int activated_motors() const;
 
@@ -71,6 +69,7 @@ class HalfCheetahWorld {
   std::vector<dJointID> joints;
   double penalty;
   double reward;
+  double pos_before;
 
   std::vector<double> internal_state;
 };
@@ -78,5 +77,7 @@ class HalfCheetahWorld {
 struct nearCallbackDataHalfCheetah {
   HalfCheetahWorld *inst;
 };
+
+void nearCallbackHalfCheetah(void* data, dGeomID o1, dGeomID o2);
 
 #endif  // ADVANCEDACROBOTWORLD_HPP

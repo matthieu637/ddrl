@@ -157,14 +157,35 @@ void HalfCheetahWorldView::step(const std::vector<double>& motors) {
         modified_motors[i] = inst->modified_motor;
   }
 
-  Mutex::scoped_lock lock(mutex_reset);
   HalfCheetahWorld::step(modified_motors);
-  lock.release();
 
   inst->modified_motor = -2.f;
   // approximative human vision smooth
 //   usleep(25 * 1000);
-  
+}
 
-  usleep(3*WORLD_STEP / speed * 1000 * 1000);  // needed to don't be faster than the view
+void HalfCheetahWorldView::step_core(const std::vector<double> &f_joints){
+  for(uint frame=0;frame<FRAME_SKIP;frame++){
+    Mutex::scoped_lock lock(mutex_reset);
+    nearCallbackDataHalfCheetah d = {this};
+    dSpaceCollide(odeworld.space_id, &d, &nearCallbackHalfCheetah);
+    
+    uint begin_index = 0;
+    for(dJointID j : joints) {
+      if(j != nullptr)
+        dJointAddHingeTorque(j, f_joints[begin_index]);
+      begin_index++;
+    }
+    
+    //     Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
+    dWorldStep(odeworld.world_id, WORLD_STEP);
+    //     lock.release();
+    
+    dJointGroupEmpty(odeworld.contactgroup);
+    
+//     usleep(10 * 1000);
+    usleep(3*WORLD_STEP / speed * 1000 * 1000);  // don't be faster than the view
+    // view speed is 10 * 1000 : 10 milisec 0.01 sec
+    lock.release();
+  }
 }

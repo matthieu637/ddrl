@@ -44,14 +44,8 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
     hcheetah_physics init;
     init.apply_armature = pt->get<bool>("environment.apply_armature");
     init.damping = pt->get<uint>("environment.damping");
-    init.approx = pt->get<uint>("environment.approx");
     init.control = pt->get<uint>("environment.control");
-    init.mu = pt->get<double>("environment.mu");
-    init.mu2 = pt->get<double>("environment.mu2");
     init.soft_cfm = pt->get<double>("environment.soft_cfm");
-    init.slip1 = pt->get<double>("environment.slip1");
-    init.slip2 = pt->get<double>("environment.slip2");
-    init.soft_erp = pt->get<double>("environment.soft_erp");
     init.bounce = pt->get<double>("environment.bounce");
     init.bounce_vel = 0;    
     if (init.bounce >= 0.0000f)

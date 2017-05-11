@@ -8,18 +8,6 @@
 #include "bib/Utils.hpp"
 #include "ODEFactory.hpp"
 
-
-double softstepf(double x) {
-  if (x<=0)
-    return 0;
-  else if(x <= 0.5)
-    return 2*x*x;
-  else if(x <= 1)
-    return 1 - 2*(x-1)*(x-1);
-  else
-    return 1;
-}
-
 HalfCheetahWorld::HalfCheetahWorld(hcheetah_physics _phy) : odeworld(ODEFactory::getInstance()->createWorld()),
   phy(_phy) {
 
@@ -29,64 +17,33 @@ HalfCheetahWorld::HalfCheetahWorld(hcheetah_physics _phy) : odeworld(ODEFactory:
   contact[0].surface.mode = dContactApprox0;
   contact[1].surface.mode = dContactApprox0;
 
-  if (phy.approx == 1) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1;
-    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1;
-  } else if (phy.approx == 2) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1_1;
-    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1_1;
-  } else if (phy.approx == 3) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactApprox1_N;
-    contact[1].surface.mode = contact[1].surface.mode | dContactApprox1_N;
-  }
-
-  if (phy.mu2 >= 0.0000f) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactMu2;
-    contact[1].surface.mode = contact[1].surface.mode | dContactMu2;
-  }
+  contact[0].surface.mode = contact[0].surface.mode | dContactApprox1;
+  contact[1].surface.mode = contact[1].surface.mode | dContactApprox1;
 
   if (phy.soft_cfm >= 0.0000f) {
     contact[0].surface.mode = contact[0].surface.mode | dContactSoftCFM;
     contact[1].surface.mode = contact[1].surface.mode | dContactSoftCFM;
   }
 
-  if (phy.slip1 >= 0.0000f) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactSlip1;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSlip1;
-  }
-
-  if (phy.slip2 >= 0.0000f) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactSlip2;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSlip2;
-  }
-
-  if (phy.soft_erp >= 0.0000f) {
-    contact[0].surface.mode = contact[0].surface.mode | dContactSoftERP;
-    contact[1].surface.mode = contact[1].surface.mode | dContactSoftERP;
-  }
-
   if (phy.bounce >= 0.0000f) {
     contact[0].surface.mode = contact[0].surface.mode | dContactBounce;
     contact[1].surface.mode = contact[1].surface.mode | dContactBounce;
   }
+  
+  contact[0].surface.mode = contact[0].surface.mode | dContactRolling;
+  contact[1].surface.mode = contact[1].surface.mode | dContactRolling;
 
-  contact[0].surface.mu = phy.mu;
-  contact[0].surface.mu2 = phy.mu2;
+  contact[0].surface.mu = 0.4;
   contact[0].surface.soft_cfm = phy.soft_cfm;
-  contact[0].surface.slip1 = phy.slip1;
-  contact[0].surface.slip2 = phy.slip2;
-  contact[0].surface.soft_erp = phy.soft_erp;
   contact[0].surface.bounce = phy.bounce;
   contact[0].surface.bounce = phy.bounce_vel;
+  contact[0].surface.rho = 0.1;
 
-  contact[1].surface.mu = phy.mu;
-  contact[1].surface.mu2 = phy.mu2;
+  contact[1].surface.mu = 0.4;
   contact[1].surface.soft_cfm = phy.soft_cfm;
-  contact[1].surface.slip1 = phy.slip1;
-  contact[1].surface.slip2 = phy.slip2;
-  contact[1].surface.soft_erp = phy.soft_erp;
   contact[1].surface.bounce = phy.bounce;
   contact[1].surface.bounce = phy.bounce_vel;
+  contact[1].surface.rho = 0.1;
 
   createWorld();
 
@@ -94,6 +51,7 @@ HalfCheetahWorld::HalfCheetahWorld(hcheetah_physics _phy) : odeworld(ODEFactory:
   fknee_touch = false;
   bknee_touch = false;
   penalty = 0;
+  pos_before = dBodyGetPosition(bones[1]->getID())[0];
 
   if(phy.predev == 0)
     internal_state.resize(18);
@@ -478,6 +436,9 @@ void nearCallbackHalfCheetah(void* data, dGeomID o1, dGeomID o2) {
 
 void HalfCheetahWorld::step(const vector<double>& _motors) {
   std::vector<double> motors(_motors);
+  for(uint i=0; i < motors.size(); i++)
+    motors[i] = std::min(std::max((double)-1., motors[i]), (double)1.);
+  
   if(phy.predev == 1 || phy.predev == 2 || phy.predev == 3) {
     motors.resize(6);
     motors[2] = 0;
@@ -506,13 +467,11 @@ void HalfCheetahWorld::step(const vector<double>& _motors) {
     motors[5] = _motors[3];
   }
 
-  head_touch = false;
-  fknee_touch = false;
-  bknee_touch = false;
   penalty = 0;
-
-  nearCallbackDataHalfCheetah d = {this};
-  dSpaceCollide(odeworld.space_id, &d, &nearCallbackHalfCheetah);
+  
+  for (auto a : motors)
+    penalty += a*a;
+  penalty = - 0.1 * penalty;
 
   std::vector<double> p_joints(joints.size(), 0.f);
   unsigned int begin_index = 0;
@@ -536,18 +495,30 @@ void HalfCheetahWorld::step(const vector<double>& _motors) {
     }
     begin_index++;
   }
-
-  for (auto a : motors)
-    penalty += a*a;
-  penalty = - 1e-1 * 0.5 * penalty;
-
-  Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
-  dWorldStep(odeworld.world_id, WORLD_STEP);
-  lock.release();
-
-  dJointGroupEmpty(odeworld.contactgroup);
+  
+  step_core(f_joints);
 
   update_state();
+}
+
+void HalfCheetahWorld::step_core(const std::vector<double> &f_joints){
+  for(uint frame=0;frame<FRAME_SKIP;frame++){
+    nearCallbackDataHalfCheetah d = {this};
+    dSpaceCollide(odeworld.space_id, &d, &nearCallbackHalfCheetah);
+    
+    uint begin_index = 0;
+    for(dJointID j : joints) {
+      if(j != nullptr)
+        dJointAddHingeTorque(j, f_joints[begin_index]);
+      begin_index++;
+    }
+    
+    //     Mutex::scoped_lock lock(ODEFactory::getInstance()->wannaStep());
+    dWorldStep(odeworld.world_id, WORLD_STEP);
+    //     lock.release();
+    
+    dJointGroupEmpty(odeworld.contactgroup);
+  }
 }
 
 void HalfCheetahWorld::update_state() {
@@ -683,15 +654,11 @@ void HalfCheetahWorld::update_state() {
 //     LOG_DEBUG("back touched");
 //   }
 
+  double pos_after = root_pos[0];
+  double lin_vel_cost = (pos_after - pos_before) / (WORLD_STEP * FRAME_SKIP);
+  pos_before = pos_after;
 
-  if(head_touch)
-    penalty += -1;
-  if(fknee_touch)
-    penalty += -1;
-  if(bknee_touch)
-    penalty += -1;
-
-  reward = penalty + root_vel[0];
+  reward = penalty + lin_vel_cost;
 }
 
 const std::vector<double>& HalfCheetahWorld::state() const {
@@ -738,6 +705,7 @@ void HalfCheetahWorld::resetPositions(std::vector<double>&, const std::vector<do
   fknee_touch = false;
   bknee_touch = false;
   penalty = 0;
+  pos_before = dBodyGetPosition(bones[1]->getID())[0];
 
   update_state();
 }
