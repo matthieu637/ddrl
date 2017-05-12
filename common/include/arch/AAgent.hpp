@@ -81,7 +81,7 @@ class AAgent : public ProgOptions, public CommonAE {
    * @brief This method is called after each end of an instance
    * @return void
    */
-  virtual void end_episode() {}
+  virtual void end_episode(bool) {}
 
   /**
    * @brief To save your agent to a file.

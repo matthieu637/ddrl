@@ -802,9 +802,10 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
     }
   }
 
-  void end_episode() override {
+  void end_episode(bool) override {
     update_actor_critic();
   }
+  
 #ifdef POOL_FOR_TESTING
   void start_instance(bool learning) override {
     if(!learning && best_pol_population.size() > 0) {

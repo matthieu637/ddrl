@@ -381,6 +381,7 @@ class MLP {
     auto net_from = from.neural_net;
     auto net_to = neural_net;
     // TODO: Test if learnable_params() is sufficient for soft update
+//     learnable param already contains batch_norm parameters
     const auto& from_params = net_from->params();
     const auto& to_params = net_to->params();
     CHECK_EQ(from_params.size(), to_params.size());

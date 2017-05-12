@@ -812,8 +812,11 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
   }
 
-  void end_episode() override {
-    episode++;
+  void end_episode(bool learning) override {
+    if(learning)
+      episode++;
+    else
+      return;
 
     if(fishing_policy > 0)
       old_executed_policies.push_back(new MLP(*ann, true));

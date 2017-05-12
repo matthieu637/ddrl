@@ -103,6 +103,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     delete qnn_target;
     delete ann_target;
     
+    delete ann_testing;
+    
     delete hidden_unit_q;
     delete hidden_unit_a;
     
@@ -120,7 +122,12 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
                                  bool learning, bool goal_reached, bool last) override {
 
-    vector<double>* next_action = ann->computeOut(sensors);
+    vector<double>* next_action ;
+    if(learning)
+      next_action = ann->computeOut(sensors);
+    else
+      // protect batch norm from testing data
+      next_action = ann_testing->computeOut(sensors);
     
     if (last_action.get() != nullptr && learning){
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || (count_last && last)};
@@ -154,7 +161,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       trajectory.pop_front();
     trajectory.push_back(sa);
       
-    end_episode();
+    end_episode(true);
   }
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* command_args) override {
@@ -202,6 +209,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     else
       ann_target = new NN(*ann, true);
     
+    ann_testing = new NN(*ann, false);
+    
     qnn = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm_critic);
     if(std::is_same<NN, DevMLP>::value)
       qnn->exploit(pt, static_cast<DeepQNAg *>(old_ag)->qnn);
@@ -214,15 +223,13 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       qnn_target = new NN(*qnn, true);
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool _learning) override {
+  void _start_episode(const std::vector<double>& sensors, bool learning) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
     last_action = nullptr;
     last_pure_action = nullptr;
-    
-    learning = _learning;
     
     last_trajectory_a.clear();
     
@@ -237,6 +244,13 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       }
       static_cast<DODevMLP *>(qnn_target)->inform(episode);
       static_cast<DODevMLP *>(ann_target)->inform(episode);
+      static_cast<DODevMLP *>(ann_testing)->inform(episode);
+    }
+    
+    if(!learning){
+      double* weights = new double[ann->number_of_parameters(false)];
+      ann->copyWeightsTo(weights, false);
+      ann_testing->copyWeightsFrom(weights, false);
     }
   }
   
@@ -301,9 +315,9 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         delete it->qnn;
         best_population.erase(it);
       }
+      
+      episode++;
     }
-    
-    episode++;
   }
   
   void restoreBest() override {
@@ -322,7 +336,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     qnn = new MLP(*it->qnn, false);
   }
   
-  void end_episode() override {
+  void end_episode(bool learning) override {
     
     if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
       return;
@@ -528,7 +542,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   uint batch_norm_actor, batch_norm_critic;
   uint actor_output_layer_type, hidden_layer_type;
   
-  bool learning, inverting_grad, count_last;
+  bool inverting_grad, count_last;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
@@ -567,6 +581,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   
   MLP* ann, *ann_target;
   MLP* qnn, *qnn_target;
+  MLP* ann_testing;
   
   struct algo_state {
     uint episode;

@@ -63,6 +63,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   virtual ~OfflineCaclaAg() {
     delete vnn;
     delete ann;
+    
+    delete ann_testing;
 
     delete hidden_unit_v;
     delete hidden_unit_a;
@@ -71,7 +73,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
                                   bool learning, bool goal_reached, bool) {
 
-    vector<double>* next_action = ann->computeOut(sensors);
+    vector<double>* next_action ;
+    if(learning)
+      next_action = ann->computeOut(sensors);
+    else
+      // protect batch norm from testing data
+      next_action = ann_testing->computeOut(sensors);
 
     if (last_action.get() != nullptr && learning)
       trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
@@ -123,6 +130,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(std::is_same<NN, DODevMLP>::value)
       vnn->exploit(pt, ann);
     
+    ann_testing = new NN(*ann, false);
+    
     if(std::is_same<NN, DODevMLP>::value){
       try {
         if(pt->get<bool>("devnn.reset_learning_algo")){
@@ -134,7 +143,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     }
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool) override {
+  void _start_episode(const std::vector<double>& sensors, bool learning) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -147,6 +156,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(std::is_same<NN, DODevMLP>::value){
       static_cast<DODevMLP *>(vnn)->inform(episode);
       static_cast<DODevMLP *>(ann)->inform(episode);
+      static_cast<DODevMLP *>(ann_testing)->inform(episode);
+    }
+    
+    if(!learning){
+      double* weights = new double[ann->number_of_parameters(false)];
+      ann->copyWeightsTo(weights, false);
+      ann_testing->copyWeightsFrom(weights, false);
     }
   }
 
@@ -193,8 +209,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     }
   }
 
-  void end_episode() override {
+  void end_episode(bool learning) override {
 //     LOG_FILE("policy_exploration", ann->hash());
+    if(!learning)
+      return;
 
     if(trajectory.size() > 0)
       vnn->increase_batchsize(trajectory.size());
@@ -263,8 +281,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     }
   }
   
-  void end_instance(bool) override {
-    episode++;
+  void end_instance(bool learning) override {
+    if(learning)
+      episode++;
   }
 
   void save(const std::string& path, bool) override {
@@ -334,6 +353,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   NN* ann;
   NN* vnn;
+  NN* ann_testing;
 
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;

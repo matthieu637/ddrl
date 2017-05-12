@@ -112,7 +112,7 @@ class BaseCaclaAg : public arch::ARLAgent<> {
     last_action = nullptr;
   }
 
-  void end_episode() override {
+  void end_episode(bool) override {
 //      write_actionf_file("ac_func.data");
 //      write_valuef_file("v_after.data");
 //     ann->print();

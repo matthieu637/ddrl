@@ -36,26 +36,11 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
   }
 
   const std::vector<double>& _run(double , const std::vector<double>& sensors,
-                                 bool learning, bool, bool) {
+                                 bool, bool, bool) {
 
     vector<double>* next_action = ann->computeOut(sensors);
 
-    if(learning) {
-      if(gaussian_policy){
-        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, policy_stochasticity);
-        delete next_action;
-        next_action = randomized_action;
-      } else {
-        if(bib::Utils::rand01() < policy_stochasticity)
-          for (uint i = 0; i < next_action->size(); i++)
-            next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
-      }
-    } //TODO: might not be necessary in the future?
-    else {
-      for (uint i = 0; i < next_action->size(); i++)
-        next_action->at(i) = std::min(std::max(next_action->at(i), (double)-1.f), (double) 1.f);
-    }
-    
+//  CMA-ES already implement exploration in parameter space   
     last_action.reset(next_action);
 
     return *next_action;
@@ -68,8 +53,6 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     actor_output_layer_type     = pt->get<uint>("agent.actor_output_layer_type");
     batch_norm                  = pt->get<uint>("agent.batch_norm");
     population                  = pt->get<uint>("agent.population");
-    gaussian_policy             = pt->get<bool>("agent.gaussian_policy");
-    policy_stochasticity        = pt->get<double>("agent.policy_stochasticity");
     initial_deviation           = pt->get<double>("agent.initial_deviation");
     
     check_feasible = true;
@@ -219,7 +202,8 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
       loadPolicyParameters(parameters);
     }
     
-    episode++;
+    if(learning)
+      episode++;
     //LOG_FILE("policy_exploration", ann->hash());
   }
   
@@ -228,7 +212,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     loadPolicyParameters(parameters);
   }
 
-  void end_episode() override {
+  void end_episode(bool) override {
       scores.push_back(-sum_weighted_reward);
   }
   
@@ -243,42 +227,9 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
         new_population();
       }
     }
+    
     justLoaded = false;
-    
-//     LOG_DEBUG(cmaes_Get(evo, "fbestever"));
-//     const double* parameters = cmaes_GetPtr(evo, "xbestever");
-//     bib::Logger::PRINT_ELEMENTS(parameters, ann->number_of_parameters());
-//     LOG_DEBUG("");
-//     LOG_DEBUG("");
   }
-  
-   void write_actionf_file(const std::string& file){
-      std::ofstream out;
-      out.open(file, std::ofstream::out);
-    
-      auto iter = [&](const std::vector<double>& x) {
-        for(uint i=0;i < x.size();i++)
-          out << x[i] << " ";
-//         out << ann->computeOut(x)[0];
-        LOG_ERROR("todo");
-        out << std::endl;
-      };
-      
-      bib::Combinaison::continuous<>(iter, nb_sensors, -1, 1, 6);
-      out.close();
-/*
-      close all; clear all; 
-      X=load("ac_func.data");
-      tmp_ = X(:,2); X(:,2) = X(:,3); X(:,3) = tmp_;
-      key = X(:, 1:2);
-      for i=1:size(key, 1)
-       subkey = find(sum(X(:, 1:2) == key(i,:), 2) == 2);
-       data(end+1, :) = [key(i, :) mean(X(subkey, end))];
-      endfor
-      [xx,yy] = meshgrid (linspace (-1,1,300));
-      griddata(data(:,1), data(:,2), data(:,3), xx, yy, "linear"); xlabel('theta_1'); ylabel('theta_2');
-*/    
-   }
 
   void save(const std::string& path, bool save_best) override {
     if(!save_best || !cmaes_UpdateDistribution_done_once){
@@ -363,9 +314,7 @@ private:
   
   //initialized by invoke
   std::vector<uint>* hidden_unit_a;
-  double policy_stochasticity;
   uint population, actor_hidden_layer_type, actor_output_layer_type, batch_norm;
-  bool gaussian_policy;
   double initial_deviation;
   bool check_feasible;
   bool ignore_null_lr;

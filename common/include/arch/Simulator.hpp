@@ -161,7 +161,7 @@ class Simulator {
       all_rewards.push_back(reward);
 
       env->next_instance(learning);
-      agent->end_episode();
+      agent->end_episode(learning);
 
       if(must_load_previous_run){
         std::string source_path = learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :

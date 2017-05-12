@@ -367,6 +367,22 @@ TEST(MLP, CaffeCopyActor) {
   }
 }
 
+TEST(MLP, CaffeCopyWeightsActor) {
+  std::vector<uint> batch_norms = {4,6,7,8,10,11,12,14,15};
+  for(uint batch_norm : batch_norms) {
+    for(uint hidden_layer = 1; hidden_layer <=3 ; hidden_layer++) {
+      //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
+      uint batch_size = 400; //must be a squared number
+      std::vector<double> sensors(batch_size);
+      
+      MLP actor(1, {8}, 1, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
+      MLP actor_nobn(1, {8}, 1, 0.01f, batch_size, hidden_layer, 0, 0);
+      EXPECT_EQ(actor_nobn.number_of_parameters(false), 25);
+      EXPECT_GT(actor.number_of_parameters(false), 25);
+    }
+  }
+}
+
 TEST(MLP, BackwardActor) {//valgrind test only
   std::vector<uint> batch_norms = {0,4,6,7,8,10,11,12,14,15};
   for(uint batch_norm : batch_norms) {
