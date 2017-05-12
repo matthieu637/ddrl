@@ -178,7 +178,7 @@ HumanoidWorld::HumanoidWorld(humanoid_physics _phy) : odeworld(ODEFactory::getIn
   if(!phy.additional_sensors)
     internal_state.resize(22+23);
   else
-    internal_state.resize(22+23+110+60+17);
+    internal_state.resize(22+23+60+17);
   
   std::fill(internal_state.begin(), internal_state.end(), 0.f);
 
@@ -919,19 +919,20 @@ void HumanoidWorld::update_state(bool updateReward) {
   std::copy(qvel.begin(), qvel.end(), internal_state.begin() + qpos.size());
   
   if(phy.additional_sensors && updateReward){
-    begin_index=0;
-    std::vector<double> cinert(10*11);
-    for(auto m : body_mass)
-      cinert[begin_index++] = m;
-    for(auto b : bones)
-      if(b->getID() != nullptr){
-        dMass m;
-        dBodyGetMass(b->getID(), &m);
-        for(uint i=0;i<9;i++)
-          cinert[begin_index++] = m.I[i];
-      }
-    
-    ASSERT(110 == begin_index, "pb");
+//     in ODE those values are fixed
+//     begin_index=0;
+//     std::vector<double> cinert(10*11);
+//     for(auto m : body_mass)
+//       cinert[begin_index++] = m;
+//     for(auto b : bones)
+//       if(b->getID() != nullptr){
+//         dMass m;
+//         dBodyGetMass(b->getID(), &m);
+//         for(uint i=0;i<9;i++)
+//           cinert[begin_index++] = m.I[i];
+//       }
+//     
+//     ASSERT(110 == begin_index, "pb");
     
     begin_index=0;
     std::vector<double> cvel(10*6);
@@ -951,11 +952,11 @@ void HumanoidWorld::update_state(bool updateReward) {
     //cfrc_ext is different than dBodyGetTorque/dBodyGetForce
     // in ode those value are always 0
     
-    std::copy(cinert.begin(), cinert.end(), internal_state.begin() + qpos.size() + qvel.size());
+//     std::copy(cinert.begin(), cinert.end(), internal_state.begin() + qpos.size() + qvel.size());
     std::copy(cvel.begin(), cvel.end(), 
-              internal_state.begin() + qpos.size() + qvel.size() + cinert.size());
+              internal_state.begin() + qpos.size() + qvel.size());
     std::copy(qfrc_actuator.begin(), qfrc_actuator.end(), 
-              internal_state.begin() + qpos.size() + qvel.size() + cinert.size() + cvel.size());
+              internal_state.begin() + qpos.size() + qvel.size() + cvel.size());
   }
 
   if(updateReward){
