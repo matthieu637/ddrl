@@ -326,7 +326,10 @@ class DODevMLP : public MLP {
         auto blob_st = neural_net->layer_by_name("devnn_states")->blobs()[0];
         auto data_st = blob_st->mutable_cpu_data();
         for(uint i=0; i < st_control->size() ; i++){
-          data_st[i] = ((double)episode) * heuristic_linearcoef->at(i);
+          if( heuristic_linearcoef->at(i) >= 1.)
+            data_st[i] = 1.;
+          else
+            data_st[i] = ((double)episode) * heuristic_linearcoef->at(i);
         }
       }
       
@@ -334,7 +337,10 @@ class DODevMLP : public MLP {
         auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
         auto data = blob_ac->mutable_cpu_data();
         for(uint i=0; i < ac_control->size() ; i++){
-          data[i] = ((double)episode) * heuristic_linearcoef->at(i + st_control->size());
+          if( heuristic_linearcoef->at(i + st_control->size()) >= 1.)
+            data[i] = 1.;
+          else
+            data[i] = ((double)episode) * heuristic_linearcoef->at(i + st_control->size());
         }
       }
     }
