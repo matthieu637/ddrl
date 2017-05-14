@@ -33,6 +33,9 @@ target_link_libraries(cartpole ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES})
 add_executable(half-cheetah src/test/HalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(half-cheetah ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 
+add_executable(random-half-cheetah src/test/RandomHC.cpp ${all_include} ${all_sources} )
+target_link_libraries(random-half-cheetah ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+
 add_executable(humanoid src/test/Humanoid.cpp ${all_include} ${all_sources} )
 target_link_libraries(humanoid ${HUMANOID_LIBRARY} ${BASE_LIBRARIES} )
 
