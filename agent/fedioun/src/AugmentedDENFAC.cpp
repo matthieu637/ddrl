@@ -389,7 +389,7 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		          weighting_strategy > 0);
   	}
 
-  	if (!retrace_lambda) {
+  	if (retrace_lambda) {
   		const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
 		double* q_values_diff = q_values_blob->mutable_cpu_diff();
 
@@ -540,7 +540,7 @@ void AugmentedDENFAC::update_actor_critic() {
 /***
  * Start update
  */
-void AugmentedDENFAC::end_episode()  {
+void AugmentedDENFAC::end_episode(bool)  {
 	episode++;
 	update_actor_critic();
 }

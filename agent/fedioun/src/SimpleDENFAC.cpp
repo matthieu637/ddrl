@@ -419,7 +419,7 @@ void SimpleDENFAC::update_actor_critic() {
 /***
  * Start update
  */
-void SimpleDENFAC::end_episode()  {
+void SimpleDENFAC::end_episode(bool)  {
 	episode++;
 	update_actor_critic();
 }
