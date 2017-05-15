@@ -71,7 +71,7 @@ class AugmentedDENFAC : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
     void update_actor_critic();
 
-    void end_episode() override;
+    void end_episode(bool) override;
 
     void save(const std::string& path, bool) override;
 
