@@ -26,39 +26,17 @@ int main(int argc, char **argv) {
   read_mnist_img(10000,784,ar);
   read_mnist_lbl(lbl);
 
+  
+  // Parameters
   int data_size = 784;   
   int label_size = 10;
   int training_examples = 1000;
-  
-  vector<double> training_data = {};
-  training_data.resize(data_size * training_examples);
-  vector<double> training_labels = {};
-  training_labels.resize(label_size * training_examples, 0);
-    
-  
-  for(int i = 0; i < training_examples; i++) {
-    for(int j = 0; j < data_size; j++) {
-      training_data[i*data_size +j] = ar[i][j];
-    }    
-    training_labels[i*label_size+ lbl[i]] = 1;
-    
-  }
-  
-  for(int i = 0; i < 20; i++) {
-   cout << training_labels[i] << " ";
-   if ((i+1)%10 == 0)
-     cout << endl;
-  }
-  
-  
-  
-  
-  // Parameters
   int input_size = 784;
   vector<uint> hiddens = {30};
   unsigned int motors = 10;
   double alpha = 0.001;
   uint kMinibatchSize = 10;
+  int batchNum = training_examples / kMinibatchSize;
   uint hidden_layer_type = 2;
   uint last_layer_type = 0;
   /*
@@ -69,6 +47,29 @@ int main(int argc, char **argv) {
    */
   uint batch_norm = 0;
   bool loss_layer = true;
+  
+  
+  vector<vector<double>> training_data_batches = {};
+  training_data_batches.resize(batchNum);
+  vector<vector<double>> training_label_batches = {};
+  training_label_batches.resize(batchNum);
+  
+  for(int i = 0; i < batchNum ; i++) {
+    training_data_batches[i].resize(kMinibatchSize * data_size);
+    training_label_batches[i].resize(kMinibatchSize * label_size,0);
+    for(uint k = 0; k < kMinibatchSize; k++) {
+      for(int j = 0; j < data_size; j++) {
+	training_data_batches[i][k*data_size + j] = ar[i*kMinibatchSize + k][j];
+      }     
+      training_label_batches[i][k*label_size + lbl[i*kMinibatchSize + k]] = 1;      
+    }           
+  }
+  
+  print_mnist_img(450, ar);
+  for (int i = 0; i < label_size ; i++) {
+    cout << training_label_batches[45][i];
+  }
+  
   
   
   boost::property_tree::ptree properties;
@@ -82,8 +83,9 @@ int main(int argc, char **argv) {
   MLP my_network(input_size, hiddens, motors, alpha, kMinibatchSize, hidden_layer_type, last_layer_type, batch_norm, loss_layer);
   
   // Trainning
-  for(uint i=0;i<1000;i++){
-   my_network.learn(training_data, training_labels);
+  for(uint i=0;i<100;i++){
+   
+   my_network.learn(training_data_batches[0], training_label_batches[0]);
    LOG_DEBUG(my_network.error() << " " << my_network.weight_l1_norm());
    LOG_FILE("learning.data", i << " " << my_network.error() << " " << my_network.weight_l1_norm());
   }

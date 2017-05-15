@@ -1,4 +1,4 @@
-#include "SimpleDENFAC.hpp"
+#include "AugmentedDENFAC.hpp"
 
 #include <vector>
 #include <string>
@@ -20,10 +20,10 @@
 
 typedef MLP PolicyImpl;
 
-SimpleDENFAC::SimpleDENFAC(unsigned int _nb_motors, unsigned int _nb_sensors): arch::AACAgent<PolicyImpl, AgentGPUProgOptions>(_nb_motors), nb_sensors(_nb_sensors) {
+AugmentedDENFAC::AugmentedDENFAC(unsigned int _nb_motors, unsigned int _nb_sensors): arch::AACAgent<PolicyImpl, AgentGPUProgOptions>(_nb_motors), nb_sensors(_nb_sensors) {
 }
 
-SimpleDENFAC::~SimpleDENFAC() {
+AugmentedDENFAC::~AugmentedDENFAC() {
 	delete qnn;
 	delete ann;
 
@@ -37,7 +37,7 @@ SimpleDENFAC::~SimpleDENFAC() {
  *  Update last action and last state and best reward
  *  Fill replay buffer
  */
-const std::vector<double>& SimpleDENFAC::_run(double reward, const std::vector<double>& sensors, bool learning, bool goal_reached, bool last) {
+const std::vector<double>& AugmentedDENFAC::_run(double reward, const std::vector<double>& sensors, bool learning, bool goal_reached, bool last) {
     
     // Store previous sample into the replay buffer 
     if (last_action.get() != nullptr && learning) {
@@ -45,8 +45,8 @@ const std::vector<double>& SimpleDENFAC::_run(double reward, const std::vector<d
 	    for(uint i=0; i < nb_motors; i++) {
 	        p0 *= bib::Proba<double>::truncatedGaussianDensity(last_action->at(i), last_pure_action->at(i), noise);
 	    }
-
-        sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || last, p0};
+	    // TODO check reward terminal state
+        sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0};
         insertSample(sa);
     }
 
@@ -85,7 +85,7 @@ const std::vector<double>& SimpleDENFAC::_run(double reward, const std::vector<d
  * Called from _run()
  * Optionnaly do on-line updates
  */
-void SimpleDENFAC::insertSample(const sample& sa) {
+void AugmentedDENFAC::insertSample(const sample& sa) {
     if(trajectory.size() >= replay_memory)
       trajectory.pop_front();
 
@@ -97,7 +97,7 @@ void SimpleDENFAC::insertSample(const sample& sa) {
  * Get parameters from config.ini (located in the current build directory or provided with the --config option)
  * Initialize actor and critic networks
  */
-void SimpleDENFAC::_unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* command_args) {
+void AugmentedDENFAC::_unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* command_args) {
     hidden_unit_q               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_q"));
     hidden_unit_a               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                       = pt->get<double>("agent.noise");
@@ -118,6 +118,8 @@ void SimpleDENFAC::_unique_invoke(boost::property_tree::ptree* pt, boost::progra
     last_layer_actor            = pt->get<uint>("agent.last_layer_actor");
     reset_ann                   = pt->get<bool>("agent.reset_ann");
     hidden_layer_type           = pt->get<uint>("agent.hidden_layer_type");
+
+    retrace_lambda				= pt->get<bool>("agent.retrace_lambda");
     
 	#ifdef CAFFE_CPU_ONLY
 	    LOG_INFO("CPU mode");
@@ -147,7 +149,7 @@ void SimpleDENFAC::_unique_invoke(boost::property_tree::ptree* pt, boost::progra
 /***
  * Load previous run to resume in case of interruption
  */
-void SimpleDENFAC::load_previous_run() {
+void AugmentedDENFAC::load_previous_run() {
 	ann->load("continue.actor");
 	qnn->load("continue.critic");
 	auto p1 = bib::XMLEngine::load<std::deque<sample>>("trajectory", "continue.trajectory.data");
@@ -167,7 +169,7 @@ void SimpleDENFAC::load_previous_run() {
 /***
  * Save current state 
  */
-void SimpleDENFAC::save_run() {
+void AugmentedDENFAC::save_run() {
 	ann->save("continue.actor");
 	qnn->save("continue.critic");
 	bib::XMLEngine::save(trajectory, "trajectory", "continue.trajectory.data");
@@ -178,7 +180,7 @@ void SimpleDENFAC::save_run() {
 /***
  * Episode initialization
  */
-void SimpleDENFAC::_start_episode(const std::vector<double>& sensors, bool _learning) {
+void AugmentedDENFAC::_start_episode(const std::vector<double>& sensors, bool _learning) {
 	last_state.clear();
 	for (uint i = 0; i < sensors.size(); i++)
 	  last_state.push_back(sensors[i]);
@@ -194,7 +196,7 @@ void SimpleDENFAC::_start_episode(const std::vector<double>& sensors, bool _lear
 /***
  * Compute importance sampling
  */
-void SimpleDENFAC::computePThetaBatch(const std::deque< sample >& vtraj, double *ptheta, const std::vector<double>* all_next_actions) {
+void AugmentedDENFAC::computePThetaBatch(const std::deque< sample >& vtraj, double *ptheta, const std::vector<double>* all_next_actions) {
 	uint i=0;
 	for(auto it : vtraj) {
 	  double p0 = 1.f;
@@ -207,81 +209,177 @@ void SimpleDENFAC::computePThetaBatch(const std::deque< sample >& vtraj, double 
 }
 
 /***
- * Update the critic using a batch sampled from the replay buffer
+ * Update the critic using a trajectory sampled from the replay buffer
  */
-void SimpleDENFAC::critic_update(uint iter) {
+void AugmentedDENFAC::critic_update(uint iter) {
 	// Get Replay buffer
 	std::deque<sample>* traj = &trajectory;
+	std::vector<double>* q_targets_weights = nullptr;
 
-	// ******* Compute q_k (q_targets here) *******
-
-	// Compute \pi(s_{t+1})
-
-	// Get batch data (s_t, s_{t+1} and a)
 	std::vector<double> all_next_states(traj->size() * nb_sensors);
 	std::vector<double> all_states(traj->size() * nb_sensors);
-	std::vector<double> all_actions(traj->size() * nb_motors);
-	uint i=0;
-	for (auto it : *traj) {
-		std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
-		std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
-		std::copy(it.a.begin(), it.a.end(), all_actions.begin() + i * nb_motors);
-		i++;
-	}
-
-	// Compute all next action
-	std::vector<double>* all_next_actions;
-	all_next_actions = ann->computeOutBatch(all_next_states);
-
-	// DEBUGTEST
-	std::cout << " nb_motors : " << nb_motors << std::endl;
-	std::cout << " traj_size : " << traj->size() << std::endl;
-	std::cout << " n_actions_size : " << all_next_actions->size() << std::endl;
-
-	for(uint i=0;i<traj->size()*nb_sensors;i++){
-		std::cout << all_states[i] << " ";
-	}
-	for(uint i=0;i<traj->size()*nb_motors;i++){
-		std::cout << all_actions[i] << " ";
-	}
-
-	// Compute next Q value
-	std::vector<double>* q_targets = new std::vector<double>(traj->size(),0.f);
-	std::vector<double>* q_targets_weights = nullptr;
+	std::vector<double>* 	all_actions = new std::vector<double>(traj->size() * nb_motors);
 	double* ptheta = nullptr;
 
-	//q_targets = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+	std::vector<double>* q_targets;
 
-	// Importance sampling
-	if(weighting_strategy != 0) {
-		q_targets_weights = new std::vector<double>(q_targets->size(), 1.0f);
-		if(weighting_strategy > 1) {
-			ptheta = new double[traj->size()];
-			computePThetaBatch(*traj, ptheta, all_next_actions);
-		}
-	}
-	delete all_next_actions;
 
-	// Adjust q_targets
-	i=0;
-	for (auto it : *traj) {
-		if(it.goal_reached)
-			q_targets->at(i) = it.r;
-		else {
-			q_targets->at(i) = it.r + gamma * q_targets->at(i);
+	// ******* Compute Q targets *******
+
+	if (!retrace_lambda) {
+
+		double lambda = 0.8;
+		std::vector<double>*			   all_next_actions;			// \pi(s_t)
+		std::vector<double>*       					 all_QV;			// Q(s_t, \mu(s_t))
+		std::vector<double>*                   next_action = new std::vector<double>(nb_motors);
+		std::vector<double>* 			  randomized_action;
+		std::vector<double>       all_next_QV(traj->size());			// Q(s_t, \pi(s_t))
+		std::vector<double>     retrace_coefs(traj->size());				
+		std::vector<double> bellman_residuals(traj->size());			
+		q_targets = new std::vector<double>(traj->size()); // Retrace Q target
+
+		
+		uint i=0;
+
+		// Get data from traj
+		for (auto it : *traj) {
+			std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
+			std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
+			std::copy(it.a.begin(), it.a.end(), all_actions->begin() + i * nb_motors);
+			i++;
 		}
-		if(weighting_strategy==1)
-			q_targets_weights->at(i)=1.0f/it.p0;
-		else if(weighting_strategy==2)
-			q_targets_weights->at(i)=ptheta[i]/it.p0;
-		else if(weighting_strategy==3)
-			q_targets_weights->at(i)=std::min((double)1.0f, ptheta[i]/it.p0);
-		i++;
+
+		// Compute retrace_coefs (check other version later)
+		all_next_actions = ann->computeOutBatch(all_next_states);
+
+		// \pi(s_{t+1})
+		ptheta = new double[traj->size()];
+		computePThetaBatch(*traj, ptheta, all_next_actions);
+
+		i = 0;
+		for (auto it : *traj) {
+			retrace_coefs[i] = lambda * std::min((double)1, ptheta[i] / it.p0 );
+			i++;
+		}
+
+		// Compute Bellman residuals
+
+		std::cout << "nb_motors : " << nb_motors << std::endl;
+		std::cout << "nb_sensors : " << nb_sensors << std::endl;
+		std::cout << "nb_states : " << traj->size() << std::endl;
+		std::cout << "all_actions : " <<  all_actions->size() << std::endl;
+		std::cout << "all_states : " << all_states.size() << std::endl;
+
+
+		// Q (s_t,a_t)
+		all_QV = qnn->computeOutVFBatch(all_states, *all_actions);
+
+		// Q (s_{t+1}, a_{t+1})
+
+		uint nb_Q_samples = 1;
+		
+
+		for (uint j = 0; j < traj->size(); j++) {
+			// Copy next action
+			for(uint k = 0; k < nb_motors; k++) {
+				next_action->at(k) = all_next_actions->at(j*nb_motors +k);
+			}
+			// Add gaussian noise and compute corresponding Q_value
+			double avg_QV = 0;
+			// Sampling
+			for (uint k = 0; k < nb_Q_samples; k++) {
+				randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+				avg_QV += qnn->computeOutVF(traj->at(j).next_s, *randomized_action);
+			}
+			all_next_QV.at(j) = avg_QV / nb_Q_samples;
+		}
+
+		i = 0;
+		// TODO compute action, (add noise + compute Q value) * k
+		for (auto it = traj->begin(); it != traj->end(); it++) {
+			bellman_residuals[i] = it->r;
+			if(!it->goal_reached) {
+				bellman_residuals[i] += gamma * all_next_QV.at(i) - all_QV->at(i); 
+			}
+			i++;		
+		}
+
+		// Compute Q targets
+
+		// \delta Q(x_t,a_t) = \sum_{s=t}^{t+k-1} \gamma^{s-t} ( \prod_{i = t+1}^s c_i )[ r(x_s, a_s) + \gamma Q(x_{s+1}, a_{s+1}) - Q(x_s, a_s)]
+
+		double retrace_target_sum = 0;
+		// TODO goal reached
+		for(int j = traj->size()-1; j >= 0; j--) {
+			retrace_target_sum += bellman_residuals[j];
+			q_targets->at(j) = retrace_target_sum;
+
+			retrace_target_sum *= gamma * retrace_coefs[j];			
+		}
+
+		delete next_action;
+		delete all_next_actions;
+		delete all_QV;
+		delete randomized_action;
+		delete[] ptheta; 
+	} else {
+
+		// Standard DENFAC Q target
+
+		// Compute \pi(s_{t+1})
+
+		// Get batch data (s_t, s_{t+1} and a)
+		uint i=0;
+		for (auto it : *traj) {
+			std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
+			std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
+			std::copy(it.a.begin(), it.a.end(), all_actions->begin() + i * nb_motors);
+			i++;
+		}
+
+		// Compute all next action
+		std::vector<double>* all_next_actions;
+		all_next_actions = ann->computeOutBatch(all_next_states);
+
+		// Compute next Q value
+
+		q_targets = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+
+		// Importance sampling
+		if(weighting_strategy != 0) {
+			q_targets_weights = new std::vector<double>(q_targets->size(), 1.0f);
+			if(weighting_strategy > 1) {
+				ptheta = new double[traj->size()];
+				computePThetaBatch(*traj, ptheta, all_next_actions);
+			}
+		}
+		delete all_next_actions;
+
+		// Adjust q_targets
+		i=0;
+		for (auto it : *traj) {
+			if(it.goal_reached)
+				q_targets->at(i) = it.r;
+			else {
+				q_targets->at(i) = it.r + gamma * q_targets->at(i);
+			}
+			if(weighting_strategy==1)
+				q_targets_weights->at(i)=1.0f/it.p0;
+			else if(weighting_strategy==2)
+				q_targets_weights->at(i)=ptheta[i]/it.p0;
+			else if(weighting_strategy==3)
+				q_targets_weights->at(i)=std::min((double)1.0f, ptheta[i]/it.p0);
+			i++;
+		}
+
+
+
+
+
 	}
 
 	// Optionnaly reset the network 
 	if(reset_qnn && episode < 1000 ) {
-
 		delete qnn;
 		qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q,
 		          alpha_v,
@@ -291,20 +389,43 @@ void SimpleDENFAC::critic_update(uint iter) {
 		          weighting_strategy > 0);
   	}
 
-	// Update critic
-	if(weighting_strategy != 0)
-		qnn->stepCritic(all_states, all_actions, *q_targets, iter, q_targets_weights);
-	else
-		qnn->stepCritic(all_states, all_actions, *q_targets, iter);
+  	if (!retrace_lambda) {
+  		const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
+		double* q_values_diff = q_values_blob->mutable_cpu_diff();
 
-	delete q_targets;
-	if(weighting_strategy != 0) {
-		delete q_targets_weights;
-		if(weighting_strategy > 1)
-	  		delete[] ptheta;
-	}
+		for (uint j =0; j < traj->size(); j++) {			
+			q_values_diff[q_values_blob->offset(j,0,0,0)] = q_targets->at(j);
+		}
 
-	qnn->ZeroGradParameters();
+		qnn->critic_backward();
+		// Update QTM
+		ann->getSolver()->ApplyUpdate();
+		ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+
+		qnn->ZeroGradParameters();
+		std::cout << "Critic update done" << std::endl;
+		delete q_targets;
+
+
+  	} else {
+  		// Update critic
+		if(weighting_strategy != 0)
+			qnn->stepCritic(all_states, *all_actions, *q_targets, iter, q_targets_weights);
+		else
+			qnn->stepCritic(all_states, *all_actions, *q_targets, iter);
+
+		delete q_targets;
+		if(weighting_strategy != 0) {
+			delete q_targets_weights;
+			if(weighting_strategy > 1)
+		  		delete[] ptheta;
+		}
+
+		qnn->ZeroGradParameters();
+  	}
+
+
+  	delete all_actions;
 
 }
 
@@ -312,7 +433,7 @@ void SimpleDENFAC::critic_update(uint iter) {
  * Compute the critic's gradient wrt the actor's actions
  * Update the actor using this gradient and the inverting gradient strategy 
  */
-void SimpleDENFAC::actor_update_grad() {
+void AugmentedDENFAC::actor_update_grad() {
 
 	std::deque<sample>* traj = &trajectory;
 
@@ -388,7 +509,7 @@ void SimpleDENFAC::actor_update_grad() {
 /***
  * Performs fitted updates of the actor and the critic
  */
-void SimpleDENFAC::update_actor_critic() {
+void AugmentedDENFAC::update_actor_critic() {
 	if(!learning)
 		return;
 
@@ -411,32 +532,32 @@ void SimpleDENFAC::update_actor_critic() {
 		}
 
 		// Fitted actor updates
-		//for(uint i=0; i<nb_actor_updates ; i++)
-		//	actor_update_grad();
+		for(uint i=0; i<nb_actor_updates ; i++)
+			actor_update_grad();
 	}
 }
 
 /***
  * Start update
  */
-void SimpleDENFAC::end_episode()  {
+void AugmentedDENFAC::end_episode()  {
 	episode++;
 	update_actor_critic();
 }
 
-void SimpleDENFAC::save(const std::string& path, bool)  {
+void AugmentedDENFAC::save(const std::string& path, bool)  {
 	ann->save(path+".actor");
 	qnn->save(path+".critic");
 	LOG_INFO("Saved as " + path+ ".actor");
 	//      bib::XMLEngine::save<>(trajectory, "trajectory", "trajectory.data");
 }
 
-void SimpleDENFAC::load(const std::string& path)  {
+void AugmentedDENFAC::load(const std::string& path)  {
 	ann->load(path+".actor");
 	qnn->load(path+".critic");
 }
 
-void SimpleDENFAC::_display(std::ostream& out) const  {
+void AugmentedDENFAC::_display(std::ostream& out) const  {
 	out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward
 	#ifndef NDEBUG
 	    << " " << std::setw(8) << std::fixed << std::setprecision(5) << noise
@@ -448,17 +569,17 @@ void SimpleDENFAC::_display(std::ostream& out) const  {
 	    ;
 }
 
-void SimpleDENFAC::_dump(std::ostream& out) const  {
+void AugmentedDENFAC::_dump(std::ostream& out) const  {
 	out <<" " << std::setw(25) << std::fixed << std::setprecision(22) <<
 	sum_weighted_reward << " " << std::setw(8) << std::fixed <<
 	std::setprecision(5) << trajectory.size() ;
 }
 
-double SimpleDENFAC::criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions){
+double AugmentedDENFAC::criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions){
     return qnn->computeOutVF(perceptions, actions);
 }
 
-arch::Policy<MLP>* SimpleDENFAC::getCopyCurrentPolicy() {
+arch::Policy<MLP>* AugmentedDENFAC::getCopyCurrentPolicy() {
 	return new arch::Policy<MLP>(new MLP(*ann, true) , gaussian_policy ? arch::policy_type::GAUSSIAN :
                              arch::policy_type::GREEDY,
                              noise, decision_each);
