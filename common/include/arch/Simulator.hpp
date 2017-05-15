@@ -188,11 +188,14 @@ class Simulator {
 
     agent->end_instance(learning);
     
-    if(can_continue){
+    if(can_continue && learning){
       if(lepisode % continue_save_each == 0 && !must_load_previous_run && lepisode > 0){
         agent->save_run();
         bib::XMLEngine::save<simu_state>({lepisode+1}, "episode", "continue.simu.data");
       }
+      if(test_episode_per_episode == 0)
+        must_load_previous_run = false;
+    } else if(can_continue && !learning && tepisode + 1 >= test_episode_per_episode){
       must_load_previous_run = false;
     }
 
