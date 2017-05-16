@@ -61,6 +61,10 @@ target_link_libraries(half-cheetah-nfmac
 add_executable(humanoid src/test/Humanoid.cpp ${all_include} ${all_sources} )
 target_link_libraries(humanoid 
   ${HUMANOID_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  
+add_executable(humanoid-dodev src/test/DodevHumanoid.cpp ${all_include} ${all_sources} )
+target_link_libraries(humanoid-dodev 
+  ${HUMANOID_LIBRARY} ${COMMON_DRL_LIBRARY} )
 
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
