@@ -62,6 +62,10 @@ class DODevMLP : public MLP {
         LOG_INFO("heuristic is 1 so probabilistic should be 1");
         exit(1);
       }
+      if((heuristic == 2 && st_probabilistic != 0) || (heuristic == 2 && ac_probabilistic != 0)){
+        LOG_INFO("heuristic is 2 so probabilistic should be 0");
+        exit(1);
+      }
       LOG_INFO("catch heuristic " <<heuristic);
     } catch(boost::exception const& ) {
     }

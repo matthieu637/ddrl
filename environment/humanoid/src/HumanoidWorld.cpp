@@ -864,7 +864,7 @@ void HumanoidWorld::update_state(bool updateReward) {
   for(uint i=0;i<4;i++)
     qpos[begin_index++]=q_root[i];
   
-  qpos[begin_index++] = dJointGetUniversalAngle1(joints[0]);
+  qpos[begin_index++] = dJointGetUniversalAngle1(joints[0]);//5
   qpos[begin_index++] = dJointGetUniversalAngle2(joints[0]);
   qpos[begin_index++] = dJointGetHingeAngle(joints[1]);
   qpos[begin_index++] = dJointGetAMotorAngle(joints[2], 0);
@@ -875,7 +875,7 @@ void HumanoidWorld::update_state(bool updateReward) {
   qpos[begin_index++] = dJointGetAMotorAngle(joints[5], 1);
   qpos[begin_index++] = dJointGetAMotorAngle(joints[5], 2);
   qpos[begin_index++] = dJointGetHingeAngle(joints[7]);
-  qpos[begin_index++] = dJointGetUniversalAngle1(joints[8]);
+  qpos[begin_index++] = dJointGetUniversalAngle1(joints[8]);//15
   qpos[begin_index++] = dJointGetUniversalAngle2(joints[8]);
   qpos[begin_index++] = dJointGetHingeAngle(joints[9]);
   qpos[begin_index++] = dJointGetUniversalAngle1(joints[10]);
@@ -894,7 +894,7 @@ void HumanoidWorld::update_state(bool updateReward) {
   for(uint i=0;i<3;i++)
     qvel[begin_index++]=torsoav[i];
   
-  qvel[begin_index++] = dJointGetUniversalAngle1Rate(joints[0]);
+  qvel[begin_index++] = dJointGetUniversalAngle1Rate(joints[0]);//28
   qvel[begin_index++] = dJointGetUniversalAngle2Rate(joints[0]);
   qvel[begin_index++] = dJointGetHingeAngleRate(joints[1]);
   qvel[begin_index++] = dJointGetAMotorAngleRate(joints[2], 0);

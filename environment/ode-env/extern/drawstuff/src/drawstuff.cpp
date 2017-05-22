@@ -512,7 +512,7 @@ static void drawPatch (float p1[3], float p2[3], float p3[3], int level) {
 
 // draw a sphere of radius 1
 
-static int sphere_quality = 1;
+static int sphere_quality = 6;
 
 static void drawSphere() {
   // icosahedron data for an icosahedron of radius 1.0
@@ -639,7 +639,7 @@ static void drawTriangleD (const double *v0, const double *v1, const double *v2,
 
 // draw a capped cylinder of length l and radius r, aligned along the x axis
 
-static int capped_cylinder_quality = 3;
+static int capped_cylinder_quality = 20;
 
 static void drawCapsule (float l, float r) {
   int i, j;
@@ -647,6 +647,8 @@ static void drawCapsule (float l, float r) {
   // number of sides to the cylinder (divisible by 4):
   const int n = capped_cylinder_quality * 4;
 
+  glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
+  
   l *= 0.5;
   a = float(M_PI * 2.0) / float(n);
   sa = (float) sin(a);
@@ -1093,7 +1095,7 @@ void dsDrawFrame (int width, int height, dsFunctions *fn, int pause) {
   glColor3f (1.0, 1.0, 1.0);
 
   // clear the window
-  glClearColor (0.5, 0.5, 0.5, 0);
+  glClearColor (1., 1., 1., 1.);
   glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   // snapshot camera position (in MS Windows it is changed by the GUI thread)
@@ -1113,7 +1115,7 @@ void dsDrawFrame (int width, int height, dsFunctions *fn, int pause) {
   glLightfv (GL_LIGHT0, GL_POSITION, light_position);
 
   // draw the background (ground, sky etc)
-  drawSky (view2_xyz);
+//   drawSky (view2_xyz);
   drawGround();
 
   // draw the little markers on the ground
@@ -1121,6 +1123,16 @@ void dsDrawFrame (int width, int height, dsFunctions *fn, int pause) {
 
   // leave openGL in a known state - flat shaded white, no textures
   glEnable (GL_LIGHTING);
+  
+  glEnable(GL_POLYGON_SMOOTH);
+  glEnable(GL_BLEND);
+  glDisable(GL_DEPTH_TEST);
+  glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
+  glHint( GL_LINE_SMOOTH_HINT, GL_NICEST );
+  glBlendFunc( GL_SRC_ALPHA_SATURATE, GL_ONE ) ;
+  glEnable(GL_MULTISAMPLE); 
+  glEnable(GL_MULTISAMPLE_ARB);
+  
   glDisable (GL_TEXTURE_2D);
   glShadeModel (GL_FLAT);
   glEnable (GL_DEPTH_TEST);
@@ -1136,7 +1148,6 @@ void dsDrawFrame (int width, int height, dsFunctions *fn, int pause) {
   tnum = 0;
   if (fn->step) fn->step (pause);
 }
-
 
 int dsGetShadows() {
   return use_shadows;
@@ -1185,7 +1196,8 @@ static void setupDrawingMode() {
 
   if (color[3] < 1) {
     glEnable (GL_BLEND);
-    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+//     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc( GL_SRC_ALPHA_SATURATE, GL_ONE ) ;
   } else {
     glDisable (GL_BLEND);
   }

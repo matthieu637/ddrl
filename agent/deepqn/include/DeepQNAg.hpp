@@ -251,6 +251,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       double* weights = new double[ann->number_of_parameters(false)];
       ann->copyWeightsTo(weights, false);
       ann_testing->copyWeightsFrom(weights, false);
+      delete[] weights;
     }
   }
   

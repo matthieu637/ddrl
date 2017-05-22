@@ -115,10 +115,14 @@ void createMainWindow (int _width, int _height) {
 
   // get GL visual
   static int attribListDblBuf[] = {GLX_RGBA, GLX_DOUBLEBUFFER, GLX_DEPTH_SIZE, 16,
-                                   GLX_RED_SIZE, 4, GLX_GREEN_SIZE, 4, GLX_BLUE_SIZE, 4, None
+                                   GLX_RED_SIZE, 4, GLX_GREEN_SIZE, 4, GLX_BLUE_SIZE, 4, 
+                                   GLX_SAMPLE_BUFFERS_ARB, 1, GLX_SAMPLES_ARB, 2,
+                                   None
                                   };
   static int attribList[] = {GLX_RGBA, GLX_DEPTH_SIZE, 16,
-                             GLX_RED_SIZE, 4, GLX_GREEN_SIZE, 4, GLX_BLUE_SIZE, 4, None
+                             GLX_RED_SIZE, 4, GLX_GREEN_SIZE, 4, GLX_BLUE_SIZE, 4, 
+                             GLX_SAMPLE_BUFFERS_ARB, 1, GLX_SAMPLES_ARB, 2,
+                             None
                             };
   visual = glXChooseVisual (display, screen, attribListDblBuf);
   if (!visual) visual = glXChooseVisual (display, screen, attribList);
