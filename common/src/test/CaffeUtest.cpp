@@ -677,7 +677,7 @@ TEST(MLP, DevelopmentalLayer) {
         delete all_actions_outputs;
         delete all_actions_outputs2;
         double proba = (((float)fit)/((float)batch_size));
-        EXPECT_GE(proba, 0.53);
+        EXPECT_GE(proba, 0.52);
         EXPECT_LE(proba, 0.67);
       }
       
