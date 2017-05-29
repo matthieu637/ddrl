@@ -28,6 +28,8 @@ class BaseCaclaAg : public arch::ARLAgent<> {
     delete vnn;
     delete ann;
     
+    delete ann_testing;
+    
     delete hidden_unit_v;
     delete hidden_unit_a;
   }
@@ -35,9 +37,13 @@ class BaseCaclaAg : public arch::ARLAgent<> {
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
                                   bool learning, bool goal_reached, bool finished) {
 
-    vector<double>* next_action = ann->computeOut(sensors);
+    vector<double>* next_action ;
+    if(learning)
+      next_action = ann->computeOut(sensors);
+    else
+      // protect batch norm from testing data
+      next_action = ann_testing->computeOut(sensors);
     
-
     if (last_action.get() != nullptr && learning) {  // Update Q
 
       double vtarget = reward;
@@ -87,98 +93,43 @@ class BaseCaclaAg : public arch::ARLAgent<> {
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
     hidden_unit_v           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
-    alpha_v                 = pt->get<double>("agent.alpha_v");
-    alpha_a                 = pt->get<double>("agent.alpha_a");
     noise                   = pt->get<double>("agent.noise");
     plus_var_version        = pt->get<bool>("agent.plus_var_version");
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
-    batch_norm              = pt->get<uint>("agent.batch_norm");
-    actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
-    hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
+    double alpha_v                 = pt->get<double>("agent.alpha_v");
+    double alpha_a                 = pt->get<double>("agent.alpha_a");
+    uint batch_norm_critic       = pt->get<uint>("agent.batch_norm_critic");
+    uint batch_norm_actor        = pt->get<uint>("agent.batch_norm_actor");
+    uint actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
+    uint hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     
-    beta = 0.001;
+    beta = 0.001f;
+    if(plus_var_version)
+      beta                  = pt->get<uint>("agent.beta");
     delta_var = 1;
+    uint kMinibatchSize = 1;
 
-    vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, kMinibatchSize, -1, hidden_layer_type, batch_norm);
+    vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, kMinibatchSize, -1, hidden_layer_type, batch_norm_critic);
     
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm, true);
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true);
+    
+    ann_testing = new MLP(*ann, false);
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool) override {
+  void _start_episode(const std::vector<double>& sensors, bool learning) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
     last_action = nullptr;
-  }
-
-  void end_episode(bool) override {
-//      write_actionf_file("ac_func.data");
-//      write_valuef_file("v_after.data");
-//     ann->print();
-//     LOG_FILE("policy_exploration", ann->hash());
+    
+    if(!learning){
+      double* weights = new double[ann->number_of_parameters(false)];
+      ann->copyWeightsTo(weights, false);
+      ann_testing->copyWeightsFrom(weights, false);
+    }
   }
   
-   void write_actionf_file(const std::string& file){
-      
-      std::ofstream out;
-      out.open(file, std::ofstream::out);
-    
-      auto iter = [&](const std::vector<double>& x) {
-        for(uint i=0;i < x.size();i++)
-          out << x[i] << " ";
-//         out << ann->computeOut(x)[0];
-        LOG_ERROR("todo");
-        out << std::endl;
-      };
-      
-      bib::Combinaison::continuous<>(iter, nb_sensors, -1, 1, 6);
-      out.close();
-/*
-      close all; clear all; 
-      X=load("ac_func.data");
-      tmp_ = X(:,2); X(:,2) = X(:,3); X(:,3) = tmp_;
-      key = X(:, 1:2);
-      for i=1:size(key, 1)
-       subkey = find(sum(X(:, 1:2) == key(i,:), 2) == 2);
-       data(end+1, :) = [key(i, :) mean(X(subkey, end))];
-      endfor
-      [xx,yy] = meshgrid (linspace (-1,1,300));
-      griddata(data(:,1), data(:,2), data(:,3), xx, yy, "linear"); xlabel('theta_1'); ylabel('theta_2');
-*/    
-   }
-  
-  void write_valuef_file(const std::string& file){
-      
-      std::ofstream out;
-      out.open(file, std::ofstream::out);
-    
-      auto iter = [&](const std::vector<double>& x) {
-        for(uint i=0;i < x.size();i++)
-          out << x[i] << " ";
-        out << vnn->computeOutVF(x, {});
-        out << std::endl;
-      };
-      
-      bib::Combinaison::continuous<>(iter, nb_sensors, -1, 1, 6);
-      out.close();
-/*
-      function doit()
-      close all; clear all; 
-      X=load("v_after.data");
-      X=load("v_before.data"); 
-      tmp_ = X(:,2); X(:,2) = X(:,3); X(:,3) = tmp_;
-      key = X(:, 1:2);
-      for i=1:size(key, 1)
-       subkey = find(sum(X(:, 1:2) == key(i,:), 2) == 2);
-       data(end+1, :) = [key(i, :) mean(X(subkey, end))];
-      endfor
-      [xx,yy] = meshgrid (linspace (-1,1,300));
-      griddata(data(:,1), data(:,2), data(:,3), xx, yy, "linear"); xlabel('theta_1'); ylabel('theta_2');
-      endfunction
-*/    
-  }
-
   void save(const std::string& path, bool) override {
     ann->save(path+".actor");
     vnn->save(path+".critic");
@@ -202,12 +153,9 @@ class BaseCaclaAg : public arch::ARLAgent<> {
   }
 
  private:
-  uint kMinibatchSize = 1;
   uint nb_sensors;
   std::vector<double> empty_action;
-  uint batch_norm, actor_output_layer_type, hidden_layer_type;
 
-  double alpha_v, alpha_a;
   double noise;
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
@@ -223,6 +171,8 @@ class BaseCaclaAg : public arch::ARLAgent<> {
 
   MLP* ann;
   MLP* vnn;
+  
+  MLP* ann_testing;
 };
 
 #endif
