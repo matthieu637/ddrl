@@ -233,24 +233,12 @@ void SimpleDENFAC::critic_update(uint iter) {
 	std::vector<double>* all_next_actions;
 	all_next_actions = ann->computeOutBatch(all_next_states);
 
-	// DEBUGTEST
-	std::cout << " nb_motors : " << nb_motors << std::endl;
-	std::cout << " traj_size : " << traj->size() << std::endl;
-	std::cout << " n_actions_size : " << all_next_actions->size() << std::endl;
-
-	for(uint i=0;i<traj->size()*nb_sensors;i++){
-		std::cout << all_states[i] << " ";
-	}
-	for(uint i=0;i<traj->size()*nb_motors;i++){
-		std::cout << all_actions[i] << " ";
-	}
-
 	// Compute next Q value
-	std::vector<double>* q_targets = new std::vector<double>(traj->size(),0.f);
+	std::vector<double>* q_targets;
 	std::vector<double>* q_targets_weights = nullptr;
 	double* ptheta = nullptr;
 
-	//q_targets = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+	q_targets = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
 
 	// Importance sampling
 	if(weighting_strategy != 0) {
