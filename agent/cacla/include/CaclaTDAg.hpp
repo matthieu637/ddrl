@@ -51,7 +51,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
         double nextV = vnn->computeOutVF(sensors, {});
         vtarget += gamma * nextV;
       }
-      double lastv = vnn->computeOutVF(last_state, *next_action);
+      double lastv = vnn->computeOutVF(last_state, empty_action);
 
       vnn->learn(last_state, empty_action, vtarget);
       double delta = vtarget - lastv;

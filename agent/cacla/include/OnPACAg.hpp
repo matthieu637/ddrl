@@ -43,7 +43,7 @@ class OnPACAg : public arch::ARLAgent<> {
     else
       // protect batch norm from testing data
       next_action = ann_testing->computeOut(sensors);
-    
+
     if(learning && on_policy) {
       if(gaussian_policy) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
@@ -54,6 +54,8 @@ class OnPACAg : public arch::ARLAgent<> {
           for (uint i = 0; i < next_action->size(); i++)
             next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
       }
+    } else if(learning && actor_output_layer_type == 0) {
+      shrink_actions(next_action);
     }
 
     if (last_action.get() != nullptr && learning) {  // Update Q
@@ -70,10 +72,10 @@ class OnPACAg : public arch::ARLAgent<> {
       //update actor with Q grad error
       qnn->ZeroGradParameters();
       ann->ZeroGradParameters();
-      
+
       auto actions_outputs = ann->computeOut(last_state);
       qnn->computeOutVF(last_state, *actions_outputs);
-      
+
       const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
       double* q_values_diff = q_values_blob->mutable_cpu_diff();
       q_values_diff[q_values_blob->offset(0,0,0,0)] = -1.0f;
@@ -86,10 +88,10 @@ class OnPACAg : public arch::ARLAgent<> {
       ann->actor_backward();
       ann->getSolver()->ApplyUpdate();
       ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
-      
+
       delete actions_outputs;
     }
-    
+
     if(learning && !on_policy) {
       if(gaussian_policy) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
@@ -121,7 +123,7 @@ class OnPACAg : public arch::ARLAgent<> {
     double alpha_a                = pt->get<double>("agent.alpha_a");
     uint batch_norm_critic        = pt->get<uint>("agent.batch_norm_critic");
     uint batch_norm_actor         = pt->get<uint>("agent.batch_norm_actor");
-    uint actor_output_layer_type  = pt->get<uint>("agent.actor_output_layer_type");
+    actor_output_layer_type       = pt->get<uint>("agent.actor_output_layer_type");
     uint hidden_layer_type        = pt->get<uint>("agent.hidden_layer_type");
     on_policy                     = pt->get<bool>("agent.on_policy");
     uint kMinibatchSize = 1;
@@ -173,12 +175,21 @@ class OnPACAg : public arch::ARLAgent<> {
   }
 
  private:
+  void shrink_actions(vector<double>* next_action) {
+    for(uint i=0; i < nb_motors ; i++)
+      if(next_action->at(i) > 1.f)
+        next_action->at(i)=1.f;
+      else if(next_action->at(i) < -1.f)
+        next_action->at(i)=-1.f;
+  }
+
   uint nb_sensors;
 
   double noise;
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
 
+  uint actor_output_layer_type;
   bool gaussian_policy, on_policy;
 
   std::shared_ptr<std::vector<double>> last_action;
