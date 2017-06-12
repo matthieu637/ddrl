@@ -67,7 +67,9 @@ class OnPACAg : public arch::ARLAgent<> {
       }
 //       double lastv = qnn->computeOutVF(last_state, *last_action);
 //       double delta = qtarget - lastv;
-      qnn->learn(last_state, *last_action, qtarget);
+
+      if(!delay_q_update)
+        qnn->learn(last_state, *last_action, qtarget);
 
       //update actor with Q grad error
       qnn->ZeroGradParameters();
@@ -89,6 +91,8 @@ class OnPACAg : public arch::ARLAgent<> {
       ann->getSolver()->ApplyUpdate();
       ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
 
+      if(delay_q_update)
+        qnn->learn(last_state, *last_action, qtarget);
       delete actions_outputs;
     }
 
@@ -126,6 +130,7 @@ class OnPACAg : public arch::ARLAgent<> {
     actor_output_layer_type       = pt->get<uint>("agent.actor_output_layer_type");
     uint hidden_layer_type        = pt->get<uint>("agent.hidden_layer_type");
     on_policy                     = pt->get<bool>("agent.on_policy");
+    delay_q_update                = pt->get<bool>("agent.delay_q_update");
     uint kMinibatchSize = 1;
 
     qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_v, alpha_v, kMinibatchSize, -1, hidden_layer_type,
@@ -190,7 +195,7 @@ class OnPACAg : public arch::ARLAgent<> {
   std::vector<uint>* hidden_unit_a;
 
   uint actor_output_layer_type;
-  bool gaussian_policy, on_policy;
+  bool gaussian_policy, on_policy, delay_q_update;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;
