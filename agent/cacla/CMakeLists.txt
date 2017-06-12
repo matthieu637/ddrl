@@ -50,6 +50,12 @@ target_link_libraries(cp-cacla-off ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} )
 add_executable(hf-cacla-on src/test/HalfCheetahCacOn.cpp ${all_include} ${all_sources} )
 target_link_libraries(hf-cacla-on ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 
+add_executable(hf-caclatd-on src/test/HalfCheetahCacTDOn.cpp ${all_include} ${all_sources} )
+target_link_libraries(hf-caclatd-on ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+
+add_executable(hf-pac src/test/HalfCheetahOnPAC.cpp ${all_include} ${all_sources} )
+target_link_libraries(hf-pac ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+
 add_executable(hf-cacla-off src/test/HalfCheetahCacOff.cpp ${all_include} ${all_sources} )
 target_link_libraries(hf-cacla-off ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 

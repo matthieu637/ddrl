@@ -1,5 +1,5 @@
-#ifndef BASECACLAAG_HPP
-#define BASECACLAAG_HPP
+#ifndef CACLATDAG_HPP
+#define CACLATDAG_HPP
 
 #include <vector>
 #include <string>
@@ -17,19 +17,19 @@
 #include <bib/Combinaison.hpp>
 #include "nn/MLP.hpp"
 
-class BaseCaclaAg : public arch::ARLAgent<> {
+class CaclaTDAg : public arch::ARLAgent<> {
  public:
-  BaseCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
+  CaclaTDAg(unsigned int _nb_motors, unsigned int _nb_sensors)
     : ARLAgent<>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0) {
 
   }
 
-  virtual ~BaseCaclaAg() {
+  virtual ~CaclaTDAg() {
     delete vnn;
     delete ann;
-    
+
     delete ann_testing;
-    
+
     delete hidden_unit_v;
     delete hidden_unit_a;
   }
@@ -43,7 +43,7 @@ class BaseCaclaAg : public arch::ARLAgent<> {
     else
       // protect batch norm from testing data
       next_action = ann_testing->computeOut(sensors);
-    
+
     if (last_action.get() != nullptr && learning) {  // Update Q
 
       double vtarget = reward;
@@ -56,21 +56,30 @@ class BaseCaclaAg : public arch::ARLAgent<> {
       vnn->learn(last_state, empty_action, vtarget);
       double delta = vtarget - lastv;
 
-      if (delta > 0) { //increase this action
-        if(plus_var_version) {
-          uint number_update = ceil(delta / sqrt(delta_var));
-          for(uint k=0; k < number_update; k++)
-            ann->learn(last_state, *last_action);
-        } else
-          ann->learn(last_state, *last_action);
+      //update actor with td error
+//       ann->learn(last_state, *last_action); //cacla update
+      if((pos_delta && delta > 0) || !pos_delta){
+        ann->ZeroGradParameters();
+        auto ac_out = ann->computeOut(last_state);
+        
+        const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
+        auto ac_diff = actor_actions_blob->mutable_cpu_diff();
+        if(with_delta){
+          for(int i=0;i<actor_actions_blob->count();i++)
+              ac_diff[i] = -delta / (last_action->at(i) - ac_out->at(i));
+        } else {
+          for(int i=0;i<actor_actions_blob->count();i++)
+            ac_diff[i] = -1.f / (last_action->at(i) - ac_out->at(i));
+        }
+        ann->actor_backward();
+        ann->getSolver()->ApplyUpdate();
+        ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+        delete ac_out;
       }
-
-      if(plus_var_version)
-        delta_var = (1 - beta) * delta_var + beta * delta * delta;
     }
 
     if(learning) {
-      if(gaussian_policy){
+      if(gaussian_policy) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
@@ -94,25 +103,23 @@ class BaseCaclaAg : public arch::ARLAgent<> {
     hidden_unit_v           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
-    plus_var_version        = pt->get<bool>("agent.plus_var_version");
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
+    with_delta              = pt->get<bool>("agent.with_delta");
+    pos_delta               = pt->get<bool>("agent.pos_delta");
     double alpha_v                 = pt->get<double>("agent.alpha_v");
     double alpha_a                 = pt->get<double>("agent.alpha_a");
     uint batch_norm_critic       = pt->get<uint>("agent.batch_norm_critic");
     uint batch_norm_actor        = pt->get<uint>("agent.batch_norm_actor");
     uint actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
     uint hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
-    
-    beta = 0.001f;
-    if(plus_var_version)
-      beta                  = pt->get<uint>("agent.beta");
-    delta_var = 1;
     uint kMinibatchSize = 1;
 
-    vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, kMinibatchSize, -1, hidden_layer_type, batch_norm_critic);
-    
-    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true);
-    
+    vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, kMinibatchSize, -1, hidden_layer_type,
+                  batch_norm_critic);
+
+    ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type,
+                  actor_output_layer_type, batch_norm_actor, false);
+
     ann_testing = new MLP(*ann, false);
   }
 
@@ -122,15 +129,15 @@ class BaseCaclaAg : public arch::ARLAgent<> {
       last_state.push_back(sensors[i]);
 
     last_action = nullptr;
-    
-    if(!learning){
+
+    if(!learning) {
       double* weights = new double[ann->number_of_parameters(false)];
       ann->copyWeightsTo(weights, false);
       ann_testing->copyWeightsFrom(weights, false);
       delete[] weights;
     }
   }
-  
+
   void save(const std::string& path, bool) override {
     ann->save(path+".actor");
     vnn->save(path+".critic");
@@ -161,9 +168,7 @@ class BaseCaclaAg : public arch::ARLAgent<> {
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
 
-  double beta, delta_var;
-  bool plus_var_version;
-  bool gaussian_policy;
+  bool gaussian_policy, with_delta, pos_delta;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;
@@ -172,7 +177,7 @@ class BaseCaclaAg : public arch::ARLAgent<> {
 
   MLP* ann;
   MLP* vnn;
-  
+
   MLP* ann_testing;
 };
 
