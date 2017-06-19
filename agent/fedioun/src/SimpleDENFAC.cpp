@@ -399,8 +399,8 @@ void SimpleDENFAC::update_actor_critic() {
 		}
 
 		// Fitted actor updates
-		//for(uint i=0; i<nb_actor_updates ; i++)
-		//	actor_update_grad();
+		for(uint i=0; i<nb_actor_updates ; i++)
+			actor_update_grad();
 	}
 }
 
