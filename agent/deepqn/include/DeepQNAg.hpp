@@ -122,12 +122,12 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
                                  bool learning, bool goal_reached, bool last) override {
 
-    vector<double>* next_action ;
-    if(learning)
-      next_action = ann->computeOut(sensors);
-    else
-      // protect batch norm from testing data
-      next_action = ann_testing->computeOut(sensors);
+    // protect batch norm from testing data and poor data
+    double* weights = new double[ann->number_of_parameters(false)];
+    ann->copyWeightsTo(weights, false);
+    ann_testing->copyWeightsFrom(weights, false);
+    delete[] weights;
+    vector<double>* next_action = ann_testing->computeOut(sensors);
     
     if (last_action.get() != nullptr && learning){
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || (count_last && last)};
@@ -205,11 +205,12 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       ann->exploit(pt, nullptr);
     
     if(test_net)
-      ann_target = new NN(*ann, false);
+      ann_target = new NN(*ann, false, ::caffe::Phase::TEST);
     else
-      ann_target = new NN(*ann, true);
+      ann_target = new NN(*ann, false);
     
-    ann_testing = new NN(*ann, false);
+    ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
+    ann_testing->increase_batchsize(1);
     
     qnn = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm_critic);
     if(std::is_same<NN, DevMLP>::value)
@@ -218,12 +219,12 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       qnn->exploit(pt, ann);
     
     if(test_net)
-      qnn_target = new NN(*qnn, false);
+      qnn_target = new NN(*qnn, false, ::caffe::Phase::TEST);
     else
-      qnn_target = new NN(*qnn, true);
+      qnn_target = new NN(*qnn, false);
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool learning) override {
+  void _start_episode(const std::vector<double>& sensors, bool) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -246,13 +247,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       static_cast<DODevMLP *>(ann_target)->inform(episode);
       static_cast<DODevMLP *>(ann_testing)->inform(episode);
     }
-    
-    if(!learning){
-      double* weights = new double[ann->number_of_parameters(false)];
-      ann->copyWeightsTo(weights, false);
-      ann_testing->copyWeightsFrom(weights, false);
-      delete[] weights;
-    }
   }
   
   void sample_transition(std::vector<sample>& traj, const std::deque<sample>& from){
@@ -273,7 +267,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       
       ann = best_pol_population.begin()->ann;
     } else if(learning){
-      to_be_restaured_ann = new MLP(*ann, false);
+      to_be_restaured_ann = new MLP(*ann, false, ::caffe::Phase::TEST);
     }
   }
 #endif
@@ -304,8 +298,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 #endif
 
     if(learning){
-      MLP* cann = new MLP(*ann, false);
-      MLP* cqnn = new MLP(*qnn, false);
+      MLP* cann = new MLP(*ann, false, ::caffe::Phase::TEST);
+      MLP* cqnn = new MLP(*qnn, false, ::caffe::Phase::TEST);
       best_population.insert({cann, cqnn, sum_weighted_reward, last_trajectory_a});
       
       if(best_population.size() > 5){
@@ -328,13 +322,14 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
     
     LOG_INFO("WARNING : hard to restoreBest because of online updates");
+    exit(1);
     
     delete ann;
     delete qnn;
     
     auto it = best_population.begin();
-    ann = new MLP(*it->ann, false);
-    qnn = new MLP(*it->qnn, false);
+    ann = new MLP(*it->ann, false, ::caffe::Phase::TEST);
+    qnn = new MLP(*it->qnn, false, ::caffe::Phase::TEST);
   }
   
   void end_episode(bool learning) override {
@@ -458,8 +453,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     delete qnn_target;
     delete ann_target;
     
-    qnn_target = new MLP(*qnn, false);
-    ann_target = new MLP(*ann, false);
+    qnn_target = new MLP(*qnn, false, ::caffe::Phase::TEST);
+    ann_target = new MLP(*ann, false, ::caffe::Phase::TEST);
   }
   
   void save_run() override {

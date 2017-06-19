@@ -63,7 +63,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   virtual ~OfflineCaclaAg() {
     delete vnn;
     delete ann;
-    
+
     delete ann_testing;
 
     delete hidden_unit_v;
@@ -80,7 +80,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
 
     last_pure_action.reset(new vector<double>(*next_action));
-    if(learning) {
+    if(learning && !policy_evaluation_phase) {
       if(gaussian_policy) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
@@ -108,7 +108,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
     update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
-    update_critic_first     = pt->get<bool>("agent.update_critic_first");
     number_fitted_iteration = pt->get<uint>("agent.number_fitted_iteration");
     stoch_iter              = pt->get<uint>("agent.stoch_iter");
     batch_norm_actor        = pt->get<uint>("agent.batch_norm_actor");
@@ -118,19 +117,20 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
 
-    ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true);
+    ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type,
+                 batch_norm_actor, true);
     if(std::is_same<NN, DODevMLP>::value)
       ann->exploit(pt, nullptr);
-    
+
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic);
     if(std::is_same<NN, DODevMLP>::value)
       vnn->exploit(pt, ann);
-    
+
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
-    
-    if(std::is_same<NN, DODevMLP>::value){
+
+    if(std::is_same<NN, DODevMLP>::value) {
       try {
-        if(pt->get<bool>("devnn.reset_learning_algo")){
+        if(pt->get<bool>("devnn.reset_learning_algo")) {
           LOG_ERROR("NFAC cannot reset anything with DODevMLP");
           exit(1);
         }
@@ -148,17 +148,18 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     last_pure_action = nullptr;
 
     trajectory.clear();
-    
-    if(std::is_same<NN, DODevMLP>::value){
+
+    if(std::is_same<NN, DODevMLP>::value) {
       static_cast<DODevMLP *>(vnn)->inform(episode);
       static_cast<DODevMLP *>(ann)->inform(episode);
       static_cast<DODevMLP *>(ann_testing)->inform(episode);
     }
-    
+
     double* weights = new double[ann->number_of_parameters(false)];
     ann->copyWeightsTo(weights, false);
     ann_testing->copyWeightsFrom(weights, false);
-    delete[] weights;
+    
+    policy_evaluation_phase = true;
   }
 
   void update_critic() {
@@ -190,12 +191,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         }
 
         ASSERT(li == trajectory.size(), "");
-        if(vnn_from_scratch){
+        if(vnn_from_scratch) {
           delete vnn;
-          vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, trajectory.size(), -1, hidden_layer_type, batch_norm_critic);
+          vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, trajectory.size(), -1, hidden_layer_type,
+                       batch_norm_critic);
         }
         vnn->learn_batch(all_states, empty_action, v_target, stoch_iter);
-        
+
         delete all_nextV;
       };
 
@@ -205,17 +207,17 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   }
 
   void end_episode(bool learning) override {
-//     LOG_FILE("policy_exploration", ann->hash());
+    //     LOG_FILE("policy_exploration", ann->hash());
     if(!learning)
       return;
 
     if(trajectory.size() > 0)
       vnn->increase_batchsize(trajectory.size());
-    
-    if(update_critic_first)
+
+    if(policy_evaluation_phase)
       update_critic();
 
-    if (trajectory.size() > 0) {
+    if (trajectory.size() > 0 && !policy_evaluation_phase) {
       std::vector<double> sensors(trajectory.size() * nb_sensors);
       std::vector<double> actions(trajectory.size() * this->nb_motors);
 
@@ -241,11 +243,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
         target = sm.r;
         if (!sm.goal_reached) {
-//           double nextV = vnn->computeOutVF(sm.next_s, {});
+          //           double nextV = vnn->computeOutVF(sm.next_s, {});
           double nextV = all_nextV->at(li);
           target += this->gamma * nextV;
         }
-//         mine = vnn->computeOutVF(sm.s, {});
+        //         mine = vnn->computeOutVF(sm.s, {});
         mine = all_mine->at(li);
 
         if(target > mine) {
@@ -270,12 +272,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       delete all_nextV;
       delete all_mine;
     }
-
-    if(!update_critic_first){
-      update_critic();
-    }
+    
+    policy_evaluation_phase = !policy_evaluation_phase;
   }
-  
+
   void end_instance(bool learning) override {
     if(learning)
       episode++;
@@ -285,7 +285,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     ann->save(path+".actor");
     vnn->save(path+".critic");
   }
-  
+
   void save_run() override {
     ann->save("continue.actor");
     vnn->save("continue.critic");
@@ -297,7 +297,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     ann->load(path+".actor");
     vnn->load(path+".critic");
   }
-  
+
   void load_previous_run() override {
     ann->load("continue.actor");
     vnn->load("continue.critic");
@@ -312,7 +312,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   }
 
   arch::Policy<NN>* getCopyCurrentPolicy() override {
-//         return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
+    //         return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
     return nullptr;
   }
 
@@ -324,7 +324,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   void _dump(std::ostream& out) const override {
     out << std::setw(25) << std::fixed << std::setprecision(22) <<
-    this->sum_weighted_reward << " " << std::setw(8) << std::fixed <<
+        this->sum_weighted_reward << " " << std::setw(8) << std::fixed <<
         std::setprecision(5) << vnn->error() << " " << trajectory.size() ;
   }
 
@@ -333,7 +333,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   uint episode = 0;
 
   double noise;
-  bool gaussian_policy, vnn_from_scratch, update_critic_first,
+  bool policy_evaluation_phase;
+  bool gaussian_policy, vnn_from_scratch, 
        update_delta_neg;
   uint number_fitted_iteration, stoch_iter;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type;
@@ -344,7 +345,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   double alpha_v, alpha_a;
 
   std::set<sample> trajectory;
-//     std::list<sample> trajectory;
+  //     std::list<sample> trajectory;
 
   NN* ann;
   NN* vnn;
@@ -353,10 +354,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
   std::vector<double> empty_action; //dummy action cause c++ cannot accept null reference
-  
+
   struct algo_state {
     uint episode;
-    
+
     friend class boost::serialization::access;
     template <typename Archive>
     void serialize(Archive& ar, const unsigned int) {

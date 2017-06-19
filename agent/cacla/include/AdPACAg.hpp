@@ -17,16 +17,17 @@
 #include <bib/Combinaison.hpp>
 #include "nn/MLP.hpp"
 
-class OnPACAg : public arch::ARLAgent<> {
+class AdPACAg : public arch::ARLAgent<> {
  public:
-  OnPACAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : ARLAgent<>(_nb_motors), nb_sensors(_nb_sensors) {
+  AdPACAg(unsigned int _nb_motors, unsigned int _nb_sensors)
+    : ARLAgent<>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0) {
 
   }
 
-  virtual ~OnPACAg() {
+  virtual ~AdPACAg() {
     delete qnn;
     delete ann;
+    delete adnn;
 
     delete ann_testing;
 
@@ -54,8 +55,6 @@ class OnPACAg : public arch::ARLAgent<> {
           for (uint i = 0; i < next_action->size(); i++)
             next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
       }
-    } else if(learning && actor_output_layer_type == 0) {
-      shrink_actions(next_action);
     }
 
     if (last_action.get() != nullptr && learning) {  // Update Q
@@ -65,24 +64,26 @@ class OnPACAg : public arch::ARLAgent<> {
         double nextQ = qnn->computeOutVF(sensors, *next_action);
         qtarget += gamma * nextQ;
       }
-//       double lastv = qnn->computeOutVF(last_state, *last_action);
-//       double delta = qtarget - lastv;
-
-      if(!delay_q_update)
-        qnn->learn(last_state, *last_action, qtarget);
+      //       double lastv = qnn->computeOutVF(last_state, *last_action);
+      //       double delta = qtarget - lastv;
+      qnn->learn(last_state, *last_action, qtarget);
+      
+      
+      auto actions_outputs = ann->computeOut(last_state);
+      double vtarget = qnn->computeOutVF(last_state, *actions_outputs);
+      adnn->learn(last_state, *last_action, qtarget - vtarget);
 
       //update actor with Q grad error
-      qnn->ZeroGradParameters();
+      adnn->ZeroGradParameters();
       ann->ZeroGradParameters();
 
-      auto actions_outputs = ann->computeOut(last_state);
-      qnn->computeOutVF(last_state, *actions_outputs);
+      adnn->computeOutVF(last_state, *actions_outputs);
 
-      const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
+      const auto q_values_blob = adnn->getNN()->blob_by_name(MLP::q_values_blob_name);
       double* q_values_diff = q_values_blob->mutable_cpu_diff();
       q_values_diff[q_values_blob->offset(0,0,0,0)] = -1.0f;
-      qnn->critic_backward();
-      const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
+      adnn->critic_backward();
+      const auto critic_action_blob = adnn->getNN()->blob_by_name(MLP::actions_blob_name);
 
       // Transfer input-level diffs from Critic to Actor
       const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
@@ -91,8 +92,6 @@ class OnPACAg : public arch::ARLAgent<> {
       ann->getSolver()->ApplyUpdate();
       ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
 
-      if(delay_q_update)
-        qnn->learn(last_state, *last_action, qtarget);
       delete actions_outputs;
     }
 
@@ -127,16 +126,18 @@ class OnPACAg : public arch::ARLAgent<> {
     double alpha_a                = pt->get<double>("agent.alpha_a");
     uint batch_norm_critic        = pt->get<uint>("agent.batch_norm_critic");
     uint batch_norm_actor         = pt->get<uint>("agent.batch_norm_actor");
-    actor_output_layer_type       = pt->get<uint>("agent.actor_output_layer_type");
+    uint actor_output_layer_type  = pt->get<uint>("agent.actor_output_layer_type");
     uint hidden_layer_type        = pt->get<uint>("agent.hidden_layer_type");
     on_policy                     = pt->get<bool>("agent.on_policy");
-    delay_q_update                = pt->get<bool>("agent.delay_q_update");
     uint kMinibatchSize = 1;
     
     if(batch_norm_critic > 0 || batch_norm_actor > 0)
       LOG_WARNING("You want to use batch normalization but there is no batch.");
-
+    
     qnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_v, alpha_v, kMinibatchSize, -1, hidden_layer_type,
+                  batch_norm_critic);
+    
+    adnn = new MLP(nb_sensors + nb_motors, nb_sensors, *hidden_unit_v, alpha_v, kMinibatchSize, -1, hidden_layer_type,
                   batch_norm_critic);
 
     ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type,
@@ -183,23 +184,15 @@ class OnPACAg : public arch::ARLAgent<> {
   }
 
  private:
-  void shrink_actions(vector<double>* next_action) {
-    for(uint i=0; i < nb_motors ; i++)
-      if(next_action->at(i) > 1.f)
-        next_action->at(i)=1.f;
-      else if(next_action->at(i) < -1.f)
-        next_action->at(i)=-1.f;
-  }
-
   uint nb_sensors;
 
   double noise;
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
 
-  uint actor_output_layer_type;
-  bool gaussian_policy, on_policy, delay_q_update;
+  bool gaussian_policy, on_policy;
 
+  std::vector<double> empty_action;
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;
 
@@ -207,6 +200,7 @@ class OnPACAg : public arch::ARLAgent<> {
 
   MLP* ann;
   MLP* qnn;
+  MLP* adnn;
 
   MLP* ann_testing;
 };

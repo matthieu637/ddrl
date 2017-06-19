@@ -74,6 +74,11 @@ class CaclaTDAg : public arch::ARLAgent<> {
         ann->actor_backward();
         ann->getSolver()->ApplyUpdate();
         ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+        
+#ifndef NDEBUG
+        //print gradient over actions
+//         bib::Logger::PRINT_ELEMENTS(ac_diff, actor_actions_blob->count());
+#endif
         delete ac_out;
       }
     }
@@ -113,6 +118,9 @@ class CaclaTDAg : public arch::ARLAgent<> {
     uint actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
     uint hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     uint kMinibatchSize = 1;
+    
+    if(batch_norm_critic > 0 || batch_norm_actor > 0)
+      LOG_WARNING("You want to use batch normalization but there is no batch.");
 
     vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, kMinibatchSize, -1, hidden_layer_type,
                   batch_norm_critic);
@@ -120,7 +128,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
     ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type,
                   actor_output_layer_type, batch_norm_actor, false);
 
-    ann_testing = new MLP(*ann, false);
+    ann_testing = new MLP(*ann, false, ::caffe::Phase::TEST);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool learning) override {
