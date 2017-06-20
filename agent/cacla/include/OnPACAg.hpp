@@ -72,28 +72,31 @@ class OnPACAg : public arch::ARLAgent<> {
         qnn->learn(last_state, *last_action, qtarget);
 
       //update actor with Q grad error
-      qnn->ZeroGradParameters();
-      ann->ZeroGradParameters();
+      if(proba_actor_update < 0.f || 
+        bib::Utils::rand01() >= proba_actor_update_current ){
+        qnn->ZeroGradParameters();
+        ann->ZeroGradParameters();
 
-      auto actions_outputs = ann->computeOut(last_state);
-      qnn->computeOutVF(last_state, *actions_outputs);
+        auto actions_outputs = ann->computeOut(last_state);
+        qnn->computeOutVF(last_state, *actions_outputs);
 
-      const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
-      double* q_values_diff = q_values_blob->mutable_cpu_diff();
-      q_values_diff[q_values_blob->offset(0,0,0,0)] = -1.0f;
-      qnn->critic_backward();
-      const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
+        const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
+        double* q_values_diff = q_values_blob->mutable_cpu_diff();
+        q_values_diff[q_values_blob->offset(0,0,0,0)] = -1.0f;
+        qnn->critic_backward();
+        const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
 
-      // Transfer input-level diffs from Critic to Actor
-      const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
-      actor_actions_blob->ShareDiff(*critic_action_blob);
-      ann->actor_backward();
-      ann->getSolver()->ApplyUpdate();
-      ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+        // Transfer input-level diffs from Critic to Actor
+        const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
+        actor_actions_blob->ShareDiff(*critic_action_blob);
+        ann->actor_backward();
+        ann->getSolver()->ApplyUpdate();
+        ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+        delete actions_outputs;
+      }
 
       if(delay_q_update)
         qnn->learn(last_state, *last_action, qtarget);
-      delete actions_outputs;
     }
 
     if(learning && !on_policy) {
@@ -117,7 +120,6 @@ class OnPACAg : public arch::ARLAgent<> {
     return *next_action;
   }
 
-
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
     hidden_unit_v                 = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
     hidden_unit_a                 = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
@@ -131,7 +133,9 @@ class OnPACAg : public arch::ARLAgent<> {
     uint hidden_layer_type        = pt->get<uint>("agent.hidden_layer_type");
     on_policy                     = pt->get<bool>("agent.on_policy");
     delay_q_update                = pt->get<bool>("agent.delay_q_update");
+    proba_actor_update            = pt->get<double>("agent.proba_actor_update");
     uint kMinibatchSize = 1;
+    proba_actor_update_current = 1;
     
     if(batch_norm_critic > 0 || batch_norm_actor > 0)
       LOG_WARNING("You want to use batch normalization but there is no batch.");
@@ -158,6 +162,11 @@ class OnPACAg : public arch::ARLAgent<> {
       ann_testing->copyWeightsFrom(weights, false);
       delete[] weights;
     }
+  }
+  
+  void end_episode(bool learning) override {
+    if(learning)
+      proba_actor_update_current = proba_actor_update_current * proba_actor_update;
   }
 
   void save(const std::string& path, bool) override {
@@ -199,6 +208,8 @@ class OnPACAg : public arch::ARLAgent<> {
 
   uint actor_output_layer_type;
   bool gaussian_policy, on_policy, delay_q_update;
+  double proba_actor_update;
+  double proba_actor_update_current;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;
