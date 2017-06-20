@@ -101,6 +101,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   virtual ~NeuralFittedACAg() {
     delete qnn;
     delete ann;
+    
+    delete ann_testing;
 
     delete hidden_unit_q;
     delete hidden_unit_a;
@@ -122,7 +124,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
                                   bool learning, bool goal_reached, bool) override {
 
-    vector<double>* next_action = ann->computeOut(sensors);
+    // protect batch norm from testing data and poor data
+    vector<double>* next_action = ann_testing->computeOut(sensors);
 
     if (last_action.get() != nullptr && learning) {
       double p0 = 1.f;
@@ -262,8 +265,12 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
     ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, mini_batch_size, hidden_layer_type, last_layer_actor,
                   batch_norm);
+    
+    ann_testing = new MLP(*ann, false, ::caffe::Phase::TEST);
+    ann_testing->increase_batchsize(1);
 
     if(target_network) {
+      //TODO: check if testing or learning BN
       qnn_target = new MLP(*qnn, false);
       ann_target = new MLP(*ann, false);
     }
@@ -322,6 +329,13 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
     current_trajectory.clear();
     step = 0;
+    
+    if(learning){
+      double* weights = new double[ann->number_of_parameters(false)];
+      ann->copyWeightsTo(weights, false);
+      ann_testing->copyWeightsFrom(weights, false);
+      delete[] weights;
+    }
   }
 
   void computePTheta(const std::deque< sample >& vtraj, double *ptheta) {
@@ -960,6 +974,8 @@ class NeuralFittedACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
   MLP* ann;
   MLP* qnn;
+  
+  MLP* ann_testing;
 
   MLP* ann_target;
   MLP* qnn_target;

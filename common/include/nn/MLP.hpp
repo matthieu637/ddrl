@@ -12,6 +12,7 @@
 #include <bib/Utils.hpp>
 #include <caffe/caffe.hpp>
 #include <caffe/layers/memory_data_layer.hpp>
+#include <caffe/layers/batch_norm_layer.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -75,6 +76,9 @@ class MLP {
 
   constexpr static auto kStateInputCount = 1;
 
+//   
+//   CRITIC NET
+//   
   MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha,
       uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false) :
     size_input_state(input), size_sensors(sensors), size_motors(size_input_state - sensors),
@@ -231,21 +235,25 @@ class MLP {
 //       LOG_DEBUG("actor critic : " <<  neural_net->params().size());
   }
 
+//   
+// COPY CONST
+// 
   MLP(const MLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : size_input_state(
       m.size_input_state), size_sensors(m.size_sensors),
     size_motors(m.size_motors), kMinibatchSize(m.kMinibatchSize), add_loss_layer(m.add_loss_layer),
     weighted_sample(m.weighted_sample), hiddens_size(m.hiddens_size) {
     if(!copy_solver) {
-      ASSERT(_phase == ::caffe::Phase::TRAIN, "this constructor is useless");
+      if(_phase == ::caffe::Phase::TRAIN)
+        LOG_WARNING("You are copying a net in training phase without solver." << std::endl <<
+        "So you BN layer will still learn");
 
       caffe::NetParameter net_param;
       m.neural_net->ToProto(&net_param);
       net_param.set_force_backward(true);
-      net_param.mutable_state()->set_phase(::caffe::Phase::TEST);
+      net_param.mutable_state()->set_phase(_phase);
       for(int i =0; i < net_param.layer_size(); i++) {
         if(net_param.layer(i).has_batch_norm_param()) {
-//           net_param.mutable_layer(i)->clear_param();
-          net_param.mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(true);
+          net_param.mutable_layer(i)->mutable_batch_norm_param()->set_use_global_stats(_phase == ::caffe::Phase::TEST);
         }
       }
       UpgradeNetBatchNorm(&net_param);
@@ -255,6 +263,8 @@ class MLP {
         exit(1);
       }
 #endif
+      
+//       net_param.PrintDebugString();
       neural_net.reset(new caffe::Net<double>(net_param));
       solver = nullptr;
     } else {
@@ -486,7 +496,7 @@ class MLP {
   }
 
   std::vector<double>* computeOutBatch(const std::vector<double>& in) {
-    InputDataIntoLayers(&in, NULL, NULL);
+    InputDataIntoLayers(&in, NULL, NULL, add_loss_layer);
     neural_net->Forward(nullptr);
 
     auto outputs = new std::vector<double>(kMinibatchSize * size_motors);

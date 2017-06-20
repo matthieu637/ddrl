@@ -274,12 +274,12 @@ TEST(MLP, CaffeSaveLoad) {
       nn.learn_batch(sensors, actions, qvalues, 5);
 
       nn.save("CaffeSaveLoad.cache");
-      MLP nn_test(nn, false);
+      MLP nn_test(nn, false, ::caffe::Phase::TEST);
 
       MLP nn2(2, 1, {20,10}, 0.005f, batch_size, -1, hidden_layer, batch_norm);
       nn2.load("CaffeSaveLoad.cache");
 
-      MLP nn3(nn2, false);
+      MLP nn3(nn2, false, ::caffe::Phase::TEST);
       MLP nn4(nn2, true);//learning net
 
       for (n = 0; n < VALGRIND_REDUCE(100, 3) ; n++) {
@@ -297,7 +297,7 @@ TEST(MLP, CaffeSaveLoad) {
 //      Some configuration of batch norm and hidden layer are very bad
 //         EXPECT_GT(nn_test.computeOutVF(sens, ac), out - 0.3);
 //         EXPECT_LT(nn_test.computeOutVF(sens, ac), out + 0.3);
-//         
+//
 //         if(batch_norm == 0) {
 // //        nn and nn2 are in learning phase so it's still learn batch norm
 // //        don't test them during learning with batch norm
@@ -328,9 +328,9 @@ TEST(MLP, CaffeCopyActor) {
 
       MLP actor(1, {8}, 1, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       MLP actor_test(actor, true);//train
-      MLP actor_test2(actor, false);//test
+      MLP actor_test2(actor, false, ::caffe::Phase::TEST);//test
       MLP actor_test3(actor, true, ::caffe::Phase::TEST);//test
-      MLP actor_test4(actor_test2, false);//test
+      MLP actor_test4(actor_test2, false, ::caffe::Phase::TEST);//test
 
       uint n = 0;
       auto iter = [&](const std::vector<double>& x) {
@@ -374,7 +374,7 @@ TEST(MLP, CaffeCopyWeightsActor) {
       //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
       uint batch_size = 400; //must be a squared number
       std::vector<double> sensors(batch_size);
-      
+
       MLP actor(1, {8}, 1, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       MLP actor_nobn(1, {8}, 1, 0.01f, batch_size, hidden_layer, 0, 0);
       EXPECT_EQ(actor_nobn.number_of_parameters(false), 25);
@@ -389,30 +389,30 @@ TEST(MLP, BackwardActor) {//valgrind test only
     for(uint hidden_layer = 1; hidden_layer <= 3 ; hidden_layer++) {
       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
       uint batch_size = 400; //must be a squared number
-      
+
       std::vector<double> sensors(batch_size);
-      
+
       MLP actor(1, {8}, 1, 0.01f, batch_size, hidden_layer, 2, batch_norm);
-      
+
       for(uint forced = 0; forced < 5 ; forced++) {
         uint n = 0;
         auto iter = [&](const std::vector<double>& x) {
           sensors[n] = x[0];
-          
+
           if(bib::Utils::rand01() < 0.4) {
             sensors[n] = bib::Utils::rand01()*2 -1;
           }
           n++;
         };
-        
+
         bib::Combinaison::continuous<>(iter, 2, -1, 1, sqrt(batch_size)-1);
-        
+
         auto all_actions_outputs = actor.computeOutBatch(sensors);
-        
+
         //call to forward needed
         actor.actor_backward();
         delete all_actions_outputs;
-        
+
         caffe::Blob<double> diff({400,1});
         all_actions_outputs = actor.computeOutBatch(sensors);
         const auto actor_actions_blob = actor.getNN()->blob_by_name(MLP::actions_blob_name);
@@ -432,12 +432,12 @@ TEST(MLP, BackwardCritic) {//valgrind test only
     for(uint hidden_layer = 1; hidden_layer <= 3 ; hidden_layer++) {
       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
       uint batch_size = 400; //must be a squared number
-      
+
       std::vector<double> sensors(batch_size);
       std::vector<double> actions(batch_size);
-      
+
       MLP nn(2, 1, {50,10}, 0.001f, batch_size, -1, hidden_layer, batch_norm);
-      
+
       for(uint forced = 0; forced < 5 ; forced++) {
         uint n = 0;
         auto iter = [&](const std::vector<double>& x) {
@@ -454,12 +454,12 @@ TEST(MLP, BackwardCritic) {//valgrind test only
         bib::Combinaison::continuous<>(iter, 2, -1, 1, sqrt(batch_size)-1);
 
         auto all_q = nn.computeOutVFBatch(sensors, actions);
-        
+
         //call to forward needed
         nn.critic_backward();
         delete all_q;
       }
-      
+
     }
   }
 }
@@ -497,7 +497,7 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
         nn.learn_batch(sensors, actions, qvalues, VALGRIND_REDUCE(50,2));
       }
 
-      MLP nn_test(nn, false);//testing
+      MLP nn_test(nn, false, ::caffe::Phase::TEST);//testing
       MLP actor(1, {8}, 1, 0.01f, batch_size, hidden_layer, 2, batch_norm);
       MLP actor_test(actor, true);
 
@@ -594,7 +594,7 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
         ac1_error += fabs(out - actor1_out->at(0));
         ac2_error += fabs(out - actor2_out->at(0));
         q_error += fabs(nn.computeOutVF(sens, ac) - qout);
-        
+
         delete actor1_out;
         delete actor2_out;
       }
@@ -602,7 +602,7 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
       ac1_error /= 100.f;
       ac2_error /= 100.f;
       q_error /= 100.f;
-      
+
       //if critic well learned
       if(q_error < 0.1){
         VALGRIND_SKIP(EXPECT_LT(ac1_error, 0.15));
@@ -621,7 +621,7 @@ TEST(MLP, DevelopmentalLayer) {
       //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
       uint batch_size = 400; //must be a squared number
       std::vector<double> sensors(batch_size);
-      
+
       MLP actor(1, {8}, 1, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       DODevMLP actor2(1, {8}, 1, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       std::string config="[devnn]\nst_scale=false\nst_probabilistic=0\nac_scale=false\nac_probabilistic=0\nst_control=\nac_control=\n";
@@ -635,13 +635,13 @@ TEST(MLP, DevelopmentalLayer) {
       uint n = 0;
       auto iter = [&](const std::vector<double>& x) {
         sensors[n] = x[0];
-        
+
         if(bib::Utils::rand01() < 0.4) {
           sensors[n] = bib::Utils::rand01()*2 -1;
         }
         n++;
       };
-      
+
       //copy param of actor to actor2
       double* weights = new double[actor.number_of_parameters(true)];
       actor.copyWeightsTo(weights, true);
@@ -653,7 +653,7 @@ TEST(MLP, DevelopmentalLayer) {
       weights2[actor2.number_of_parameters(true)-1]=1.f;
       actor2.copyWeightsFrom(weights2, true);
       bib::Combinaison::continuous<>(iter, 1, -1, 1, batch_size);
-      
+
       for(uint forced=0;forced<5;forced++){
         auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
         auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
@@ -663,7 +663,7 @@ TEST(MLP, DevelopmentalLayer) {
         delete all_actions_outputs;
         delete all_actions_outputs2;
       }
-      
+
       weights2[actor2.number_of_parameters(true)-1] = 0.6f;
       actor2.copyWeightsFrom(weights2, true);
       for(uint forced=0;forced<5;forced++){
@@ -680,7 +680,7 @@ TEST(MLP, DevelopmentalLayer) {
         EXPECT_GE(proba, 0.52);
         EXPECT_LE(proba, 0.67);
       }
-      
+
       delete[] weights;
       delete[] weights2;
     }
@@ -694,7 +694,7 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
       //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
       uint batch_size = 343; //must be a power3 number
       std::vector<double> sensors(batch_size*3);
-      
+
       MLP actor(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       DODevMLP actor2(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       std::string config="[devnn]\nst_scale=false\nst_probabilistic=0\nac_scale=false\nac_probabilistic=0\nst_control=\nac_control=None\n";
@@ -702,7 +702,7 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
       boost::iostreams::stream<boost::iostreams::array_source> stream(config.c_str(), config.size());
       boost::property_tree::ini_parser::read_ini(stream, properties);
       actor2.exploit(&properties, nullptr);
-      
+
       EXPECT_EQ(actor2.number_of_parameters(true) - 3 - 4, actor.number_of_parameters(true));
       uint n = 0;
       auto iter = [&](const std::vector<double>& x) {
@@ -710,18 +710,18 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
-        
+
         sensors[n] = x[1];
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
-        
+
         sensors[n] = x[2];
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
       };
-      
+
       //copy param of actor to actor2
       double* weights = new double[actor.number_of_parameters(true)];
       actor.copyWeightsTo(weights, true);
@@ -736,7 +736,7 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
       actor2.copyWeightsFrom(weights2, true);
       bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
       CHECK_EQ(n, batch_size*3);
-      
+
       for(uint forced=0;forced<5;forced++){
         auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
         auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
@@ -746,16 +746,16 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
         delete all_actions_outputs;
         delete all_actions_outputs2;
       }
-      
+
       weights2[actor2.number_of_parameters(true)-4] = 0.1f;
       weights2[actor2.number_of_parameters(true)-3] = 0.8f;
       weights2[actor2.number_of_parameters(true)-2] = 0.4f;
       weights2[actor2.number_of_parameters(true)-1] = 0.6f;
       actor2.copyWeightsFrom(weights2, true);
-      
+
       delete[] weights;
       delete[] weights2;
-      
+
       for(uint forced=0;forced<5;forced++){
         auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
         auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
@@ -773,7 +773,7 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
                 fit1++;
               else if(j==2)
                 fit2++;
-              else 
+              else
                 fit3++;
             }
             y++;
@@ -806,7 +806,7 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
       //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
       uint batch_size = 343; //must be a power3 number
       std::vector<double> sensors(batch_size*3);
-      
+
       MLP actor(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       DODevMLP actor2(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       std::string config="[devnn]\nst_scale=false\nst_probabilistic=0\nac_scale=false\nac_probabilistic=0\nst_control=1:2\nac_control=1:2\n";
@@ -814,7 +814,7 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
       boost::iostreams::stream<boost::iostreams::array_source> stream(config.c_str(), config.size());
       boost::property_tree::ini_parser::read_ini(stream, properties);
       actor2.exploit(&properties, nullptr);
-      
+
       EXPECT_EQ(actor2.number_of_parameters(true) - (3-1) - (4-2), actor.number_of_parameters(true));
       uint n = 0;
       auto iter = [&](const std::vector<double>& x) {
@@ -822,18 +822,18 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
-        
+
         sensors[n] = x[1];
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
-        
+
         sensors[n] = x[2];
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
       };
-      
+
       //copy param of actor to actor2
       double* weights = new double[actor.number_of_parameters(true)];
       actor.copyWeightsTo(weights, true);
@@ -848,7 +848,7 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
       actor2.copyWeightsFrom(weights2, true);
       bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
       CHECK_EQ(n, batch_size*3);
-      
+
       for(uint forced=0;forced<5;forced++){
         auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
         auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
@@ -858,14 +858,14 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
         delete all_actions_outputs;
         delete all_actions_outputs2;
       }
-      
+
       weights2[actor2.number_of_parameters(true)-2] = 0.4f;
       weights2[actor2.number_of_parameters(true)-1] = 0.6f;
       actor2.copyWeightsFrom(weights2, true);
-      
+
       delete[] weights;
       delete[] weights2;
-      
+
       for(uint forced=0;forced<5;forced++){
         auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
         auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
@@ -883,7 +883,7 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
                 fit1++;
               else if(j==2)
                 fit2++;
-              else 
+              else
                 fit3++;
             }
             y++;
@@ -910,14 +910,14 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
 }
 
 
-TEST(MLP, DevelopmentalLayerSharedParameters) { 
+TEST(MLP, DevelopmentalLayerSharedParameters) {
   std::vector<uint> batch_norms = {0,4,6,7,8,10,11,12,14,15};
   for(uint batch_norm : batch_norms) {
     for(uint hidden_layer = 1; hidden_layer <=3 ; hidden_layer++) {
       //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
       uint batch_size = 343; //must be a power3 number
       std::vector<double> sensors(batch_size*3);
-      
+
       MLP actor2(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       DODevMLP actor(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       std::string config="[devnn]\nst_scale=false\nst_probabilistic=0\nac_scale=false\nac_probabilistic=0\nst_control=1:2\nac_control=1:2\n";
@@ -925,37 +925,37 @@ TEST(MLP, DevelopmentalLayerSharedParameters) {
       boost::iostreams::stream<boost::iostreams::array_source> stream(config.c_str(), config.size());
       boost::property_tree::ini_parser::read_ini(stream, properties);
       actor.exploit(&properties, nullptr);
-      
+
       MLP critic(4+3, 3, {10,5}, 0.005f, batch_size, -1, hidden_layer, batch_norm);
       DODevMLP critic2(4+3, 3, {10,5}, 0.005f, batch_size, -1, hidden_layer, batch_norm);
       critic2.exploit(&properties, (MLP*) &actor);
       DODevMLP critic3(critic2, true);
-      
+
       EXPECT_EQ(critic.number_of_parameters(true), critic2.number_of_parameters(true)-4);
       EXPECT_EQ(critic2.number_of_parameters(true), critic3.number_of_parameters(true));
-      
+
       uint n = 0;
       auto iter = [&](const std::vector<double>& x) {
         sensors[n] = x[0];
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
-        
+
         sensors[n] = x[1];
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
-        
+
         sensors[n] = x[2];
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
       };
-      
+
       if(batch_norm == 0){
         auto blob2 = actor.getNN()->layer_by_name("devnn_states")->blobs()[0];
         auto blob3 = critic2.getNN()->layer_by_name("devnn_states")->blobs()[0];
-        
+
         EXPECT_EQ(blob3->count(), blob2->count());
         //careful to learnable_params order
         EXPECT_EQ(blob3->count(), critic2.getNN()->learnable_params()[1]->count());
@@ -969,19 +969,19 @@ TEST(MLP, DevelopmentalLayerSharedParameters) {
         //copy param of actor to actor2
         double* weights = new double[actor.number_of_parameters(true)];
         actor.copyWeightsTo(weights, true);
-        
+
         double* weights2 = new double[critic2.number_of_parameters(true)];
         critic2.copyWeightsTo(weights2, true);
-        
+
         double* weights3 = new double[critic3.number_of_parameters(true)];
         critic3.copyWeightsTo(weights3, true);
-        
+
         const double* weights4 = critic2.getNN()->learnable_params()[1]->cpu_data();
         const double* weights5 = actor.getNN()->learnable_params()[0]->cpu_data();
-        
+
         ASSERT(critic2.getNN()->learnable_params()[1]->count(), 2);
         ASSERT(actor.getNN()->learnable_params()[0]->count(), 2);
-        
+
         for(uint i=0;i<3-1;i++){
           EXPECT_DOUBLE_EQ(weights[i], weights5[i]);
           EXPECT_DOUBLE_EQ(weights4[i], weights2[i+2]);
@@ -992,48 +992,48 @@ TEST(MLP, DevelopmentalLayerSharedParameters) {
         for(uint i=actor.number_of_parameters(true); i < actor2.number_of_parameters(true)-(3-1);i++)
           weights2[i+(3-1)]=1.f;
         actor.copyWeightsFrom(weights, true);
-        
+
         for(uint i=0;i<3-1;i++){
           EXPECT_DOUBLE_EQ(weights[i], weights5[i]);
           EXPECT_DOUBLE_EQ(weights4[i], weights2[i+2]);
           EXPECT_DOUBLE_EQ(weights[i], weights2[i+2]);
           EXPECT_DOUBLE_EQ(weights2[i], weights3[i]);//copy constructor for DODEVMLP
         }
-        
+
         delete[] weights;
         delete[] weights2;
         delete[] weights3;
       }
       bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
       CHECK_EQ(n, batch_size*3);
-      
+
       for(uint forced=0;forced<5;forced++){
         auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
         auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//no dev layer
         auto q_v = critic2.computeOutVFBatch(sensors, *all_actions_outputs2);
-        
+
         auto blob2 = actor.getNN()->layer_by_name("devnn_actions")->blobs()[0];
         auto blob3 = critic2.getNN()->layer_by_name("devnn_actions")->blobs()[0];
         auto blob33 = critic3.getNN()->layer_by_name("devnn_actions")->blobs()[0];
-        
+
         ASSERT(blob3->count(), blob2->count());
         ASSERT(blob33->count(), blob2->count());
         for (int i =0;i<blob3->count();i++){
           EXPECT_EQ(blob3->cpu_data()[i], blob2->cpu_data()[i]);
           EXPECT_EQ(blob33->cpu_data()[i], blob2->cpu_data()[i]);
         }
-        
+
         auto blob4 = actor.getNN()->layer_by_name("devnn_states")->blobs()[0];
         auto blob5 = critic2.getNN()->layer_by_name("devnn_states")->blobs()[0];
         auto blob55 = critic3.getNN()->layer_by_name("devnn_states")->blobs()[0];
-        
+
         ASSERT(blob4->count(), blob5->count());
         ASSERT(blob55->count(), blob5->count());
         for (int i =0;i<blob4->count();i++){
           EXPECT_EQ(blob4->cpu_data()[i], blob5->cpu_data()[i]);
           EXPECT_EQ(blob55->cpu_data()[i], blob5->cpu_data()[i]);
         }
-        
+
         delete q_v;
         delete all_actions_outputs;
         delete all_actions_outputs2;
@@ -1049,7 +1049,7 @@ TEST(MLP, DevelopmentalLayerScalingControl) {
       //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
       uint batch_size = 343; //must be a power3 number
       std::vector<double> sensors(batch_size*3);
-      
+
       MLP actor(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       DODevMLP actor2(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       std::string config="[devnn]\nst_scale=true\nst_probabilistic=0\nac_scale=true\nac_probabilistic=0\nst_control=1:2\nac_control=1:2\n";
@@ -1057,7 +1057,7 @@ TEST(MLP, DevelopmentalLayerScalingControl) {
       boost::iostreams::stream<boost::iostreams::array_source> stream(config.c_str(), config.size());
       boost::property_tree::ini_parser::read_ini(stream, properties);
       actor2.exploit(&properties, nullptr);
-      
+
       EXPECT_EQ(actor2.number_of_parameters(true) - (3-1) - (4-2), actor.number_of_parameters(true));
       uint n = 0;
       auto iter = [&](const std::vector<double>& x) {
@@ -1065,18 +1065,18 @@ TEST(MLP, DevelopmentalLayerScalingControl) {
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
-        
+
         sensors[n] = x[1];
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
-        
+
         sensors[n] = x[2];
         if(bib::Utils::rand01() < 0.4)
           sensors[n] = bib::Utils::rand01()*2 -1;
         n++;
       };
-      
+
       //copy param of actor to actor2
       double* weights = new double[actor.number_of_parameters(true)];
       actor.copyWeightsTo(weights, true);
@@ -1091,7 +1091,7 @@ TEST(MLP, DevelopmentalLayerScalingControl) {
       actor2.copyWeightsFrom(weights2, true);
       bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
       CHECK_EQ(n, batch_size*3);
-      
+
       for(uint forced=0;forced<5;forced++){
         auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
         auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
@@ -1101,18 +1101,18 @@ TEST(MLP, DevelopmentalLayerScalingControl) {
         delete all_actions_outputs;
         delete all_actions_outputs2;
       }
-      
+
       weights2[actor2.number_of_parameters(true)-2] = 0.4f;
       weights2[actor2.number_of_parameters(true)-1] = 0.6f;
       actor2.copyWeightsFrom(weights2, true);
-      
+
       delete[] weights;
       delete[] weights2;
-      
+
       for(uint forced=0;forced<5;forced++){
         auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
         auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
- 
+
         uint y=0;
         uint fit0=0;
         uint fit1=0;
@@ -1158,7 +1158,7 @@ TEST(MLP, DevelopmentalLayerBackward) {
       for(uint probabilistic = 0; probabilistic <=3 ; probabilistic++){
         uint batch_size = 343; //must be a power3 number
         std::vector<double> sensors(batch_size*3);
-        
+
         DODevMLP actor(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
         std::string config="[devnn]\nst_scale=false\nst_probabilistic=";
         config += std::to_string(probabilistic);
@@ -1169,28 +1169,28 @@ TEST(MLP, DevelopmentalLayerBackward) {
         boost::iostreams::stream<boost::iostreams::array_source> stream(config.c_str(), config.size());
         boost::property_tree::ini_parser::read_ini(stream, properties);
         actor.exploit(&properties, nullptr);
-        
+
         uint n = 0;
         auto iter = [&](const std::vector<double>& x) {
           sensors[n] = x[0];
           if(bib::Utils::rand01() < 0.4)
             sensors[n] = bib::Utils::rand01()*2 -1;
           n++;
-          
+
           sensors[n] = x[1];
           if(bib::Utils::rand01() < 0.4)
             sensors[n] = bib::Utils::rand01()*2 -1;
           n++;
-          
+
           sensors[n] = x[2];
           if(bib::Utils::rand01() < 0.4)
             sensors[n] = bib::Utils::rand01()*2 -1;
           n++;
         };
-        
+
         bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
         CHECK_EQ(n, batch_size*3);
-        
+
         for(uint forced=0;forced<5;forced++){
           auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
           actor.actor_backward();
@@ -1207,7 +1207,7 @@ TEST(MLP, DevelopmentalLayerBackwardDiffCompute) {
       for(uint probabilistic = 0; probabilistic <=3 ; probabilistic++){
         uint batch_size = 343; //must be a power3 number
         std::vector<double> sensors(batch_size*3);
-        
+
         DODevMLP actor(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
         std::string config="[devnn]\ncompute_diff_backward=true\nst_scale=false\nst_probabilistic=";
         config += std::to_string(probabilistic);
@@ -1218,28 +1218,28 @@ TEST(MLP, DevelopmentalLayerBackwardDiffCompute) {
         boost::iostreams::stream<boost::iostreams::array_source> stream(config.c_str(), config.size());
         boost::property_tree::ini_parser::read_ini(stream, properties);
         actor.exploit(&properties, nullptr);
-        
+
         uint n = 0;
         auto iter = [&](const std::vector<double>& x) {
           sensors[n] = x[0];
           if(bib::Utils::rand01() < 0.4)
             sensors[n] = bib::Utils::rand01()*2 -1;
           n++;
-          
+
           sensors[n] = x[1];
           if(bib::Utils::rand01() < 0.4)
             sensors[n] = bib::Utils::rand01()*2 -1;
           n++;
-          
+
           sensors[n] = x[2];
           if(bib::Utils::rand01() < 0.4)
             sensors[n] = bib::Utils::rand01()*2 -1;
           n++;
         };
-        
+
         bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
         CHECK_EQ(n, batch_size*3);
-        
+
         for(uint forced=0;forced<5;forced++){
           auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
           actor.actor_backward();
@@ -1255,7 +1255,7 @@ TEST(MLP, DevelopmentalLayerHeuristic1) {
       for(uint probabilistic = 0; probabilistic <=3 ; probabilistic++){
         uint batch_size = 343; //must be a power3 number
         std::vector<double> sensors(batch_size*3);
-        
+
         DODevMLP actor(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
         {
           std::string config="[devnn]\nheuristic=1\nst_scale=false\nst_probabilistic=1\n";
@@ -1266,7 +1266,7 @@ TEST(MLP, DevelopmentalLayerHeuristic1) {
           boost::property_tree::ini_parser::read_ini(stream, properties);
           actor.exploit(&properties, nullptr);
         }
-        
+
         DODevMLP actor2(3, {8}, 4, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
         {
           std::string config="[devnn]\nheuristic=1\nst_scale=false\nst_probabilistic=1\n";
@@ -1277,33 +1277,33 @@ TEST(MLP, DevelopmentalLayerHeuristic1) {
           boost::property_tree::ini_parser::read_ini(stream, properties);
           actor2.exploit(&properties, nullptr);
         }
-        
+
         uint n = 0;
         auto iter = [&](const std::vector<double>& x) {
           sensors[n] = x[0];
           if(bib::Utils::rand01() < 0.4)
             sensors[n] = bib::Utils::rand01()*2 -1;
           n++;
-          
+
           sensors[n] = x[1];
           if(bib::Utils::rand01() < 0.4)
             sensors[n] = bib::Utils::rand01()*2 -1;
           n++;
-          
+
           sensors[n] = x[2];
           if(bib::Utils::rand01() < 0.4)
             sensors[n] = bib::Utils::rand01()*2 -1;
           n++;
         };
-        
+
         bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
         CHECK_EQ(n, batch_size*3);
-        
+
         double* weights = new double[actor.number_of_parameters(true)];
         actor.copyWeightsTo(weights, true);
         actor2.copyWeightsFrom(weights, true);
         delete[] weights;
-        
+
         EXPECT_EQ(actor.number_of_parameters(true), actor2.number_of_parameters(true));
         EXPECT_GT(actor.number_of_parameters(false), actor2.number_of_parameters(false));
 
@@ -1315,7 +1315,7 @@ TEST(MLP, DevelopmentalLayerHeuristic1) {
             for (uint j =0; j < 4; j++)
               if(all_actions_outputs->at(i*4+j) != 0 && sensors[i*3+1] > 0.0001 && sensors[i*3+2] > 0.0001)
                 EXPECT_NE(all_actions_outputs->at(i*4+j), all_actions_outputs2->at(i*4+j));
-          
+
           delete all_actions_outputs;
           delete all_actions_outputs2;
         }
@@ -1323,12 +1323,118 @@ TEST(MLP, DevelopmentalLayerHeuristic1) {
         {
           auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
           auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
-          
+
           for (uint i =0; i < batch_size; i++)
             EXPECT_DOUBLE_EQ(all_actions_outputs->at(i), all_actions_outputs2->at(i));
-          
+
           delete all_actions_outputs;
           delete all_actions_outputs2;
         }
       }
+}
+
+TEST(MLP, CaffeBNTesting) {
+  std::vector<uint> batch_norms = {4,6,7,8,10,11,12,14,15};
+  std::vector<bool> alola = {true,false};
+  uint hidden_layer = 1;
+  for(uint batch_norm : batch_norms) {
+    for(bool add_loss_layer : alola) {
+      //       LOG_DEBUG("bn " << batch_norm << " " << hidden_layer);
+      uint batch_size = 400; //must be a squared number
+      std::vector<double> sensors(batch_size);
+      std::vector<double> sensors2(batch_size);
+
+      MLP actor(1, {50,25}, 1, 0.01f, batch_size, hidden_layer, 0, batch_norm, add_loss_layer);//train
+      MLP actor_bn_dontlearn(actor, false, ::caffe::Phase::TEST);
+      EXPECT_EQ(actor_bn_dontlearn.number_of_parameters(false), actor.number_of_parameters(false));
+
+      uint n = 0;
+      auto iter = [&](const std::vector<double>& x) {
+        sensors[n] = x[0];
+        sensors2[n] = 5.f + x[0];
+
+        if(bib::Utils::rand01() < 0.4) {
+          sensors[n] = bib::Utils::rand01()*2 -1;
+          sensors2[n] = bib::Utils::rand01()*2 -1;
+        }
+        n++;
+      };
+
+      bib::Combinaison::continuous<>(iter, 1, -1, 1, batch_size);
+
+      if(add_loss_layer)
+          actor.learn_batch(sensors2, {}, sensors2, 5);
+      auto all_actions_outputs1 = actor.computeOutBatch(sensors);
+      delete actor.computeOutBatch(sensors2);
+      delete actor.computeOutBatch(sensors);
+      delete actor.computeOutBatch(sensors2);
+      delete actor.computeOutBatch(sensors);
+      delete actor.computeOutBatch(sensors2);
+      auto all_actions_outputs2 = actor.computeOutBatch(sensors);
+      //because BN is learning all_actions_outputs1 != all_actions_outputs2
+//       apparently it is not that sure...
+      double diff = 0;
+      for(uint i=0; i<batch_size; i++)
+        diff += fabs(all_actions_outputs1->at(i) - all_actions_outputs2->at(i));
+//       LOG_DEBUG(diff);
+//       conclusion BN output is the same over severy same batch
+
+      delete all_actions_outputs1;
+      delete all_actions_outputs2;
+//       but at least the weight of BN changed
+      double* weights = new double[actor.number_of_parameters(false)];
+      double* weights2 = new double[actor_bn_dontlearn.number_of_parameters(false)];
+      actor.copyWeightsTo(weights, false);
+      actor_bn_dontlearn.copyWeightsTo(weights2, false);
+      diff = 0;
+      for(uint i=0; i<actor.number_of_parameters(false); i++)
+        diff += fabs(weights[i] - weights2[i]);
+      EXPECT_GT(diff, 2.f);
+
+      delete[] weights;
+      delete[] weights2;
+
+//       now check that classic copy is enough to take advantage of bn
+      auto all_actions_outputs0 = actor.computeOutBatch(sensors);
+      MLP actor_bn_dontlearn_after(actor, false, ::caffe::Phase::TEST);
+      auto all_actions_outputs4 = actor_bn_dontlearn.computeOutBatch(sensors);
+      {
+        double* weights = new double[actor.number_of_parameters(false)];
+        actor.copyWeightsTo(weights, false);
+        actor_bn_dontlearn.copyWeightsFrom(weights, false);
+        delete[] weights;
+      }
+
+      all_actions_outputs1 = actor.computeOutBatch(sensors);
+      all_actions_outputs2 = actor_bn_dontlearn.computeOutBatch(sensors);
+      auto all_actions_outputs5 = actor_bn_dontlearn_after.computeOutBatch(sensors);
+
+      diff = 0;
+      double diff2 = 0;
+      double diff3 = 0;
+      double diff4 = 0;
+      for(uint i=0; i<batch_size; i++) {
+        diff += fabs(all_actions_outputs1->at(i) - all_actions_outputs2->at(i));
+        diff2 += fabs(all_actions_outputs0->at(i) - all_actions_outputs2->at(i));
+        diff3 += fabs(all_actions_outputs4->at(i) - all_actions_outputs2->at(i));
+        diff4 += fabs(all_actions_outputs5->at(i) - all_actions_outputs2->at(i));
+      }
+//       LOG_DEBUG(diff << " " << diff2 << " " << diff3 << " " << diff4 << " " <<
+//                 fabs(actor.weight_l1_norm() - actor_bn_dontlearn.weight_l1_norm()));
+
+// conclusion : BN is not the same in learning and testing
+//       EXPECT_DOUBLE_EQ(diff, 0.000f);
+//       EXPECT_DOUBLE_EQ(diff2, 0.000f);
+//       EXPECT_DOUBLE_EQ(diff3, 0.000f);
+      EXPECT_DOUBLE_EQ(diff4, 0.000f);
+
+      delete all_actions_outputs1;
+      delete all_actions_outputs2;
+      delete all_actions_outputs0;
+      delete all_actions_outputs4;
+
+//       if it's in testing then is output different than training
+      EXPECT_GT(fabs(actor.weight_l1_norm() - actor_bn_dontlearn.weight_l1_norm()), 0.01);
+    }
+  }
 }

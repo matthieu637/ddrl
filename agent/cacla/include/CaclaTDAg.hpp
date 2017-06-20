@@ -55,32 +55,45 @@ class CaclaTDAg : public arch::ARLAgent<> {
 
       vnn->learn(last_state, empty_action, vtarget);
       double delta = vtarget - lastv;
+      gradient_step = fabs(delta) <= gradient_step_proba;
 
       //update actor with td error
 //       ann->learn(last_state, *last_action); //cacla update
-      if((pos_delta && delta > 0) || !pos_delta){
-        ann->ZeroGradParameters();
-        auto ac_out = ann->computeOut(last_state);
-        
-        const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
-        auto ac_diff = actor_actions_blob->mutable_cpu_diff();
-        if(with_delta){
-          for(int i=0;i<actor_actions_blob->count();i++)
+      if(gradient_step) {
+//       LOG_DEBUG(delta << " " << gradient_step);
+        if((pos_delta && delta > 0) || !pos_delta) {
+          ann->ZeroGradParameters();
+          auto ac_out = ann->computeOut(last_state);
+
+          const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
+          auto ac_diff = actor_actions_blob->mutable_cpu_diff();
+          if(with_delta) {
+            for(int i=0; i<actor_actions_blob->count(); i++)
               ac_diff[i] = -delta / (last_action->at(i) - ac_out->at(i));
-        } else {
-          for(int i=0;i<actor_actions_blob->count();i++)
-            ac_diff[i] = -1.f / (last_action->at(i) - ac_out->at(i));
+          } else {
+            for(int i=0; i<actor_actions_blob->count(); i++)
+              ac_diff[i] = -1.f / (last_action->at(i) - ac_out->at(i));
+          }
+          ann->actor_backward();
+          ann->getSolver()->ApplyUpdate();
+          ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+
+#ifndef NDEBUG
+          //print gradient over actions
+//         bib::Logger::PRINT_ELEMENTS(ac_diff, actor_actions_blob->count());
+#endif
+          delete ac_out;
         }
-        ann->actor_backward();
-        ann->getSolver()->ApplyUpdate();
-        ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
-        delete ac_out;
       }
     }
 
     if(learning) {
       if(gaussian_policy) {
-        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+//         gradient_step = bib::Utils::rand01() < gradient_step_proba;
+        double lnoise = noise;
+//         if(gradient_step)
+//           lnoise = 0.0001;
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, lnoise);
         delete next_action;
         next_action = randomized_action;
       } else {
@@ -100,19 +113,23 @@ class CaclaTDAg : public arch::ARLAgent<> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
-    hidden_unit_v           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
-    hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
-    noise                   = pt->get<double>("agent.noise");
-    gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
-    with_delta              = pt->get<bool>("agent.with_delta");
-    pos_delta               = pt->get<bool>("agent.pos_delta");
-    double alpha_v                 = pt->get<double>("agent.alpha_v");
-    double alpha_a                 = pt->get<double>("agent.alpha_a");
+    hidden_unit_v                = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
+    hidden_unit_a                = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
+    noise                        = pt->get<double>("agent.noise");
+    gaussian_policy              = pt->get<bool>("agent.gaussian_policy");
+    with_delta                   = pt->get<bool>("agent.with_delta");
+    pos_delta                    = pt->get<bool>("agent.pos_delta");
+    gradient_step_proba          = pt->get<double>("agent.gradient_step_proba");
+    double alpha_v               = pt->get<double>("agent.alpha_v");
+    double alpha_a               = pt->get<double>("agent.alpha_a");
     uint batch_norm_critic       = pt->get<uint>("agent.batch_norm_critic");
     uint batch_norm_actor        = pt->get<uint>("agent.batch_norm_actor");
     uint actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
     uint hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     uint kMinibatchSize = 1;
+
+    if(batch_norm_critic > 0 || batch_norm_actor > 0)
+      LOG_WARNING("You want to use batch normalization but there is no batch.");
 
     vnn = new MLP(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, kMinibatchSize, -1, hidden_layer_type,
                   batch_norm_critic);
@@ -120,7 +137,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
     ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type,
                   actor_output_layer_type, batch_norm_actor, false);
 
-    ann_testing = new MLP(*ann, false);
+    ann_testing = new MLP(*ann, false, ::caffe::Phase::TEST);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool learning) override {
@@ -169,6 +186,8 @@ class CaclaTDAg : public arch::ARLAgent<> {
   std::vector<uint>* hidden_unit_a;
 
   bool gaussian_policy, with_delta, pos_delta;
+  double gradient_step_proba;
+  bool gradient_step;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;

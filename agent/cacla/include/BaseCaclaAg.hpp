@@ -63,6 +63,12 @@ class BaseCaclaAg : public arch::ARLAgent<> {
             ann->learn(last_state, *last_action);
         } else
           ann->learn(last_state, *last_action);
+#ifndef NDEBUG
+        //print gradient over actions
+//         const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
+//         auto ac_diff = actor_actions_blob->cpu_diff();
+//         bib::Logger::PRINT_ELEMENTS(ac_diff, actor_actions_blob->count());
+#endif
       }
 
       if(plus_var_version)
@@ -91,6 +97,7 @@ class BaseCaclaAg : public arch::ARLAgent<> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
+//     bib::Seed::setFixedSeedUTest();
     hidden_unit_v           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
@@ -103,6 +110,9 @@ class BaseCaclaAg : public arch::ARLAgent<> {
     uint actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
     uint hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     
+    if(batch_norm_critic > 0 || batch_norm_actor > 0)
+      LOG_WARNING("You want to use batch normalization but there is no batch.");
+    
     beta = 0.001f;
     if(plus_var_version)
       beta                  = pt->get<uint>("agent.beta");
@@ -113,7 +123,7 @@ class BaseCaclaAg : public arch::ARLAgent<> {
     
     ann = new MLP(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true);
     
-    ann_testing = new MLP(*ann, false);
+    ann_testing = new MLP(*ann, false, ::caffe::Phase::TEST);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool learning) override {
