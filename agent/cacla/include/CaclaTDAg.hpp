@@ -55,11 +55,11 @@ class CaclaTDAg : public arch::ARLAgent<> {
 
       vnn->learn(last_state, empty_action, vtarget);
       double delta = vtarget - lastv;
-      gradient_step = fabs(delta) <= gradient_step_proba;
+//       gradient_step = fabs(delta) <= gradient_step_proba;
 
       //update actor with td error
 //       ann->learn(last_state, *last_action); //cacla update
-      if(gradient_step) {
+//       if(gradient_step) {
 //       LOG_DEBUG(delta << " " << gradient_step);
         if((pos_delta && delta > 0) || !pos_delta) {
           ann->ZeroGradParameters();
@@ -67,12 +67,53 @@ class CaclaTDAg : public arch::ARLAgent<> {
 
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
-          if(with_delta) {
-            for(int i=0; i<actor_actions_blob->count(); i++)
-              ac_diff[i] = -delta / (last_action->at(i) - ac_out->at(i));
+//           if(with_delta) {
+//             for(int i=0; i<actor_actions_blob->count(); i++)
+//               ac_diff[i] = -delta / (last_action->at(i) - ac_out->at(i));
+//           } else {
+//             for(int i=0; i<actor_actions_blob->count(); i++)
+//               ac_diff[i] = -1.f / (last_action->at(i) - ac_out->at(i));
+//           }
+          if(shrink_ga){
+            if(with_delta) {
+              for(int i=0; i<actor_actions_blob->count(); i++){
+                double x = last_action->at(i) - ac_out->at(i);
+                double fabs_x = fabs(x);
+                if(fabs_x <= 1.f)
+                  ac_diff[i] = - sign(x) * ( delta - sign(delta) * (sqrt(fabs_x) - 1.f));
+                else
+                  ac_diff[i] = -delta / x;
+              }
+            } else {
+              for(int i=0; i<actor_actions_blob->count(); i++){
+                double x = last_action->at(i) - ac_out->at(i);
+                double fabs_x = fabs(x);
+                if(fabs_x <= 1.f)
+                  ac_diff[i] = - sign(x) * ( 2.f - sqrt(fabs_x));
+                else
+                  ac_diff[i] = -1.f / x;
+              }
+            }
           } else {
-            for(int i=0; i<actor_actions_blob->count(); i++)
-              ac_diff[i] = -1.f / (last_action->at(i) - ac_out->at(i));
+            if(with_delta) {
+              for(int i=0; i<actor_actions_blob->count(); i++){
+                double x = last_action->at(i) - ac_out->at(i);
+                double fabs_x = fabs(x);
+                if(fabs_x <= 1.f)
+                  ac_diff[i] = - delta * x;
+                else
+                  ac_diff[i] = - delta / x;
+              }
+            } else {
+              for(int i=0; i<actor_actions_blob->count(); i++){
+                double x = last_action->at(i) - ac_out->at(i);
+                double fabs_x = fabs(x);
+                if(fabs_x <= 1.f)
+                  ac_diff[i] = - x;
+                else
+                  ac_diff[i] = -1.f / x;
+              }
+            }
           }
           ann->actor_backward();
           ann->getSolver()->ApplyUpdate();
@@ -84,7 +125,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
 #endif
           delete ac_out;
         }
-      }
+//       }
     }
 
     if(learning) {
@@ -119,6 +160,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
     gaussian_policy              = pt->get<bool>("agent.gaussian_policy");
     with_delta                   = pt->get<bool>("agent.with_delta");
     pos_delta                    = pt->get<bool>("agent.pos_delta");
+    shrink_ga                    = pt->get<bool>("agent.shrink_ga");
     gradient_step_proba          = pt->get<double>("agent.gradient_step_proba");
     double alpha_v               = pt->get<double>("agent.alpha_v");
     double alpha_a               = pt->get<double>("agent.alpha_a");
@@ -176,6 +218,12 @@ class CaclaTDAg : public arch::ARLAgent<> {
         sum_weighted_reward << " " << std::setw(8) << std::fixed <<
         std::setprecision(5) << vnn->error() << " " << noise;
   }
+  
+  double sign(double x){
+    if(x>=0)
+      return 1.f;
+    return -1.f;
+  }
 
  private:
   uint nb_sensors;
@@ -187,7 +235,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
 
   bool gaussian_policy, with_delta, pos_delta;
   double gradient_step_proba;
-  bool gradient_step;
+  bool gradient_step, shrink_ga;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;
