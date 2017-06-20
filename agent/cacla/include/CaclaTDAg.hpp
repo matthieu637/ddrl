@@ -55,10 +55,12 @@ class CaclaTDAg : public arch::ARLAgent<> {
 
       vnn->learn(last_state, empty_action, vtarget);
       double delta = vtarget - lastv;
+      gradient_step = fabs(delta) <= gradient_step_proba;
 
       //update actor with td error
 //       ann->learn(last_state, *last_action); //cacla update
       if(gradient_step) {
+//       LOG_DEBUG(delta << " " << gradient_step);
         if((pos_delta && delta > 0) || !pos_delta) {
           ann->ZeroGradParameters();
           auto ac_out = ann->computeOut(last_state);
@@ -87,10 +89,10 @@ class CaclaTDAg : public arch::ARLAgent<> {
 
     if(learning) {
       if(gaussian_policy) {
-        gradient_step = bib::Utils::rand01() < gradient_step_proba;
+//         gradient_step = bib::Utils::rand01() < gradient_step_proba;
         double lnoise = noise;
-        if(gradient_step)
-          lnoise = 0.0001;
+//         if(gradient_step)
+//           lnoise = 0.0001;
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, lnoise);
         delete next_action;
         next_action = randomized_action;
