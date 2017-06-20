@@ -15,6 +15,7 @@ class HalfCheetahWorldView : public HalfCheetahWorld {
   ~HalfCheetahWorldView();
   void step(const std::vector<double> &motors) override;
   void step_core(const std::vector<double> &motors) override;
+  void resetPositions(std::vector<double> & result_stoch, const std::vector<double>& given_stoch) override;
 
 protected:
   virtual void createWorld() override;

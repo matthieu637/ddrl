@@ -40,7 +40,7 @@ class HalfCheetahWorld {
   HalfCheetahWorld(const hcheetah_physics phy);
   virtual ~HalfCheetahWorld();
 
-  void resetPositions(std::vector<double> &, const std::vector<double>& given_stoch);
+  virtual void resetPositions(std::vector<double> &, const std::vector<double>& given_stoch);
   
   bool final_state() const;
   

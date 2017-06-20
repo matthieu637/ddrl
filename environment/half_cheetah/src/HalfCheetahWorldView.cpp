@@ -146,6 +146,12 @@ HalfCheetahWorldView::~HalfCheetahWorldView() {
   delete eventThread;
 }
 
+void HalfCheetahWorldView::resetPositions(std::vector<double> & result_stoch, const std::vector<double>& given_stoch) {
+  Mutex::scoped_lock lock(mutex_reset);
+  HalfCheetahWorld::resetPositions(result_stoch, given_stoch);
+  lock.release();
+}
+
 void HalfCheetahWorldView::step(const std::vector<double>& motors) {
   std::vector<double> modified_motors(motors.size(), 0);
   if (!inst->ignoreMotor) {
