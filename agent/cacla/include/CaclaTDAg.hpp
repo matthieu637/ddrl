@@ -64,55 +64,29 @@ class CaclaTDAg : public arch::ARLAgent<> {
         if((pos_delta && delta > 0) || !pos_delta) {
           ann->ZeroGradParameters();
           auto ac_out = ann->computeOut(last_state);
+          
+          if(!with_delta)
+            delta = 1.f;
 
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
-//           if(with_delta) {
-//             for(int i=0; i<actor_actions_blob->count(); i++)
-//               ac_diff[i] = -delta / (last_action->at(i) - ac_out->at(i));
-//           } else {
-//             for(int i=0; i<actor_actions_blob->count(); i++)
-//               ac_diff[i] = -1.f / (last_action->at(i) - ac_out->at(i));
-//           }
           if(shrink_ga){
-            if(with_delta) {
-              for(int i=0; i<actor_actions_blob->count(); i++){
-                double x = last_action->at(i) - ac_out->at(i);
-                double fabs_x = fabs(x);
-                if(fabs_x <= 1.f)
-                  ac_diff[i] = - sign(x) * ( delta - sign(delta) * (sqrt(fabs_x) - 1.f));
-                else
-                  ac_diff[i] = -delta / x;
-              }
-            } else {
-              for(int i=0; i<actor_actions_blob->count(); i++){
-                double x = last_action->at(i) - ac_out->at(i);
-                double fabs_x = fabs(x);
-                if(fabs_x <= 1.f)
-                  ac_diff[i] = - sign(x) * ( 2.f - sqrt(fabs_x));
-                else
-                  ac_diff[i] = -1.f / x;
-              }
+            for(int i=0; i<actor_actions_blob->count(); i++){
+              double x = last_action->at(i) - ac_out->at(i);
+              double fabs_x = fabs(x);
+              if(fabs_x <= gradient_step_proba)
+                ac_diff[i] = sign(x) * sign(delta) * (sqrt(fabs_x) - sqrt(gradient_step_proba) - sign(delta) * delta/gradient_step_proba );
+              else
+                ac_diff[i] = -delta / x;
             }
           } else {
-            if(with_delta) {
-              for(int i=0; i<actor_actions_blob->count(); i++){
-                double x = last_action->at(i) - ac_out->at(i);
-                double fabs_x = fabs(x);
-                if(fabs_x <= 1.f)
-                  ac_diff[i] = - delta * x;
-                else
-                  ac_diff[i] = - delta / x;
-              }
-            } else {
-              for(int i=0; i<actor_actions_blob->count(); i++){
-                double x = last_action->at(i) - ac_out->at(i);
-                double fabs_x = fabs(x);
-                if(fabs_x <= 1.f)
-                  ac_diff[i] = - x;
-                else
-                  ac_diff[i] = -1.f / x;
-              }
+            for(int i=0; i<actor_actions_blob->count(); i++){
+              double x = last_action->at(i) - ac_out->at(i);
+              double fabs_x = fabs(x);
+              if(fabs_x <= gradient_step_proba)
+                ac_diff[i] = - sign(x) * delta / gradient_step_proba ;
+              else
+                ac_diff[i] = - delta / x;
             }
           }
           ann->actor_backward();
