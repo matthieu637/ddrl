@@ -70,7 +70,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
 
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
-          if(shrink_ga){
+          if(shrink_ga == 0){
             for(int i=0; i<actor_actions_blob->count(); i++){
               double x = last_action->at(i) - ac_out->at(i);
               double fabs_x = fabs(x);
@@ -79,12 +79,21 @@ class CaclaTDAg : public arch::ARLAgent<> {
               else
                 ac_diff[i] = -delta / x;
             }
+          } else if(shrink_ga == 1) {
+            for(int i=0; i<actor_actions_blob->count(); i++){
+              double x = last_action->at(i) - ac_out->at(i);
+              double fabs_x = fabs(x);
+              if(fabs_x <= gradient_step_proba)
+                ac_diff[i] = - sign(x) * delta / (2.f * gradient_step_proba) - sign(x) * delta / (fabs_x + gradient_step_proba) ;
+              else
+                ac_diff[i] = - delta / x;
+            }
           } else {
             for(int i=0; i<actor_actions_blob->count(); i++){
               double x = last_action->at(i) - ac_out->at(i);
               double fabs_x = fabs(x);
               if(fabs_x <= gradient_step_proba)
-                ac_diff[i] = - sign(x) * delta / gradient_step_proba ;
+                ac_diff[i] = - sign(x) * delta / (2.f * gradient_step_proba) - sign(x) * delta / (fabs_x + gradient_step_proba) ;
               else
                 ac_diff[i] = - delta / x;
             }
@@ -134,7 +143,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
     gaussian_policy              = pt->get<bool>("agent.gaussian_policy");
     with_delta                   = pt->get<bool>("agent.with_delta");
     pos_delta                    = pt->get<bool>("agent.pos_delta");
-    shrink_ga                    = pt->get<bool>("agent.shrink_ga");
+    shrink_ga                    = pt->get<uint>("agent.shrink_ga");
     gradient_step_proba          = pt->get<double>("agent.gradient_step_proba");
     double alpha_v               = pt->get<double>("agent.alpha_v");
     double alpha_a               = pt->get<double>("agent.alpha_a");
@@ -209,7 +218,8 @@ class CaclaTDAg : public arch::ARLAgent<> {
 
   bool gaussian_policy, with_delta, pos_delta;
   double gradient_step_proba;
-  bool gradient_step, shrink_ga;
+  bool gradient_step;
+  uint shrink_ga;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::vector<double> last_state;
