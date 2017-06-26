@@ -267,6 +267,10 @@ void SimpleDENFAC::critic_update(uint iter) {
 		i++;
 	}
 
+	for(int j = traj->size()-1; j >= 0; j--) {
+		std::cout << "q_target at " << j << " = " << q_targets->at(j) << std::endl;
+	};
+
 	// Optionnaly reset the network 
 	if(reset_qnn && episode < 1000 ) {
 

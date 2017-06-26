@@ -46,25 +46,36 @@ class Proba {
 
   static Real truncatedGaussianDensity(Real r, Real mu, const Real sigma, Real a=-1.f, Real b=1.f) {
     //68–95–99.7 rule
+    /*
     if(mu > b + 3.f*sigma)
       mu = b + 3.f*sigma;
     else if(mu < a - 3.f*sigma)
       mu = a - 3.f*sigma;
-    
+    */
     const static Real sq2 = 7.071067811865475e-1;            // = 1/sqrt(2)
     const static Real sqpi = 1.772453850905516;              // = sqrt(pi)
 
     // Scaling
-    if(mu!=0 || sigma!=1) {
-      a=(a-mu)/sigma;
-      b=(b-mu)/sigma;
-    }
+    
+    a=(a-mu)/sigma;
+    b=(b-mu)/sigma;
+    Real x=(r-mu)/sigma;
 
-    Real Z = sqpi *sq2 * sigma * ( erf(b*sq2) - erf(a*sq2) );
-    Real p = exp(-pow((r-mu)/sigma,2)/2) / Z;
+    Real num = sq2 /sqpi * exp(-pow(x,2)/2);
+    Real denom = sigma * (erf(b*sq2) - erf(a*sq2)) /2;
+
+    //Real Z = sqpi *sq2 * sigma * ( erf(b*sq2) - erf(a*sq2) ) /2;
+    //Real p = exp(-pow((r-mu)/sigma,2)/2) / Z;
 //     LOG_DEBUG(p << " " << r << " " << mu << " " << Z << " " << a << " " << b <<
 //               " " <<erf(b*sq2) << " " << erf(a*sq2));
-    return  p;
+
+    
+    //std::cout<< "num = " << num << "  denom = " << denom  << std::endl;
+    
+
+    if (denom == 0)
+      return 0;
+    return  num/denom;
   }
 
   static std::vector<Real>* multidimentionnalGaussianWReject(const std::vector<Real>& centers, Real sigma) {

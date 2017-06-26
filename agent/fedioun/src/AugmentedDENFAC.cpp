@@ -202,9 +202,12 @@ void AugmentedDENFAC::computePThetaBatch(const std::deque< sample >& vtraj, doub
 	  double p0 = 1.f;
 	  for(uint j=0; j < nb_motors; j++) {
 	    p0 *= bib::Proba<double>::truncatedGaussianDensity(it.a[j], all_next_actions->at(i*nb_motors+j), noise);
-	  }
+	    	  }
 	  ptheta[i] = p0;
+
+
 	  i++;
+
 	}
 }
 
@@ -226,7 +229,7 @@ void AugmentedDENFAC::critic_update(uint iter) {
 
 	// ******* Compute Q targets *******
 
-	if (!retrace_lambda) {
+	if (retrace_lambda) {
 
 		double lambda = 0.8;
 		std::vector<double>*			   all_next_actions;			// \pi(s_t)
@@ -257,18 +260,24 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		computePThetaBatch(*traj, ptheta, all_next_actions);
 
 		i = 0;
+		int count = 0;
 		for (auto it : *traj) {
 			retrace_coefs[i] = lambda * std::min((double)1, ptheta[i] / it.p0 );
+			if (ptheta[i] / it.p0 < 1) 
+				count++;
+			//std::cout << "ptheta = " << ptheta[i] << "  p0 = " << it.p0 << " r= " << ptheta[i] / it.p0 <<  std::endl;
 			i++;
 		}
+		//std::cout<< "Ratio : " << count << "/" << i << std::endl;
+
 
 		// Compute Bellman residuals
 
-		std::cout << "nb_motors : " << nb_motors << std::endl;
-		std::cout << "nb_sensors : " << nb_sensors << std::endl;
-		std::cout << "nb_states : " << traj->size() << std::endl;
-		std::cout << "all_actions : " <<  all_actions->size() << std::endl;
-		std::cout << "all_states : " << all_states.size() << std::endl;
+		//std::cout << "nb_motors : " << nb_motors << std::endl;
+		//std::cout << "nb_sensors : " << nb_sensors << std::endl;
+		//std::cout << "nb_states : " << traj->size() << std::endl;
+		//std::cout << "all_actions : " <<  all_actions->size() << std::endl;
+		//std::cout << "all_states : " << all_states.size() << std::endl;
 
 
 		// Q (s_t,a_t)
@@ -310,11 +319,23 @@ void AugmentedDENFAC::critic_update(uint iter) {
 
 		double retrace_target_sum = 0;
 		// TODO goal reached
+		int trajCount = 0;
 		for(int j = traj->size()-1; j >= 0; j--) {
+			trajCount++;
+			// Q-targets computed separately for each trajectory
 			retrace_target_sum += bellman_residuals[j];
+			std::cout << "q_target at " << j << " = " << retrace_target_sum << std::endl;
 			q_targets->at(j) = retrace_target_sum;
 
-			retrace_target_sum *= gamma * retrace_coefs[j];			
+			retrace_target_sum *= gamma * retrace_coefs[j];
+
+			if ( j !=0 && (traj->at(j)).s !=  (traj->at(j-1)).next_s ) {
+				std::cout << "TrajLength = " << trajCount << std::endl;
+				trajCount = 0;
+
+				retrace_target_sum = 0;
+			}
+		
 		}
 
 		delete next_action;
@@ -403,7 +424,7 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
 
 		qnn->ZeroGradParameters();
-		std::cout << "Critic update done" << std::endl;
+		//std::cout << "Critic update done" << std::endl;
 		delete q_targets;
 
 
