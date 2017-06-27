@@ -219,6 +219,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           }
           ASSERT(diff[trajectory.size() -1] == deltas[trajectory.size() -1], "pb lambda");
           
+// //           comment following lines to compare with the other formula
           li=0;
           for (auto it : trajectory){
             diff[li] = diff[li] + all_V->at(li);
@@ -226,48 +227,41 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           }
           
           vnn->learn_batch(all_states, empty_action, diff, stoch_iter);
-// 
-//        The mechanic formula
-//        
+// // 
+// //        The mechanic formula
+// //        
 //           std::vector<double> diff2(trajectory.size());
 //           li=0;
 //           for (auto it : trajectory){
 //             diff2[li] = 0;
 //             double sum_n = 0.f;
-//             double last_sum_i = 0;
-//             double last_sum_i2 = 0;
-//             for(int n=1;n<=((int)trajectory.size()) - (li-1) - 1;n++){
+//             for(int n=1;n<=((int)trajectory.size()) - li - 1;n++){
 //               double sum_i = 0.f;
-//               int i=li;
-//               for(;i<=li+n-1;i++)
+//               for(int i=li;i<=li+n-1;i++)
 //                 sum_i += std::pow(this->gamma, i-li) * trajectory[i].r;
-//               last_sum_i = sum_i;
-//               if(!trajectory[li+n-1].goal_reached)
-//                 sum_i += std::pow(this->gamma, n) * all_nextV->at(li+n-1);
+//               sum_i += std::pow(this->gamma, n) * all_nextV->at(li+n-1);
 //               sum_i *= pow(lambda, n-1);
 //               sum_n += sum_i;
-//               last_sum_i2 = sum_i;
-//               if((uint)li == trajectory.size() -1)
-//                 LOG_DEBUG("here " << sum_i << " " << all_V->at(li));
 //             }
 //             sum_n *= (1.f-lambda);
-//             sum_n -= all_V->at(li);
 //             
-//             if((uint)li == trajectory.size() -1)
-//               LOG_DEBUG(last_sum_i << " " << last_sum_i2 << " " << sum_n);
-//             
-//             //last_sum_i is always Monte Carlo returns if goal is reached
+//             double sum_L = 0.f;
+//             for(int i=li;i<(int)trajectory.size();i++)
+//               sum_L += std::pow(this->gamma, i-li) * trajectory[i].r;
 //             if(trajectory[trajectory.size()-1].goal_reached)
-//               sum_n += std::pow(lambda, trajectory.size() - li - 1) * last_sum_i;
-//             else
-//               sum_n += std::pow(lambda, trajectory.size() - li - 1) * (last_sum_i + std::pow(this->gamma, ((int)trajectory.size()) - li -1 ) * all_nextV->at(trajectory.size()-1));
+//               sum_n += std::pow(lambda, trajectory.size() - li - 1) * sum_L;
+//             else {
+//               sum_L += std::pow(this->gamma, ((int)trajectory.size()) - li) * all_nextV->at(trajectory.size()-1);
+//               sum_n += std::pow(lambda, trajectory.size() - li - 1) * sum_L;
+//             }
+//             
+//             sum_n -= all_V->at(li);
 //             
 //             diff2[li] = sum_n;
 //             ++li;
 //           }
 //           bib::Logger::PRINT_ELEMENTS(diff, "form1 ");
 //           bib::Logger::PRINT_ELEMENTS(diff2, "mech form ");
-//           LOG_DEBUG(deltas[trajectory.size() -1] << " " << v_target[trajectory.size() -1] << " " << trajectory[trajectory.size()-1].r << " " << all_V->at(li-1) << " " << all_nextV->at(trajectory.size()-1));
 //           
 //           if(trajectory[trajectory.size()-1].goal_reached)
 //             exit(1);

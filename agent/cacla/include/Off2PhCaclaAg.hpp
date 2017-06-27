@@ -116,6 +116,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
+    policy_evaluation_phase = true;
 
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type,
                  batch_norm_actor, true);
@@ -158,8 +159,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     double* weights = new double[ann->number_of_parameters(false)];
     ann->copyWeightsTo(weights, false);
     ann_testing->copyWeightsFrom(weights, false);
-    
-    policy_evaluation_phase = true;
   }
 
   void update_critic() {
