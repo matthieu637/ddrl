@@ -77,7 +77,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     vector<double>* next_action = ann_testing->computeOut(sensors);
 
     if (last_action.get() != nullptr && learning)
-      trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
+      trajectory.push_back( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
@@ -117,6 +117,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
+    lambda                 = pt->get<double>("agent.lambda");
 
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true);
     if(std::is_same<NN, DODevMLP>::value)
@@ -139,7 +140,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     }
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool learning) override {
+  void _start_episode(const std::vector<double>& sensors, bool) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -168,7 +169,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         std::vector<double> all_states(trajectory.size() * nb_sensors);
         std::vector<double> all_next_states(trajectory.size() * nb_sensors);
         std::vector<double> v_target(trajectory.size());
-        uint li=0;
+        int li=0;
         for (auto it : trajectory) {
           std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * nb_sensors);
           std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * nb_sensors);
@@ -179,22 +180,99 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
         li=0;
         for (auto it : trajectory) {
-          double delta = it.r;
+          double target = it.r;
           if (!it.goal_reached) {
             double nextV = all_nextV->at(li);
-            delta += this->gamma * nextV;
+            target += this->gamma * nextV;
           }
 
-          v_target[li] = delta;
+          v_target[li] = target;
           li++;
         }
 
-        ASSERT(li == trajectory.size(), "");
+        ASSERT((uint)li == trajectory.size(), "");
         if(vnn_from_scratch){
           delete vnn;
           vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, trajectory.size(), -1, hidden_layer_type, batch_norm_critic);
         }
-        vnn->learn_batch(all_states, empty_action, v_target, stoch_iter);
+        if(lambda < 0.f)
+          vnn->learn_batch(all_states, empty_action, v_target, stoch_iter);
+        else {
+          auto all_V = vnn->computeOutVFBatch(all_states, empty_action);
+          std::vector<double> deltas(trajectory.size());
+//           
+//        Simple computation for lambda return
+//           
+          li=0;
+          for (auto it : trajectory){
+            deltas[li] = v_target[li] - all_V->at(li);
+            ++li;
+          }
+          
+          std::vector<double> diff(trajectory.size());
+          li=0;
+          for (auto it : trajectory){
+            diff[li] = 0;
+            for (uint n=li;n<trajectory.size();n++)
+              diff[li] += std::pow(this->gamma * lambda, n-li) * deltas[n];
+            li++;
+          }
+          ASSERT(diff[trajectory.size() -1] == deltas[trajectory.size() -1], "pb lambda");
+          
+          li=0;
+          for (auto it : trajectory){
+            diff[li] = diff[li] + all_V->at(li);
+            ++li;
+          }
+          
+          vnn->learn_batch(all_states, empty_action, diff, stoch_iter);
+// 
+//        The mechanic formula
+//        
+//           std::vector<double> diff2(trajectory.size());
+//           li=0;
+//           for (auto it : trajectory){
+//             diff2[li] = 0;
+//             double sum_n = 0.f;
+//             double last_sum_i = 0;
+//             double last_sum_i2 = 0;
+//             for(int n=1;n<=((int)trajectory.size()) - (li-1) - 1;n++){
+//               double sum_i = 0.f;
+//               int i=li;
+//               for(;i<=li+n-1;i++)
+//                 sum_i += std::pow(this->gamma, i-li) * trajectory[i].r;
+//               last_sum_i = sum_i;
+//               if(!trajectory[li+n-1].goal_reached)
+//                 sum_i += std::pow(this->gamma, n) * all_nextV->at(li+n-1);
+//               sum_i *= pow(lambda, n-1);
+//               sum_n += sum_i;
+//               last_sum_i2 = sum_i;
+//               if((uint)li == trajectory.size() -1)
+//                 LOG_DEBUG("here " << sum_i << " " << all_V->at(li));
+//             }
+//             sum_n *= (1.f-lambda);
+//             sum_n -= all_V->at(li);
+//             
+//             if((uint)li == trajectory.size() -1)
+//               LOG_DEBUG(last_sum_i << " " << last_sum_i2 << " " << sum_n);
+//             
+//             //last_sum_i is always Monte Carlo returns if goal is reached
+//             if(trajectory[trajectory.size()-1].goal_reached)
+//               sum_n += std::pow(lambda, trajectory.size() - li - 1) * last_sum_i;
+//             else
+//               sum_n += std::pow(lambda, trajectory.size() - li - 1) * (last_sum_i + std::pow(this->gamma, ((int)trajectory.size()) - li -1 ) * all_nextV->at(trajectory.size()-1));
+//             
+//             diff2[li] = sum_n;
+//             ++li;
+//           }
+//           bib::Logger::PRINT_ELEMENTS(diff, "form1 ");
+//           bib::Logger::PRINT_ELEMENTS(diff2, "mech form ");
+//           LOG_DEBUG(deltas[trajectory.size() -1] << " " << v_target[trajectory.size() -1] << " " << trajectory[trajectory.size()-1].r << " " << all_V->at(li-1) << " " << all_nextV->at(trajectory.size()-1));
+//           
+//           if(trajectory[trajectory.size()-1].goal_reached)
+//             exit(1);
+          delete all_V;
+        }
         
         delete all_nextV;
       };
@@ -337,14 +415,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
        update_delta_neg;
   uint number_fitted_iteration, stoch_iter;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type;
+  double lambda;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
   std::vector<double> last_state;
   double alpha_v, alpha_a;
 
-  std::set<sample> trajectory;
-//     std::list<sample> trajectory;
+  std::deque<sample> trajectory;
 
   NN* ann;
   NN* vnn;
