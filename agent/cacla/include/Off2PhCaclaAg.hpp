@@ -80,7 +80,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       trajectory.insert( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
 
     last_pure_action.reset(new vector<double>(*next_action));
-    if(learning && !policy_evaluation_phase) {
+    if(learning) {
       if(gaussian_policy) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
@@ -116,6 +116,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
+    policy_evaluation_phase = true;
 
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type,
                  batch_norm_actor, true);
@@ -139,7 +140,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     }
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool learning) override {
+  void _start_episode(const std::vector<double>& sensors, bool) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -158,8 +159,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     double* weights = new double[ann->number_of_parameters(false)];
     ann->copyWeightsTo(weights, false);
     ann_testing->copyWeightsFrom(weights, false);
-    
-    policy_evaluation_phase = true;
+    delete[] weights;
   }
 
   void update_critic() {

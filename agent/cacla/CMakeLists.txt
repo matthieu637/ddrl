@@ -62,6 +62,9 @@ target_link_libraries(hf-adpac ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 add_executable(hf-cacla-off src/test/HalfCheetahCacOff.cpp ${all_include} ${all_sources} )
 target_link_libraries(hf-cacla-off ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 
+add_executable(hf-cacla-off2ph src/test/HalfCheetahCacOff2Ph.cpp ${all_include} ${all_sources} )
+target_link_libraries(hf-cacla-off2ph ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
+
 add_executable(hf-cacla-off-dodev src/test/HalfCheetahCacOffDodev.cpp ${all_include} ${all_sources} )
 target_link_libraries(hf-cacla-off-dodev ${HALF_CHEETAH_LIBRARY} ${BASE_LIBRARIES} )
 
