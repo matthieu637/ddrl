@@ -10,6 +10,7 @@
 #include "RTNorm.hpp"
 
 
+
 namespace bib {
 
 template<typename Real>
@@ -52,29 +53,27 @@ class Proba {
     else if(mu < a - 3.f*sigma)
       mu = a - 3.f*sigma;
     */
+
+    //Real Z = sqpi *sq2 * sigma * ( erf(b*sq2) - erf(a*sq2) ) /2;
+    //Real p = exp(-pow((r-mu)/sigma,2)/2) / Z;
+    //LOG_DEBUG("r = " << r << " Mu = " << mu << " a = " << a << " b = " << b << "sigma = " << sigma);
+
+    
     const static Real sq2 = 7.071067811865475e-1;            // = 1/sqrt(2)
     const static Real sqpi = 1.772453850905516;              // = sqrt(pi)
 
     // Scaling
     
-    a=(a-mu)/sigma;
-    b=(b-mu)/sigma;
     Real x=(r-mu)/sigma;
+    a = (a-mu) / sigma;
+    b = (b-mu) / sigma;
 
-    Real num = sq2 /sqpi * exp(-pow(x,2)/2);
-    Real denom = sigma * (erf(b*sq2) - erf(a*sq2)) /2;
 
-    //Real Z = sqpi *sq2 * sigma * ( erf(b*sq2) - erf(a*sq2) ) /2;
-    //Real p = exp(-pow((r-mu)/sigma,2)/2) / Z;
-//     LOG_DEBUG(p << " " << r << " " << mu << " " << Z << " " << a << " " << b <<
-//               " " <<erf(b*sq2) << " " << erf(a*sq2));
+    Real num = sq2 /sqpi * exp(-pow(x,2)/2) / sigma;
+    Real denom = (erf(b*sq2) - erf(a*sq2)) /2;
 
     
     //std::cout<< "num = " << num << "  denom = " << denom  << std::endl;
-    
-
-    if (denom == 0)
-      return 0;
     return  num/denom;
   }
 

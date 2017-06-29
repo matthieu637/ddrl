@@ -38,6 +38,23 @@ typedef struct _sample {
 
 } sample;
 
+typedef struct _trajectory {
+  std::shared_ptr<std::vector<sample>> transitions;  // Transitions
+  int cumul_reward;
+  int id;
+  bool goal_reached;
+
+  friend class boost::serialization::access;
+  template <typename Archive>
+  void serialize(Archive& ar, const unsigned int) {
+    ar& BOOST_SERIALIZATION_NVP(transitions);
+    ar& BOOST_SERIALIZATION_NVP(cumul_reward);
+    ar& BOOST_SERIALIZATION_NVP(id);
+    ar& BOOST_SERIALIZATION_NVP(goal_reached);
+  }
+
+} trajectory;
+
 class AugmentedDENFAC : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   public:
     typedef MLP PolicyImpl;
@@ -62,7 +79,7 @@ class AugmentedDENFAC : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
     void _start_episode(const std::vector<double>& sensors, bool _learning) override;
 
-    void computePThetaBatch(const std::deque< sample >& vtraj, double *ptheta,const std::vector<double>* all_next_actions);
+    void computePThetaBatch(const std::vector< sample >& vtraj, double *ptheta,const std::vector<double>* all_next_actions);
 
     void critic_update(uint iter);
 
@@ -117,13 +134,13 @@ class AugmentedDENFAC : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
     bool retrace_lambda;
 
-    std::deque<sample>  trajectory;         // Replay buffer
+    std::deque<trajectory> trajectories;
     
 
     // Network parameters
 
     uint nb_sensors;
-    uint mini_batch_size;
+    uint replay_traj_size;
     uint batch_norm, weighting_strategy;
     uint last_layer_actor, hidden_layer_type, step;
 
