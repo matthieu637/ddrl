@@ -223,8 +223,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           vnn->learn_batch(all_states, empty_action, v_target, stoch_iter_critic);
         else if(lambda < 0.f){
           for(uint sia = 0; sia < stoch_iter_critic; sia++){
-            auto all_V = vnn_testing->computeOutVFBatch(all_states, empty_action);
             delete vnn->computeOutVFBatch(all_states, empty_action);
+            {
+              double* weights = new double[vnn->number_of_parameters(false)];
+              vnn->copyWeightsTo(weights, false);
+              vnn_testing->copyWeightsFrom(weights, false);
+              delete[] weights;
+            }
+            auto all_V = vnn_testing->computeOutVFBatch(all_states, empty_action);
             
             const auto q_values_blob = vnn->getNN()->blob_by_name(MLP::q_values_blob_name);
             double* q_values_diff = q_values_blob->mutable_cpu_diff();
