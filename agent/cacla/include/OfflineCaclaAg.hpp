@@ -235,8 +235,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             const auto q_values_blob = vnn->getNN()->blob_by_name(MLP::q_values_blob_name);
             double* q_values_diff = q_values_blob->mutable_cpu_diff();
             uint i=0;
+            double s = trajectory.size();
             for (auto it : trajectory){
-              q_values_diff[i] = all_V->at(i)-v_target[i];
+              q_values_diff[i] = (all_V->at(i)-v_target[i])/s;
+              i++;
             }
             vnn->critic_backward();
             vnn->getSolver()->ApplyUpdate();
