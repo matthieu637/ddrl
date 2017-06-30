@@ -98,6 +98,11 @@ class CaclaTDAg : public arch::ARLAgent<> {
                 ac_diff[i] = - delta / x;
             }
           }
+//        Similar to euclidien loss for fair comparaison
+          double s_ = actor_actions_blob->count();
+          for(int i=0; i<actor_actions_blob->count(); i++)
+            ac_diff[i] /= s_;
+            
           ann->actor_backward();
           ann->getSolver()->ApplyUpdate();
           ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
