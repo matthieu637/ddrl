@@ -99,10 +99,9 @@ class CaclaTDAg : public arch::ARLAgent<> {
             }
           }
 //        Similar to euclidien loss for fair comparaison
-//           double s_ = actor_actions_blob->count();
-//           for(int i=0; i<actor_actions_blob->count(); i++)
-//             ac_diff[i] /= s_;
-//        pertubate learning with TD scale
+          double s_ = actor_actions_blob->count();
+          for(int i=0; i<actor_actions_blob->count(); i++)
+            ac_diff[i] /= s_;
             
           ann->actor_backward();
           ann->getSolver()->ApplyUpdate();
