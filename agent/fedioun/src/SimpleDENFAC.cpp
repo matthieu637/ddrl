@@ -46,7 +46,7 @@ const std::vector<double>& SimpleDENFAC::_run(double reward, const std::vector<d
 	        p0 *= bib::Proba<double>::truncatedGaussianDensity(last_action->at(i), last_pure_action->at(i), noise);
 	    }
 
-        sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || last, p0};
+        sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, p0};
         insertSample(sa);
     }
 
@@ -98,6 +98,7 @@ void SimpleDENFAC::insertSample(const sample& sa) {
  * Initialize actor and critic networks
  */
 void SimpleDENFAC::_unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* command_args) {
+    //bib::Seed::setFixedSeedUTest();
     hidden_unit_q               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_q"));
     hidden_unit_a               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                       = pt->get<double>("agent.noise");
@@ -248,6 +249,7 @@ void SimpleDENFAC::critic_update(uint iter) {
 			computePThetaBatch(*traj, ptheta, all_next_actions);
 		}
 	}
+
 	delete all_next_actions;
 
 	// Adjust q_targets
@@ -257,6 +259,7 @@ void SimpleDENFAC::critic_update(uint iter) {
 			q_targets->at(i) = it.r;
 		else {
 			q_targets->at(i) = it.r + gamma * q_targets->at(i);
+			//std::cout<< " Reward = " << it.r << " QV = " << q_targets->at(i) << std::endl;
 		}
 		if(weighting_strategy==1)
 			q_targets_weights->at(i)=1.0f/it.p0;
@@ -267,9 +270,9 @@ void SimpleDENFAC::critic_update(uint iter) {
 		i++;
 	}
 
-	for(int j = traj->size()-1; j >= 0; j--) {
-		std::cout << "q_target at " << j << " = " << q_targets->at(j) << std::endl;
-	};
+//	for(int j = traj->size()-1; j >= 0; j--) {
+//		std::cout << "q_target at " << j << " = " << q_targets->at(j) << std::endl;
+//	};
 
 	// Optionnaly reset the network 
 	if(reset_qnn && episode < 1000 ) {
@@ -282,7 +285,14 @@ void SimpleDENFAC::critic_update(uint iter) {
 		          hidden_layer_type, batch_norm,
 		          weighting_strategy > 0);
   	}
+  	/*
+  	LOG_DEBUG(sum_weighted_reward);
+  	for (int i=0; i < q_targets->size(); i++) {
+  		std::cout << "Q_target " << i << " : " << q_targets->at(i) << " Reward : " << traj->at(i).r << std::endl;
 
+  	}
+  	exit(1);
+  	*/
 	// Update critic
 	if(weighting_strategy != 0)
 		qnn->stepCritic(all_states, all_actions, *q_targets, iter, q_targets_weights);

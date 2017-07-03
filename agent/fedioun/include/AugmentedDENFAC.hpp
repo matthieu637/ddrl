@@ -133,6 +133,7 @@ class AugmentedDENFAC : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     bool reset_ann, keep_weights_wr;
 
     bool retrace_lambda;
+    double lambda;
 
     std::deque<trajectory> trajectories;
     

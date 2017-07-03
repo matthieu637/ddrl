@@ -104,6 +104,8 @@ void AugmentedDENFAC::insertSample(const sample& sa) {
  * Initialize actor and critic networks
  */
 void AugmentedDENFAC::_unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* command_args) {
+	// Fixed seed for debugging purpose
+	//bib::Seed::setFixedSeedUTest();
     hidden_unit_q               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_q"));
     hidden_unit_a               = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                       = pt->get<double>("agent.noise");
@@ -124,7 +126,7 @@ void AugmentedDENFAC::_unique_invoke(boost::property_tree::ptree* pt, boost::pro
     reset_ann                   = pt->get<bool>("agent.reset_ann");
     hidden_layer_type           = pt->get<uint>("agent.hidden_layer_type");
     replay_traj_size			= pt->get<uint>("agent.replay_traj_size");
-
+    lambda 						= pt->get<double>("agent.lambda");
     retrace_lambda				= pt->get<bool>("agent.retrace_lambda");
     
 	#ifdef CAFFE_CPU_ONLY
@@ -258,8 +260,7 @@ void AugmentedDENFAC::critic_update(uint iter) {
 
 
 	double* ptheta = nullptr;
-	double lambda = 0.9;
-
+	
 
 	/*
 	
@@ -336,8 +337,9 @@ void AugmentedDENFAC::critic_update(uint iter) {
 			double avg_QV = 0;
 			// Sampling
 			for (uint k = 0; k < nb_Q_samples; k++) {
-				randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
-				
+				//randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+				randomized_action = next_action;
+				//std::cout << "Action " << j << " : " << next_action->at(0) << std::endl; 
 				avg_QV += qnn->computeOutVF((current_traj.transitions)->at(j).next_s, *randomized_action);
 			}
 			trajectory_next_QV->at(j) = avg_QV / nb_Q_samples;
@@ -352,6 +354,7 @@ void AugmentedDENFAC::critic_update(uint iter) {
 			if(!it->goal_reached) {
 				//std::cout << " Current QV : " << all_QV->at(i) << " Next QV : " << all_next_QV.at(i) << std::endl ;
 				bellman_residuals[i] += gamma * trajectory_next_QV->at(i) - trajectory_QV->at(i); 
+				//std::cout << " Reward " << i << " : " << it->r << " QV = " << trajectory_next_QV->at(i) << std::endl;
 			}
 			//std::cout << "Bellman residual : " << bellman_residuals[i] << std::endl;
 			i++;
@@ -373,16 +376,17 @@ void AugmentedDENFAC::critic_update(uint iter) {
 			trajectory_q_targets->at(j) = retrace_target_sum;
 			//std::cout << "Q_target at " << j << " = " << retrace_target_sum << std::endl;
 			retrace_target_sum *= gamma * retrace_coefs->at(j);
-			//std::cout << "Retrace_coefs :  " << retrace_coefs[j] << std::endl << std::endl;		
+			//std::cout << "Retrace_coefs :  " << retrace_coefs[j] << std::endl << std::endl;	
+
 		}
 
 		// Saving data
 		for (uint j = 0; j < (current_traj.transitions)->size(); j++) {
-			all_q_targets.push_back(trajectory_q_targets->at(j));
-			for (int i=0; i < nb_sensors; i++) {
+			all_q_targets.push_back(trajectory_q_targets->at(j) + trajectory_QV->at(j));
+			for (uint i=0; i < nb_sensors; i++) {
 				all_states.push_back(trajectory_states->at(j * nb_sensors + i));
 			}
-			for (int i=0; i < nb_motors; i++) {
+			for (uint i=0; i < nb_motors; i++) {
 				all_actions.push_back(trajectory_actions->at(j * nb_motors + i));
 			}
 		}
@@ -412,6 +416,14 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		          weighting_strategy > 0);
   	}
 
+  	/*
+  	LOG_DEBUG(sum_weighted_reward);
+  	for (uint i=0; i < all_q_targets.size(); i++) {
+  		std::cout << "Q_target " << i << " : " << all_q_targets.at(i) << " Reward : " << trajectories.at(0).transitions->at(i).r << std::endl;
+
+  	}
+  	exit(1);
+  	*/
   	qnn->increase_batchsize(traj_size);
   	qnn->stepCritic(all_states, all_actions, all_q_targets, iter);
 
@@ -420,14 +432,14 @@ void AugmentedDENFAC::critic_update(uint iter) {
 	double* q_values_diff = q_values_blob->mutable_cpu_diff();
 
 	for (uint j =0; j < traj->size(); j++) {			
-		q_values_diff[q_values_blob->offset(j,0,0,0)] = q_targets->at(j);
+		q_values_diff[q_values_blob->offset(j,0,0,0)] = all_q_targets->at(j);
 	}
 
 	qnn->critic_backward();
 
 	// Update QTM
-	ann->getSolver()->ApplyUpdate();
-	ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+	qnn->getSolver()->ApplyUpdate();
+	qnn->getSolver()->set_iter(ann->getSolver()->iter() + 1);
 
 	*/
 
@@ -449,7 +461,7 @@ void AugmentedDENFAC::actor_update_grad() {
 	for(auto current_traj : trajectories) {
 		traj_size += (current_traj.transitions)->size();
 		for (auto it : *(current_traj.transitions)) {
-			for (int i = 0; i < nb_sensors; i++) {
+			for (uint i = 0; i < nb_sensors; i++) {
 				all_states.push_back((it.s).at(i)); 
 			}
 		}
@@ -585,11 +597,9 @@ void AugmentedDENFAC::_display(std::ostream& out) const  {
 }
 
 void AugmentedDENFAC::_dump(std::ostream& out) const  {
-	/*
 	out <<" " << std::setw(25) << std::fixed << std::setprecision(22) <<
 	sum_weighted_reward << " " << std::setw(8) << std::fixed << 
-	std::setprecision(5) << trajectory.size() ;
-	*/
+	std::setprecision(5) << trajectories.size() ;
 }
 
 double AugmentedDENFAC::criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions){
