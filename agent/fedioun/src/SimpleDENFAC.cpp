@@ -444,7 +444,7 @@ void SimpleDENFAC::_display(std::ostream& out) const  {
 	    << " " << std::setw(8) << std::fixed << std::setprecision(5) << noise
 	    << " " << trajectory.size()
 	    << " " << ann->weight_l1_norm()
-	    << " " << std::fixed << std::setprecision(7) << qnn->error()
+	    << " " << std::fixed << " E "  << std::setprecision(7) << qnn->error()
 	    << " " << qnn->weight_l1_norm()
 	#endif
 	    ;

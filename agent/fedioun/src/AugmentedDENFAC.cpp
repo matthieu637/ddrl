@@ -237,6 +237,7 @@ void AugmentedDENFAC::computePThetaBatch(const std::vector< sample >& vtraj, dou
  */
 void AugmentedDENFAC::critic_update(uint iter) {
 	// Get Replay buffer
+
 	std::deque<trajectory>* traj = &trajectories;
 	int traj_size = 0;
 
@@ -250,7 +251,6 @@ void AugmentedDENFAC::critic_update(uint iter) {
 	std::vector<double>*    trajectory_QV;			// Q(s_t, \mu(s_t))
 	std::vector<double>*    trajectory_next_QV;			// Q(s_{t+1}, \mu(s_{t+1}))
 	std::vector<double>*    next_action;
-	std::vector<double>* 	randomized_action;
 	double* 				bellman_residuals;
 
 	std::vector<double>     all_states;
@@ -260,18 +260,6 @@ void AugmentedDENFAC::critic_update(uint iter) {
 
 
 	double* ptheta = nullptr;
-	
-
-	/*
-	
-
-	
-	std::vector<double>       all_next_QV(traj_size);			// Q(s_t, \pi(s_t))
-					
-	std::vector<double> bellman_residuals(traj_size);
-
-	q_targets = new std::vector<double>(traj_size); // Retrace Q target
-	*/
 
 
 	// For each trajectory
@@ -281,8 +269,8 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		//std::cout << "Traj " << current_traj.id << " size : " << (current_traj.transitions)->size() << std::endl;
 
 		// Allocate memory
-		trajectory_states = 		new std::vector<double>((current_traj.transitions)->size() * nb_sensors);
 		trajectory_next_states = 	new std::vector<double>((current_traj.transitions)->size() * nb_sensors);
+		trajectory_states = 		new std::vector<double>((current_traj.transitions)->size() * nb_sensors);
 		trajectory_actions = 		new std::vector<double>((current_traj.transitions)->size() * nb_motors);
 		retrace_coefs = 			new std::vector<double>((current_traj.transitions)->size());
 		trajectory_next_QV =		new std::vector<double>((current_traj.transitions)->size());
@@ -333,16 +321,8 @@ void AugmentedDENFAC::critic_update(uint iter) {
 			for(uint k = 0; k < nb_motors; k++) {
 				next_action->at(k) = trajectory_next_actions->at(j*nb_motors +k);
 			}
-			// Add gaussian noise and compute corresponding Q_value
-			double avg_QV = 0;
-			// Sampling
-			for (uint k = 0; k < nb_Q_samples; k++) {
-				//randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
-				randomized_action = next_action;
-				//std::cout << "Action " << j << " : " << next_action->at(0) << std::endl; 
-				avg_QV += qnn->computeOutVF((current_traj.transitions)->at(j).next_s, *randomized_action);
-			}
-			trajectory_next_QV->at(j) = avg_QV / nb_Q_samples;
+
+			trajectory_next_QV->at(j) = qnn->computeOutVF((current_traj.transitions)->at(j).next_s,*next_action);
 		}
 
 		i = 0;
@@ -397,7 +377,11 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		delete trajectory_actions;
 		delete retrace_coefs;
 		delete trajectory_next_QV;
+		delete trajectory_QV;
+		delete trajectory_q_targets;
 		delete next_action;
+		delete trajectory_next_actions;
+
 		delete[] ptheta;
 		delete[] bellman_residuals;
 
@@ -590,7 +574,7 @@ void AugmentedDENFAC::_display(std::ostream& out) const  {
 	    << " " << std::setw(8) << std::fixed << std::setprecision(5) << noise
 	   // << " " << trajectory.size()
 	    << " " << ann->weight_l1_norm()
-	    << " " << std::fixed << std::setprecision(7) << qnn->error()
+	    << " " << std::fixed << " E " << std::setprecision(7) << qnn->error()
 	    << " " << qnn->weight_l1_norm()
 	#endif
 	    ;
