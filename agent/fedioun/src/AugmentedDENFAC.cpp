@@ -37,7 +37,7 @@ AugmentedDENFAC::~AugmentedDENFAC() {
  *  Update last action and last state and best reward
  *  Fill replay buffer
  */
-const std::vector<double>& AugmentedDENFAC::_run(double reward, const std::vector<double>& sensors, bool learning, bool goal_reached, bool last) {
+const std::vector<double>& AugmentedDENFAC::_run(double reward, const std::vector<double>& sensors, bool learning, bool goal_reached, bool) {
     
     // Store previous sample into the replay buffer 
     if (last_action.get() != nullptr && learning) {
@@ -89,13 +89,7 @@ void AugmentedDENFAC::insertSample(const sample& sa) {
 	//LOG_DEBUG(trajectories.size());
 	//LOG_DEBUG(trajectories.back().transitions->size());
 	((trajectories.back()).transitions)->push_back(sa);
-
-	/*
-    if(trajectories.size() >= replay_memory)
-      trajectory.pop_front();
-
-    trajectory.push_back(sa);
-    */
+    
 }
 
 
@@ -193,7 +187,7 @@ void AugmentedDENFAC::_start_episode(const std::vector<double>& sensors, bool _l
 	last_pure_action = nullptr;
 
 	// Updating the replay buffer
-	if(trajectories.size() >= replay_traj_size) {
+	if(trajectories.size() >= 1) {
 		trajectories.pop_front();		
 	}
 
@@ -362,7 +356,10 @@ void AugmentedDENFAC::critic_update(uint iter) {
 
 		// Saving data
 		for (uint j = 0; j < (current_traj.transitions)->size(); j++) {
-			all_q_targets.push_back(trajectory_q_targets->at(j) + trajectory_QV->at(j));
+			if(current_traj.transitions->at(j).goal_reached)
+				all_q_targets.push_back(trajectory_q_targets->at(j));
+			else
+				all_q_targets.push_back(trajectory_q_targets->at(j) + trajectory_QV->at(j));
 			for (uint i=0; i < nb_sensors; i++) {
 				all_states.push_back(trajectory_states->at(j * nb_sensors + i));
 			}
@@ -400,14 +397,19 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		          weighting_strategy > 0);
   	}
 
-  	/*
-  	LOG_DEBUG(sum_weighted_reward);
-  	for (uint i=0; i < all_q_targets.size(); i++) {
-  		std::cout << "Q_target " << i << " : " << all_q_targets.at(i) << " Reward : " << trajectories.at(0).transitions->at(i).r << std::endl;
+  	
+/*
+	LOG_DEBUG(sum_weighted_reward);
 
+  	for (uint i=0; i < all_q_targets.size(); i++) {
+  		std::cout << std::setprecision(9) << "Q_target " << i << " : " << all_q_targets.at(i) << " Reward : " << trajectories.at(0).transitions->at(i).r << std::endl;
   	}
-  	exit(1);
-  	*/
+  	if (all_q_targets.size() < 198 ) {
+  		exit(1);
+  	}
+*/
+
+
   	qnn->increase_batchsize(traj_size);
   	qnn->stepCritic(all_states, all_actions, all_q_targets, iter);
 
@@ -497,6 +499,8 @@ void AugmentedDENFAC::actor_update_grad() {
 				action_diff[offset] = diff;
 			}
 		}
+
+		//bib::Logger::PRINT_ELEMENTS(action_diff, critic_action_blob->count());
 	}
 
 	// Transfer input-level diffs from Critic to Actor

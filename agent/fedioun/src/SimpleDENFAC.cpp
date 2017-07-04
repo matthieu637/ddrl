@@ -37,7 +37,7 @@ SimpleDENFAC::~SimpleDENFAC() {
  *  Update last action and last state and best reward
  *  Fill replay buffer
  */
-const std::vector<double>& SimpleDENFAC::_run(double reward, const std::vector<double>& sensors, bool learning, bool goal_reached, bool last) {
+const std::vector<double>& SimpleDENFAC::_run(double reward, const std::vector<double>& sensors, bool learning, bool goal_reached, bool) {
     
     // Store previous sample into the replay buffer 
     if (last_action.get() != nullptr && learning) {
@@ -186,6 +186,7 @@ void SimpleDENFAC::_start_episode(const std::vector<double>& sensors, bool _lear
 
 	last_action = nullptr;
 	last_pure_action = nullptr;
+	trajectory.clear();
 
 	learning = _learning;
 
@@ -286,13 +287,17 @@ void SimpleDENFAC::critic_update(uint iter) {
 		          weighting_strategy > 0);
   	}
   	/*
-  	LOG_DEBUG(sum_weighted_reward);
+  	
+  		LOG_DEBUG(sum_weighted_reward);
   	for (int i=0; i < q_targets->size(); i++) {
-  		std::cout << "Q_target " << i << " : " << q_targets->at(i) << " Reward : " << traj->at(i).r << std::endl;
+  		std::cout << std::setprecision(9) << "Q_target " << i << " : " << q_targets->at(i) << " Reward : " << traj->at(i).r << std::endl;
 
   	}
-  	exit(1);
+  	if (q_targets->size() < 198) {
+  		exit(1);
+  	}
   	*/
+  	
 	// Update critic
 	if(weighting_strategy != 0)
 		qnn->stepCritic(all_states, all_actions, *q_targets, iter, q_targets_weights);
@@ -369,6 +374,8 @@ void SimpleDENFAC::actor_update_grad() {
 				action_diff[offset] = diff;
 			}
 		}
+
+		//bib::Logger::PRINT_ELEMENTS(action_diff, critic_action_blob->count());
 	}
 
 	// Transfer input-level diffs from Critic to Actor
