@@ -122,10 +122,20 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     alpha_v                 = pt->get<double>("agent.alpha_v");
     lambda                  = pt->get<double>("agent.lambda");
     corrected_update_ac     = false;
+    gae                     = false;
     try {
       corrected_update_ac   = pt->get<bool>("agent.corrected_update_ac");
     } catch(boost::exception const& ) {
     }
+    if(corrected_update_ac){
+      try {
+        corrected_update_ac_factor   = pt->get<double>("agent.corrected_update_ac_factor");
+      } catch(boost::exception const& ) {
+      }
+    }
+    
+    if(lambda >= 0.)
+      gae = pt->get<bool>("agent.gae");
     
     if(lambda >=0. && batch_norm_critic != 0){
       LOG_DEBUG("to be done!");
@@ -344,7 +354,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       std::vector<double> actions(trajectory.size() * this->nb_motors);
       std::vector<bool> disable_back(trajectory.size() * this->nb_motors, false);
       const std::vector<bool> disable_back_ac(this->nb_motors, true);
-      std::vector<double> deltas(trajectory.size() * this->nb_motors);
+      std::vector<double> deltas_blob(trajectory.size() * this->nb_motors);
+      std::vector<double> deltas(trajectory.size());
 
       std::vector<double> all_states(trajectory.size() * nb_sensors);
       std::vector<double> all_next_states(trajectory.size() * nb_sensors);
@@ -368,25 +379,49 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
         all_mine = vnn->computeOutVFBatch(all_states, empty_action);
       }
-
+      
+      li=0;
+      for (auto it : trajectory){
+        sample sm = it;
+        double v_target = sm.r;
+        if (!sm.goal_reached) {
+          double nextV = all_nextV->at(li);
+          v_target += this->gamma * nextV;
+        }
+        
+        deltas[li] = v_target - all_mine->at(li);
+        ++li;
+      }
+      
+      if(gae){
+        //           
+        //        Simple computation for lambda return
+        //           
+        std::vector<double> diff(trajectory.size());
+        li=0;
+        for (auto it : trajectory){
+          diff[li] = 0;
+          for (uint n=li;n<trajectory.size();n++)
+            diff[li] += std::pow(this->gamma * lambda, n-li) * deltas[n];
+          li++;
+        }
+        
+        ASSERT(diff[trajectory.size() -1] == deltas[trajectory.size() -1], "pb lambda");
+        li=0;
+        for (auto it : trajectory){
+//           diff[li] = diff[li] + all_V->at(li);
+          deltas[li] = diff[li];
+          ++li;
+        }
+      }
+      
       uint n=0;
       li=0;
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
         sample sm = *it;
 
-        double target = 0.f;
-        double mine = 0.f;
-
-        target = sm.r;
-        if (!sm.goal_reached) {
-          double nextV = all_nextV->at(li);
-          target += this->gamma * nextV;
-        }
-
-        mine = all_mine->at(li);
-
         std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
-        if(target > mine) {
+        if(deltas[li] > 0.) {
           std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
           n++;
         } else if(update_delta_neg) {
@@ -395,7 +430,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
         }
-        std::fill(deltas.begin() + li * this->nb_motors, deltas.begin() + (li+1) * this->nb_motors, target-mine);
+        std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
         li++;
       }
 
@@ -426,10 +461,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                 ac_diff[i] = -x;
               else {
                 double fabs_x = fabs(x);
-                if(fabs_x <= 0.5)
-                  ac_diff[i] = sign(x) * sign(deltas[i]) * (sqrt(fabs_x) - sqrt(0.5) - sign(deltas[i]) * deltas[i]/0.5 );
+                if(fabs_x <= corrected_update_ac_factor)
+                  ac_diff[i] = sign(x) * sign(deltas_blob[i]) * (sqrt(fabs_x) 
+                  - sqrt(corrected_update_ac_factor) - sign(deltas_blob[i]) * deltas_blob[i]/corrected_update_ac_factor );
                 else
-                  ac_diff[i] = -deltas[i] / x;
+                  ac_diff[i] = -deltas_blob[i] / x;
               }
             }
           }
@@ -519,10 +555,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   double noise;
   bool gaussian_policy, vnn_from_scratch, update_critic_first,
-        update_delta_neg, corrected_update_ac;
+        update_delta_neg, corrected_update_ac, gae;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type;
-  double lambda;
+  double lambda, corrected_update_ac_factor;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
