@@ -187,7 +187,7 @@ void AugmentedDENFAC::_start_episode(const std::vector<double>& sensors, bool _l
 	last_pure_action = nullptr;
 
 	// Updating the replay buffer
-	if(trajectories.size() >= 1) {
+	if(trajectories.size() >= replay_traj_size) {
 		trajectories.pop_front();		
 	}
 
@@ -196,7 +196,7 @@ void AugmentedDENFAC::_start_episode(const std::vector<double>& sensors, bool _l
 		traj.transitions.reset(new std::vector<sample>);
 
 		trajectories.push_back(traj);
-		//LOG_DEBUG(trajectories.size());
+		LOG_DEBUG(trajectories.size());
 	}
 	
 
@@ -483,6 +483,15 @@ void AugmentedDENFAC::actor_update_grad() {
 	if(inverting_grad) {
 		// QTM
 		double* action_diff = critic_action_blob->mutable_cpu_diff();
+
+		double sum_diff = 0;
+		for(uint j = 0; j < traj_size; j++) {
+			sum_diff += action_diff[j];
+			
+		}
+		
+		std::cout << sum_diff << std::endl;
+
 
 		for (int n = 0; n < traj_size ; n++) {
 			for (uint h = 0; h < nb_motors; ++h) {
