@@ -187,7 +187,7 @@ void AugmentedDENFAC::_start_episode(const std::vector<double>& sensors, bool _l
 	last_pure_action = nullptr;
 
 	// Updating the replay buffer
-	if(trajectories.size() >= replay_traj_size) {
+	if(trajectories.size() >= replay_traj_size && _learning) {
 		trajectories.pop_front();		
 	}
 
@@ -306,8 +306,6 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		trajectory_QV = qnn->computeOutVFBatch(*trajectory_states, *trajectory_actions);
 
 		// Q (s_{t+1}, a_{t+1})
-
-		uint nb_Q_samples = 1;
 		
 
 		for (uint j = 0; j < (current_traj.transitions)->size(); j++) {
@@ -428,6 +426,7 @@ void AugmentedDENFAC::critic_update(uint iter) {
 	qnn->getSolver()->set_iter(ann->getSolver()->iter() + 1);
 
 	*/
+	//std::cout << " Traj size : " << traj_size << std::endl;
 
 	qnn->ZeroGradParameters();
 	//std::cout << "Critic update done" << std::endl;
@@ -485,12 +484,12 @@ void AugmentedDENFAC::actor_update_grad() {
 		double* action_diff = critic_action_blob->mutable_cpu_diff();
 
 		double sum_diff = 0;
-		for(uint j = 0; j < traj_size; j++) {
+		for(int j = 0; j < traj_size; j++) {
 			sum_diff += action_diff[j];
 			
 		}
 		
-		std::cout << sum_diff << std::endl;
+		//std::cout << sum_diff << std::endl;
 
 
 		for (int n = 0; n < traj_size ; n++) {
@@ -585,7 +584,7 @@ void AugmentedDENFAC::_display(std::ostream& out) const  {
 	out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward
 	#ifndef NDEBUG
 	    << " " << std::setw(8) << std::fixed << std::setprecision(5) << noise
-	   // << " " << trajectory.size()
+	    << " " << trajectories.size()
 	    << " " << ann->weight_l1_norm()
 	    << " " << std::fixed << " E " << std::setprecision(7) << qnn->error()
 	    << " " << qnn->weight_l1_norm()
@@ -596,7 +595,7 @@ void AugmentedDENFAC::_display(std::ostream& out) const  {
 void AugmentedDENFAC::_dump(std::ostream& out) const  {
 	out <<" " << std::setw(25) << std::fixed << std::setprecision(22) <<
 	sum_weighted_reward << " " << std::setw(8) << std::fixed << 
-	std::setprecision(5) << trajectories.size() ;
+	std::setprecision(5) << trajectories.size() << 42;
 }
 
 double AugmentedDENFAC::criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions){
