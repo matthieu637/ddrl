@@ -186,6 +186,7 @@ void SimpleDENFAC::_start_episode(const std::vector<double>& sensors, bool _lear
 
 	last_action = nullptr;
 	last_pure_action = nullptr;
+	trajectory.clear();
 
 	learning = _learning;
 
@@ -365,7 +366,7 @@ void SimpleDENFAC::actor_update_grad() {
 		for (auto it : *traj)
 			sum_diff += action_diff[i++];
 		
-		std::cout << sum_diff << std::endl;
+		//std::cout << sum_diff << std::endl;
 
 		for (uint n = 0; n < traj->size(); ++n) {
 			for (uint h = 0; h < nb_motors; ++h) {
