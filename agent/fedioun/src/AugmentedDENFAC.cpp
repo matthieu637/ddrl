@@ -122,6 +122,7 @@ void AugmentedDENFAC::_unique_invoke(boost::property_tree::ptree* pt, boost::pro
     replay_traj_size			= pt->get<uint>("agent.replay_traj_size");
     lambda 						= pt->get<double>("agent.lambda");
     retrace_lambda				= pt->get<bool>("agent.retrace_lambda");
+    lambda_only				    = pt->get<bool>("agent.lambda_only");
     
 	#ifdef CAFFE_CPU_ONLY
 	    LOG_INFO("CPU mode");
@@ -226,6 +227,20 @@ void AugmentedDENFAC::computePThetaBatch(const std::vector< sample >& vtraj, dou
 	}
 }
 
+double AugmentedDENFAC::euclidien_dist(const std::vector<double>& v1, const std::vector<double>& v2, int nb_motors, int transition) {
+	  double sum = 0;
+
+	  for(int i= transition * nb_motors; i < (transition+1) * nb_motors  ; i++) {
+	  	sum += pow(v1[i] - v2[i], 2);
+	  	//std::cout << "v1[i] - v2[i] = " << v1[i] - v2[i] << "  Sum = " << sum << std::endl;
+	  }
+	  //std::cout << "Final sum = " <<  1 - sqrt(sum / (4* nb_motors)) << std::endl;
+
+	  return 1 - sqrt(sum / (4* nb_motors));
+}
+
+
+
 /***
  * Update the critic using a trajectory sampled from the replay buffer
  */
@@ -237,14 +252,23 @@ void AugmentedDENFAC::critic_update(uint iter) {
 
 
 	std::vector<double>* 	trajectory_next_states;
+
 	std::vector<double>* 	trajectory_states;
-	std::vector<double>* 	trajectory_actions;
-	std::vector<double>*	trajectory_next_actions;			// \pi(s_t)
-	std::vector<double>* 	trajectory_q_targets;
+
+
+
+	std::vector<double>* 	trajectory_actions;				// \mu(s_t)
+	std::vector<double>*	trajectory_next_actions; 		// \pi(s_{t+1})
+	std::vector<double>* 	trajectory_q_targets;			
 	std::vector<double>*    retrace_coefs;
-	std::vector<double>*    trajectory_QV;			// Q(s_t, \mu(s_t))
-	std::vector<double>*    trajectory_next_QV;			// Q(s_{t+1}, \mu(s_{t+1}))
-	std::vector<double>*    next_action;
+	std::vector<double>*    trajectory_QV;					// Q(s_t, \mu(s_t))
+	std::vector<double>*    trajectory_next_QV;				// Q(s_{t+1}, \pi(s_{t+1}))
+	std::vector<double>*    next_action;					// \pi(s_{t+1})
+
+
+	std::vector<double>*    trajectory_new_actions;			// \pi(s_t)
+
+
 	double* 				bellman_residuals;
 
 	std::vector<double>     all_states;
@@ -266,6 +290,8 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		trajectory_next_states = 	new std::vector<double>((current_traj.transitions)->size() * nb_sensors);
 		trajectory_states = 		new std::vector<double>((current_traj.transitions)->size() * nb_sensors);
 		trajectory_actions = 		new std::vector<double>((current_traj.transitions)->size() * nb_motors);
+
+
 		retrace_coefs = 			new std::vector<double>((current_traj.transitions)->size());
 		trajectory_next_QV =		new std::vector<double>((current_traj.transitions)->size());
 		trajectory_q_targets = 		new std::vector<double>((current_traj.transitions)->size());
@@ -286,15 +312,24 @@ void AugmentedDENFAC::critic_update(uint iter) {
 
 		// Compute retrace_coefs (check other version later)
 		ann->increase_batchsize((current_traj.transitions)->size());
+
+		trajectory_new_actions = ann->computeOutBatch(*trajectory_states);  
 		trajectory_next_actions = ann->computeOutBatch(*trajectory_next_states);
 
-		// \pi(s_{t+1})
+		// \pi(s_t)
 		
-		computePThetaBatch(*(current_traj.transitions), ptheta, trajectory_next_actions);
+
+		computePThetaBatch(*(current_traj.transitions), ptheta, trajectory_new_actions);
 
 		i = 0;
 		for (auto it : *(current_traj.transitions)) {
-			retrace_coefs->at(i) = lambda * std::min((double)1, ptheta[i] / it.p0 );
+			retrace_coefs->at(i) = lambda;
+
+			if (!lambda_only) 
+				retrace_coefs->at(i) *= std::min((double)1, ptheta[i] / it.p0 );
+			// * std::min((double)1, ptheta[i] / it.p0 );
+			//euclidien_dist(*trajectory_actions, *trajectory_new_actions, nb_motors, i);
+
 			//std::cout << "At " << i << " : ptheta = " << ptheta[i] << "  p0 = " << it.p0 << " r= " << ptheta[i] / it.p0 <<  std::endl;
 			i++;
 		}
@@ -376,6 +411,7 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		delete trajectory_q_targets;
 		delete next_action;
 		delete trajectory_next_actions;
+		delete trajectory_new_actions;
 
 		delete[] ptheta;
 		delete[] bellman_residuals;
@@ -565,6 +601,17 @@ void AugmentedDENFAC::update_actor_critic() {
  */
 void AugmentedDENFAC::end_episode(bool)  {
 	episode++;
+	//std::cout << "End ep" << std::endl;
+	if (!learning) {
+		//std::cout << "No learn" << std::endl;
+		if (sum_weighted_reward > best_score) {
+			//std::cout << "New best score : " << sum_weighted_reward << std::endl;
+			best_score = sum_weighted_reward;
+			save("agent",true);
+		}
+	}
+
+
 	update_actor_critic();
 }
 
