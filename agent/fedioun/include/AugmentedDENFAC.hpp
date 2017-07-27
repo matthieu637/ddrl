@@ -81,6 +81,7 @@ class AugmentedDENFAC : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
     void computePThetaBatch(const std::vector< sample >& vtraj, double *ptheta,const std::vector<double>* all_next_actions);
 
+    double euclidien_dist(const std::vector<double>& v1, const std::vector<double>& v2, int nb_motors, int transition);
     void critic_update(uint iter);
 
 
@@ -133,6 +134,7 @@ class AugmentedDENFAC : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     bool reset_ann, keep_weights_wr;
 
     bool retrace_lambda;
+    bool lambda_only;
     double lambda;
 
     std::deque<trajectory> trajectories;
@@ -151,6 +153,8 @@ class AugmentedDENFAC : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     double alpha_a;
     double alpha_v;
     double decay_v;
+
+    double best_score = -1000;
     
     PolicyImpl* ann;
     PolicyImpl* qnn;    
