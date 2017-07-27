@@ -120,7 +120,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                 bool learning, bool goal_reached, bool last) override {
+                                 bool learning, bool goal_reached, bool) override {
 
     // protect batch norm from testing data and poor data
     double* weights = new double[ann->number_of_parameters(false)];
@@ -130,7 +130,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     vector<double>* next_action = ann_testing->computeOut(sensors);
     
     if (last_action.get() != nullptr && learning){
-      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached || (count_last && last)};
+      sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached};
       insertSample(sa);
     }
 
@@ -179,7 +179,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     decay_v                 = pt->get<double>("agent.decay_v");
     batch_norm_critic       = pt->get<uint>("agent.batch_norm_critic");
     batch_norm_actor        = pt->get<uint>("agent.batch_norm_actor");
-    count_last              = pt->get<bool>("agent.count_last");
     actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
     hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     bool test_net           = pt->get<bool>("agent.test_net");
@@ -538,7 +537,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   uint batch_norm_actor, batch_norm_critic;
   uint actor_output_layer_type, hidden_layer_type;
   
-  bool inverting_grad, count_last;
+  bool inverting_grad;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

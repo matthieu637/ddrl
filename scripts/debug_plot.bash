@@ -1,7 +1,7 @@
 #!/bin/bash
 
 STAT_FILE=".learning.data"
-LHPO_PATH="$(pwd)/extern/lhpo"
+LHPO_PATH="$(pwd)/scripts/extern/lhpo"
 
 echoerr() { echo "$@" 1>&2; }
 
@@ -34,8 +34,8 @@ function ask_learning_testing(){
 }
 
 function ask_save_best(){
-	echoerr "Save best ? (0/1)"
-	arg=(0 1)
+	echoerr "Save best ? (0/1/2)"
+	arg=(0 1 2)
 	read_input_until arg[@]
 }
 
@@ -58,11 +58,9 @@ fi
 
 dimension=`ask_dimension`
 save_best=0
-if [[ $lot != "T" ]] ; then
-	save_best=`ask_save_best`
-fi
+save_best=`ask_save_best`
 higher_better=0
-if [[ $save_best == "1" ]] ; then
+if [[ $save_best != "0" ]] ; then
 	higher_better=`ask_higher_better`
 fi
 

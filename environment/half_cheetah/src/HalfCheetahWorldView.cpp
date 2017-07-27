@@ -86,8 +86,8 @@ void threadloopHalfCheetah(const std::string& goodpath) {
     HACKdraw(&inst->fn);
     lock.release();
     //wait time between frame draw
-//     usleep(1 * 1000);//each milisecond -> 1000fps
-    usleep(10 * 1000);//each milisecond -> 100fps
+    usleep(1 * 1000);//each milisecond -> 1000fps
+//     usleep(10 * 1000);//each milisecond -> 100fps
     
     double x = dBodyGetPosition(inst->bones[1]->getID())[0];
     dsGetViewpoint(xyz, hpr);
@@ -101,7 +101,7 @@ void threadloopHalfCheetah(const std::string& goodpath) {
 HalfCheetahWorldView::HalfCheetahWorldView(const std::string& path, const hcheetah_physics phy)
   : HalfCheetahWorld(phy),
     requestEnd(false),
-    speed(1.),
+    speed(0.25),
     ignoreMotor(false) {
   std::string goodpath = path;
 
