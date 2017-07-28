@@ -356,11 +356,11 @@ void AugmentedDENFAC::critic_update(uint iter) {
 		// TODO compute action, (add noise + compute Q value) * k
 		for (auto it = (current_traj.transitions)->begin(); it != (current_traj.transitions)->end(); it++) {
 
-			bellman_residuals[i] = it->r;
+      bellman_residuals[i] = it->r - trajectory_QV->at(i);
 			//std::cout << "Reward : " << it->r;
 			if(!it->goal_reached) {
 				//std::cout << " Current QV : " << all_QV->at(i) << " Next QV : " << all_next_QV.at(i) << std::endl ;
-				bellman_residuals[i] += gamma * trajectory_next_QV->at(i) - trajectory_QV->at(i); 
+				bellman_residuals[i] += gamma * trajectory_next_QV->at(i); 
 				//std::cout << " Reward " << i << " : " << it->r << " QV = " << trajectory_next_QV->at(i) << std::endl;
 			}
 			//std::cout << "Bellman residual : " << bellman_residuals[i] << std::endl;
@@ -389,10 +389,7 @@ void AugmentedDENFAC::critic_update(uint iter) {
 
 		// Saving data
 		for (uint j = 0; j < (current_traj.transitions)->size(); j++) {
-			if(current_traj.transitions->at(j).goal_reached)
-				all_q_targets.push_back(trajectory_q_targets->at(j));
-			else
-				all_q_targets.push_back(trajectory_q_targets->at(j) + trajectory_QV->at(j));
+      all_q_targets.push_back(trajectory_q_targets->at(j) + trajectory_QV->at(j));
 			for (uint i=0; i < nb_sensors; i++) {
 				all_states.push_back(trajectory_states->at(j * nb_sensors + i));
 			}
