@@ -135,6 +135,7 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     lambda                  = pt->get<double>("agent.lambda");
     max_trajectory          = pt->get<uint>("agent.max_trajectory");
     offpolicy_strategy      = pt->get<uint>("agent.offpolicy_strategy");
+    add_v_corrector         = pt->get<bool>("agent.add_v_corrector");
     corrected_update_ac     = false;
     gae                     = false;
     try {
@@ -161,7 +162,7 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(std::is_same<NN, DODevMLP>::value)
       ann->exploit(pt, nullptr);
 
-    vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic);
+    vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, add_v_corrector);
     if(std::is_same<NN, DODevMLP>::value)
       vnn->exploit(pt, ann);
 
@@ -261,7 +262,7 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         if(vnn_from_scratch) {
           delete vnn;
           vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, all_size, -1, hidden_layer_type,
-                       batch_norm_critic);
+                       batch_norm_critic, add_v_corrector);
         }
         if(lambda < 0.f && batch_norm_critic == 0)
           vnn->learn_batch(all_states, empty_action, v_target, stoch_iter_critic);
@@ -299,6 +300,7 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           decltype(ann->computeOutBatch(all_states)) all_pi;
           double* ptheta;
           double max_ptheta;
+          std::vector<double>* sample_weight;
           if(offpolicy_strategy != 0) {
             ann->increase_batchsize(all_size);
             all_pi = ann->computeOutBatch(all_states);
@@ -317,6 +319,9 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               }
             }
             max_ptheta = *std::max_element(ptheta, ptheta+all_size);
+            
+            if(add_v_corrector)
+              sample_weight = new std::vector<double>(all_size);
           }
 
           std::vector<double> diff(all_size);
@@ -349,6 +354,8 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                   diff[index_shift+li] = target_sum;
                   target_sum *= this->gamma * lambda * (ptheta[index_shift+n]/max_ptheta);
                 }
+                if(add_v_corrector)
+                  sample_weight->at(index_shift+li) = ptheta[index_shift+li]/max_ptheta;
               } else if(offpolicy_strategy == 2) {
                 double target_sum = 0;
                 for (int n=trajectory.size()-1; n>=li; n--) {
@@ -356,6 +363,8 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                   diff[index_shift+li] = target_sum;
                   target_sum *= this->gamma * lambda * (ptheta[index_shift+n]/trajectory[n].dpmu);
                 }
+                if(add_v_corrector)
+                  sample_weight->at(index_shift+li) = ptheta[index_shift+li]/trajectory[li].dpmu;
               } else if(offpolicy_strategy == 3) {
                 double target_sum = 0;
                 for (int n=trajectory.size()-1; n>=li; n--) {
@@ -363,6 +372,8 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                   diff[index_shift+li] = target_sum;
                   target_sum *= this->gamma * lambda * std::min((double)1.f,ptheta[index_shift+n]/trajectory[n].dpmu);
                 }
+                if(add_v_corrector)
+                  sample_weight->at(index_shift+li) = std::min((double)1.f,ptheta[index_shift+li]/trajectory[li].dpmu);
               } else if(offpolicy_strategy == 4) {
                 double target_sum = 0;
                 for (int n=trajectory.size()-1; n>=li; n--) {
@@ -370,6 +381,8 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                   diff[index_shift+li] = target_sum;
                   target_sum *= this->gamma * lambda * (1.f - l2dist(trajectory[n].a, *all_pi, index_shift+n));
                 }
+                if(add_v_corrector)
+                  sample_weight->at(index_shift+li) = std::min((double)1.f,ptheta[index_shift+li]/trajectory[li].dpmu);
               } else if(offpolicy_strategy == 5) {
                 double target_sum = 0;
                 for (int n=trajectory.size()-1; n>=li; n--) {
@@ -379,6 +392,9 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                     (1.f - std::min(l2dist(trajectory[n].a, *all_pi, index_shift+n),
                                     l2dist(trajectory[n].pure_a, *all_pi, index_shift+n)));
                 }
+                if(add_v_corrector)
+                  sample_weight->at(index_shift+li) = 1.f - std::min(l2dist(trajectory[li].a, *all_pi, index_shift+li),
+                                                                 l2dist(trajectory[li].pure_a, *all_pi, index_shift+li));
               }
 
               li++;
@@ -388,18 +404,24 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           }
           ASSERT(index_shift == all_size, "index pb");
 
-          if(offpolicy_strategy != 0) {
-            delete[] ptheta;
-            delete all_pi;
-          }
-
           // comment following lines to compare with the other formula
           for (int i=0; i<all_size; i++)
             diff[i] = diff[i] + all_V->at(i);
 
 //           bib::Logger::PRINT_ELEMENTS(*all_V, "all v ");
 //           bib::Logger::PRINT_ELEMENTS(diff, "final diff ");
-          vnn->learn_batch(all_states, empty_action, diff, stoch_iter_critic);
+          if(offpolicy_strategy != 0 && add_v_corrector)
+            vnn->learn_batch_lw(all_states, empty_action, diff, *sample_weight, stoch_iter_critic);
+          else
+            vnn->learn_batch(all_states, empty_action, diff, stoch_iter_critic);
+          
+          if(offpolicy_strategy != 0) {
+            delete[] ptheta;
+            delete all_pi;
+            if(add_v_corrector)
+              delete sample_weight;
+          }
+          
           delete all_V;
         }
 
@@ -656,7 +678,7 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   double noise;
   bool gaussian_policy, vnn_from_scratch, update_critic_first,
-       update_delta_neg, corrected_update_ac, gae;
+        update_delta_neg, corrected_update_ac, gae, add_v_corrector;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type,
        hidden_layer_type, max_trajectory, offpolicy_strategy;
