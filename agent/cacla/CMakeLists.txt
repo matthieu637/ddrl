@@ -26,7 +26,8 @@ include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${COMMON_D
 
 set(BASE_LIBRARIES ${COMMON_DRL_LIBRARY} ${Boost_LIBRARIES} )
 file ( GLOB_RECURSE all_include include/*.hpp)
-file ( GLOB all_sources src/*.cpp)
+#file ( GLOB all_sources src/*.cpp)
+set(all_sources "")
 
 if(${OPTPP_LIBRARY_FOUND})
 	include_directories(${OPTPP_INCLUDE_DIRS})
@@ -77,6 +78,10 @@ target_link_libraries(hum-cacla-off ${HUMANOID_LIBRARY} ${BASE_LIBRARIES} )
 add_executable(hum-cacla-off-dodev src/test/HumanoidCacOffDodev.cpp ${all_include} ${all_sources} )
 target_link_libraries(hum-cacla-off-dodev ${HUMANOID_LIBRARY} ${BASE_LIBRARIES} )
 
+set(LIBRARY_NAME "ddrl-cacla")
+rename_buildtype(LIBRARY_NAME)
+add_library(${LIBRARY_NAME} SHARED ${all_include} src/openai.cpp)
+target_link_libraries(${LIBRARY_NAME} ${BASE_LIBRARIES} )
 
 # add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
 # target_link_libraries(ada-nfac ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})

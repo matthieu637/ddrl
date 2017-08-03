@@ -911,8 +911,9 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     return sqrt(r)/(2.f *((double) a.size()));
   }
 
- private:
+ public:
   uint nb_sensors;
+ private:
   uint episode = 0;
 
   double noise;
