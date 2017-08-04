@@ -39,4 +39,5 @@ for ep in range(max_episode):
     ag.end_ep(learning)
     ag.dumpdisplay(learning, ep, step)
     
+open('time_elapsed', 'a').close()
 
