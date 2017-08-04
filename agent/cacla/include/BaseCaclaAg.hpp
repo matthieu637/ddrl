@@ -163,8 +163,9 @@ class BaseCaclaAg : public arch::ARLAgent<> {
         std::setprecision(5) << vnn->error() << " " << noise;
   }
 
- private:
+ public:
   uint nb_sensors;
+ private:
   std::vector<double> empty_action;
 
   double noise;
