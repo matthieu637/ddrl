@@ -1,6 +1,7 @@
 from osim.env import RunEnv
 from agent import *
 import ConfigParser
+import time
 
 config = ConfigParser.ConfigParser()
 config.readfp(open('config.ini'))
@@ -15,6 +16,7 @@ if config.get('simulation', 'agent_type') == 'cacla':
     ag = CaclaAg(env.action_space.shape[0], nb_sensors);
 else:
     ag = OffNFACAg(env.action_space.shape[0], nb_sensors);
+start_time = time.time()
 for ep in range(max_episode):
     #env stoch but testing only on one episode
     if ep % 100 == 0 and ep > 0:
@@ -38,6 +40,8 @@ for ep in range(max_episode):
 
     ag.end_ep(learning)
     ag.dumpdisplay(learning, ep, step)
-    
-open('time_elapsed', 'a').close()
+
+elapsed_time = (time.time() - start_time)/60.
+with open('time_elapsed', 'w') as f:
+  f.write('%d' % elapsed_time)
 
