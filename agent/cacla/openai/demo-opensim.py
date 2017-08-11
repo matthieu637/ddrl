@@ -38,10 +38,14 @@ for ep in range(max_episode):
             env.reset()
             break
 
+    if not learning:
+        ag.save(episode)
     ag.end_ep(learning)
     ag.dumpdisplay(learning, ep, step)
 
+ag.save(max_episode)
+
 elapsed_time = (time.time() - start_time)/60.
 with open('time_elapsed', 'w') as f:
-  f.write('%d' % elapsed_time)
+  f.write('%d\n' % elapsed_time)
 

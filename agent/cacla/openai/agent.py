@@ -31,6 +31,12 @@ class OffNFACAg(object):
     def dumpdisplay(self, learning, episode, step):
         lib.OffNFACAg_dump(self.obj, learning, episode, step)
         lib.OffNFACAg_display(self.obj, learning, episode, step)
+        
+    def save(self, episode):
+        lib.OffNFACAg_save(self.obj, episode)
+
+    def load(self, episode):
+        lib.OffNFACAg_load(self.obj, episode)
 
 class CaclaAg(object):
     def __init__(self, nb_motors, nb_sensors):
@@ -50,3 +56,9 @@ class CaclaAg(object):
     def dumpdisplay(self, learning, episode, step):
         lib.CaclaAg_dump(self.obj, learning, episode, step)
         lib.CaclaAg_display(self.obj, learning, episode, step)
+
+    def save(self, episode):
+        lib.CaclaAg_save(self.obj, episode)
+
+    def load(self, episode):
+        lib.CaclaAg_load(self.obj, episode)

@@ -69,6 +69,16 @@ extern "C" {
              << std::left << std::setw(7) << std::fixed << step
              << " " << agent_dump);
   }
+  
+  void OffNFACAg_save(OffNFACAg<MLP>* ag, int episode) {
+    std::string path = "agent" + std::to_string(episode);
+    ag->save(path, true);
+  }
+  
+  void OffNFACAg_load(OffNFACAg<MLP>* ag, int episode) {
+    std::string path = "agent" + std::to_string(episode);
+    ag->load(path);
+  }
 
   BaseCaclaAg* CaclaAg_new(uint a, uint b) {
     FLAGS_minloglevel = 2;
@@ -135,5 +145,15 @@ extern "C" {
              << std::left << std::setw(6) << std::setfill(' ') << episode
              << std::left << std::setw(7) << std::fixed << step
              << " " << agent_dump);
+  }
+  
+  void CaclaAg_save(BaseCaclaAg* ag, int episode) {
+    std::string path = "agent" + std::to_string(episode);
+    ag->save(path, true);
+  }
+  
+  void CaclaAg_load(OffNFACAg<MLP>* ag, int episode) {
+    std::string path = "agent" + std::to_string(episode);
+    ag->load(path);
   }
 }
