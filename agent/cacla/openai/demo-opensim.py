@@ -39,7 +39,7 @@ for ep in range(max_episode):
             break
 
     if not learning:
-        ag.save(episode)
+        ag.save(ep)
     ag.end_ep(learning)
     ag.dumpdisplay(learning, ep, step)
 
