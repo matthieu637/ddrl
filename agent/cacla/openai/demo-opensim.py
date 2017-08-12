@@ -10,7 +10,7 @@ max_episode=int(config.get('simulation', 'max_episode'))
 learning=True
 
 env = RunEnv(visualize=False)
-observation = env.reset(difficulty = 0)
+observation = env.reset(difficulty = 2)
 nb_sensors = env.observation_space.shape[0]
 if config.get('simulation', 'agent_type') == 'cacla':
     ag = CaclaAg(env.action_space.shape[0], nb_sensors);
