@@ -56,17 +56,18 @@ extern "C" {
     return ac.data();
   }
 
-  void OffNFACAg_dump(OffNFACAg<MLP>* ag, bool learning, int episode, int step) {
+  void OffNFACAg_dump(OffNFACAg<MLP>* ag, bool learning, int episode, int step, double treward) {
     bib::Dumper<OffNFACAg<MLP>, bool, bool> agent_dump(ag, false, true);
     LOG_FILE(std::to_string(0) + (learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE),
-             episode << " " << step << " " << agent_dump);
+             episode << " " << step << " " << treward << " " << agent_dump);
   }
 
-  void OffNFACAg_display(OffNFACAg<MLP>* ag, bool learning, int episode, int step) {
+  void OffNFACAg_display(OffNFACAg<MLP>* ag, bool learning, int episode, int step, double treward) {
     bib::Dumper<OffNFACAg<MLP>, bool, bool> agent_dump(ag, true, false);
     LOG_INFO((learning ? "L " : "T ")
              << std::left << std::setw(6) << std::setfill(' ') << episode
              << std::left << std::setw(7) << std::fixed << step
+             << std::left << std::setw(7) << std::fixed << treward
              << " " << agent_dump);
   }
   
@@ -133,17 +134,18 @@ extern "C" {
     return ac.data();
   }
 
-  void CaclaAg_dump(BaseCaclaAg* ag, bool learning, int episode, int step) {
+  void CaclaAg_dump(BaseCaclaAg* ag, bool learning, int episode, int step, double treward) {
     bib::Dumper<BaseCaclaAg, bool, bool> agent_dump(ag, false, true);
     LOG_FILE(std::to_string(0) + (learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE),
-             episode << " " << step << " " << agent_dump);
+             episode << " " << step << " " << treward << " " << agent_dump);
   }
 
-  void CaclaAg_display(BaseCaclaAg* ag, bool learning, int episode, int step) {
+  void CaclaAg_display(BaseCaclaAg* ag, bool learning, int episode, int step, double treward) {
     bib::Dumper<BaseCaclaAg, bool, bool> agent_dump(ag, true, false);
     LOG_INFO((learning ? "L " : "T ")
              << std::left << std::setw(6) << std::setfill(' ') << episode
              << std::left << std::setw(7) << std::fixed << step
+             << std::left << std::setw(7) << std::fixed << treward
              << " " << agent_dump);
   }
   

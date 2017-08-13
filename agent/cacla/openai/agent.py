@@ -10,8 +10,12 @@ config.readfp(open('config.ini'))
 lib = cdll.LoadLibrary(config.get('simulation', 'library'))
 lib.OffNFACAg_start_episode.argtypes = [ ctypes.c_int, ndpointer(ctypes.c_double), ctypes.c_bool]
 lib.OffNFACAg_run.argtypes = [ ctypes.c_int, ctypes.c_double, ndpointer(ctypes.c_double), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
+lib.OffNFACAg_dump.argtypes = [ ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
+lib.OffNFACAg_display.argtypes = [ ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
 lib.CaclaAg_start_episode.argtypes = [ ctypes.c_int, ndpointer(ctypes.c_double), ctypes.c_bool]
 lib.CaclaAg_run.argtypes = [ ctypes.c_int, ctypes.c_double, ndpointer(ctypes.c_double), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
+lib.CaclaAg_dump.argtypes = [ ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
+lib.CaclaAg_display.argtypes = [ ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
 
 class OffNFACAg(object):
     def __init__(self, nb_motors, nb_sensors):
@@ -28,9 +32,9 @@ class OffNFACAg(object):
     def end_ep(self, learning):
         lib.OffNFACAg_end_episode(self.obj, learning)
 
-    def dumpdisplay(self, learning, episode, step):
-        lib.OffNFACAg_dump(self.obj, learning, episode, step)
-        lib.OffNFACAg_display(self.obj, learning, episode, step)
+    def dumpdisplay(self, learning, episode, step, treward):
+        lib.OffNFACAg_dump(self.obj, learning, episode, step, treward)
+        lib.OffNFACAg_display(self.obj, learning, episode, step, treward)
         
     def save(self, episode):
         lib.OffNFACAg_save(self.obj, episode)
@@ -53,9 +57,9 @@ class CaclaAg(object):
     def end_ep(self, learning):
         lib.CaclaAg_end_episode(self.obj, learning)
 
-    def dumpdisplay(self, learning, episode, step):
-        lib.CaclaAg_dump(self.obj, learning, episode, step)
-        lib.CaclaAg_display(self.obj, learning, episode, step)
+    def dumpdisplay(self, learning, episode, step, treward):
+        lib.CaclaAg_dump(self.obj, learning, episode, step, treward)
+        lib.CaclaAg_display(self.obj, learning, episode, step, treward)
 
     def save(self, episode):
         lib.CaclaAg_save(self.obj, episode)
