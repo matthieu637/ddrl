@@ -41,8 +41,8 @@ for ep in range(max_episode):
         total_reward += reward
         step += 1
 #debug only
-        if done or step >= 10:
-#        if done:
+#        if done or step >= 10:
+        if done:
             env.reset()
             break
 
