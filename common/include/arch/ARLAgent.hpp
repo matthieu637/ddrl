@@ -7,7 +7,7 @@
 
 #include "arch/Dummy.hpp"
 #include "arch/AAgent.hpp"
-
+// TODO:finished with action history
 /**
  * @brief architecture
  *
@@ -19,7 +19,8 @@ namespace arch {
 template <typename ProgOptions = AgentProgOptions>
 class ARLAgent : public AAgent<ProgOptions> {
  public:
-  ARLAgent(uint _nb_motors):returned_ac(_nb_motors), nb_motors(_nb_motors){
+  ARLAgent(uint _nb_motors, uint _nb_sensors=0):
+  returned_ac(_nb_motors), nb_sensors(_nb_sensors), nb_motors(_nb_motors){
     
   }
    
@@ -35,6 +36,16 @@ class ARLAgent : public AAgent<ProgOptions> {
    */
   const std::vector<double>& runf(double r, const std::vector<double>& perceptions,
                                          bool learning, bool absorbing_state, bool finished) override {
+    const std::vector<double> *state_to_send = &perceptions;
+    if(history_size > 1){
+      for (uint h = history_size - 1 ; h >= 1; h--)
+        std::copy(returned_st.begin() + (h-1) * nb_sensors,
+                  returned_st.begin() + h * nb_sensors, 
+                  returned_st.begin() + h * nb_sensors);
+      
+      std::copy(perceptions.begin(), perceptions.end(), returned_st.begin());
+      state_to_send = &returned_st;
+    }
     inter_rewards.push_back(r);
     time_for_ac--;
     if (time_for_ac == 0 || absorbing_state || finished) {
@@ -47,7 +58,7 @@ class ARLAgent : public AAgent<ProgOptions> {
       }
  
       _last_receive_reward = reward;
-      const std::vector<double>& next_action = _run(reward, perceptions, learning, absorbing_state, finished);
+      const std::vector<double>& next_action = _run(reward, *state_to_send, learning, absorbing_state, finished);
       time_for_ac = decision_each;
 
       for (uint i = 0; i < nb_motors; i++)
@@ -80,6 +91,14 @@ class ARLAgent : public AAgent<ProgOptions> {
   uint get_number_motors(){
       return nb_motors;
   }
+  
+  uint get_number_sensors(){
+      return nb_sensors;
+  }
+  
+  uint get_state_size(){
+      return state_size;
+  }
 
   /**
    * @brief This method is called after each beginning of a new instance of episode
@@ -92,7 +111,23 @@ class ARLAgent : public AAgent<ProgOptions> {
     sum_weighted_reward = 0;
     global_pow_gamma = 1.000000000f;
     
-    _start_episode(perceptions, learning);
+    if(history_size == 1)
+      _start_episode(perceptions, learning);
+    else {
+      if(get_state_size()==0){
+        LOG_ERROR("fix your agent constructor " << nb_sensors <<  " " << history_size );
+        exit(1);
+      }
+      returned_st.resize(get_state_size());
+      for (uint h = 0 ; h < history_size; h++)
+        std::copy(perceptions.begin(), perceptions.end(), returned_st.begin() + h * nb_sensors);
+      if(action_in_history){
+        for (uint h = 0 ; h < history_size; h++)
+          for (uint j = 0 ; j < nb_motors; j++)
+            returned_st[history_size*nb_sensors + h * nb_motors + j] = 0.f;
+      }
+      _start_episode(returned_st, learning);
+    }
   }
   
   void unique_invoke(boost::property_tree::ptree* inifile,
@@ -100,13 +135,31 @@ class ARLAgent : public AAgent<ProgOptions> {
                      bool forbidden_load) override {
     gamma                 = inifile->get<double>("agent.gamma");
     decision_each         = inifile->get<int>("agent.decision_each");
+    history_size          = 1;
+    action_in_history     = false;
+    try {
+      history_size        = inifile->get<int>("agent.history_size");
+    } catch(boost::exception const& ) {
+    }
+    try {
+      action_in_history   = inifile->get<bool>("agent.action_in_history");
+    } catch(boost::exception const& ) {
+    }
     
-    if(inifile->count("environment.max_step_per_instance") != 0 ){
+    if(history_size == 0){
+      LOG_ERROR("cannot have 0 history");
+      exit(1);
+    }
+    
+    try {
       if(inifile->get<int>("environment.max_step_per_instance") % decision_each != 0){
           LOG_ERROR("please synchronize environment.max_step_per_instance with agent.decision_each");
           exit(1);
       }
+    } catch(boost::exception const& ) {
     }
+    state_size = nb_sensors * history_size;
+    //+ (action_in_history ? nb_motors * history_size : 0 );
     
     _unique_invoke(inifile, command_args);
     if (command_args->count("load") && !forbidden_load)
@@ -154,12 +207,17 @@ private:
   
   std::vector<double> returned_ac;
   double _last_receive_reward;
+  std::vector<double> returned_st;
+  uint nb_sensors;
   
 protected:
   double sum_weighted_reward;
   double gamma;
   uint nb_motors;
+  uint state_size;
   uint decision_each;
+  uint history_size;
+  bool action_in_history;
   AAgent<ProgOptions>* old_ag;
 };
 }  // namespace arch

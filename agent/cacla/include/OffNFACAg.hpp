@@ -7,7 +7,7 @@
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
 
-#include "arch/AACAgent.hpp"
+#include "arch/ARLAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
 #include <bib/MetropolisHasting.hpp>
@@ -57,12 +57,12 @@ typedef struct _trajectory {
 } trajectory;
 
 template<typename NN = MLP>
-class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
+class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
  public:
   typedef NN PolicyImpl;
 
   OffNFACAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0) {
+    : arch::ARLAgent<arch::AgentProgOptions>(_nb_motors, _nb_sensors), empty_action(0) {
 
   }
 
@@ -168,12 +168,12 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       exit(1);
     }
 
-    ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type,
+    ann = new NN(this->get_state_size(), *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type,
                  batch_norm_actor, true);
     if(std::is_same<NN, DODevMLP>::value)
       ann->exploit(pt, nullptr);
 
-    vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic,
+    vnn = new NN(this->get_state_size(), this->get_state_size(), *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic,
                  add_v_corrector);
     if(std::is_same<NN, DODevMLP>::value)
       vnn->exploit(pt, ann);
@@ -228,8 +228,8 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if (all_size > 0) {
       //remove trace of old policy
       auto iter = [&]() {
-        std::vector<double> all_states(all_size * nb_sensors);
-        std::vector<double> all_next_states(all_size * nb_sensors);
+        std::vector<double> all_states(all_size * this->get_state_size());
+        std::vector<double> all_next_states(all_size * this->get_state_size());
         std::vector<double> v_target(all_size);
 
         int li=0;
@@ -237,8 +237,8 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           const std::deque<sample>& trajectory = *one_trajectory->transitions;
 
           for (auto it : trajectory) {
-            std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * nb_sensors);
-            std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * nb_sensors);
+            std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * this->get_state_size());
+            std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * this->get_state_size());
             li++;
           }
         }
@@ -273,7 +273,7 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
         if(vnn_from_scratch) {
           delete vnn;
-          vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, all_size, -1, hidden_layer_type,
+          vnn = new NN(this->get_state_size(), this->get_state_size(), *hidden_unit_v, alpha_v, all_size, -1, hidden_layer_type,
                        batch_norm_critic, add_v_corrector);
         }
         if(lambda < 0.f && batch_norm_critic == 0)
@@ -486,19 +486,19 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     const std::deque<sample>& trajectory = *trajectories.back()->transitions;
     vnn->increase_batchsize(trajectory.size());
     if (trajectory.size() > 0) {
-      std::vector<double> sensors(trajectory.size() * nb_sensors);
+      std::vector<double> sensors(trajectory.size() * this->get_state_size());
       std::vector<double> actions(trajectory.size() * this->nb_motors);
       std::vector<bool> disable_back(trajectory.size() * this->nb_motors, false);
       const std::vector<bool> disable_back_ac(this->nb_motors, true);
       std::vector<double> deltas_blob(trajectory.size() * this->nb_motors);
       std::vector<double> deltas(trajectory.size());
 
-      std::vector<double> all_states(trajectory.size() * nb_sensors);
-      std::vector<double> all_next_states(trajectory.size() * nb_sensors);
+      std::vector<double> all_states(trajectory.size() * this->get_state_size());
+      std::vector<double> all_next_states(trajectory.size() * this->get_state_size());
       uint li=0;
       for (auto it : trajectory) {
-        std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * nb_sensors);
-        std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * nb_sensors);
+        std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * this->get_state_size());
+        std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * this->get_state_size());
         li++;
       }
 
@@ -555,7 +555,7 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
         sample sm = *it;
 
-        std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
+        std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * this->get_state_size());
         if(deltas[li] > 0.) {
           std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
           n++;
@@ -626,22 +626,22 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     int all_size = alltransitions();
     ann->increase_batchsize(all_size);
 
-    std::vector<double> sensors(all_size * nb_sensors);
+    std::vector<double> sensors(all_size * this->get_state_size());
     std::vector<double> actions(all_size * this->nb_motors);
     std::vector<bool> disable_back(all_size * this->nb_motors, false);
     const std::vector<bool> disable_back_ac(this->nb_motors, true);
     std::vector<double> deltas_blob(all_size * this->nb_motors);
     std::vector<double> deltas(all_size);
 
-    std::vector<double> all_states(all_size * nb_sensors);
-    std::vector<double> all_next_states(all_size * nb_sensors);
+    std::vector<double> all_states(all_size * this->get_state_size());
+    std::vector<double> all_next_states(all_size * this->get_state_size());
 
     int li=0;
     for(auto one_trajectory : trajectories) {
       const std::deque<sample>& trajectory = *one_trajectory->transitions;
       for (auto it : trajectory) {
-        std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * nb_sensors);
-        std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * nb_sensors);
+        std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * this->get_state_size());
+        std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * this->get_state_size());
         li++;
       }
     }
@@ -773,7 +773,7 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     for(auto one_trajectory : trajectories) {
       const std::deque<sample>& trajectory = *one_trajectory->transitions;
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-        std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
+        std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * this->get_state_size());
         if(deltas[li] > 0.) {
           std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
           n++;
@@ -832,7 +832,8 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
         delete ac_out;
       }
-    }
+    } else if (gae && offpolicy_strategy != 0)
+      delete all_pi;
 
     delete all_nextV;
     delete all_mine;
@@ -864,16 +865,6 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     auto p3 = bib::XMLEngine::load<struct algo_state>("algo_state", "continue.algo_state.data");
     episode = p3->episode;
     delete p3;
-  }
-
-  double criticEval(const std::vector<double>&, const std::vector<double>&) override {
-    LOG_INFO("not implemented");
-    return 0;
-  }
-
-  arch::Policy<NN>* getCopyCurrentPolicy() override {
-    //         return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
-    return nullptr;
   }
 
  protected:
@@ -911,8 +902,6 @@ class OffNFACAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     return sqrt(r)/(2.f *((double) a.size()));
   }
 
- public:
-  uint nb_sensors;
  private:
   uint episode = 0;
 

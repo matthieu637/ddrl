@@ -3,6 +3,8 @@ from agent import *
 import ConfigParser
 import time
 
+#TODO:do not always calls end episode
+
 def str2bool(v):
   return v.lower() in ("yes", "true", "1")
 
@@ -29,8 +31,8 @@ for ep in range(max_episode):
         learning=False
     elif not testing_only:
         learning=True
-    ag.start_ep(env.current_state, learning)
-    ac = ag.run(0, env.current_state, learning, False, False)
+    ag.start_ep(observation, learning)
+    ac = ag.run(0, observation, learning, False, False)
     total_reward = 0.0
     step = 0
     while True:
@@ -43,7 +45,7 @@ for ep in range(max_episode):
 #debug only
 #        if done or step >= 10:
         if done:
-            env.reset()
+            observation = env.reset(difficulty = 2)
             break
 
     if not learning and not testing_only:

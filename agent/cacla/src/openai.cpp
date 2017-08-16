@@ -41,7 +41,7 @@ extern "C" {
   }
 
   void OffNFACAg_start_episode(OffNFACAg<MLP>* ag, const double* _state, bool learning) {
-    std::vector<double> state(_state, _state+ag->nb_sensors);
+    std::vector<double> state(_state, _state+ag->get_number_sensors());
     return ag->start_episode(state, learning);
   }
 
@@ -51,7 +51,7 @@ extern "C" {
 
   const double* OffNFACAg_run(OffNFACAg<MLP>* ag, double reward, const double* sensors,
                               bool learning, bool goal_reached, bool last) {
-    std::vector<double> state(sensors, sensors+ag->nb_sensors);
+    std::vector<double> state(sensors, sensors+ag->get_number_sensors());
     const std::vector<double>& ac = ag->runf(reward, state, learning, goal_reached, last);
     return ac.data();
   }
