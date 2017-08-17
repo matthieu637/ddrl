@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [ -e out ] ; then
+	rm -rf out
+fi
+mkdir out
+echo -n '' > out/file.list
+
+COUNTER=0
+
+find . -type f -name 'agent*.actor.solverstate.data' | while read file ; do
+	nb=$(basename $file | sed -e 's/^agent\([0-9]*\)[.].*$/\1/')
+	echo "$nb to $COUNTER"
+	cp $file out/agent$COUNTER.actor.solverstate.data.gz
+	cp $(dirname $file)/agent$nb.actor.caffemodel.data out/agent$COUNTER.actor.caffemodel.data.gz
+	cp $(dirname $file)/agent$nb.critic.caffemodel.data out/agent$COUNTER.critic.caffemodel.data.gz
+	cp $(dirname $file)/agent$nb.critic.solverstate.data out/agent$COUNTER.critic.solverstate.data.gz
+	
+	echo "$nb:$COUNTER" >> out/file.list
+	COUNTER=$((COUNTER + 1))
+done
+
+echo $COUNTER
+cd out
+gunzip *
+tar -cJf savedagents.tar.xz *
+

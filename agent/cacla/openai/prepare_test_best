@@ -1,0 +1,60 @@
+#!/bin/bash
+
+#for sort order
+export LC_ALL=C
+
+POLICY_DIR=~/git/drl/thesis_data/opensim/opensim-stage1/nfac-state
+find . -type d -name '[0-9]*' | tail -1 | xargs diff $POLICY_DIR/out/file.list
+if [ $? -ne 0 ] ; then
+	echo "file list doesn't match with policy_dir"
+	exit 1
+fi
+
+echo -n '' > perf
+
+find . -type f -name '0.testing.data' | while read file ; do
+	echo "$(octave --no-gui --eval "X=load('$file');median(X)(3)" |& grep -e 'ans' | sed -e 's/[^0-9-]*\([0-9.-]*\)$/\1/') $(dirname $file)" >> perf
+done
+
+nbline=$(wc -l perf | cut -f1 -d' ')
+keep=$(expr $nbline - 50)
+cat perf  | sort -rn | head -50
+cat perf  | sort -rn | tail -$keep | cut -f2 -d' ' | xargs rm -rf
+
+if [ -e out ] ; then
+	rm -rf out
+fi
+mkdir out
+echo -n '' > out/file.list
+
+
+find . -type d -name '[0-9]*' | while read file ; do
+	rm -f $file/agent*.data
+	id=$(echo $file | sed -e 's/[.][/]\([0-9]*\)_.*$/\1/')
+	cp $POLICY_DIR/out/agent$id.* $file
+	line=$(cat $file/file.list | cut -d ':' -f2 | grep -ne "^${id}$" | cut -d ':' -f1)
+	outnb=$(sed -n "${line}p" $file/file.list | cut -d ':' -f1)
+	mv $file/agent$id.actor.solverstate.data $file/agent$outnb.actor.solverstate.data
+	mv $file/agent$id.actor.caffemodel.data $file/agent$outnb.actor.caffemodel.data
+	mv $file/agent$id.critic.solverstate.data $file/agent$outnb.critic.solverstate.data
+	mv $file/agent$id.critic.caffemodel.data $file/agent$outnb.critic.caffemodel.data
+done
+
+COUNTER=0
+
+find . -type f -name 'agent*.actor.solverstate.data' | while read file ; do
+	nb=$(basename $file | sed -e 's/^agent\([0-9]*\)[.].*$/\1/')
+	echo "$nb to $COUNTER ($file)"
+	cp $file out/agent$COUNTER.actor.solverstate.data
+	cp $(dirname $file)/agent$nb.actor.caffemodel.data out/agent$COUNTER.actor.caffemodel.data
+	cp $(dirname $file)/agent$nb.critic.caffemodel.data out/agent$COUNTER.critic.caffemodel.data
+	cp $(dirname $file)/agent$nb.critic.solverstate.data out/agent$COUNTER.critic.solverstate.data
+	
+	echo "$nb:$COUNTER" >> out/file.list
+	COUNTER=$((COUNTER + 1))
+done
+
+echo $COUNTER
+cd out
+tar -cJf savedagents.tar.xz *
+
