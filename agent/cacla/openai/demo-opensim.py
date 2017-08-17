@@ -2,6 +2,7 @@ from osim.env import RunEnv
 from agent import *
 import ConfigParser
 import time
+import glob, os
 
 #TODO:do not always calls end episode
 
@@ -13,6 +14,7 @@ config.readfp(open('config.ini'))
 
 max_episode=int(config.get('simulation', 'max_episode'))
 testing_only=str2bool(config.get('simulation', 'testing_only'))
+can_continue=str2bool(config.get('simulation', 'continue'))
 learning=(not testing_only)
 
 env = RunEnv(visualize=False)
@@ -22,8 +24,11 @@ if config.get('simulation', 'agent_type') == 'cacla':
     ag = CaclaAg(env.action_space.shape[0], nb_sensors);
 else:
     ag = OffNFACAg(env.action_space.shape[0], nb_sensors);
-if testing_only:
+if testing_only or can_continue:
     ag.load(int(config.get('simulation', 'load_episode')))
+    if can_continue:
+        for f in glob.glob("agent*.data"):
+            os.remove(f)
 start_time = time.time()
 for ep in range(max_episode):
     #env stoch but testing only on one episode
