@@ -83,7 +83,7 @@ class OnPACAg : public arch::ARLAgent<> {
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
           for(int i=0; i<actor_actions_blob->count(); i++)
-              ac_diff[i] = q*(last_action[i]-actions_outputs[i])/noise;
+              ac_diff[i] = q*(last_action->at(i)-actions_outputs->at(i))/noise;
           ann->actor_backward();
           ann->getSolver()->ApplyUpdate();
           ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
