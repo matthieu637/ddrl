@@ -78,20 +78,30 @@ class OnPACAg : public arch::ARLAgent<> {
         ann->ZeroGradParameters();
 
         auto actions_outputs = ann->computeOut(last_state);
-        qnn->computeOutVF(last_state, *actions_outputs);
+        if(stochastic_gradient){
+          double q = qnn->computeOutVF(last_state, *last_action);
+          const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
+          auto ac_diff = actor_actions_blob->mutable_cpu_diff();
+          for(int i=0; i<actor_actions_blob->count(); i++)
+              ac_diff[i] = q*(last_action[i]-actions_outputs[i])/noise;
+          ann->actor_backward();
+          ann->getSolver()->ApplyUpdate();
+          ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+        } else {
+          qnn->computeOutVF(last_state, *actions_outputs);
+          const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
+          double* q_values_diff = q_values_blob->mutable_cpu_diff();
+          q_values_diff[q_values_blob->offset(0,0,0,0)] = -1.0f;
+          qnn->critic_backward();
+          const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
 
-        const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
-        double* q_values_diff = q_values_blob->mutable_cpu_diff();
-        q_values_diff[q_values_blob->offset(0,0,0,0)] = -1.0f;
-        qnn->critic_backward();
-        const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
-
-        // Transfer input-level diffs from Critic to Actor
-        const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
-        actor_actions_blob->ShareDiff(*critic_action_blob);
-        ann->actor_backward();
-        ann->getSolver()->ApplyUpdate();
-        ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+          // Transfer input-level diffs from Critic to Actor
+          const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
+          actor_actions_blob->ShareDiff(*critic_action_blob);
+          ann->actor_backward();
+          ann->getSolver()->ApplyUpdate();
+          ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+        }
         delete actions_outputs;
       }
 
@@ -134,6 +144,7 @@ class OnPACAg : public arch::ARLAgent<> {
     on_policy                     = pt->get<bool>("agent.on_policy");
     delay_q_update                = pt->get<bool>("agent.delay_q_update");
     proba_actor_update            = pt->get<double>("agent.proba_actor_update");
+    stochastic_gradient           = pt->get<bool>("agent.stochastic_gradient");
     uint kMinibatchSize = 1;
     proba_actor_update_current = 1;
     
@@ -207,7 +218,7 @@ class OnPACAg : public arch::ARLAgent<> {
   std::vector<uint>* hidden_unit_a;
 
   uint actor_output_layer_type;
-  bool gaussian_policy, on_policy, delay_q_update;
+  bool gaussian_policy, on_policy, delay_q_update, stochastic_gradient;
   double proba_actor_update;
   double proba_actor_update_current;
 
