@@ -88,7 +88,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
               else
                 ac_diff[i] = - delta / x;
             }
-          } else {
+          } else if(shrink_ga == 2) {
             for(int i=0; i<actor_actions_blob->count(); i++){
               double x = last_action->at(i) - ac_out->at(i);
               double fabs_x = fabs(x);
@@ -97,7 +97,17 @@ class CaclaTDAg : public arch::ARLAgent<> {
               else
                 ac_diff[i] = - delta / x;
             }
-          }
+          } else if(shrink_ga == 3) {
+            for(int i=0; i<actor_actions_blob->count(); i++){
+              double x = last_action->at(i) - ac_out->at(i);
+              ac_diff[i] = - x;
+            }
+	  } else {
+            for(int i=0; i<actor_actions_blob->count(); i++){
+              double x = last_action->at(i) - ac_out->at(i);
+              ac_diff[i] = - x * vtarget;
+            }
+	  }
 //        Similar to euclidien loss for fair comparaison
           double s_ = actor_actions_blob->count();
           for(int i=0; i<actor_actions_blob->count(); i++)
