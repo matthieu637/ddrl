@@ -137,8 +137,13 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     offpolicy_strategy      = pt->get<uint>("agent.offpolicy_strategy");
     add_v_corrector         = pt->get<bool>("agent.add_v_corrector");
     offpolicy_actor         = pt->get<bool>("agent.offpolicy_actor");
+    number_global_fitted_iteration         = pt->get<uint>("agent.number_global_fitted_iteration");
+    a3c                                    = pt->get<bool>("agent.a3c");
+    offpolicy_critic                       = pt->get<bool>("agent.offpolicy_critic");
+    shuffle_buffer                         = pt->get<bool>("agent.shuffle_buffer");
     corrected_update_ac     = false;
     gae                     = false;
+    
     try {
       corrected_update_ac   = pt->get<bool>("agent.corrected_update_ac");
     } catch(boost::exception const& ) {
@@ -158,8 +163,23 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       exit(1);
     }
 
+    if(lambda < 0. && offpolicy_critic) {
+      LOG_DEBUG("set lambda please!");
+      exit(1);
+    }
+    
     if(offpolicy_actor && !gae) {
-      LOG_DEBUG("to be done?");
+      LOG_DEBUG("to be done? (offpolicy_actor without gae)");
+      exit(1);
+    }
+    
+    if(offpolicy_actor && a3c) {
+      LOG_DEBUG("a3c is on-policy");
+      exit(1);
+    }
+    
+    if(gae && a3c) {
+      LOG_DEBUG("choose either gae or a3c");
       exit(1);
     }
 
@@ -313,7 +333,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
           double* ptheta;
           double max_ptheta;
           std::vector<double>* sample_weight;
-          if(offpolicy_strategy != 0) {
+          if(offpolicy_strategy != 0 && offpolicy_critic) {
             ann->increase_batchsize(all_size);
             all_pi = ann->computeOutBatch(all_states);
             ptheta = new double[all_size];
@@ -352,7 +372,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 //               3 : lambda min(1,\pi / \mu) (Retrace)
 //               4 : lambda * (1-||a_t - \pi||) (ours)
 //               5 : lambda * (1-min(||a_t - \pi||, ||u_t - \pi|| )) (ours)
-              if(offpolicy_strategy == 0) {
+              if(offpolicy_strategy == 0 || !offpolicy_critic) {
                 for (uint n=li; n<trajectory.size(); n++)
                   diff[index_shift+li] += std::pow(this->gamma * lambda, n-li) * deltas[index_shift+n];
               } else if(offpolicy_strategy == 1) {
@@ -424,7 +444,30 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
 //           bib::Logger::PRINT_ELEMENTS(*all_V, "all v ");
 //           bib::Logger::PRINT_ELEMENTS(diff, "final diff ");
-          if(offpolicy_strategy != 0 && add_v_corrector)
+          if(!offpolicy_critic){
+            int size_last_traj = trajectories.back()->transitions->size();
+            vnn->increase_batchsize(size_last_traj);
+            
+            std::vector<double> subdiff(size_last_traj);
+            std::vector<double> subsensors(size_last_traj * this->get_state_size());
+            
+            const std::deque<sample>& trajectory = *trajectories.back()->transitions;
+            
+            li=0;
+            for (auto it : trajectory){
+              std::copy(it.s.begin(), it.s.end(), subsensors.begin() + li * this->get_state_size());
+              li++;
+            }
+            
+            int index=size_last_traj-1;
+            for(li=all_size - 1;li>=(all_size-size_last_traj);li--){
+              subdiff[index]=diff[li];
+              index--;
+            }
+            vnn->learn_batch(subsensors, empty_action, subdiff, stoch_iter_critic);
+            
+            vnn->increase_batchsize(all_size);
+          } else if(offpolicy_strategy != 0 && add_v_corrector)
             vnn->learn_batch_lw(all_states, empty_action, diff, *sample_weight, stoch_iter_critic);
           else
             vnn->learn_batch(all_states, empty_action, diff, stoch_iter_critic);
@@ -459,21 +502,30 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
         vnn_testing->increase_batchsize(all_size);
     }
 
-    if(update_critic_first)
-      update_critic();
+    for(uint fi = 0 ; fi < number_global_fitted_iteration; fi++){
+      if(update_critic_first)
+        update_critic();
 
-    if(!offpolicy_actor)
-      actor_update_onpolicy();
-    else
-      actor_update_offpolicy();
+      if(!offpolicy_actor){
+        if(a3c)
+          actor_update_onpolicy_a3c();
+        else
+          actor_update_onpolicy();
+      } else
+        actor_update_offpolicy();
 
-    if(!update_critic_first) {
-      if(all_size > 0 && !offpolicy_actor) {
-        vnn->increase_batchsize(all_size);
-        if(batch_norm_critic != 0)
-          vnn_testing->increase_batchsize(all_size);
+      if(!update_critic_first) {
+        if(all_size > 0 && !offpolicy_actor) {
+          vnn->increase_batchsize(all_size);
+          if(batch_norm_critic != 0)
+            vnn_testing->increase_batchsize(all_size);
+        }
+        update_critic();
       }
-      update_critic();
+    }
+    
+    if(shuffle_buffer){
+      std::random_shuffle(trajectories.begin(), trajectories.end());
     }
   }
 
@@ -594,14 +646,16 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
               double x = actions[i] - ac_out->at(i);
               if(!corrected_update_ac)
                 ac_diff[i] = -x;
-              else {
-                double fabs_x = fabs(x);
-                if(fabs_x <= corrected_update_ac_factor)
-                  ac_diff[i] = sign(x) * sign(deltas_blob[i]) * (sqrt(fabs_x)
-                               - sqrt(corrected_update_ac_factor) - sign(deltas_blob[i]) * deltas_blob[i]/corrected_update_ac_factor );
-                else
-                  ac_diff[i] = -deltas_blob[i] / x;
-              }
+              else
+                ac_diff[i] = 1.f/ac_out->at(i);
+//               else {
+//                 double fabs_x = fabs(x);
+//                 if(fabs_x <= corrected_update_ac_factor)
+//                   ac_diff[i] = sign(x) * sign(deltas_blob[i]) * (sqrt(fabs_x)
+//                                - sqrt(corrected_update_ac_factor) - sign(deltas_blob[i]) * deltas_blob[i]/corrected_update_ac_factor );
+//                 else
+//                   ac_diff[i] = -deltas_blob[i] / x;
+//               }
             }
           }
           ann->actor_backward();
@@ -619,6 +673,74 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
       if(batch_norm_actor != 0)
         ann_testing->increase_batchsize(1);
+    }
+  }
+  
+  void actor_update_onpolicy_a3c() {
+    const std::deque<sample>& trajectory = *trajectories.back()->transitions;
+    vnn->increase_batchsize(trajectory.size());
+    if (trajectory.size() > 0) {
+      std::vector<double> sensors(trajectory.size() * this->get_state_size());
+      std::vector<double> actions(trajectory.size() * this->nb_motors);
+      std::vector<double> deltas_blob(trajectory.size() * this->nb_motors);
+      std::vector<double> deltas(trajectory.size());
+      
+      std::vector<double> all_states(trajectory.size() * this->get_state_size());
+      std::vector<double> all_next_states(trajectory.size() * this->get_state_size());
+      uint li=0;
+      for (auto it : trajectory) {
+        std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * this->get_state_size());
+        std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * this->get_state_size());
+        li++;
+      }
+      
+      decltype(vnn->computeOutVFBatch(all_next_states, empty_action)) all_nextV, all_mine;
+      all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
+      all_mine = vnn->computeOutVFBatch(all_states, empty_action);
+      
+      li=0;
+      double sum_gamma_rt = 0;
+      for (auto it : trajectory) {
+        sample sm = it;
+        sum_gamma_rt += std::pow(gamma, li) * sm.r;
+        double v_target = sum_gamma_rt;
+        if (!sm.goal_reached) {
+          double nextV = all_nextV->at(li);
+          v_target += std::pow(this->gamma, li+1) * nextV;
+        }
+        
+        deltas[li] =  v_target - all_mine->at(li);
+        ++li;
+      }
+
+      li=0;
+      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        sample sm = *it;
+        
+        std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * this->get_state_size());
+        std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
+        std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
+        li++;
+      }
+      
+      for(uint sia = 0; sia < stoch_iter_actor; sia++) {
+        ann->increase_batchsize(trajectory.size());
+        auto ac_out = ann->computeOutBatch(sensors);
+        
+        const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
+        auto ac_diff = actor_actions_blob->mutable_cpu_diff();
+        for(int i=0; i<actor_actions_blob->count(); i++) {
+            double x = actions[i] - ac_out->at(i);
+            ac_diff[i] = -x*deltas_blob[i];
+        }
+        ann->actor_backward();
+        ann->getSolver()->ApplyUpdate();
+        ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+        delete ac_out;
+      }
+      
+      delete all_nextV;
+      delete all_mine;
     }
   }
 
@@ -912,6 +1034,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type,
        hidden_layer_type, max_trajectory, offpolicy_strategy;
   double lambda, corrected_update_ac_factor;
+  uint number_global_fitted_iteration;
+  bool offpolicy_critic, a3c, shuffle_buffer;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
