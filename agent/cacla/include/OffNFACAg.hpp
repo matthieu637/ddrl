@@ -472,7 +472,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
           else
             vnn->learn_batch(all_states, empty_action, diff, stoch_iter_critic);
 
-          if(offpolicy_strategy != 0) {
+          if(offpolicy_strategy != 0 && offpolicy_critic) {
             delete[] ptheta;
             delete all_pi;
             if(add_v_corrector)
