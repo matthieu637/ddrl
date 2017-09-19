@@ -79,11 +79,10 @@ class OnPACAg : public arch::ARLAgent<> {
 
         auto actions_outputs = ann->computeOut(last_state);
         if(stochastic_gradient){
-          double q = qnn->computeOutVF(last_state, *last_action);
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
           for(int i=0; i<actor_actions_blob->count(); i++)
-              ac_diff[i] = q*(last_action->at(i)-actions_outputs->at(i))/noise;
+              ac_diff[i] = -qtarget*(last_action->at(i)-actions_outputs->at(i))/noise;
           ann->actor_backward();
           ann->getSolver()->ApplyUpdate();
           ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
