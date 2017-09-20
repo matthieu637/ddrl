@@ -74,7 +74,6 @@ class OnPACAg : public arch::ARLAgent<> {
       //update actor with Q grad error
       if(proba_actor_update < 0.f || 
         bib::Utils::rand01() >= proba_actor_update_current ){
-        qnn->ZeroGradParameters();
         ann->ZeroGradParameters();
 
         auto actions_outputs = ann->computeOut(last_state);
@@ -82,11 +81,12 @@ class OnPACAg : public arch::ARLAgent<> {
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
           for(int i=0; i<actor_actions_blob->count(); i++)
-              ac_diff[i] = -qtarget*(last_action->at(i)-actions_outputs->at(i))/noise;
+              ac_diff[i] = qtarget*(last_action->at(i)-actions_outputs->at(i))/noise;
           ann->actor_backward();
           ann->getSolver()->ApplyUpdate();
           ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
         } else {
+          qnn->ZeroGradParameters();
           qnn->computeOutVF(last_state, *actions_outputs);
           const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
           double* q_values_diff = q_values_blob->mutable_cpu_diff();
