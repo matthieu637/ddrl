@@ -58,7 +58,7 @@ class ARLAgent : public AAgent<ProgOptions> {
       }
  
       _last_receive_reward = reward;
-      const std::vector<double>& next_action = _run(reward, *state_to_send, learning, absorbing_state, finished);
+      const std::vector<double>& next_action = _run(reward*reward_scale, *state_to_send, learning, absorbing_state, finished);
       time_for_ac = decision_each;
 
       for (uint i = 0; i < nb_motors; i++)
@@ -137,12 +137,18 @@ class ARLAgent : public AAgent<ProgOptions> {
     decision_each         = inifile->get<int>("agent.decision_each");
     history_size          = 1;
     action_in_history     = false;
+    reward_scale          = 1.0f;
     try {
       history_size        = inifile->get<int>("agent.history_size");
     } catch(boost::exception const& ) {
     }
     try {
       action_in_history   = inifile->get<bool>("agent.action_in_history");
+    } catch(boost::exception const& ) {
+    }
+    
+    try {
+      reward_scale        = inifile->get<double>("agent.reward_scale");
     } catch(boost::exception const& ) {
     }
     
@@ -209,6 +215,7 @@ private:
   double _last_receive_reward;
   std::vector<double> returned_st;
   uint nb_sensors;
+  double reward_scale;
   
 protected:
   double sum_weighted_reward;
