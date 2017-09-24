@@ -66,10 +66,15 @@ class OnPACAg : public arch::ARLAgent<> {
         double nextQ = qnn->computeOutVF(sensors, *next_action);
         qtarget += gamma * nextQ;
         if(stochastic_gradient) {
-          vector<double>* ac = ann->computeOut(sensors);
-          double nextQpi = qnn->computeOutVF(sensors, *ac);
+          vector<double>* ac = ann->computeOut(last_state);
+          double vs = 0;
+          for(int j=0;j<10;j++){
+            vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*ac, noise);
+            vs += qnn->computeOutVF(last_state, *randomized_action);
+            delete randomized_action;
+          }
+          qtarget_pi += qtarget - vs/10.f;
           delete ac;
-          qtarget_pi += gamma * nextQpi;
         }
       }
 //       double lastv = qnn->computeOutVF(last_state, *last_action);
@@ -88,7 +93,7 @@ class OnPACAg : public arch::ARLAgent<> {
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
           for(int i=0; i<actor_actions_blob->count(); i++)
-            ac_diff[i] = -qtarget_pi*(last_action->at(i)-actions_outputs->at(i))/noise;
+            ac_diff[i] = -qtarget_pi*(last_action->at(i)-actions_outputs->at(i));
           ann->actor_backward();
           ann->getSolver()->ApplyUpdate();
           ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
