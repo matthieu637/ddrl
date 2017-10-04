@@ -493,7 +493,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     if (trajectory.size() > 0) {
       std::vector<bool> disable_back(trajectory.size() * this->nb_motors, false);
       const std::vector<bool> disable_back_ac(this->nb_motors, true);
-      std::vector<double> deltas_blob(trajectory.size() * this->nb_motors);
+//       std::vector<double> deltas_blob(trajectory.size() * this->nb_motors);
       std::vector<double> deltas(trajectory.size());
 
       std::vector<double> all_states(trajectory.size() * this->get_state_size());
@@ -558,7 +558,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
         }
-        std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
+//         std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
         li++;
       }
 
@@ -609,7 +609,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
     std::vector<bool> disable_back(all_size * this->nb_motors, false);
     const std::vector<bool> disable_back_ac(this->nb_motors, true);
-    std::vector<double> deltas_blob(all_size * this->nb_motors);
+//     std::vector<double> deltas_blob(all_size * this->nb_motors);
     std::vector<double> deltas(all_size);
 
     std::vector<double> all_states(all_size * this->get_state_size());
@@ -751,7 +751,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
         }
-        std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
+//         std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
         li++;
       }
     }
