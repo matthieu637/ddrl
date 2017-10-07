@@ -194,7 +194,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       ann->exploit(pt, nullptr);
 
     vnn = new NN(this->get_state_size(), this->get_state_size(), *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic,
-                 add_v_corrector);
+                 add_v_corrector && offpolicy_critic && offpolicy_strategy != 0);
     if(std::is_same<NN, DODevMLP>::value)
       vnn->exploit(pt, ann);
 
@@ -841,6 +841,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
               diff[index_shift+li] = target_sum;
               target_sum *= this->gamma * lambda * (ptheta[index_shift+n]/max_ptheta);
             }
+            if(add_v_corrector)
+              diff[index_shift+li] *= ptheta[index_shift+li]/max_ptheta;
           } else if(offpolicy_strategy == 2) {
             double target_sum = 0;
             for (int n=trajectory.size()-1; n>=li; n--) {
@@ -848,6 +850,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
               diff[index_shift+li] = target_sum;
               target_sum *= this->gamma * lambda * (ptheta[index_shift+n]/trajectory[n].dpmu);
             }
+            if(add_v_corrector)
+              diff[index_shift+li] *= ptheta[index_shift+li]/trajectory[li].dpmu;
           } else if(offpolicy_strategy == 3) {
             double target_sum = 0;
             for (int n=trajectory.size()-1; n>=li; n--) {
@@ -855,6 +859,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
               diff[index_shift+li] = target_sum;
               target_sum *= this->gamma * lambda * std::min((double)1.f,ptheta[index_shift+n]/trajectory[n].dpmu);
             }
+            if(add_v_corrector)
+              diff[index_shift+li] *= std::min((double)1.f,ptheta[index_shift+li]/trajectory[li].dpmu);
           } else if(offpolicy_strategy == 4) {
             double target_sum = 0;
             for (int n=trajectory.size()-1; n>=li; n--) {
@@ -862,6 +868,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
               diff[index_shift+li] = target_sum;
               target_sum *= this->gamma * lambda * (1.f - l2dist(trajectory[n].a, *all_pi, index_shift+n));
             }
+            if(add_v_corrector)
+              diff[index_shift+li] *= 1.f - l2dist(trajectory[li].a, *all_pi, index_shift+li);
           } else if(offpolicy_strategy == 5) {
             double target_sum = 0;
             for (int n=trajectory.size()-1; n>=li; n--) {
@@ -871,6 +879,9 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
                             (1.f - std::min(l2dist(trajectory[n].a, *all_pi, index_shift+n),
                                             l2dist(trajectory[n].pure_a, *all_pi, index_shift+n)));
             }
+            if(add_v_corrector)
+              diff[index_shift+li] *= 1.f - std::min(l2dist(trajectory[li].a, *all_pi, index_shift+li),
+                                                     l2dist(trajectory[li].pure_a, *all_pi, index_shift+li));
           }
           li++;
         }
