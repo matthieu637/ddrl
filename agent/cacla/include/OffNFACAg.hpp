@@ -71,8 +71,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     delete ann;
 
     delete ann_testing;
-    if(batch_norm_critic != 0)
-      delete vnn_testing;
 
     delete hidden_unit_v;
     delete hidden_unit_a;
@@ -199,8 +197,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       vnn->exploit(pt, ann);
 
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
-    if(batch_norm_critic != 0)
-      vnn_testing = new NN(*vnn, false, ::caffe::Phase::TEST);
+    ann_testing->increase_batchsize(1);
 
     if(std::is_same<NN, DODevMLP>::value) {
       try {
@@ -264,15 +261,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
         }
         ASSERT(li == all_size, "pb");
 
-        decltype(vnn_testing->computeOutVFBatch(all_next_states, empty_action)) all_nextV;
-        if(batch_norm_critic != 0) {
-          double* weights = new double[vnn->number_of_parameters(false)];
-          vnn->copyWeightsTo(weights, false);
-          vnn_testing->copyWeightsFrom(weights, false);
-          delete[] weights;
-          all_nextV = vnn_testing->computeOutVFBatch(all_next_states, empty_action);
-        } else
-          all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
+        decltype(vnn->computeOutVFBatch(all_next_states, empty_action)) all_nextV;
+        all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
 
         li=0;
         for(auto one_trajectory : trajectories) {
@@ -296,31 +286,9 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
           vnn = new NN(this->get_state_size(), this->get_state_size(), *hidden_unit_v, alpha_v, all_size, -1, hidden_layer_type,
                        batch_norm_critic, add_v_corrector);
         }
-        if(lambda < 0.f && batch_norm_critic == 0)
+        if(lambda < 0.f)
           vnn->learn_batch(all_states, empty_action, v_target, stoch_iter_critic);
-        else if(lambda < 0.f) {
-          for(uint sia = 0; sia < stoch_iter_critic; sia++) {
-            delete vnn->computeOutVFBatch(all_states, empty_action);
-            {
-              double* weights = new double[vnn->number_of_parameters(false)];
-              vnn->copyWeightsTo(weights, false);
-              vnn_testing->copyWeightsFrom(weights, false);
-              delete[] weights;
-            }
-            auto all_V = vnn_testing->computeOutVFBatch(all_states, empty_action);
-
-            const auto v_values_blob = vnn->getNN()->blob_by_name(MLP::q_values_blob_name);
-            double* v_values_diff = v_values_blob->mutable_cpu_diff();
-
-            double s = all_size;
-            for (int i=0; i<all_size; i++)
-              v_values_diff[i] = (all_V->at(i)-v_target[i])/s;
-            vnn->critic_backward();
-            vnn->getSolver()->ApplyUpdate();
-            vnn->getSolver()->set_iter(vnn->getSolver()->iter() + 1);
-            delete all_V;
-          }
-        } else {
+        else {
           auto all_V = vnn->computeOutVFBatch(all_states, empty_action);
           std::vector<double> deltas(all_size);
           //
@@ -498,8 +466,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     uint all_size = alltransitions();
     if(all_size > 0) {
       vnn->increase_batchsize(all_size);
-      if(batch_norm_critic != 0)
-        vnn_testing->increase_batchsize(all_size);
     }
 
     for(uint fi = 0 ; fi < number_global_fitted_iteration; fi++){
@@ -517,8 +483,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       if(!update_critic_first) {
         if(all_size > 0 && !offpolicy_actor) {
           vnn->increase_batchsize(all_size);
-          if(batch_norm_critic != 0)
-            vnn_testing->increase_batchsize(all_size);
         }
         update_critic();
       }
@@ -555,17 +519,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       }
 
       decltype(vnn->computeOutVFBatch(all_next_states, empty_action)) all_nextV, all_mine;
-      if(batch_norm_critic != 0) {
-        double* weights = new double[vnn->number_of_parameters(false)];
-        vnn->copyWeightsTo(weights, false);
-        vnn_testing->copyWeightsFrom(weights, false);
-        delete[] weights;
-        all_nextV = vnn_testing->computeOutVFBatch(all_next_states, empty_action);
-        all_mine = vnn_testing->computeOutVFBatch(all_states, empty_action);
-      } else {
-        all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
-        all_mine = vnn->computeOutVFBatch(all_states, empty_action);
-      }
+      all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
+      all_mine = vnn->computeOutVFBatch(all_states, empty_action);
 
       li=0;
       for (auto it : trajectory) {
@@ -626,16 +581,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
           ann->increase_batchsize(trajectory.size());
           //learn BN
           auto ac_out = ann->computeOutBatch(sensors);
-          if(batch_norm_actor != 0) {
-            //re-compute ac_out with BN as testing
-            double* weights = new double[ann->number_of_parameters(false)];
-            ann->copyWeightsTo(weights, false);
-            ann_testing->copyWeightsFrom(weights, false);
-            delete[] weights;
-            delete ac_out;
-            ann_testing->increase_batchsize(trajectory.size());
-            ac_out = ann_testing->computeOutBatch(sensors);
-          }
 
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
@@ -670,9 +615,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
       delete all_nextV;
       delete all_mine;
-
-      if(batch_norm_actor != 0)
-        ann_testing->increase_batchsize(1);
     }
   }
   
@@ -769,17 +711,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     }
 
     decltype(vnn->computeOutVFBatch(all_next_states, empty_action)) all_nextV, all_mine;
-    if(batch_norm_critic != 0) {
-      double* weights = new double[vnn->number_of_parameters(false)];
-      vnn->copyWeightsTo(weights, false);
-      vnn_testing->copyWeightsFrom(weights, false);
-      delete[] weights;
-      all_nextV = vnn_testing->computeOutVFBatch(all_next_states, empty_action);
-      all_mine = vnn_testing->computeOutVFBatch(all_states, empty_action);
-    } else {
-      all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
-      all_mine = vnn->computeOutVFBatch(all_states, empty_action);
-    }
+    all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
+    all_mine = vnn->computeOutVFBatch(all_states, empty_action);
 
     li=0;
     for(auto one_trajectory : trajectories) {
@@ -929,16 +862,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
           ac_out = all_pi; // I already computeOutBatch sensors
         else {
           ac_out = ann->computeOutBatch(sensors);
-          if(batch_norm_actor != 0) {
-            //re-compute ac_out with BN as testing
-            double* weights = new double[ann->number_of_parameters(false)];
-            ann->copyWeightsTo(weights, false);
-            ann_testing->copyWeightsFrom(weights, false);
-            delete[] weights;
-            delete ac_out;
-            ann_testing->increase_batchsize(all_size);
-            ac_out = ann_testing->computeOutBatch(sensors);
-          }
         }
 
         const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
@@ -970,9 +893,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
     delete all_nextV;
     delete all_mine;
-
-    if(batch_norm_actor != 0)
-      ann_testing->increase_batchsize(1);
   }
 
   void save(const std::string& path, bool) override {
@@ -1058,7 +978,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
   NN* ann;
   NN* vnn;
   NN* ann_testing;
-  NN* vnn_testing;
 
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
