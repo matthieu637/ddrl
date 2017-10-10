@@ -42,7 +42,7 @@ class MLP {
 
   static const std::string task_name;
 
-  typedef enum {none, first, all_except_last, all} batch_norm_arch;
+  typedef enum {none, first, all_except_last, all, first_except_action, very_all} batch_norm_arch;
   struct batch_norm_type {
     batch_norm_arch arch;
     bool with_scale;
@@ -55,7 +55,11 @@ class MLP {
     r.with_scale_bias = bn & (1 << 0);
     r.with_scale = bn & (1 << 1);
     r.max_rank = max_rank;
-    if((bn & (1 << 2)) && (bn & (1 << 3)))
+    if ((bn & (1 << 4)) && !(bn & (1 << 2)))
+      r.arch = batch_norm_arch::first_except_action;
+    else if (bn & (1 << 4))
+      r.arch = batch_norm_arch::very_all;
+    else if((bn & (1 << 2)) && (bn & (1 << 3)))
       r.arch = batch_norm_arch::all;
     else if((bn & (1 << 2)))
       r.arch = batch_norm_arch::first;
@@ -90,6 +94,10 @@ class MLP {
     ASSERT(hidden_layer_type >= 1 && hidden_layer_type <= 3, "hidden_layer_type not in (1,2,3)");
     batch_norm_type bna = convertBN(batch_norm, hiddens.size());
 
+    if(size_motors == 0 && bna.arch == batch_norm_arch::first_except_action){
+      LOG_ERROR("use only value > 15 of batch norm for critic Q");
+      exit(-1);
+    }
 
     caffe::SolverParameter solver_param;
     caffe::NetParameter* net_param = solver_param.mutable_net_param();
@@ -117,12 +125,20 @@ class MLP {
     else
       SilenceLayer(net_param_init, "silence", {"dummy1","dummy3"}, {}, boost::none);
 
-    if(size_motors > 0)
+    std::string tower_top;
+    if(bna.arch == batch_norm_arch::first_except_action){
+      BatchNormTower(net_param_init, 0, {states_blob_name}, {states_blob_name}, boost::none, bna);
+      bna.arch = batch_norm_arch::none;
       ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {states_actions_blob_name}, boost::none, 2);
-    else
-      ConcatLayer(net_param_init, "concat", {states_blob_name}, {states_actions_blob_name}, boost::none, 2);
-    std::string tower_top = Tower(net_param_init, states_actions_blob_name, hiddens, bna, hidden_layer_type);
-    BatchNormTower(net_param_init, hiddens.size(), {tower_top}, {tower_top}, boost::none, bna);
+      tower_top = Tower(net_param_init, states_actions_blob_name, hiddens, bna, hidden_layer_type);
+    } else {
+      if(size_motors > 0)
+        ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {states_actions_blob_name}, boost::none, 2);
+      else
+        ConcatLayer(net_param_init, "concat", {states_blob_name}, {states_actions_blob_name}, boost::none, 2);
+      tower_top = Tower(net_param_init, states_actions_blob_name, hiddens, bna, hidden_layer_type);
+      BatchNormTower(net_param_init, hiddens.size(), {tower_top}, {tower_top}, boost::none, bna);
+    }
     IPLayer(net_param_init, produce_name("ip", hiddens.size()+1), {tower_top}, {q_values_blob_name}, boost::none, 1);
     if(!weighted_sample)
       EuclideanLossLayer(net_param_init, "loss", {q_values_blob_name, targets_blob_name},
@@ -206,6 +222,9 @@ class MLP {
       IPLayer(net_param_init, layer_name, {tower_top}, {actions_blob_name}, boost::none, motors);
       ReluLayer(net_param_init, produce_name("func", hiddens.size()+1), {actions_blob_name}, {actions_blob_name},
                 boost::none);
+    }
+    if(bna.arch == batch_norm_arch::very_all){
+      BatchNormTower(net_param_init, hiddens.size()+1, {actions_blob_name}, {actions_blob_name}, boost::none, bna);
     }
     if(loss_layer) {
       MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy2"},
