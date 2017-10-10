@@ -156,11 +156,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     if(lambda >= 0.)
       gae = pt->get<bool>("agent.gae");
 
-    if(lambda >=0. && batch_norm_critic != 0) {
-      LOG_DEBUG("to be done!");
-      exit(1);
-    }
-
     if(lambda < 0. && offpolicy_critic) {
       LOG_DEBUG("set lambda please!");
       exit(1);
