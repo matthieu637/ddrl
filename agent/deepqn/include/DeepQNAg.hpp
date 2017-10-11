@@ -182,6 +182,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
     hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     bool test_net           = pt->get<bool>("agent.test_net");
+    bn_adapt                = pt->get<bool>("agent.bn_adapt");
     
 #ifdef CAFFE_CPU_ONLY
     LOG_INFO("CPU mode");
@@ -379,6 +380,12 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       ann->ZeroGradParameters();
       
       auto all_actions_outputs = ann->computeOutBatch(all_states);
+      if(batch_norm_actor != 0 && bn_adapt){
+        delete all_actions_outputs;
+        ann_testing->increase_batchsize(kMinibatchSize);
+        all_actions_outputs = ann_testing->computeOutBatch(all_states);
+        ann_testing->increase_batchsize(1);
+      }
 
       delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
       
@@ -537,7 +544,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   uint batch_norm_actor, batch_norm_critic;
   uint actor_output_layer_type, hidden_layer_type;
   
-  bool inverting_grad;
+  bool inverting_grad, bn_adapt;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
