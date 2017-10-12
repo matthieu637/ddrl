@@ -78,7 +78,7 @@ class MLP {
     return r;
   }
 
-  constexpr static auto kStateInputCount = 1;
+  constexpr static auto kFixedDim = 1;
 
 //   
 //   CRITIC NET
@@ -106,19 +106,19 @@ class MLP {
     net_param_init.set_name("Critic");
     net_param_init.set_force_backward(true);
     MemoryDataLayer(net_param_init, state_input_layer_name, {states_blob_name,"dummy1"},
-                    boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
+                    boost::none, {kMinibatchSize, size_sensors, kFixedDim, kFixedDim});
     if(size_motors > 0)
       MemoryDataLayer(net_param_init, action_input_layer_name, {actions_blob_name,"dummy2"},
-                      boost::none, {kMinibatchSize, kStateInputCount, size_motors, 1});
+                      boost::none, {kMinibatchSize, size_motors, kFixedDim, kFixedDim});
     MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy3"},
-                    boost::none, {kMinibatchSize, 1, 1, 1});
+                    boost::none, {kMinibatchSize, 1, kFixedDim, kFixedDim});
     if(weighted_sample && size_motors > 0) {
       MemoryDataLayer(net_param_init, wsample_input_layer_name, {wsample_blob_name,"dummy4"},
-                      boost::none, {kMinibatchSize, 1, 1, 1});
+                      boost::none, {kMinibatchSize, 1, kFixedDim, kFixedDim});
       SilenceLayer(net_param_init, "silence", {"dummy1","dummy2","dummy3", "dummy4"}, {}, boost::none);
     } else if(weighted_sample) {
       MemoryDataLayer(net_param_init, wsample_input_layer_name, {wsample_blob_name,"dummy4"},
-                      boost::none, {kMinibatchSize, 1, 1, 1});
+                      boost::none, {kMinibatchSize, 1, kFixedDim, kFixedDim});
       SilenceLayer(net_param_init, "silence", {"dummy1","dummy3", "dummy4"}, {}, boost::none);
     } else if(size_motors > 0)
       SilenceLayer(net_param_init, "silence", {"dummy1","dummy2","dummy3"}, {}, boost::none);
@@ -129,13 +129,13 @@ class MLP {
     if(bna.arch == batch_norm_arch::first_except_action){
       BatchNormTower(net_param_init, 0, {states_blob_name}, {states_blob_name}, boost::none, bna);
       bna.arch = batch_norm_arch::none;
-      ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {states_actions_blob_name}, boost::none, 2);
+      ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {states_actions_blob_name}, boost::none, 1);
       tower_top = Tower(net_param_init, states_actions_blob_name, hiddens, bna, hidden_layer_type);
     } else {
       if(size_motors > 0)
-        ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {states_actions_blob_name}, boost::none, 2);
+        ConcatLayer(net_param_init, "concat", {states_blob_name,actions_blob_name}, {states_actions_blob_name}, boost::none, 1);
       else
-        ConcatLayer(net_param_init, "concat", {states_blob_name}, {states_actions_blob_name}, boost::none, 2);
+        ConcatLayer(net_param_init, "concat", {states_blob_name}, {states_actions_blob_name}, boost::none, 1);
       tower_top = Tower(net_param_init, states_actions_blob_name, hiddens, bna, hidden_layer_type);
       BatchNormTower(net_param_init, hiddens.size(), {tower_top}, {tower_top}, boost::none, bna);
     }
@@ -197,9 +197,8 @@ class MLP {
     net_param_init.set_name("Actor");
     net_param_init.set_force_backward(true);
 
-    MemoryDataLayer(net_param_init, state_input_layer_name,
-    {states_blob_name, "dummy1"},
-    boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
+    MemoryDataLayer(net_param_init, state_input_layer_name, {states_blob_name, "dummy1"},
+        boost::none, {kMinibatchSize, size_sensors, kFixedDim, kFixedDim});
     if(!loss_layer)
       SilenceLayer(net_param_init, "silence", {"dummy1"}, {}, boost::none);
     std::string tower_top = Tower(net_param_init,
@@ -228,7 +227,7 @@ class MLP {
     }
     if(loss_layer) {
       MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy2"},
-                      boost::none, {kMinibatchSize, 1, size_motors, 1});
+                      boost::none, {kMinibatchSize, size_motors, kFixedDim, kFixedDim});
       SilenceLayer(net_param_init, "silence", {"dummy1", "dummy2"}, {}, boost::none);
       EuclideanLossLayer(net_param_init, "loss", {actions_blob_name, targets_blob_name},
       {loss_blob_name}, boost::none);
@@ -354,9 +353,9 @@ class MLP {
 //     net_param_init.set_name("Critic");
 //     net_param_init.set_force_backward(true);
 //     MemoryDataLayer(net_param_init, state_input_layer_name, {states_blob_name,"dummy1"},
-//                 boost::none, {kMinibatchSize, kStateInputCount, size_sensors, 1});
+//                 boost::none, {kMinibatchSize, kFixedDim, size_sensors, 1});
 //     MemoryDataLayer(net_param_init, action_input_layer_name, {actions_blob_name,"dummy2"},
-//                 boost::none, {kMinibatchSize, kStateInputCount, size_motors, 1});
+//                 boost::none, {kMinibatchSize, kFixedDim, size_motors, 1});
 //     MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy3"},
 //                 boost::none, {kMinibatchSize, 1, 1, 1});
 //     SilenceLayer(net_param_init, "silence", {"dummy1","dummy2","dummy3"}, {}, boost::none);
@@ -375,7 +374,7 @@ class MLP {
   void increase_batchsize(uint new_batch_size) {
     kMinibatchSize = new_batch_size;
 
-    neural_net->blob_by_name(MLP::states_blob_name)->Reshape(kMinibatchSize, kStateInputCount, size_sensors, 1);
+    neural_net->blob_by_name(MLP::states_blob_name)->Reshape(kMinibatchSize, size_sensors, kFixedDim, kFixedDim);
     auto state_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(neural_net->layer_by_name(
                                state_input_layer_name));
     state_input_layer->set_batch_size(kMinibatchSize);
@@ -383,20 +382,20 @@ class MLP {
     if(size_input_state != size_sensors || add_loss_layer
         || size_motors == 0) { //critic net constructor 1 or actor with loss
       if(size_motors > 0 && !add_loss_layer) { //only for critic with action in inputs
-        neural_net->blob_by_name(MLP::actions_blob_name)->Reshape(kMinibatchSize, kStateInputCount, size_motors, 1);
+        neural_net->blob_by_name(MLP::actions_blob_name)->Reshape(kMinibatchSize, size_motors, kFixedDim, kFixedDim);
         auto action_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(neural_net->layer_by_name(
                                     action_input_layer_name));
         action_input_layer->set_batch_size(kMinibatchSize);
       }
 
-      neural_net->blob_by_name(MLP::targets_blob_name)->Reshape(kMinibatchSize, kStateInputCount,
-          !add_loss_layer ? 1 : size_motors, 1);
+      neural_net->blob_by_name(MLP::targets_blob_name)->Reshape(kMinibatchSize, !add_loss_layer ? 1 : size_motors, 
+                                                                kFixedDim, kFixedDim);
       auto target_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(neural_net->layer_by_name(
                                   target_input_layer_name));
       target_input_layer->set_batch_size(kMinibatchSize);
 
       if(weighted_sample) {
-        neural_net->blob_by_name(MLP::wsample_blob_name)->Reshape(kMinibatchSize, kStateInputCount, 1, 1);
+        neural_net->blob_by_name(MLP::wsample_blob_name)->Reshape(kMinibatchSize, 1, kFixedDim, kFixedDim);
         auto wsample_input_layer = boost::dynamic_pointer_cast<caffe::MemoryDataLayer<double>>(neural_net->layer_by_name(
                                      wsample_input_layer_name));
         wsample_input_layer->set_batch_size(kMinibatchSize);
@@ -669,11 +668,6 @@ protected:
       if(link_struct != 0) {
         std::vector<std::string> bottoms;
         bottoms.push_back(input_name);
-        uint axis_concat;
-        if(i==1)
-          axis_concat = 2;
-        else
-          axis_concat = 1;
 
         if(link_struct & (1 << 0)) {
           if(i==1) {
@@ -701,7 +695,7 @@ protected:
             bottoms.push_back(produce_name("ip", i+1, task -1));
         }
         layer_name = produce_name("cc", i, task);
-        ConcatLayer(np, layer_name, bottoms, {layer_name}, boost::none, axis_concat);
+        ConcatLayer(np, layer_name, bottoms, {layer_name}, boost::none, 1);
         input_name = layer_name;
       }
 
