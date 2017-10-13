@@ -647,6 +647,10 @@ class MLP {
   caffe::Solver<double>* getSolver() {
     return solver;
   }
+  
+  void copyParametersFrom(const MLP * from){
+    neural_net->ShareTrainedLayersWith(from->neural_net.get());
+  }
 
 protected:
   std::string Tower(caffe::NetParameter& np,
