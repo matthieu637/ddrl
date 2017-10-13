@@ -139,19 +139,9 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     a3c                                    = pt->get<bool>("agent.a3c");
     offpolicy_critic                       = pt->get<bool>("agent.offpolicy_critic");
     shuffle_buffer                         = pt->get<bool>("agent.shuffle_buffer");
-    corrected_update_ac     = false;
+    testing_ann_offpolicy                  = pt->get<bool>("agent.testing_ann_offpolicy");
+//     testing_vnn                            = pt->get<bool>("agent.testing_vnn");
     gae                     = false;
-    
-    try {
-      corrected_update_ac   = pt->get<bool>("agent.corrected_update_ac");
-    } catch(boost::exception const& ) {
-    }
-    if(corrected_update_ac) {
-      try {
-        corrected_update_ac_factor   = pt->get<double>("agent.corrected_update_ac_factor");
-      } catch(boost::exception const& ) {
-      }
-    }
 
     if(lambda >= 0.)
       gae = pt->get<bool>("agent.gae");
@@ -292,13 +282,20 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
           for (int i=0; i<all_size; i++)
             deltas[i] = v_target[i] - all_V->at(i);
 
-          decltype(ann->computeOutBatch(all_states)) all_pi;
+          std::vector<double>* all_pi;
           double* ptheta;
           double max_ptheta;
           std::vector<double>* sample_weight;
           if(offpolicy_strategy != 0 && offpolicy_critic) {
             ann->increase_batchsize(all_size);
-            all_pi = ann->computeOutBatch(all_states);
+            if(testing_ann_offpolicy){
+              ann_testing->copyParametersFrom(ann);
+              ann_testing->increase_batchsize(all_size);
+              all_pi = ann_testing->computeOutBatch(all_states);
+              ann_testing->increase_batchsize(1);
+            }
+            else
+              all_pi = ann->computeOutBatch(all_states);
             ptheta = new double[all_size];
 
             uint i=0;
@@ -571,11 +568,20 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
         li++;
       }
 
+      ann->increase_batchsize(trajectory.size());
       if(n > 0) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++) {
-          ann->increase_batchsize(trajectory.size());
           //learn BN
-          auto ac_out = ann->computeOutBatch(sensors);
+          std::vector<double>* ac_out = ann->computeOutBatch(sensors);
+          if(batch_norm_actor != 0){
+            //re-compute ac_out with BN as testing
+            ann_testing->copyParametersFrom(ann);
+            ann_testing->increase_batchsize(trajectory.size());
+            delete ac_out;
+            ac_out = ann_testing->computeOutBatch(sensors);
+            if(sia + 1 == stoch_iter_actor )
+              ann_testing->increase_batchsize(1);
+          }
 
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
@@ -584,18 +590,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
               ac_diff[i] = 0.00000000f;
             } else {
               double x = actions[i] - ac_out->at(i);
-              if(!corrected_update_ac)
-                ac_diff[i] = -x;
-              else
-                ac_diff[i] = 1.f/ac_out->at(i);
-//               else {
-//                 double fabs_x = fabs(x);
-//                 if(fabs_x <= corrected_update_ac_factor)
-//                   ac_diff[i] = sign(x) * sign(deltas_blob[i]) * (sqrt(fabs_x)
-//                                - sqrt(corrected_update_ac_factor) - sign(deltas_blob[i]) * deltas_blob[i]/corrected_update_ac_factor );
-//                 else
-//                   ac_diff[i] = -deltas_blob[i] / x;
-//               }
+              ac_diff[i] = -x;
             }
           }
           ann->actor_backward();
@@ -603,9 +598,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
           ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
           delete ac_out;
         }
-      } else if(batch_norm_actor != 0) {
-        ann->increase_batchsize(trajectory.size());
-        delete ann->computeOutBatch(sensors);
       }
 
       delete all_nextV;
@@ -663,6 +655,15 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       for(uint sia = 0; sia < stoch_iter_actor; sia++) {
         ann->increase_batchsize(trajectory.size());
         auto ac_out = ann->computeOutBatch(sensors);
+        if(batch_norm_actor != 0){
+          //re-compute ac_out with BN as testing
+          ann_testing->copyParametersFrom(ann);
+          ann_testing->increase_batchsize(trajectory.size());
+          delete ac_out;
+          ac_out = ann_testing->computeOutBatch(sensors);
+          if(sia + 1 == stoch_iter_actor )
+            ann_testing->increase_batchsize(1);
+        }
         
         const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
         auto ac_diff = actor_actions_blob->mutable_cpu_diff();
@@ -725,17 +726,24 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       }
     }
 
-    decltype(ann->computeOutBatch(all_states)) all_pi;
+    
     if(gae) {
       //
       //        Simple computation for lambda return
       //
+      std::vector<double>* all_pi;
       std::vector<double> diff(all_size);
       int index_shift=0;
       double* ptheta;
       double max_ptheta;
       if(offpolicy_strategy != 0) {
-        all_pi = ann->computeOutBatch(all_states);
+        if(testing_ann_offpolicy){
+          ann_testing->copyParametersFrom(ann);
+          ann_testing->increase_batchsize(all_size);
+          all_pi = ann_testing->computeOutBatch(all_states);
+          ann_testing->increase_batchsize(1);
+        } else
+          all_pi = ann->computeOutBatch(all_states);
         ptheta = new double[all_size];
 
         uint i=0;
@@ -818,7 +826,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       }
 
       if(offpolicy_strategy != 0) {
-        //don't delete all_pi it'll be used later
+        delete all_pi;
         delete [] ptheta;
       }
 
@@ -851,12 +859,15 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
     if(n > 0) {
       for(uint sia = 0; sia < stoch_iter_actor; sia++) {
-        decltype(ann->computeOutBatch(all_states)) ac_out;
-        //learn BN
-        if(stoch_iter_actor == 1 && gae && offpolicy_strategy != 0)
-          ac_out = all_pi; // I already computeOutBatch sensors
-        else {
-          ac_out = ann->computeOutBatch(sensors);
+        std::vector<double>* ac_out = ann->computeOutBatch(sensors);
+        if(batch_norm_actor != 0){
+          //re-compute ac_out with BN as testing
+          ann_testing->copyParametersFrom(ann);
+          ann_testing->increase_batchsize(all_size);
+          delete ac_out;
+          ac_out = ann_testing->computeOutBatch(sensors);
+          if(sia + 1 == stoch_iter_actor )
+            ann_testing->increase_batchsize(1);
         }
 
         const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
@@ -866,16 +877,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
             ac_diff[i] = 0.00000000f;
           } else {
             double x = actions[i] - ac_out->at(i);
-            if(!corrected_update_ac)
-              ac_diff[i] = -x;
-            else {
-              double fabs_x = fabs(x);
-              if(fabs_x <= corrected_update_ac_factor)
-                ac_diff[i] = sign(x) * sign(deltas_blob[i]) * (sqrt(fabs_x)
-                             - sqrt(corrected_update_ac_factor) - sign(deltas_blob[i]) * deltas_blob[i]/corrected_update_ac_factor );
-              else
-                ac_diff[i] = -deltas_blob[i] / x;
-            }
+            ac_diff[i] = -x;
           }
         }
         ann->actor_backward();
@@ -883,8 +885,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
         ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
         delete ac_out;
       }
-    } else if (gae && offpolicy_strategy != 0)
-      delete all_pi;
+    }
 
     delete all_nextV;
     delete all_mine;
@@ -955,13 +956,13 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
   double noise;
   bool gaussian_policy, vnn_from_scratch, update_critic_first,
-       update_delta_neg, corrected_update_ac, gae, add_v_corrector, offpolicy_actor;
+       update_delta_neg, gae, add_v_corrector, offpolicy_actor;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type,
        hidden_layer_type, max_trajectory, offpolicy_strategy;
-  double lambda, corrected_update_ac_factor;
+  double lambda;
   uint number_global_fitted_iteration;
-  bool offpolicy_critic, a3c, shuffle_buffer;
+  bool offpolicy_critic, a3c, shuffle_buffer, testing_ann_offpolicy;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
