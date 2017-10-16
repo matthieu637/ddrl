@@ -95,7 +95,8 @@ class DevMLP : public MLP {
       caffe::LayerParameter* lp = net_param_init.add_layer();
       lp->CopyFrom(net_param_old.layer(0));
       caffe::MemoryDataParameter* mdataparam = lp->mutable_memory_data_param();
-      mdataparam->set_height(size_sensors);
+      mdataparam->set_channels(size_sensors);
+      mdataparam->set_height(1);
       const uint old_batch_size = mdataparam->batch_size();
       
       int layer_index = 1; 
@@ -106,7 +107,8 @@ class DevMLP : public MLP {
         lp = net_param_init.add_layer();
         lp->CopyFrom(net_param_old.layer(1));
         mdataparam = lp->mutable_memory_data_param();
-        mdataparam->set_height(size_motors);
+        mdataparam->set_channels(size_motors);
+        mdataparam->set_height(1);
         
         //target layer
         lp = net_param_init.add_layer();
@@ -181,7 +183,7 @@ class DevMLP : public MLP {
       }
       
       if(!policy && link_structure != 9){
-        ConcatLayer(net_param_init, "concat2", {states_blob_name_new, actions_blob_name_new}, {states_actions_blob_name_new}, boost::none, 2);
+        ConcatLayer(net_param_init, "concat2", {states_blob_name_new, actions_blob_name_new}, {states_actions_blob_name_new}, boost::none, 1);
       }
 
       ASSERT(net_param_old.layer(layer_index).type() == "InnerProduct", "wrong fusion " << net_param_old.layer(2).type());
@@ -236,6 +238,9 @@ class DevMLP : public MLP {
       int last_one_layer = net_param_old.layer_size() - 1;
       if(!policy)
         last_one_layer--;
+      else {
+        ASSERT(net_param_old.layer(last_one_layer).type() == "InnerProduct", "not implemeted with a last func on actor");
+      }
       //add everything else except last one
       for(; layer_index < last_one_layer ; layer_index++) {
         lp = net_param_init.add_layer();
@@ -265,11 +270,11 @@ class DevMLP : public MLP {
         uint i = 1;
         if(link_structure & (1 << 1) && i==1 ) {
           layer_name = produce_name("rsh", i, task - 1);
-          ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old_hiddens[i-1],1});
+          ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,old_hiddens[i-1],1,1});
         }
         if(link_structure & (1 << 2) && i==1 ) {
           layer_name = produce_name("rsh", i + 1, task - 1);
-          ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i + 1, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old_hiddens[i],1});
+          ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i + 1, task - 1)}, {layer_name}, boost::none, {old_batch_size,old_hiddens[i],1,1});
         }
       } else if(link_structure == 8) {
         std::vector<std::string> to_be_cc;
@@ -285,16 +290,16 @@ class DevMLP : public MLP {
           layer_name = produce_name("rsh", i, task - 1);
 
           if(i - 1 < old_hiddens.size())
-            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old_hiddens[i-1],1});
+            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,old_hiddens[i-1],1,1});
           else if(policy)
-            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,old->size_motors,1});
+            ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,old->size_motors,1,1});
           else //!policy
             ReshapeLayer(net_param_init, layer_name, {produce_name("ip", i, task - 1)}, {layer_name}, boost::none, {old_batch_size,1,1,1});
 
           to_be_cc.push_back(layer_name);
         }
         layer_name = produce_name("cc", 1, task);
-        ConcatLayer(net_param_init, layer_name, to_be_cc, {layer_name}, boost::none, 2);
+        ConcatLayer(net_param_init, layer_name, to_be_cc, {layer_name}, boost::none, 1);
         states_blob_name_new = layer_name;
       }
       
@@ -350,7 +355,7 @@ class DevMLP : public MLP {
       
         if(add_loss_layer) {
           MemoryDataLayer(net_param_init, target_input_layer_name, {targets_blob_name,"dummy2"},
-                          boost::none, {kMinibatchSize, 1, num_output, 1});
+                          boost::none, {kMinibatchSize, num_output, 1, 1});
           EuclideanLossLayer(net_param_init, "loss", {last_layer_name, targets_blob_name},
           {loss_blob_name}, boost::none);
         }
@@ -474,9 +479,9 @@ class DevMLP : public MLP {
 
     auto ac = _old->computeOut(substate);
     auto ac2 = MLP::computeOut(states_batch);
-//     bib::Logger::PRINT_ELEMENTS(*ac, "old action : ");
-//     delete ac;
-//     bib::Logger::PRINT_ELEMENTS(*ac2, "new actions : ");
+    bib::Logger::PRINT_ELEMENTS(*ac, "old action : ");
+    delete ac;
+    bib::Logger::PRINT_ELEMENTS(*ac2, "new actions : ");
 
     return ac2;
   }
@@ -504,7 +509,7 @@ class DevMLP : public MLP {
     return q2;
   }
   
-  std::vector<double>* computeOutVFBatch(std::vector<double>& sensors, std::vector<double>& motors) override {
+  std::vector<double>* computeOutVFBatch(const std::vector<double>& sensors, const std::vector<double>& motors) override {
     caffe::NetParameter net_param_old;
     _old->neural_net->ToProto(&net_param_old);
     net_param_old.PrintDebugString();
