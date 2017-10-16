@@ -139,6 +139,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     shuffle_buffer                         = pt->get<bool>("agent.shuffle_buffer");
     determinist_update                     = pt->get<bool>("agent.determinist_update");
 
+    gamma_corrector                        = pt->get<bool>("agent.gamma_corrector");
     gae                     = false;
 
     if(lambda >= 0.)
@@ -151,11 +152,6 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
     if(lambda < 0. && offpolicy_critic) {
       LOG_DEBUG("set lambda please! (offpolicy_critic)");
-      exit(1);
-    }
-
-    if(offpolicy_actor && !gae) {
-      LOG_DEBUG("to be done? (offpolicy_actor without gae)");
       exit(1);
     }
 
@@ -619,33 +615,44 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     int li=0;
     for(auto one_trajectory : trajectories) {
       const std::deque<sample>& trajectory = *one_trajectory->transitions;
+      double gamma_factor = 1.f;
       for (auto it : trajectory) {
         std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * this->get_state_size());
         std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * this->get_state_size());
-        std::copy(it.a.begin(), it.a.end(), all_actions.begin() + li * this->nb_motors);
+        if(!determinist_update)
+          std::copy(it.a.begin(), it.a.end(), all_actions.begin() + li * this->nb_motors);
+        else if(gamma_corrector) {//store gamma values
+          std::fill(all_actions.begin() + li * this->nb_motors, all_actions.begin() + (li+1) * this->nb_motors, gamma_factor);
+          gamma_factor *= this->gamma;
+        }
         li++;
       }
     }
 
-    auto all_next_actions = ann->computeOutBatch(all_next_states);
-    std::vector<double>* all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
-    std::vector<double>* all_mine = qnn->computeOutVFBatch(all_states, all_actions);
-    delete all_next_actions;
+    if(!determinist_update) {
+      auto all_next_actions = ann->computeOutBatch(all_next_states);
+      std::vector<double>* all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+      std::vector<double>* all_mine = qnn->computeOutVFBatch(all_states, all_actions);
+      delete all_next_actions;
 
-    li=0;
-    for(auto one_trajectory : trajectories) {
-      const std::deque<sample>& trajectory = *one_trajectory->transitions;
-      for (auto it : trajectory) {
-        sample sm = it;
-        double v_target = sm.r;
-        if (!sm.goal_reached) {
-          double nextV = all_nextV->at(li);
-          v_target += this->gamma * nextV;
+      li=0;
+      for(auto one_trajectory : trajectories) {
+        const std::deque<sample>& trajectory = *one_trajectory->transitions;
+        for (auto it : trajectory) {
+          sample sm = it;
+          double v_target = sm.r;
+          if (!sm.goal_reached) {
+            double nextV = all_nextV->at(li);
+            v_target += this->gamma * nextV;
+          }
+
+          deltas[li] = v_target - all_mine->at(li);
+          ++li;
         }
-
-        deltas[li] = v_target - all_mine->at(li);
-        ++li;
       }
+      
+      delete all_nextV;
+      delete all_mine;
     }
 
     decltype(ann->computeOutBatch(all_states)) all_pi;
@@ -788,7 +795,13 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
             q_values_diff[q_values_blob->offset(i,0,0,0)] = -1.0f;
           qnn->critic_backward();
           const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
-          actor_actions_blob->ShareDiff(*critic_action_blob);
+          if(gamma_corrector){
+            auto ac_diff_critic = critic_action_blob->cpu_diff();
+            auto ac_diff = actor_actions_blob->mutable_cpu_diff();
+            for(int i=0; i<actor_actions_blob->count(); i++)
+              ac_diff[i] = ac_diff_critic[i] * all_actions[i];
+          } else 
+            actor_actions_blob->ShareDiff(*critic_action_blob);
         }
         ann->actor_backward();
         ann->getSolver()->ApplyUpdate();
@@ -798,8 +811,6 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     } else if (gae && offpolicy_strategy != 0)
       delete all_pi;
 
-    delete all_nextV;
-    delete all_mine;
   }
 
   void save(const std::string& path, bool) override {
@@ -873,7 +884,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
        hidden_layer_type, max_trajectory, offpolicy_strategy;
   double lambda;
   uint number_global_fitted_iteration;
-  bool offpolicy_critic, shuffle_buffer;
+  bool offpolicy_critic, shuffle_buffer, gamma_corrector;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
