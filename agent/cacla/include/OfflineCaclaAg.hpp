@@ -123,8 +123,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     lambda                  = pt->get<double>("agent.lambda");
     corrected_update_ac     = false;
     gae                     = false;
+    inverting_gradient      = false;
     try {
       corrected_update_ac   = pt->get<bool>("agent.corrected_update_ac");
+    } catch(boost::exception const& ) {
+    }
+    try {
+      inverting_gradient   = pt->get<bool>("agent.inverting_gradient");
     } catch(boost::exception const& ) {
     }
     if(corrected_update_ac){
@@ -457,8 +462,18 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               ac_diff[i] = 0.00000000f;
             } else {
               double x = actions[i] - ac_out->at(i);
-              if(!corrected_update_ac)
+              if(!corrected_update_ac){
                 ac_diff[i] = -x;
+                if(inverting_gradient){
+                  const double min_ = -1.0; 
+                  const double max_ = 1.0;
+                  
+                  if (ac_diff[i] < 0)
+                    ac_diff[i] *= (max_ - ac_out->at(i)) / (max_ - min_);
+                  else if (ac_diff[i] > 0)
+                    ac_diff[i] *= (ac_out->at(i) - min_) / (max_ - min_);
+                }
+              }
               else {
                 double fabs_x = fabs(x);
                 if(fabs_x <= corrected_update_ac_factor)
@@ -556,6 +571,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   double noise;
   bool gaussian_policy, vnn_from_scratch, update_critic_first,
         update_delta_neg, corrected_update_ac, gae;
+  bool inverting_gradient;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type;
   double lambda, corrected_update_ac_factor;
