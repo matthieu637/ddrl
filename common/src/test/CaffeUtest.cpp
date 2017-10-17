@@ -194,8 +194,9 @@ TEST(MLP, LearnNonLinearLabelWeight) {
     EXPECT_GT(nn.computeOutVF(sens, ac), out - 0.1);
     EXPECT_LT(nn.computeOutVF(sens, ac), out + 0.1);
 
-    if(x1 > 0.15 && x1 < 0.85)
+    if(x1 > 0.15 && x1 < 0.85){
       EXPECT_GE(fabs(nn.computeOutVF(sens, ac) - old_out), fabs(nn.computeOutVF(sens, ac) - out));
+    }
   }
 }
 

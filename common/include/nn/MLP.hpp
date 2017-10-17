@@ -824,7 +824,7 @@ protected:
     PopulateLayer(layer, name, "Slice", bottoms, tops, include_phase);
     caffe::SliceParameter* slice_param = layer.mutable_slice_param();
 //     slice_param->set
-    slice_param->set_axis(2);
+    slice_param->set_axis(1);
     slice_param->add_slice_point(until);
   }
   void TanhLayer(caffe::NetParameter& net_param,
