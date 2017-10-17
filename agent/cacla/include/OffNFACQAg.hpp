@@ -145,11 +145,6 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     if(lambda >= 0.)
       gae = pt->get<bool>("agent.gae");
 
-    if(lambda >=0. && batch_norm_critic != 0) {
-      LOG_DEBUG("to be done!");
-      exit(1);
-    }
-
     if(lambda < 0. && offpolicy_critic) {
       LOG_DEBUG("set lambda please! (offpolicy_critic)");
       exit(1);
@@ -298,7 +293,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
                        hidden_layer_type,
                        batch_norm_critic, add_v_corrector);
         }
-        if(lambda < 0.f && batch_norm_critic == 0)
+        if(lambda < 0.f)
           qnn->learn_batch(all_states, all_actions, v_target, stoch_iter_critic);
         else {
           auto all_V = qnn->computeOutVFBatch(all_states, all_actions);
@@ -656,7 +651,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     }
 
     decltype(ann->computeOutBatch(all_states)) all_pi;
-    if(gae) {
+    if(gae && !determinist_update) {
       //
       //        Simple computation for lambda return
       //
@@ -749,21 +744,23 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     }
 
     uint n=0;
-    li=0;
-    for(auto one_trajectory : trajectories) {
-      const std::deque<sample>& trajectory = *one_trajectory->transitions;
-      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-        if(deltas[li] > 0.) {
-          n++;
-        } else {
-          std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
+    if(!determinist_update){
+      li=0;
+      for(auto one_trajectory : trajectories) {
+        const std::deque<sample>& trajectory = *one_trajectory->transitions;
+        for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+          if(deltas[li] > 0.) {
+            n++;
+          } else {
+            std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
+          }
+  //         std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
+          li++;
         }
-//         std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
-        li++;
       }
     }
 
-    if(n > 0) {
+    if(n > 0 || determinist_update) {
       for(uint sia = 0; sia < stoch_iter_actor; sia++) {
         decltype(ann->computeOutBatch(all_states)) ac_out;
         //learn BN
