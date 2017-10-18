@@ -140,6 +140,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     determinist_update                     = pt->get<bool>("agent.determinist_update");
 
     gamma_corrector                        = pt->get<bool>("agent.gamma_corrector");
+    batch_norm_testing                     = pt->get<bool>("agent.batch_norm_testing");
     gae                     = false;
 
     if(lambda >= 0.)
@@ -455,9 +456,9 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
       if(update_critic_first)
         update_critic();
 
-      if(!offpolicy_actor) {
+      if(!offpolicy_actor)
         actor_update_onpolicy();
-      } else
+      else
         actor_update_offpolicy();
 
       if(!update_critic_first) {
@@ -491,72 +492,92 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
       std::vector<double> all_next_states(trajectory.size() * this->get_state_size());
       std::vector<double> all_actions(trajectory.size() * this->nb_motors);
       uint li=0;
+      double gamma_factor = 1.f;
       for (auto it : trajectory) {
         std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * this->get_state_size());
         std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * this->get_state_size());
-        std::copy(it.a.begin(), it.a.end(), all_actions.begin() + li * this->nb_motors);
+        if(!determinist_update)
+          std::copy(it.a.begin(), it.a.end(), all_actions.begin() + li * this->nb_motors);
+        else if(gamma_corrector) {//store gamma values
+          std::fill(all_actions.begin() + li * this->nb_motors, all_actions.begin() + (li+1) * this->nb_motors, gamma_factor);
+          gamma_factor *= this->gamma;
+        }
         li++;
-      }
-
-      ann->increase_batchsize(trajectory.size());
-      auto all_next_actions = ann->computeOutBatch(all_next_states);
-      std::vector<double>* all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
-      std::vector<double>* all_mine = qnn->computeOutVFBatch(all_states, all_actions);
-      delete all_next_actions;
-
-      li=0;
-      for (auto it : trajectory) {
-        sample sm = it;
-        double v_target = sm.r;
-        if (!sm.goal_reached) {
-          double nextV = all_nextV->at(li);
-          v_target += this->gamma * nextV;
-        }
-
-        deltas[li] = v_target - all_mine->at(li);
-        ++li;
-      }
-
-      if(gae) {
-        //
-        //        Simple computation for lambda return
-        //
-        std::vector<double> diff(trajectory.size());
-        li=0;
-        for (auto it : trajectory) {
-          diff[li] = 0;
-          for (uint n=li; n<trajectory.size(); n++)
-            diff[li] += std::pow(this->gamma * lambda, n-li) * deltas[n];
-          li++;
-        }
-
-        ASSERT(diff[trajectory.size() -1] == deltas[trajectory.size() -1], "pb lambda");
-        li=0;
-        for (auto it : trajectory) {
-          //           diff[li] = diff[li] + all_V->at(li);
-          deltas[li] = diff[li];
-          ++li;
-        }
       }
 
       uint n=0;
-      li=0;
-      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-        sample sm = *it;
+      ann->increase_batchsize(trajectory.size());
+      if(!determinist_update){
+        auto all_next_actions = ann->computeOutBatch(all_next_states);
+        std::vector<double>* all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+        std::vector<double>* all_mine = qnn->computeOutVFBatch(all_states, all_actions);
+        delete all_next_actions;
 
-        if(deltas[li] > 0.) {
-          n++;
-        } else {
-          std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
+        li=0;
+        for (auto it : trajectory) {
+          sample sm = it;
+          double v_target = sm.r;
+          if (!sm.goal_reached) {
+            double nextV = all_nextV->at(li);
+            v_target += this->gamma * nextV;
+          }
+
+          deltas[li] = v_target - all_mine->at(li);
+          ++li;
         }
-//         std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
-        li++;
+
+        if(gae) {
+          //
+          //        Simple computation for lambda return
+          //
+          std::vector<double> diff(trajectory.size());
+          li=0;
+          for (auto it : trajectory) {
+            diff[li] = 0;
+            for (uint j=li; j<trajectory.size(); j++)
+              diff[li] += std::pow(this->gamma * lambda, j-li) * deltas[j];
+            li++;
+          }
+
+          ASSERT(diff[trajectory.size() -1] == deltas[trajectory.size() -1], "pb lambda");
+          li=0;
+          for (auto it : trajectory) {
+            //           diff[li] = diff[li] + all_V->at(li);
+            deltas[li] = diff[li];
+            ++li;
+          }
+        }
+
+        li=0;
+        for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+          sample sm = *it;
+
+          if(deltas[li] > 0.) {
+            n++;
+          } else {
+            std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
+          }
+  //         std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
+          li++;
+        }
+      
+        delete all_nextV;
+        delete all_mine;
       }
 
-      if(n > 0) {
+      if(n > 0 || determinist_update) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++) {
           //learn BN
           auto ac_out = ann->computeOutBatch(all_states);
+          if(batch_norm_actor != 0 && batch_norm_testing){
+            //re-compute ac_out with BN as testing
+            ann_testing->copyParametersFrom(ann);
+            ann_testing->increase_batchsize(trajectory.size());
+            delete ac_out;
+            ac_out = ann_testing->computeOutBatch(all_states);
+            if(sia + 1 == stoch_iter_actor )
+              ann_testing->increase_batchsize(1);
+          }
 
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           if(!determinist_update) {
@@ -580,7 +601,13 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
               q_values_diff[q_values_blob->offset(i,0,0,0)] = -1.0f;
             qnn->critic_backward();
             const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
-            actor_actions_blob->ShareDiff(*critic_action_blob);
+            if(gamma_corrector){
+              auto ac_diff_critic = critic_action_blob->cpu_diff();
+              auto ac_diff = actor_actions_blob->mutable_cpu_diff();
+              for(int i=0; i<actor_actions_blob->count(); i++)
+                ac_diff[i] = ac_diff_critic[i] * all_actions[i];
+            } else 
+              actor_actions_blob->ShareDiff(*critic_action_blob);
           }
           ann->actor_backward();
           ann->getSolver()->ApplyUpdate();
@@ -588,9 +615,6 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
           delete ac_out;
         }
       }
-
-      delete all_nextV;
-      delete all_mine;
     }
   }
 
@@ -769,6 +793,16 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
         else {
           ac_out = ann->computeOutBatch(all_states);
         }
+        
+        if(batch_norm_actor != 0 && batch_norm_testing){
+          //re-compute ac_out with BN as testing
+          ann_testing->copyParametersFrom(ann);
+          ann_testing->increase_batchsize(all_size);
+          delete ac_out;
+          ac_out = ann_testing->computeOutBatch(all_states);
+          if(sia + 1 == stoch_iter_actor )
+            ann_testing->increase_batchsize(1);
+        }
 
         const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
         if(!determinist_update) {
@@ -881,7 +915,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
        hidden_layer_type, max_trajectory, offpolicy_strategy;
   double lambda;
   uint number_global_fitted_iteration;
-  bool offpolicy_critic, shuffle_buffer, gamma_corrector;
+  bool offpolicy_critic, shuffle_buffer, gamma_corrector, batch_norm_testing;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
