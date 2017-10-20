@@ -141,6 +141,8 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
     gamma_corrector                        = pt->get<bool>("agent.gamma_corrector");
     batch_norm_testing                     = pt->get<bool>("agent.batch_norm_testing");
+    use_qmu                                = pt->get<int>("agent.use_qmu");
+    
     gae                     = false;
 
     if(lambda >= 0.)
@@ -269,7 +271,29 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
       auto iter = [&]() {
         std::vector<double> v_target(all_size);
-        std::vector<double>* all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+        std::vector<double>* all_nextV;
+        if(use_qmu <= 0)
+          all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+        else {
+          std::vector<double> all_actions_mu(all_size * this->nb_motors * use_qmu);
+          std::vector<double> all_states_tmp(all_size * this->get_state_size() * use_qmu);
+          for(int j=0;j<use_qmu;j++){
+            vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*all_next_actions, noise);
+            std::copy(randomized_action->begin(), randomized_action->end(), all_actions_mu.begin() + j * all_size * this->nb_motors);
+            std::copy(all_next_states.begin(), all_next_states.end(), all_states_tmp.begin() + j * all_size * this->get_state_size());
+            delete randomized_action;
+          }
+          qnn->increase_batchsize(all_size * use_qmu);
+          all_nextV = qnn->computeOutVFBatch(all_states_tmp, all_actions_mu);
+          qnn->increase_batchsize(all_size);
+          double factor_ = use_qmu;
+          for(int j=0;j<all_size;j++){
+            double sum_ = 0.f;
+            for(int k=0;k<use_qmu;k++)
+              sum_ += all_nextV->at(k*all_size+j);
+            all_nextV->at(j) = sum_ / factor_;
+          }
+        }
 
         li=0;
         for(auto one_trajectory : trajectories) {
@@ -509,7 +533,29 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
       ann->increase_batchsize(trajectory.size());
       if(!determinist_update){
         auto all_next_actions = ann->computeOutBatch(all_next_states);
-        std::vector<double>* all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+        std::vector<double>* all_nextV;
+        if(use_qmu <= 0)
+          all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+        else {
+          std::vector<double> all_actions_mu(trajectory.size() * this->nb_motors * use_qmu);
+          std::vector<double> all_states_tmp(trajectory.size() * this->get_state_size() * use_qmu);
+          for(int j=0;j<use_qmu;j++){
+            vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*all_next_actions, noise);
+            std::copy(randomized_action->begin(), randomized_action->end(), all_actions_mu.begin() + j * trajectory.size() * this->nb_motors);
+            std::copy(all_next_states.begin(), all_next_states.end(), all_states_tmp.begin() + j * trajectory.size() * this->get_state_size());
+            delete randomized_action;
+          }
+          qnn->increase_batchsize(trajectory.size() * use_qmu);
+          all_nextV = qnn->computeOutVFBatch(all_states_tmp, all_actions_mu);
+          qnn->increase_batchsize(trajectory.size());
+          double factor_ = use_qmu;
+          for(uint j=0;j<trajectory.size();j++){
+            double sum_ = 0.f;
+            for(int k=0;k<use_qmu;k++)
+              sum_ += all_nextV->at(k*trajectory.size()+j);
+            all_nextV->at(j) = sum_ / factor_;
+          }
+        }
         std::vector<double>* all_mine = qnn->computeOutVFBatch(all_states, all_actions);
         delete all_next_actions;
 
@@ -650,7 +696,29 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
     if(!determinist_update) {
       auto all_next_actions = ann->computeOutBatch(all_next_states);
-      std::vector<double>* all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+      std::vector<double>* all_nextV;
+      if(use_qmu <= 0)
+        all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
+      else {
+        std::vector<double> all_actions_mu(all_size * this->nb_motors * use_qmu);
+        std::vector<double> all_states_tmp(all_size * this->get_state_size() * use_qmu);
+        for(int j=0;j<use_qmu;j++){
+          vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*all_next_actions, noise);
+          std::copy(randomized_action->begin(), randomized_action->end(), all_actions_mu.begin() + j * all_size * this->nb_motors);
+          std::copy(all_next_states.begin(), all_next_states.end(), all_states_tmp.begin() + j * all_size * this->get_state_size());
+          delete randomized_action;
+        }
+        qnn->increase_batchsize(all_size * use_qmu);
+        all_nextV = qnn->computeOutVFBatch(all_states_tmp, all_actions_mu);
+        qnn->increase_batchsize(all_size);
+        double factor_ = use_qmu;
+        for(int j=0;j<all_size;j++){
+          double sum_ = 0.f;
+          for(int k=0;k<use_qmu;k++)
+            sum_ += all_nextV->at(k*all_size+j);
+          all_nextV->at(j) = sum_ / factor_;
+        }
+      }
       std::vector<double>* all_mine = qnn->computeOutVFBatch(all_states, all_actions);
       delete all_next_actions;
 
@@ -916,6 +984,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
   double lambda;
   uint number_global_fitted_iteration;
   bool offpolicy_critic, shuffle_buffer, gamma_corrector, batch_norm_testing;
+  int use_qmu;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
