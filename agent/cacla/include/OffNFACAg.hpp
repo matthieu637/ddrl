@@ -140,6 +140,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     offpolicy_critic                       = pt->get<bool>("agent.offpolicy_critic");
     shuffle_buffer                         = pt->get<bool>("agent.shuffle_buffer");
     testing_ann_offpolicy                  = pt->get<bool>("agent.testing_ann_offpolicy");
+    uint momentum           = pt->get<uint>("agent.momentum");
+    testing_ann_offpolicy = false;
 //     testing_vnn                            = pt->get<bool>("agent.testing_vnn");
     gae                     = false;
 
@@ -172,12 +174,12 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     }
 
     ann = new NN(this->get_state_size(), *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type,
-                 batch_norm_actor, true);
+                 batch_norm_actor, true, momentum);
     if(std::is_same<NN, DODevMLP>::value)
       ann->exploit(pt, nullptr);
 
     vnn = new NN(this->get_state_size(), this->get_state_size(), *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic,
-                 add_v_corrector && offpolicy_critic && offpolicy_strategy != 0);
+                 add_v_corrector && offpolicy_critic && offpolicy_strategy != 0, momentum);
     if(std::is_same<NN, DODevMLP>::value)
       vnn->exploit(pt, ann);
 

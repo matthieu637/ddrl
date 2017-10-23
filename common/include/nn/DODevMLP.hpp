@@ -8,15 +8,15 @@ class DODevMLP : public MLP {
  public:
 
    DODevMLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha,
-            uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false) :
-    MLP(input, sensors, hiddens, alpha, _kMinibatchSize, decay_v, hidden_layer_type, batch_norm, _weighted_sample) {
+            uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false, uint mom_=0) :
+    MLP(input, sensors, hiddens, alpha, _kMinibatchSize, decay_v, hidden_layer_type, batch_norm, _weighted_sample, mom_) {
 
   }
     
   //   policy
   DODevMLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize,
-            uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false) :
-    MLP(sensors, hiddens, motors, alpha, _kMinibatchSize, hidden_layer_type, last_layer_type, batch_norm, loss_layer) {
+           uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false, uint mom_=0) :
+    MLP(sensors, hiddens, motors, alpha, _kMinibatchSize, hidden_layer_type, last_layer_type, batch_norm, loss_layer, mom_) {
     
   }
 

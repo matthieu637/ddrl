@@ -23,6 +23,7 @@
 // POOL_FOR_TESTING need to be define for stochastics environements
 // in order to test (learning=false) "the best" known policy
 // 
+#undef POOL_FOR_TESTING //to be checked
 
 #define DOUBLE_COMPARE_PRECISION 1e-9
 
@@ -183,6 +184,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     bool test_net           = pt->get<bool>("agent.test_net");
     bn_adapt                = pt->get<bool>("agent.bn_adapt");
+    uint momentum           = pt->get<uint>("agent.momentum");
     
 #ifdef CAFFE_CPU_ONLY
     LOG_INFO("CPU mode");
@@ -198,7 +200,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
 #endif
     
-    ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, hidden_layer_type, actor_output_layer_type, batch_norm_actor);
+    ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, 
+                 hidden_layer_type, actor_output_layer_type, batch_norm_actor, false, momentum);
     if(std::is_same<NN, DevMLP>::value)
       ann->exploit(pt, static_cast<DeepQNAg *>(old_ag)->ann);
     else if(std::is_same<NN, DODevMLP>::value)
@@ -212,7 +215,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
     ann_testing->increase_batchsize(1);
     
-    qnn = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, decay_v, hidden_layer_type, batch_norm_critic);
+    qnn = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, 
+                 decay_v, hidden_layer_type, batch_norm_critic, false, momentum);
     if(std::is_same<NN, DevMLP>::value)
       qnn->exploit(pt, static_cast<DeepQNAg *>(old_ag)->qnn);
     else if(std::is_same<NN, DODevMLP>::value)

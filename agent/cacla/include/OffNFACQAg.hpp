@@ -144,6 +144,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     use_qmu                                = pt->get<int>("agent.use_qmu");
     use_qmu_actor                          = pt->get<bool>("agent.use_qmu_actor");
     ac_onpolnexta                        = pt->get<bool>("agent.ac_onpolnexta");
+    uint momentum           = pt->get<uint>("agent.momentum");
     
     gae                     = false;
 
@@ -177,13 +178,13 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
     ann = new NN(this->get_state_size(), *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type,
                  actor_output_layer_type,
-                 batch_norm_actor, true);
+                 batch_norm_actor, true, momentum);
     if(std::is_same<NN, DODevMLP>::value)
       ann->exploit(pt, nullptr);
 
     qnn = new NN(this->get_state_size() + this->nb_motors, this->get_state_size(), *hidden_unit_v, alpha_v, 1, -1,
                  hidden_layer_type, batch_norm_critic,
-                 add_v_corrector);
+                 add_v_corrector, momentum);
     if(std::is_same<NN, DODevMLP>::value)
       qnn->exploit(pt, ann);
 

@@ -23,14 +23,14 @@ class DevMLP : public MLP {
  public:
 
   DevMLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha,
-         uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false) :
+         uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false, uint mom_=0) :
     MLP(input, sensors, input-sensors, _kMinibatchSize, false, _weighted_sample, hiddens.size()), policy(false) {
     c = new constructor({hiddens, alpha, decay_v, hidden_layer_type, batch_norm, 0});
   }
 
 //   policy
   DevMLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize,
-         uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false) :
+         uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false, uint mom_=0) :
     MLP(sensors, sensors, motors, _kMinibatchSize, loss_layer, false, hiddens.size()), policy(true) {
     c = new constructor({hiddens, alpha, -1, hidden_layer_type, batch_norm, last_layer_type});
 
@@ -396,7 +396,7 @@ class DevMLP : public MLP {
         solver_param.set_snapshot_prefix("actor");
       else
         solver_param.set_snapshot_prefix("critic");
-      solver_param.set_clip_gradients(10);
+//       solver_param.set_clip_gradients(10);
 
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
       neural_net = solver->net();

@@ -84,7 +84,8 @@ class MLP {
 //   CRITIC NET
 //   
   MLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha,
-      uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false) :
+      uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false,
+      uint momentum_=0) :
     size_input_state(input), size_sensors(sensors), size_motors(size_input_state - sensors),
     kMinibatchSize(_kMinibatchSize), weighted_sample(_weighted_sample), hiddens_size(hiddens.size()) {
 
@@ -156,11 +157,19 @@ class MLP {
     solver_param.set_base_lr(alpha);
     solver_param.set_lr_policy("fixed");
     solver_param.set_snapshot_prefix("critic");
-//       solver_param.set_momentum(0.95);
-//       solver_param.set_momentum2(0.999);
+    if(momentum_ == 0){
+      solver_param.set_momentum(0.);
+      solver_param.set_momentum2(0.999);
+    } else if(momentum_ == 1){
+      solver_param.set_momentum(0.9);
+      solver_param.set_momentum2(0.999);
+    } else {
+      solver_param.set_momentum(0.);
+      solver_param.set_momentum2(0.);      
+    }
     if(!(decay_v < 0)) //-1
       solver_param.set_weight_decay(decay_v);
-    solver_param.set_clip_gradients(10);
+//     solver_param.set_clip_gradients(10);
 
     solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
     neural_net = solver->net();
@@ -178,9 +187,9 @@ class MLP {
 // ACTOR POLICY
 //
   MLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize,
-      uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false) : size_input_state(sensors),
-    size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize), add_loss_layer(loss_layer), 
-    hiddens_size(hiddens.size()) {
+      uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false, uint momentum_=0) : 
+      size_input_state(sensors), size_sensors(sensors), size_motors(motors), kMinibatchSize(_kMinibatchSize), 
+      add_loss_layer(loss_layer), hiddens_size(hiddens.size()) {
 
     ASSERT(alpha > 0, "alpha <= 0");
     ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
@@ -241,9 +250,17 @@ class MLP {
     solver_param.set_base_lr(alpha);
     solver_param.set_lr_policy("fixed");
     solver_param.set_snapshot_prefix("actor");
-//       solver_param.set_momentum(0.95);
-//       solver_param.set_momentum2(0.999);
-    solver_param.set_clip_gradients(10);
+    if(momentum_ == 0){
+      solver_param.set_momentum(0.);
+      solver_param.set_momentum2(0.999);
+    } else if(momentum_ == 1){
+      solver_param.set_momentum(0.9);
+      solver_param.set_momentum2(0.999);
+    } else {
+      solver_param.set_momentum(0.);
+      solver_param.set_momentum2(0.);      
+    }
+//     solver_param.set_clip_gradients(10);//not used by ADAM
 //     solver_param.set_display(true);
 
     solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
