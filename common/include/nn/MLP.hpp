@@ -163,9 +163,12 @@ class MLP {
     } else if(momentum_ == 1){
       solver_param.set_momentum(0.9);
       solver_param.set_momentum2(0.999);
-    } else {
+    } else if(momentum_ == 2){
       solver_param.set_momentum(0.);
       solver_param.set_momentum2(0.);      
+    } else {
+      solver_param.set_momentum(0.9);
+      solver_param.set_momentum2(0.);   
     }
     if(!(decay_v < 0)) //-1
       solver_param.set_weight_decay(decay_v);
@@ -256,9 +259,12 @@ class MLP {
     } else if(momentum_ == 1){
       solver_param.set_momentum(0.9);
       solver_param.set_momentum2(0.999);
-    } else {
+    } else if(momentum_ == 2){
       solver_param.set_momentum(0.);
       solver_param.set_momentum2(0.);      
+    } else {
+      solver_param.set_momentum(0.9);
+      solver_param.set_momentum2(0.);   
     }
 //     solver_param.set_clip_gradients(10);//not used by ADAM
 //     solver_param.set_display(true);
