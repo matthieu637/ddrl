@@ -143,6 +143,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     batch_norm_testing                     = pt->get<bool>("agent.batch_norm_testing");
     use_qmu                                = pt->get<int>("agent.use_qmu");
     use_qmu_actor                          = pt->get<bool>("agent.use_qmu_actor");
+    ac_onpolnexta                        = pt->get<bool>("agent.ac_onpolnexta");
     
     gae                     = false;
 
@@ -166,6 +167,11 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     
     if(use_qmu_actor && use_qmu<=0) {
       LOG_DEBUG("use_qmu_actor with use_qmu<=0");
+      exit(1);
+    }
+    
+    if(ac_onpolnexta && use_qmu >= -1) {
+      LOG_DEBUG("ac_onpolnexta with use_qmu >= -1");
       exit(1);
     }
 
@@ -247,7 +253,31 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
       ASSERT(li == all_size, "pb");
 
       ann->increase_batchsize(all_size);
-      std::vector<double>* all_next_actions = ann->computeOutBatch(all_next_states);
+      std::vector<double>* all_next_actions;
+      if(use_qmu >= -1)
+        all_next_actions = ann->computeOutBatch(all_next_states);
+      else {
+        all_next_actions = new std::vector<double>(all_size * this->nb_motors);
+        li=0;
+        for(auto one_trajectory : trajectories) {
+          const std::deque<sample>& trajectory = *one_trajectory->transitions;
+          
+          bool skip_first=true;
+          for (auto it : trajectory) {
+            if(skip_first){
+              skip_first=false;
+              continue;
+            }
+            std::copy(it.a.begin(), it.a.end(), all_actions.begin() + li * this->nb_motors);
+            li++;
+          }
+          
+          vector<double>* next_action = ann_testing->computeOut(trajectory.back().s);
+          std::copy(next_action->begin(), next_action->end(), all_actions.begin() + li * this->nb_motors);
+          delete next_action;
+          li++;
+        }
+      }
       std::vector<double>* all_pi;
       if(lambda >= 0.f && offpolicy_strategy != 0 && offpolicy_critic )
         all_pi = ann->computeOutBatch(all_states);
@@ -543,7 +573,9 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
       uint n=0;
       ann->increase_batchsize(trajectory.size());
       if(!determinist_update){
-        auto all_next_actions = ann->computeOutBatch(all_next_states);
+        std::vector<double>* all_next_actions;
+        all_next_actions = ann->computeOutBatch(all_next_states);
+        //TODO:use_qmu -2
         std::vector<double>* all_nextV;
         if(use_qmu <= 0)
           all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
@@ -729,7 +761,31 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     }
 
     if(!determinist_update) {
-      auto all_next_actions = ann->computeOutBatch(all_next_states);
+      std::vector<double>* all_next_actions ; 
+      if(!ac_onpolnexta)
+        all_next_actions = ann->computeOutBatch(all_next_states);
+      else {
+        all_next_actions = new std::vector<double>(all_size * this->nb_motors);
+        li=0;
+        for(auto one_trajectory : trajectories) {
+          const std::deque<sample>& trajectory = *one_trajectory->transitions;
+          
+          bool skip_first=true;
+          for (auto it : trajectory) {
+            if(skip_first){
+              skip_first=false;
+              continue;
+            }
+            std::copy(it.a.begin(), it.a.end(), all_actions.begin() + li * this->nb_motors);
+            li++;
+          }
+          
+          vector<double>* next_action = ann_testing->computeOut(trajectory.back().s);
+          std::copy(next_action->begin(), next_action->end(), all_actions.begin() + li * this->nb_motors);
+          delete next_action;
+          li++;
+        }
+      }
       std::vector<double>* all_nextV;
       if(use_qmu <= 0)
         all_nextV = qnn->computeOutVFBatch(all_next_states, *all_next_actions);
@@ -1042,7 +1098,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
   uint number_global_fitted_iteration;
   bool offpolicy_critic, shuffle_buffer, gamma_corrector, batch_norm_testing;
   int use_qmu;
-  bool use_qmu_actor;
+  bool use_qmu_actor, ac_onpolnexta;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
