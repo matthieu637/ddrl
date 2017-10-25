@@ -1,7 +1,6 @@
 
-
-#ifndef DEEPQNAG_HPP
-#define DEEPQNAG_HPP
+#ifndef DEEPQCACLA_HPP
+#define DEEPQCACLA_HPP
 
 #include <vector>
 #include <string>
@@ -19,11 +18,6 @@
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 
-// 
-// POOL_FOR_TESTING need to be define for stochastics environements
-// in order to test (learning=false) "the best" known policy
-// 
-#undef POOL_FOR_TESTING //to be checked
 
 #define DOUBLE_COMPARE_PRECISION 1e-9
 
@@ -88,16 +82,16 @@ typedef struct _sample {
 } sample;
 
 template<typename NN = MLP>
-class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
+class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
  public:
   typedef MLP PolicyImpl;
    
-  DeepQNAg(unsigned int _nb_motors, unsigned int _nb_sensors)
+  DeepQCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
     : arch::AACAgent<MLP, arch::AgentGPUProgOptions>(_nb_motors), nb_sensors(_nb_sensors) {
 
   }
 
-  virtual ~DeepQNAg() {
+  virtual ~DeepQCaclaAg() {
     delete qnn;
     delete ann;
     
@@ -108,16 +102,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     delete hidden_unit_q;
     delete hidden_unit_a;
-    
-    for (auto i: best_population){
-      delete i.ann;
-      delete i.qnn;
-    }
-    
-#ifdef POOL_FOR_TESTING
-    for (auto i : best_pol_population)
-      delete i.ann;
-#endif
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
@@ -185,6 +169,17 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     bool test_net           = pt->get<bool>("agent.test_net");
     bn_adapt                = pt->get<bool>("agent.bn_adapt");
     uint momentum           = pt->get<uint>("agent.momentum");
+    qac_target              = pt->get<bool>("agent.qac_target");
+    aac_target              = pt->get<bool>("agent.aac_target");
+    qac_sample              = pt->get<uint>("agent.qac_sample");
+    qnextac_sample          = pt->get<uint>("agent.qnextac_sample");
+    recompute_next_ac       = pt->get<bool>("agent.recompute_next_ac");
+    onpolac                 = pt->get<bool>("agent.onpolac");
+    
+    if(recompute_next_ac && !aac_target) {
+      LOG_DEBUG("recompute_next_ac useless");
+      exit(1);
+    }
     
 #ifdef CAFFE_CPU_ONLY
     LOG_INFO("CPU mode");
@@ -203,7 +198,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, 
                  hidden_layer_type, actor_output_layer_type, batch_norm_actor, false, momentum);
     if(std::is_same<NN, DevMLP>::value)
-      ann->exploit(pt, static_cast<DeepQNAg *>(old_ag)->ann);
+      ann->exploit(pt, static_cast<DeepQCaclaAg *>(old_ag)->ann);
     else if(std::is_same<NN, DODevMLP>::value)
       ann->exploit(pt, nullptr);
     
@@ -218,7 +213,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     qnn = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, 
                  decay_v, hidden_layer_type, batch_norm_critic, false, momentum);
     if(std::is_same<NN, DevMLP>::value)
-      qnn->exploit(pt, static_cast<DeepQNAg *>(old_ag)->qnn);
+      qnn->exploit(pt, static_cast<DeepQCaclaAg *>(old_ag)->qnn);
     else if(std::is_same<NN, DODevMLP>::value)
       qnn->exploit(pt, ann);
     
@@ -259,82 +254,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
        traj[i] = from[r];
      }
   }
-
-#ifdef POOL_FOR_TESTING
-  int choosenPol = 0;
-  void start_instance(bool learning) override {
-    
-    if(!learning && best_pol_population.size() > 0){
-      to_be_restaured_ann = ann;
-      auto it = best_pol_population.begin();
-      ++it;
-      
-      ann = best_pol_population.begin()->ann;
-    } else if(learning){
-      to_be_restaured_ann = new MLP(*ann, false, ::caffe::Phase::TEST);
-    }
-  }
-#endif
-
-  void end_instance(bool learning) override {
-#ifdef POOL_FOR_TESTING
-    if(!learning && best_pol_population.size() > 0){
-      //restore ann
-      ann = to_be_restaured_ann;
-    } else if(learning) {
-      //not totaly stable because J(the policy stored here ) != sum_weighted_reward (online updates)
-    
-      //policies pool for testing
-      if(best_pol_population.size() == 0 || best_pol_population.rbegin()->J < sum_weighted_reward){
-        if(best_pol_population.size() > 200){
-          //remove smallest
-          auto it = best_pol_population.end();
-          --it;
-          delete it->ann;
-          best_pol_population.erase(it);
-        }
-        
-        MLP* pol_fitted_sample = to_be_restaured_ann;
-        best_pol_population.insert({pol_fitted_sample,sum_weighted_reward, 0});
-      } else
-        delete to_be_restaured_ann;
-    }
-#endif
-
-    if(learning){
-      MLP* cann = new MLP(*ann, false, ::caffe::Phase::TEST);
-      MLP* cqnn = new MLP(*qnn, false, ::caffe::Phase::TEST);
-      best_population.insert({cann, cqnn, sum_weighted_reward, last_trajectory_a});
-      
-      if(best_population.size() > 5){
-        //remove smallest
-        auto it = best_population.end();
-        --it;
-        delete it->ann;
-        delete it->qnn;
-        best_population.erase(it);
-      }
-      
-      episode++;
-    }
-  }
-  
-  void restoreBest() override {
-    if(best_population.size() == 0){
-      LOG_INFO("WARNING: pop empty (random NN given as best )" << best_population.size());
-      return;
-    }
-    
-    LOG_INFO("WARNING : hard to restoreBest because of online updates");
-    exit(1);
-    
-    delete ann;
-    delete qnn;
-    
-    auto it = best_population.begin();
-    ann = new MLP(*it->ann, false, ::caffe::Phase::TEST);
-    qnn = new MLP(*it->qnn, false, ::caffe::Phase::TEST);
-  }
   
   void end_episode(bool learning) override {
     
@@ -351,6 +270,9 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       std::vector<double> all_next_states(traj.size() * nb_sensors);
       std::vector<double> all_states(traj.size() * nb_sensors);
       std::vector<double> all_actions(traj.size() * nb_motors);
+      std::vector<bool> disable_back(traj.size() * this->nb_motors, false);
+      const std::vector<bool> disable_back_ac(this->nb_motors, true);
+      std::vector<double> deltas(traj.size());
       uint i=0;
       for (auto it : traj){
         std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
@@ -363,7 +285,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         
       //compute next q
       auto q_targets = qnn_target->computeOutVFBatch(all_next_states, *all_next_actions);
-      delete all_next_actions;
       
       //adjust q_targets
       i=0;
@@ -390,43 +311,118 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         all_actions_outputs = ann_testing->computeOutBatch(all_states);
         ann_testing->increase_batchsize(1);
       }
-
-      delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
       
-      const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
-      double* q_values_diff = q_values_blob->mutable_cpu_diff();
-      i=0;
-      for (auto it : traj)
-        q_values_diff[q_values_blob->offset(i++,0,0,0)] = -1.0f;
-      qnn->critic_backward();
-      const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
+      MLP* qnn_worker = qnn;
+      if(qac_target)
+        qnn_worker = qnn_target;
       
-      if(inverting_grad){
-        double* action_diff = critic_action_blob->mutable_cpu_diff();
-        
-        for (uint n = 0; n < traj.size(); ++n) {
-          for (uint h = 0; h < nb_motors; ++h) {
-            int offset = critic_action_blob->offset(n,h,0,0);
-            double diff = action_diff[offset];
-            double output = all_actions_outputs->at(offset);
-            double min = -1.0; 
-            double max = 1.0;
-            if (diff < 0) {
-              diff *= (max - output) / (max - min);
-            } else if (diff > 0) {
-              diff *= (output - min) / (max - min);
-            }
-            action_diff[offset] = diff;
-          }
+      MLP* ann_worker = ann;
+      if(aac_target)
+        ann_worker = ann_target;
+      
+      // pre-compute delta
+      std::vector<double>* all_mine, *all_nextV;
+      
+      std::vector<double>* current_all_actions = all_actions_outputs;
+      if(onpolac)
+        current_all_actions = &all_actions;
+      
+      if(qac_sample <= 1)
+        all_mine = qnn_worker->computeOutVFBatch(all_states, *current_all_actions);
+      else {
+        all_mine = new std::vector<double>(traj.size(), 0.f);
+        for(uint j=0;j<qac_sample;j++){
+          vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*current_all_actions, noise);
+          auto local_all_mine = qnn_worker->computeOutVFBatch(all_states, *randomized_action);
+          std::transform(all_mine->begin(), all_mine->end(), local_all_mine->begin(), all_mine->begin(), std::plus<double>());
+          delete local_all_mine;
+          delete randomized_action;
         }
+        double factor_ = 1.f/((double)qac_sample);
+        std::transform(all_mine->begin(), all_mine->end(), all_mine->begin(), std::bind1st(std::multiplies<double>(), factor_));
+      }
+
+      std::vector<double>* current_all_next_actions = all_next_actions;
+      if(recompute_next_ac)
+        current_all_next_actions = ann_worker->computeOutBatch(all_next_states);
+      
+      if(qnextac_sample <= 1){
+        all_nextV = qnn_worker->computeOutVFBatch(all_next_states, *current_all_next_actions);
+      } else {
+        all_nextV = new std::vector<double>(traj.size(), 0.f);
+        for(uint j=0;j<qnextac_sample;j++){
+          vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*current_all_next_actions, noise);
+          auto local_all_nextV = qnn_worker->computeOutVFBatch(all_next_states, *randomized_action);
+          std::transform(all_nextV->begin(), all_nextV->end(), local_all_nextV->begin(), all_nextV->begin(), std::plus<double>());
+          delete local_all_nextV;
+          delete randomized_action;
+        }
+        double factor_ = 1.f/((double)qnextac_sample);
+        std::transform(all_nextV->begin(), all_nextV->end(), all_nextV->begin(), std::bind1st(std::multiplies<double>(), factor_));
       }
       
-      // Transfer input-level diffs from Critic to Actor
-      const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
-      actor_actions_blob->ShareDiff(*critic_action_blob);
-      ann->actor_backward();
-      ann->getSolver()->ApplyUpdate();
-      ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+      if(recompute_next_ac)
+        delete current_all_next_actions;
+      
+      // compute delta
+      i=0;
+      for (auto it : traj) {
+        double v_target = it.r;
+        if (!it.goal_reached) {
+          double nextV = all_nextV->at(i);
+          v_target += this->gamma * nextV;
+        }
+        
+        deltas[i] = v_target - all_mine->at(i);
+        ++i;
+      }
+      
+      // compute disable_back
+      i=0;
+      bool at_least_one_update = false;
+      for(auto it : traj) {
+        if(deltas[i] > 0.)
+          at_least_one_update = true;
+        else
+          std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + i * this->nb_motors);
+        i++;
+      }
+      
+      if(at_least_one_update){
+        const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
+        auto ac_diff = actor_actions_blob->mutable_cpu_diff();
+        for(i=0; i<actor_actions_blob->count(); i++) {
+          if(disable_back[i]) {
+            ac_diff[i] = 0.00000000f;
+          } else {
+            double x = all_actions[i] - all_actions_outputs->at(i);
+            ac_diff[i] = -x;
+          }
+        }
+        
+        if(inverting_grad){
+
+          for (uint n = 0; n < traj.size(); ++n) {
+            for (uint h = 0; h < nb_motors; ++h) {
+              int offset = actor_actions_blob->offset(n,h,0,0);
+              double diff = ac_diff[offset];
+              double output = all_actions_outputs->at(offset);
+              double min = -1.0; 
+              double max = 1.0;
+              if (diff < 0) {
+                diff *= (max - output) / (max - min);
+              } else if (diff > 0) {
+                diff *= (output - min) / (max - min);
+              }
+              ac_diff[offset] = diff;
+            }
+          }
+        }
+        
+        ann->actor_backward();
+        ann->getSolver()->ApplyUpdate();
+        ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
+      }
       
       // Soft update of targets networks
       qnn_target->soft_update(*qnn, tau_soft_update);
@@ -434,6 +430,10 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       
       delete q_targets;
       delete all_actions_outputs;
+      delete all_next_actions;
+      
+      delete all_nextV;
+      delete all_mine;
     }
   
   }
@@ -446,14 +446,14 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     return new arch::Policy<MLP>(new MLP(*ann, true) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
   }
 
-  void save(const std::string& path, bool save_best) override {
-    if(save_best && best_population.size() > 0){
-      auto it = best_population.begin();
-      bib::XMLEngine::save(it->trajectory_a, "trajectory_a", "best_trajectory_a.data");
-    } else {
+  void save(const std::string& path, bool) override {
+//     if(save_best && best_population.size() > 0){
+//       auto it = best_population.begin();
+//       bib::XMLEngine::save(it->trajectory_a, "trajectory_a", "best_trajectory_a.data");
+//     } else {
       ann->save(path+".actor");
       qnn->save(path+".critic");
-    }
+//     }
   }
 
   void load(const std::string& path) override {
@@ -465,49 +465,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     qnn_target = new MLP(*qnn, false, ::caffe::Phase::TEST);
     ann_target = new MLP(*ann, false, ::caffe::Phase::TEST);
-  }
-  
-  void save_run() override {
-#ifdef POOL_FOR_TESTING
-    LOG_DEBUG("not implemented");
-    exit(1);
-#endif
-    ann->save("continue.actor");
-    qnn->save("continue.critic");
-    ann_target->save("continue.actor_target");
-    qnn_target->save("continue.critic_target");
-    bib::XMLEngine::save(trajectory, "trajectory", "continue.trajectory.data");
-    
-    double best_J = 0;
-    const std::deque<std::vector<double>>* best_trajectory_a_;
-    if(best_population.size() == 0){
-      best_J = best_population.begin()->J;
-      best_trajectory_a_ = &best_population.begin()->trajectory_a;
-    } else {
-      best_J = sum_weighted_reward;
-      best_trajectory_a_ = &last_trajectory_a;
-    }
-    
-    struct algo_state st = {episode, best_J, *best_trajectory_a_};
-    bib::XMLEngine::save(st, "algo_state", "continue.algo_state.data");
-  }
-  
-  void load_previous_run() override {
-#ifdef POOL_FOR_TESTING
-    LOG_DEBUG("not implemented");
-    exit(1);
-#endif
-    ann->load("continue.actor");
-    qnn->load("continue.critic");
-    ann_target->load("continue.actor_target");
-    qnn_target->load("continue.critic_target");
-    auto p1 = bib::XMLEngine::load<std::deque<sample>>("trajectory", "continue.trajectory.data");
-    trajectory = *p1;
-    delete p1;
-    auto p3 = bib::XMLEngine::load<struct algo_state>("algo_state", "continue.algo_state.data");
-    episode = p3->episode;
-    best_population.insert({nullptr, nullptr, p3->J, p3->best_trajectory_a});
-    delete p3;
   }
 
  protected:
@@ -557,6 +514,9 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::deque<sample> trajectory;
   std::deque<std::vector<double>> last_trajectory_a;
   
+  bool qac_target, aac_target, recompute_next_ac, onpolac;
+  uint qac_sample, qnextac_sample;
+  
   uint episode = 0;
   
   struct my_pol_dpmt{
@@ -569,21 +529,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       return J > b.J;
     }
   };
-  std::multiset<my_pol_dpmt> best_population;
-  
-#ifdef POOL_FOR_TESTING  
-  struct my_pol{
-    MLP* ann;
-    double J;
-    uint played;
-    
-    bool operator< (const my_pol& b) const {
-      return J > b.J;
-    }
-  };
-  std::multiset<my_pol> best_pol_population;
-  MLP* to_be_restaured_ann;
-#endif  
   
   MLP* ann, *ann_target;
   MLP* qnn, *qnn_target;

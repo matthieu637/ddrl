@@ -548,8 +548,8 @@ TEST(MLP, OptimizeNNTroughGradientOfAnotherNN) {
         if(batch_norm == 0 && forced == 0)
           for (uint n = 0; n < batch_size; ++n) {
             for (uint h = 0; h < 1; ++h) {
-              int offset = critic_action_blob->offset(n,0,h,0);
-              int offset2 = critic_action_blob2->offset(n,0,h,0);
+              int offset = critic_action_blob->offset(n,h,0,0);
+              int offset2 = critic_action_blob2->offset(n,h,0,0);
               EXPECT_DOUBLE_EQ(action_diff[offset], action_diff2[offset2]);
             }
           }

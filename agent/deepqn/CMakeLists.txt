@@ -49,6 +49,10 @@ target_link_libraries(cp-nfac
 add_executable(half-cheetah src/test/HalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(half-cheetah 
   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  
+add_executable(half-cheetah-dqc src/test/HalfCheetahDQC.cpp ${all_include} ${all_sources} )
+target_link_libraries(half-cheetah-dqc 
+  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
 
 add_executable(half-cheetah-nfac src/test/NFACHalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(half-cheetah-nfac
