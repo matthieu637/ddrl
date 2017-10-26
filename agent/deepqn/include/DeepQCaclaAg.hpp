@@ -379,50 +379,59 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       
       // compute disable_back
       i=0;
-      bool at_least_one_update = false;
       for(auto it : traj) {
-        if(deltas[i] > 0.)
-          at_least_one_update = true;
-        else
+        if(deltas[i] <= 0.0000000000f)
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + i * this->nb_motors);
         i++;
       }
       
-      if(at_least_one_update){
-        const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
-        auto ac_diff = actor_actions_blob->mutable_cpu_diff();
-        for(i=0; i<actor_actions_blob->count(); i++) {
-          if(disable_back[i]) {
-            ac_diff[i] = 0.00000000f;
-          } else {
-            double x = all_actions[i] - all_actions_outputs->at(i);
-            ac_diff[i] = -x;
-          }
+      // unless deter update
+      qnn->ZeroGradParameters();
+      ann->ZeroGradParameters();
+      
+      delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
+      const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
+      double* q_values_diff = q_values_blob->mutable_cpu_diff();
+      i=0;
+      for (auto it : traj)
+        q_values_diff[q_values_blob->offset(i++,0,0,0)] = -1.0f;
+      qnn->critic_backward();
+      const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
+      const double* critic_action_diff = critic_action_blob->cpu_diff();
+      
+      const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
+      auto ac_diff = actor_actions_blob->mutable_cpu_diff();
+      for(i=0; i<actor_actions_blob->count(); i++) {
+        if(disable_back[i]) {
+          ac_diff[i] = critic_action_diff[i];
+        } else {
+          double x = all_actions[i] - all_actions_outputs->at(i);
+          ac_diff[i] = -x;
         }
-        
-        if(inverting_grad){
-
-          for (uint n = 0; n < traj.size(); ++n) {
-            for (uint h = 0; h < nb_motors; ++h) {
-              int offset = actor_actions_blob->offset(n,h,0,0);
-              double diff = ac_diff[offset];
-              double output = all_actions_outputs->at(offset);
-              double min = -1.0; 
-              double max = 1.0;
-              if (diff < 0) {
-                diff *= (max - output) / (max - min);
-              } else if (diff > 0) {
-                diff *= (output - min) / (max - min);
-              }
-              ac_diff[offset] = diff;
-            }
-          }
-        }
-        
-        ann->actor_backward();
-        ann->getSolver()->ApplyUpdate();
-        ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
       }
+      
+      if(inverting_grad){
+
+        for (uint n = 0; n < traj.size(); ++n) {
+          for (uint h = 0; h < nb_motors; ++h) {
+            int offset = actor_actions_blob->offset(n,h,0,0);
+            double diff = ac_diff[offset];
+            double output = all_actions_outputs->at(offset);
+            double min = -1.0; 
+            double max = 1.0;
+            if (diff < 0) {
+              diff *= (max - output) / (max - min);
+            } else if (diff > 0) {
+              diff *= (output - min) / (max - min);
+            }
+            ac_diff[offset] = diff;
+          }
+        }
+      }
+      
+      ann->actor_backward();
+      ann->getSolver()->ApplyUpdate();
+      ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
       
       // Soft update of targets networks
       qnn_target->soft_update(*qnn, tau_soft_update);
