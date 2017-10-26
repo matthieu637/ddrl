@@ -175,6 +175,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     qnextac_sample          = pt->get<uint>("agent.qnextac_sample");
     recompute_next_ac       = pt->get<bool>("agent.recompute_next_ac");
     onpolac                 = pt->get<bool>("agent.onpolac");
+    qmu                     = pt->get<bool>("agent.qmu");
     
     if(recompute_next_ac && !aac_target) {
       LOG_DEBUG("recompute_next_ac useless");
@@ -284,7 +285,21 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       auto all_next_actions = ann_target->computeOutBatch(all_next_states);
         
       //compute next q
-      auto q_targets = qnn_target->computeOutVFBatch(all_next_states, *all_next_actions);
+      std::vector<double>* q_targets;
+      if(!qmu)
+        q_targets = qnn_target->computeOutVFBatch(all_next_states, *all_next_actions);
+      else {
+        q_targets = new std::vector<double>(traj.size(), 0.f);
+        for(uint j=0;j<7;j++){
+          vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*all_next_actions, noise);
+          auto local_all_nextV = qnn_target->computeOutVFBatch(all_next_states, *randomized_action);
+          std::transform(q_targets->begin(), q_targets->end(), local_all_nextV->begin(), q_targets->begin(), std::plus<double>());
+          delete local_all_nextV;
+          delete randomized_action;
+        }
+        double factor_ = 1.f/((double)7.);
+        std::transform(q_targets->begin(), q_targets->end(), q_targets->begin(), std::bind1st(std::multiplies<double>(), factor_));
+      }
       
       //adjust q_targets
       i=0;
@@ -523,7 +538,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::deque<sample> trajectory;
   std::deque<std::vector<double>> last_trajectory_a;
   
-  bool qac_target, aac_target, recompute_next_ac, onpolac;
+  bool qac_target, aac_target, recompute_next_ac, onpolac, qmu;
   uint qac_sample, qnextac_sample;
   
   uint episode = 0;
