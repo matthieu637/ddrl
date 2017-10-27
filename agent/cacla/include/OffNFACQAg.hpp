@@ -145,6 +145,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     use_qmu_actor                          = pt->get<bool>("agent.use_qmu_actor");
     ac_onpolnexta                        = pt->get<bool>("agent.ac_onpolnexta");
     uint momentum           = pt->get<uint>("agent.momentum");
+    reset_actor                          = pt->get<bool>("agent.reset_actor");
     
     gae                     = false;
 
@@ -360,7 +361,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
                        hidden_layer_type,
                        batch_norm_critic, add_v_corrector);
         }
-        if(lambda < 0.f)
+        if(lambda <= 0.f)
           qnn->learn_batch(all_states, all_actions, v_target, stoch_iter_critic);
         else {
           auto all_V = qnn->computeOutVFBatch(all_states, all_actions);
@@ -521,6 +522,13 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     for(uint fi = 0 ; fi < number_global_fitted_iteration; fi++) {
       if(update_critic_first)
         update_critic();
+      
+      if(reset_actor){
+        delete ann;
+        ann = new NN(this->get_state_size(), *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type,
+                     actor_output_layer_type,
+                     batch_norm_actor, true);
+      }
 
       if(!offpolicy_actor)
         actor_update_onpolicy();
@@ -1099,7 +1107,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
   uint number_global_fitted_iteration;
   bool offpolicy_critic, shuffle_buffer, gamma_corrector, batch_norm_testing;
   int use_qmu;
-  bool use_qmu_actor, ac_onpolnexta;
+  bool use_qmu_actor, ac_onpolnexta, reset_actor;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
