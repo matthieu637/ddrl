@@ -152,11 +152,6 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
     if(lambda >= 0.)
       gae = pt->get<bool>("agent.gae");
 
-    if(lambda < 0. && offpolicy_critic) {
-      LOG_DEBUG("set lambda please! (offpolicy_critic)");
-      exit(1);
-    }
-
     if(offpolicy_actor && gae && stoch_iter_actor > 1) {
       LOG_DEBUG("to be done! (stoch_iter_actor>1 with gae and offpol)");
       exit(1);
@@ -361,7 +356,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
                        hidden_layer_type,
                        batch_norm_critic, add_v_corrector);
         }
-        if(lambda <= 0.f)
+        if(lambda < 0.f)
           qnn->learn_batch(all_states, all_actions, v_target, stoch_iter_critic);
         else {
           auto all_V = qnn->computeOutVFBatch(all_states, all_actions);
