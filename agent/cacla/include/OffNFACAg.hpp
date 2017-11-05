@@ -195,6 +195,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       } catch(boost::exception const& ) {
       }
     }
+    
+    best_testing_score = std::numeric_limits<double>::lowest();
   }
 
   void _start_episode(const std::vector<double>& sensors, bool learning) override {
@@ -490,6 +492,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
   void end_instance(bool learning) override {
     if(learning)
       episode++;
+    else if(best_testing_score < this->sum_weighted_reward)
+      best_testing_score = best_testing_score;
   }
 
   void actor_update_onpolicy() {
@@ -893,9 +897,13 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     delete all_mine;
   }
 
-  void save(const std::string& path, bool) override {
-    ann->save(path+".actor");
-    vnn->save(path+".critic");
+  void save(const std::string& path, bool save_best) override {
+    if(save_best && best_testing_score == this->sum_weighted_reward)
+      ann_testing->save(path+".actor");
+    } else if(!save_best){
+      ann->save(path+".actor");
+      vnn->save(path+".critic");
+    }
   }
 
   void save_run() override {
@@ -976,6 +984,8 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
   NN* ann;
   NN* vnn;
   NN* ann_testing;
+  //to make video on determinist env
+  double best_testing_score;
 
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
