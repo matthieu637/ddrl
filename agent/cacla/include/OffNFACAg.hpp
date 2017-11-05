@@ -897,7 +897,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
   void save(const std::string& path, bool save_best, bool learning) override {
     if(save_best && !learning && best_testing_score < this->sum_weighted_reward){
-      ann_testing->save(path+".actor");
+      ann->save(path+".actor");
       best_testing_score = this->sum_weighted_reward;
     } else if(!save_best && learning){
       ann->save(path+".actor");

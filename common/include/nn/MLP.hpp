@@ -1067,6 +1067,10 @@ public:
   }
 
   void save(const std::string& path) {
+    if(solver == nullptr){
+      LOG_DEBUG("WARNING, you are saving a net without solver");
+      return;
+    }
     solver->set_filename(path);
     solver->Snapshot();
   }
