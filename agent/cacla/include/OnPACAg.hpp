@@ -191,7 +191,7 @@ class OnPACAg : public arch::ARLAgent<> {
       proba_actor_update_current = proba_actor_update_current * proba_actor_update;
   }
 
-  void save(const std::string& path, bool) override {
+  void save(const std::string& path, bool, bool) override {
     ann->save(path+".actor");
     qnn->save(path+".critic");
   }

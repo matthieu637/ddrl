@@ -492,8 +492,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
   void end_instance(bool learning) override {
     if(learning)
       episode++;
-    else if(best_testing_score < this->sum_weighted_reward)
-      best_testing_score = best_testing_score;
   }
 
   void actor_update_onpolicy() {
@@ -897,10 +895,11 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     delete all_mine;
   }
 
-  void save(const std::string& path, bool save_best) override {
-    if(save_best && best_testing_score == this->sum_weighted_reward){
+  void save(const std::string& path, bool save_best, bool learning) override {
+    if(save_best && !learning && best_testing_score < this->sum_weighted_reward){
       ann_testing->save(path+".actor");
-    } else if(!save_best){
+      best_testing_score = this->sum_weighted_reward;
+    } else if(!save_best && learning){
       ann->save(path+".actor");
       vnn->save(path+".critic");
     }

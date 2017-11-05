@@ -73,7 +73,7 @@ extern "C" {
   
   void OffNFACAg_save(OffNFACAg<MLP>* ag, int episode) {
     std::string path = "agent" + std::to_string(episode);
-    ag->save(path, true);
+    ag->save(path, true, true);
   }
   
   void OffNFACAg_load(OffNFACAg<MLP>* ag, int episode) {
@@ -151,7 +151,7 @@ extern "C" {
   
   void CaclaAg_save(BaseCaclaAg* ag, int episode) {
     std::string path = "agent" + std::to_string(episode);
-    ag->save(path, true);
+    ag->save(path, true, true);
   }
   
   void CaclaAg_load(OffNFACAg<MLP>* ag, int episode) {

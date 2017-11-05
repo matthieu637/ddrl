@@ -604,7 +604,7 @@ void AugmentedDENFAC::end_episode(bool)  {
 		if (sum_weighted_reward > best_score) {
 			//std::cout << "New best score : " << sum_weighted_reward << std::endl;
 			best_score = sum_weighted_reward;
-			save("agent",true);
+			save("agent",true, true);
 		}
 	}
 
@@ -612,7 +612,7 @@ void AugmentedDENFAC::end_episode(bool)  {
 	update_actor_critic();
 }
 
-void AugmentedDENFAC::save(const std::string& path, bool)  {
+void AugmentedDENFAC::save(const std::string& path, bool, bool)  {
 	ann->save(path+".actor");
 	qnn->save(path+".critic");
 	LOG_INFO("Saved as " + path+ ".actor");

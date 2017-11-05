@@ -851,7 +851,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
     return nullptr;
   }
 
-  void save(const std::string& path, bool) override {
+  void save(const std::string& path, bool, bool) override {
     ann[0]->save(path+".actor");
     qnn[0]->save(path+".critic");
     //      bib::XMLEngine::save<>(trajectory, "trajectory", "trajectory.data");

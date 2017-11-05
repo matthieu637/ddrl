@@ -442,7 +442,7 @@ void SimpleDENFAC::end_episode(bool)  {
 	update_actor_critic();
 }
 
-void SimpleDENFAC::save(const std::string& path, bool)  {
+void SimpleDENFAC::save(const std::string& path, bool, bool)  {
 	ann->save(path+".actor");
 	qnn->save(path+".critic");
 	LOG_INFO("Saved as " + path+ ".actor");

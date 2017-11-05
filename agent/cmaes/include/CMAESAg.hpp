@@ -107,7 +107,6 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     if (population < 2)
       LOG_DEBUG("population too small, changed to : " << (4+(int)(3*log((double)dimension))));
     
-#ifndef NDEBUG
     if(vm->count("continue") > 0){
       uint continue_save_each          = DEFAULT_AGENT_SAVE_EACH_CONTINUE;
       try {
@@ -120,7 +119,6 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
         exit(1);
       }
     }
-#endif
   }
   
   bool is_feasible(const double* parameters){
@@ -228,14 +226,16 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
       }
     }
     
-    justLoaded = false;
+     justLoaded = false;
   }
 
-  void save(const std::string& path, bool save_best) override {
+  void save(const std::string& path, bool save_best, bool) override {
     if(!save_best || !cmaes_UpdateDistribution_done_once){
       ann->save(path+".actor");
     } else {
-      NN* to_be_restaured = new NN(*ann, true);
+      //TODO : check this part, apparently it modify the learning
+      LOG_WARNING("be careful it might be a problem here");
+      NN* to_be_restaured = new NN(*ann, false);
       const double* parameters = getBestSolution();
       loadPolicyParameters(parameters);
       ann->save(path+".actor");

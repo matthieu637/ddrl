@@ -446,7 +446,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     return new arch::Policy<MLP>(new MLP(*ann, true) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
   }
 
-  void save(const std::string& path, bool save_best) override {
+  void save(const std::string& path, bool save_best, bool) override {
     if(save_best && best_population.size() > 0){
       auto it = best_population.begin();
       bib::XMLEngine::save(it->trajectory_a, "trajectory_a", "best_trajectory_a.data");

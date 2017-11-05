@@ -195,7 +195,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
     }
   }
 
-  void save(const std::string& path, bool) override {
+  void save(const std::string& path, bool, bool) override {
     ann->save(path+".actor");
     vnn->save(path+".critic");
   }

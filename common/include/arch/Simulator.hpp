@@ -245,7 +245,7 @@ class Simulator {
       std::string filename = learning ? DEFAULT_AGENT_SAVE_FILE : DEFAULT_AGENT_TEST_SAVE_FILE;
       std::string filename2 = std::to_string(episode);
       std::string path = filename + filename2;
-      agent->save(path, save_best_agent);
+      agent->save(path, save_best_agent, learning);
     }
   }
  private:
