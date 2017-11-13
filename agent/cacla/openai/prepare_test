@@ -11,10 +11,27 @@ COUNTER=0
 find . -type f -name 'agent*.actor.solverstate.data' | while read file ; do
 	nb=$(basename $file | sed -e 's/^agent\([0-9]*\)[.].*$/\1/')
 	echo "$nb to $COUNTER"
-	cp $file out/agent$COUNTER.actor.solverstate.data.gz
-	cp $(dirname $file)/agent$nb.actor.caffemodel.data out/agent$COUNTER.actor.caffemodel.data.gz
-	cp $(dirname $file)/agent$nb.critic.caffemodel.data out/agent$COUNTER.critic.caffemodel.data.gz
-	cp $(dirname $file)/agent$nb.critic.solverstate.data out/agent$COUNTER.critic.solverstate.data.gz
+	if [[ `file -b $file | cut -d ' ' -f1` == "gzip" ]] ; then
+		cp $file out/agent$COUNTER.actor.solverstate.data.gz
+	else 
+		cp $file out/agent$COUNTER.actor.solverstate.data
+	fi
+	ff=$(dirname $file)
+	if [[ `file -b $ff/agent$nb.actor.caffemodel.data | cut -d ' ' -f1` == "gzip" ]] ; then 
+		cp $(dirname $file)/agent$nb.actor.caffemodel.data out/agent$COUNTER.actor.caffemodel.data.gz
+	else
+		cp $(dirname $file)/agent$nb.actor.caffemodel.data out/agent$COUNTER.actor.caffemodel.data
+	fi
+	if [[ `file -b $ff/agent$nb.critic.caffemodel.data | cut -d ' ' -f1` == "gzip" ]] ; then
+		cp $(dirname $file)/agent$nb.critic.caffemodel.data out/agent$COUNTER.critic.caffemodel.data.gz
+	else
+		cp $(dirname $file)/agent$nb.critic.caffemodel.data out/agent$COUNTER.critic.caffemodel.data
+	fi
+	if [[ `file -b $ff/agent$nb.critic.solverstate.data | cut -d ' ' -f1` == "gzip" ]] ; then
+		cp $(dirname $file)/agent$nb.critic.solverstate.data out/agent$COUNTER.critic.solverstate.data.gz
+	else
+		cp $(dirname $file)/agent$nb.critic.solverstate.data out/agent$COUNTER.critic.solverstate.data
+	fi
 	
 	echo "$nb:$COUNTER" >> out/file.list
 	COUNTER=$((COUNTER + 1))

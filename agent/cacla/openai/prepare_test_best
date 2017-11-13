@@ -3,7 +3,7 @@
 #for sort order
 export LC_ALL=C
 
-POLICY_DIR=~/git/drl/thesis_data/opensim/opensim-stage1/nfac-state
+POLICY_DIR=~/git/drl/thesis_data/opensim/opensim-stage1/nfac-push
 find . -type d -name '[0-9]*' | tail -1 | xargs diff $POLICY_DIR/out/file.list
 if [ $? -ne 0 ] ; then
 	echo "file list doesn't match with policy_dir"

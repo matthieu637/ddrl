@@ -77,8 +77,8 @@ void threadloopHalfCheetah(const std::string& goodpath) {
 
   HACKinitDs(1280, 720, &inst->fn);
 
-  float xyz[3] = {-1.43, -3.53, 1.79};
-  float hpr[3] = {61.5, -23, -1.3};
+  float xyz[3] = {-1.33, -3.53, 1.79};
+  float hpr[3] = {68, -20, -1.3};
   dsSetViewpoint(xyz, hpr);
 
   while (!inst->requestEnd) {
