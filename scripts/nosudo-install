@@ -1,0 +1,134 @@
+#!/bin/bash -x
+
+cd /home/mzimmer
+MYROOT=/home/mzimmer/home_ftalc/root
+#for DRL : CMAKE_PREFIX_PATH=$MYROOT/usr/
+
+#libode-dev - compiled by hand
+#libfann-dev - compiled by hand
+#apt-get remove -y libfann2 libfann-dev libode-dev
+#apt-get install -y libtbb-dev libgtest-dev libglew-dev \
+#               libprotobuf-dev libleveldb-dev libsnappy-dev protobuf-compiler libopenblas-dev \
+#               libgflags-dev libgoogle-glog-dev liblmdb-dev libhdf5-serial-dev xmlstarlet
+
+
+#CODE
+
+if [ ! -e home_ftalc/deb ] ; then
+        mkdir home_ftalc/deb
+        cd home_ftalc/deb
+        apt-get download -y libtbb-dev libgtest-dev libglew-dev \
+                libprotobuf-dev libleveldb-dev libsnappy-dev protobuf-compiler libopenblas-dev \
+                libgflags-dev libgoogle-glog-dev liblmdb-dev libhdf5-serial-dev xmlstarlet
+        find . -name '*.deb' | xargs -I % dpkg -X % ../root
+        #iterate over :
+        #find . -name '*.deb' | xargs -I % dpkg --info % | grep 'Package:' | sed -e 's/ Package: //' > all_pack
+        #cat all_pack | xargs -I % apt-cache depends % | grep Depends | sed -e 's/[ |]*Depends[ ]*://' | sed -e 's/Pre//' | sed -e 's/ //g' | sed -e 's/<//g' | sed -e 's/>//g' > requi
+        #cat requi | sort | uniq | xargs -I % dpkg -s % |& grep 'is not installed' | sed -e "s/.*package '\(.*\)'.*/\1/" | xargs -I % apt-get download -y %
+        #or -t jessie-backports in apt-get download
+        #find . -name '*.deb' | xargs -I % dpkg -X % ../root
+
+        #fixed links
+        rm $MYROOT/usr/lib/x86_64-linux-gnu/libXext.so
+        ln -s /usr/lib/x86_64-linux-gnu/libXext.so.6 $MYROOT/usr/lib/x86_64-linux-gnu/libXext.so
+
+        rm $MYROOT/usr/lib/x86_64-linux-gnu/libGL.so
+        ln -s /usr/lib/x86_64-linux-gnu/libGL.so $MYROOT/usr/lib/x86_64-linux-gnu/libGL.so
+
+        #fix hdf5
+        rm $MYROOT/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_hl.so
+        rm $MYROOT/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.so
+        ln -s /usr/lib/x86_64-linux-gnu/libhdf5_serial_hl.so.8 $MYROOT/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_hl.so
+        ln -s /usr/lib/x86_64-linux-gnu/libhdf5_serial.so.8 $MYROOT/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.so
+
+        #fix leveldb
+        rm $MYROOT/usr/lib/x86_64-linux-gnu/libleveldb.so
+        ln -s /usr/lib/x86_64-linux-gnu/libleveldb.so.1 $MYROOT/usr/lib/x86_64-linux-gnu/libleveldb.so
+        #snappy
+        rm $MYROOT/usr/lib/libsnappy.so
+        ln -s /usr/lib/libsnappy.so.1 $MYROOT/usr/lib/libsnappy.so
+
+        cd $MYROOT/usr/bin
+        ln -s xmlstarlet xml
+
+        #opensim
+        #backport cmake
+        #ln -s /usr/lib/x86_64-linux-gnu/libXi.so.6 /home/mzimmer/home_ftalc/root/usr/lib/x86_64-linux-gnu/libXi.so
+        #CXXFLAGS="-I $MYROOT/usr/include" cmake ../opensim-core/dependencies/ -DCMAKE_INSTALL_PREFIX=$MYROOT/usr/opensim_dependencies_install -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        #SWIG_LIB=$MYROOT/usr/share/swig3.0/ CXXFLAGS="-I $MYROOT/usr/include" cmake ../opensim-core -DCMAKE_INSTALL_PREFIX="$MYROOT/usr/opensim_install" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DOPENSIM_DEPENDENCIES_DIR="$MYROOT/usr/opensim_dependencies_install" -DBUILD_PYTHON_WRAPPING=ON       -DBUILD_JAVA_WRAPPING=OFF -DWITH_BTK=ON -DSWIG_DIR=$MYROOT/usr/share/swig3.0/
+fi
+
+cd /home/mzimmer
+
+if [ ! -e home_ftalc/compiled ] ; then
+        mkdir home_ftalc/compiled
+fi
+
+if [ ! -e home_ftalc/compiled/gtest ] ; then
+        mkdir home_ftalc/compiled/gtest
+        cp -r $MYROOT/usr/src/gtest/* home_ftalc/compiled/gtest
+        cd home_ftalc/compiled/gtest
+        CXXFLAGS="-I $MYROOT/usr/include" cmake .
+        make -j4
+        cp libgtest* $MYROOT/usr/lib/
+fi
+
+cd /home/mzimmer
+
+if [ ! -e home_ftalc/compiled/caffe ] ; then
+        #you should remove old lib and include to avoid compilation errors
+        cd home_ftalc/compiled 
+        git clone https://github.com/matthieu637/caffe.git
+        cd caffe
+        mkdir build
+        cd build
+        cmake ../ -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCPU_ONLY=On -DCMAKE_INSTALL_PREFIX:PATH=$MYROOT/usr
+        make -j4
+        make install
+fi
+
+cd /home/mzimmer
+
+if [ ! -e home_ftalc/compiled/ode ] ; then
+        cd home_ftalc/compiled
+        mkdir ode 
+        cd ode 
+        wget https://bitbucket.org/odedevs/ode/downloads/ode-0.14.tar.gz
+        tar -xf ode-0.14.tar.gz
+        cp -r ode-0.14 ode-0.14-debug
+        cd ode-0.14
+        sed -i 's/ode_/ode_r_/g' ode/src/Makefile.am ode/demo/Makefile.am
+        sed -i 's/ode[.]/ode_r./g' ode/src/Makefile.am ode/demo/Makefile.am
+        sed -i 's/ode_r[.]cpp/ode.cpp/g' ode/src/Makefile.am ode/demo/Makefile.am
+        ./bootstrap
+        CFLAGS=-O2 CPPFLAGS=-O2 ./configure --prefix=$MYROOT/usr --enable-shared --enable-libccd --enable-double-precision --disable-asserts --program-suffix=-r --disable-demos --with-drawstuff=none
+        make -j4
+        #make install
+
+        cd ../ode-0.14-debug
+        ./bootstrap
+        CFLAGS=-g CPPFLAGS=-g ./configure --prefix=$MYROOT/usr --enable-shared --enable-libccd --enable-double-precision --disable-demos --with-drawstuff=none
+        make -j4
+        make install
+
+        cd ../ode-0.14
+        make install
+fi
+
+cd /home/mzimmer
+
+if [ ! -e home_ftalc/compiled/boost ] ; then
+        cd home_ftalc/compiled
+        mkdir boost
+        cd boost
+        wget https://sourceforge.net/projects/boost/files/boost/1.62.0/boost_1_62_0.tar.bz2/download
+        tar -xf download
+        cd boost_1_62_0
+        ./bootstrap.sh
+        ./b2 --prefix=$MYROOT/usr --a -j4 -q install
+        cd ../
+        rm -rf boost_1_62_0
+fi
+
+
+cd /home/mzimmer
