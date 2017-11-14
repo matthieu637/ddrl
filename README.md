@@ -5,6 +5,7 @@ This source code is still in a research state, it has been used during
 my PhD thesis to develop several deep reinforcement learning agent in continuous environments (both in state and action).
 
 <img src="environment/illustration.png" width=35% align="right" />
+
 It contains : 
 - 4 open-source and free environments using ODE (open dynamic engine) based on OpenAI/mujuco : acrobot, cartpole, half-cheetah and humanoid,
 
