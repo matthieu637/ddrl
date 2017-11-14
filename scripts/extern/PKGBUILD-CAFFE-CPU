@@ -1,6 +1,6 @@
 # Maintainer: Micah Chambers <micahc.vt@gmail.com>
 
-pkgname=caffe
+pkgname=caffe-ddrl
 pkgver=git
 pkgrel=1
 pkgdesc="Neural network toolkit"
