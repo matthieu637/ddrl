@@ -84,7 +84,7 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(sensors);
 
-    if (last_action.get() != nullptr && learning){
+    if (last_action.get() != nullptr && learning) {
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached};
       insertSample(sa);
       trajectory.push_back(sa);
@@ -92,45 +92,53 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
-        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
-        delete next_action;
-        next_action = randomized_action;
-        
-        if(exploration_strat > 0 && ann_best != nullptr){
-          double qbestpol_eval_exploration = qnn_target->computeOutVF(sensors, *next_action);
-          if(exploration_strat == 1){
-            auto ac_test = ann_best->computeOut(sensors);
-            double qbestpol_eval_exploitation = qnn_target->computeOutVF(sensors, *ac_test);
-            if(qbestpol_eval_exploration > qbestpol_eval_exploitation)
-              delete ac_test;
-            else {
-              delete next_action;
-              next_action = ac_test;
-            }
-          } else if(exploration_strat == 2){
-            //TO TRY LATER remplace ann_best by ann for Q eval
-            qnn_target->computeOutVF(sensors, *next_action);
-            const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
-            double* q_values_diff = q_values_blob->mutable_cpu_diff();
-            q_values_diff[q_values_blob->offset(0,0,0,0)] = -1.0f;
-            qnn->critic_backward();
-            const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
-            auto ac_diff_critic = critic_action_blob->cpu_diff();
-            for (uint i = 0; i < this->nb_motors ; i++)
-              next_action->at(i) += alpha_a * ac_diff_critic[i];
-          } else if(exploration_strat == 3){
-            //TO TRY LATER remplace ann_best by ann for Q eval
-            qnn_target->computeOutVF(sensors, *next_action);
-            const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
-            double* q_values_diff = q_values_blob->mutable_cpu_diff();
-            q_values_diff[q_values_blob->offset(0,0,0,0)] = -1.0f;
-            qnn->critic_backward();
-            const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
-            auto ac_diff_critic = critic_action_blob->cpu_diff();
-            for (uint i = 0; i < this->nb_motors ; i++)
-              next_action->at(i) -= alpha_a * ac_diff_critic[i];
+      vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+      delete next_action;
+      next_action = randomized_action;
+
+      if(exploration_strat > 0 && ann_best != nullptr) {
+        double qbestpol_eval_exploration = qnn_target->computeOutVF(sensors, *next_action);
+        if(exploration_strat == 1) {
+          auto ac_test = ann_best->computeOut(sensors);
+          double qbestpol_eval_exploitation = qnn_target->computeOutVF(sensors, *ac_test);
+          if(qbestpol_eval_exploration > qbestpol_eval_exploitation)
+            delete ac_test;
+          else {
+            delete next_action;
+            next_action = ac_test;
           }
+        } else if(exploration_strat == 2) {
+          qnn->computeOutVF(sensors, *next_action);
+          const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
+          double* q_values_diff = q_values_blob->mutable_cpu_diff();
+          q_values_diff[q_values_blob->offset(0,0,0,0)] = -1.0f;
+          qnn->critic_backward();
+          const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
+          auto ac_diff_critic = critic_action_blob->cpu_diff();
+          for (uint i = 0; i < this->nb_motors ; i++) {
+            next_action->at(i) += 0.5 * ac_diff_critic[i];
+            if(next_action->at(i) > 1.0)
+              next_action->at(i) = 1.;
+            else if(next_action->at(i) < -1.0)
+              next_action->at(i) = -1.;
+          }
+        } else if(exploration_strat == 3) {
+          qnn->computeOutVF(sensors, *next_action);
+          const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
+          double* q_values_diff = q_values_blob->mutable_cpu_diff();
+          q_values_diff[q_values_blob->offset(0,0,0,0)] = -1.0f;
+          qnn->critic_backward();
+          const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
+          auto ac_diff_critic = critic_action_blob->cpu_diff();
+          for (uint i = 0; i < this->nb_motors ; i++) {
+            next_action->at(i) -= 0.5 * ac_diff_critic[i];
+            if(next_action->at(i) > 1.0)
+              next_action->at(i) = 1.;
+            else if(next_action->at(i) < -1.0)
+              next_action->at(i) = -1.;
+            }
         }
+      }
     }
     last_action.reset(next_action);
 
@@ -164,6 +172,7 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     tau_soft_update         = pt->get<double>("agent.tau_soft_update");
     replay_memory           = pt->get<uint>("agent.replay_memory");
     smooth_udpate_mem       = pt->get<bool>("agent.smooth_udpate_mem");
+    qoffofcurrentpol        = pt->get<bool>("agent.qoffofcurrentpol");
     exploration_strat       = pt->get<uint>("agent.exploration_strat");
     corrected_update_ac     = false;
     gae                     = false;
@@ -219,9 +228,9 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       } catch(boost::exception const& ) {
       }
     }
-    
+
     ann_best = nullptr;
-    if(smooth_udpate_mem){
+    if(smooth_udpate_mem) {
       ann_smooth = new NN(*ann, false);
       ann_smooth->increase_batchsize(kMinibatchSize);
     }
@@ -395,22 +404,32 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         iter();
     }
   }
-  
-  void sample_transition(std::vector<sample>& traj, const std::deque<sample>& from){
-    for(uint i=0;i<traj.size();i++){
+
+  void sample_transition(std::vector<sample>& traj, const std::deque<sample>& from) {
+    for(uint i=0; i<traj.size(); i++) {
       int r = std::uniform_int_distribution<int>(0, from.size() - 1)(*bib::Seed::random_engine());
       traj[i] = from[r];
     }
   }
-  
-  void insertSample(const sample& sa){
+
+  void insertSample(const sample& sa) {
     if(all_sample.size() >= replay_memory)
       all_sample.pop_front();
     all_sample.push_back(sa);
-    
-    if(ann_best == nullptr)
+
+    if(ann_best == nullptr && !qoffofcurrentpol)
       return;
-    
+
+    if(qoffofcurrentpol) {
+      ann->increase_batchsize(kMinibatchSize);
+      if(!smooth_udpate_mem)
+        online_update_qoff(ann);
+      else if(smooth_udpate_mem)
+        online_update_qoff(ann_smooth);
+
+      return;
+    }
+
     if(!smooth_udpate_mem)
       online_update_qoff(ann_best);
     else if(smooth_udpate_mem)
@@ -421,7 +440,7 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     if(all_sample.size() < kMinibatchSize)
       return;
-      
+
     std::vector<sample> traj(kMinibatchSize);
     sample_transition(traj, all_sample);
 
@@ -459,8 +478,13 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     // Soft update of targets networks
     qnn_target->soft_update(*qnn, tau_soft_update);
-    if(smooth_udpate_mem)
-      ann_smooth->soft_update(*ann_best, tau_soft_update);
+    if(smooth_udpate_mem) {
+      if(!qoffofcurrentpol)
+        ann_smooth->soft_update(*ann_best, tau_soft_update);
+      else
+        ann_smooth->soft_update(*ann, tau_soft_update);
+
+    }
 
     delete q_targets;
   }
@@ -469,8 +493,8 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 //     LOG_FILE("policy_exploration", ann->hash());
     if(!learning)
       return;
-    
-    if(this->sum_weighted_reward > best_learning_perf){
+
+    if(this->sum_weighted_reward > best_learning_perf) {
       if (ann_best != nullptr)
         delete ann_best;
       ann_best = new NN(*ann, false);
@@ -724,11 +748,11 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   uint kMinibatchSize, replay_memory;
   double tau_soft_update;
   NN* qnn, *qnn_target;
-  
+
 //   mem part
   NN* ann_best, *ann_smooth;
   double best_learning_perf;
-  bool smooth_udpate_mem;
+  bool smooth_udpate_mem, qoffofcurrentpol;
   uint exploration_strat;
 
   std::vector<uint>* hidden_unit_v;
