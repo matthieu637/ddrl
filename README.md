@@ -4,8 +4,11 @@ Deep Developmental Reinforcement Learning
 This source code is still in a research state, it has been used during 
 my PhD thesis to develop several deep reinforcement learning agent in continuous environments (both in state and action).
 
+<img src="environment/illustration.png" width=35% align="right" />
+
 It contains : 
 - 4 open-source and free environments using ODE (open dynamic engine) based on OpenAI/mujuco : acrobot, cartpole, half-cheetah and humanoid,
+
 - an implementation of DDPG with Caffe
 ```
 Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., … Wierstra, D. (2015). Continuous control with deep reinforcement learning. arXiv Preprint arXiv:1509.02971.
@@ -30,7 +33,7 @@ Van Hasselt, H., & Wiering, M. A. (2007). Reinforcement learning in continuous a
 ```
 Silver, D., Lever, G., Heess, N., Degris, T., Wierstra, D., & Riedmiller, M. (2014). Deterministic Policy Gradient Algorithms. Proceedings of the 31st International Conference on Machine Learning (ICML-14), 387–395.
 ```
-- an implementation of SGP (Stochastic Policy Gradient)
+- an implementation of SPG (Stochastic Policy Gradient)
 ```
 Sutton, R. S., Mcallester, D., Singh, S., & Mansour, Y. (1999). Policy Gradient Methods for Reinforcement Learning with Function Approximation. In Advances in Neural Information Processing Systems 12, 1057–1063. http://doi.org/10.1.1.37.9714
 ```
