@@ -13,7 +13,7 @@ It contains :
 ```
 Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., … Wierstra, D. (2015). Continuous control with deep reinforcement learning. arXiv Preprint arXiv:1509.02971.
 ```
-- implementation of NFAC(&lambda;)-V (extended with eligibility traces)
+- an implementation of NFAC(&lambda;)-V (extended with eligibility traces)
 ```
 Matthieu Zimmer, Yann Boniface, and Alain Dutech. Neural fitted actor-critic. In ESANN – European Symposium on Artificial Neural Networks, Computational Intelligence and Machine Learning, April 2016.
 ```
@@ -40,6 +40,8 @@ Sutton, R. S., Mcallester, D., Singh, S., & Mansour, Y. (1999). Policy Gradient 
 
 Everything has been developed in C++.
 The neural network library used is Caffe.
+
+[![Demo](environment/video.gif)](https://www.youtube.com/watch?v=EzBmQsiUWBo)
 
 ## Install
 
@@ -122,7 +124,7 @@ brew install llvm38
 brew update
 brew install cmake libtool findutils coreutils boost protobuf homebrew/science/hdf5 snappy leveldb gflags glog szip tbb lmdb
 
-#then do the equivalent of ubuntu compilation
+#then do the equivalent of ubuntu compilation steps
 ```
 
 ### no access to sudo
