@@ -68,8 +68,8 @@ COMMAND="one_by_one.m $STAT_FILE $dimension $save_best $higher_better more"
 
 while [ 1 ] ; do
 	cd $1
-	echo "OCTAVE_PATH=$LHPO_PATH/utils octave $LHPO_PATH/utils/$COMMAND"
-	OCTAVE_PATH=$LHPO_PATH/utils octave $LHPO_PATH/utils/$COMMAND
+	echo "OCTAVE_PATH=$LHPO_PATH/utils octave --persist --no-gui -q $LHPO_PATH/utils/$COMMAND"
+	OCTAVE_PATH=$LHPO_PATH/utils octave --persist --no-gui -q $LHPO_PATH/utils/$COMMAND
 	sleep 1s
 done
 

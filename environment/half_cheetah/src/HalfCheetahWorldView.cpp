@@ -77,8 +77,8 @@ void threadloopHalfCheetah(const std::string& goodpath) {
 
   HACKinitDs(1280, 720, &inst->fn);
 
-  float xyz[3] = {-1.33, -3.53, 1.79};
-  float hpr[3] = {68, -20, -1.3};
+  float xyz[3] = {-1.43*2, -3.44, 1.05};
+  float hpr[3] = {47, -10, -1.3};
   dsSetViewpoint(xyz, hpr);
 
   while (!inst->requestEnd) {
@@ -91,18 +91,19 @@ void threadloopHalfCheetah(const std::string& goodpath) {
     
     double x = dBodyGetPosition(inst->bones[1]->getID())[0];
     dsGetViewpoint(xyz, hpr);
-    xyz[0] = x - 1.43;
+    xyz[0] = x - 1.43*2;
     dsSetViewpoint(xyz, hpr);
   }
   
   HACKclose();
 }
 
-HalfCheetahWorldView::HalfCheetahWorldView(const std::string& path, const hcheetah_physics phy)
+HalfCheetahWorldView::HalfCheetahWorldView(const std::string& path, const hcheetah_physics phy, bool capture_)
   : HalfCheetahWorld(phy),
     requestEnd(false),
     speed(0.25),
-    ignoreMotor(false) {
+    ignoreMotor(false),
+    capture(capture_){
   std::string goodpath = path;
 
   int n;
@@ -121,6 +122,8 @@ HalfCheetahWorldView::HalfCheetahWorldView(const std::string& path, const hcheet
   inst = this;
   
   eventThread = new tbb::tbb_thread(threadloopHalfCheetah, goodpath);
+  if(capture)
+    usleep(2 * 1000 * 1000);//wait 2s for view to be ready
 }
 
 void HalfCheetahWorldView::createWorld(){
@@ -189,8 +192,12 @@ void HalfCheetahWorldView::step_core(const std::vector<double> &f_joints){
     
     dJointGroupEmpty(odeworld.contactgroup);
     
-//     usleep(10 * 1000);
-    usleep(3*WORLD_STEP / speed * 1000 * 1000);  // don't be faster than the view
+//     usleep(WORLD_STEP * 1000 * 1000); // view speed is WORLD_STEP * 1000 * 1000 
+    // one image for each 0.01 s
+    if(capture)
+      usleep(5*WORLD_STEP * 1000 * 1000); // let him the time to capture the screen and write it
+    else
+      usleep(3*WORLD_STEP / speed * 1000 * 1000);  // don't be faster than the view
     // view speed is 10 * 1000 : 10 milisec 0.01 sec
     lock.release();
   }
