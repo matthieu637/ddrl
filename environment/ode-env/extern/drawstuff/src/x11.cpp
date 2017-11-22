@@ -45,6 +45,7 @@
 
 #include <drawstuff.h>
 #include <version.h>
+#include <FreeImage.h>
 
 //***************************************************************************
 // error handling for unix
@@ -104,8 +105,6 @@ static int last_key_pressed = 0;  // last key pressed in the window
 static int run = 1;   // 1 if simulation running
 static int pausemode = 0;   // 1 if in `pause' mode
 static int singlestep = 0;  // 1 if single step key pressed
-static int writeframes = 0; // 1 if frame files to be written
-
 
 void createMainWindow (int _width, int _height) {
   // create X11 display connection
@@ -117,11 +116,13 @@ void createMainWindow (int _width, int _height) {
   static int attribListDblBuf[] = {GLX_RGBA, GLX_DOUBLEBUFFER, GLX_DEPTH_SIZE, 16,
                                    GLX_RED_SIZE, 4, GLX_GREEN_SIZE, 4, GLX_BLUE_SIZE, 4, 
                                    GLX_SAMPLE_BUFFERS_ARB, 1, GLX_SAMPLES_ARB, 2,
+                                   GLX_BUFFER_SIZE, 32, GLX_DOUBLEBUFFER, GLX_ALPHA_SIZE, 4,
                                    None
                                   };
   static int attribList[] = {GLX_RGBA, GLX_DEPTH_SIZE, 16,
                              GLX_RED_SIZE, 4, GLX_GREEN_SIZE, 4, GLX_BLUE_SIZE, 4, 
                              GLX_SAMPLE_BUFFERS_ARB, 1, GLX_SAMPLES_ARB, 2,
+                             GLX_BUFFER_SIZE, 32, GLX_DOUBLEBUFFER, GLX_ALPHA_SIZE, 4,
                              None
                             };
   visual = glXChooseVisual (display, screen, attribListDblBuf);
@@ -269,11 +270,6 @@ static void handleEvent (XEvent &event, dsFunctions *fn) {
                 xyz[0], xyz[1], xyz[2], hpr[0], hpr[1], hpr[2]);
         break;
       }
-      case 'w':
-      case 'W':
-        writeframes ^= 1;
-        if (writeframes) printf ("Now writing frames to PPM files\n");
-        break;
       }
     }
     last_key_pressed = key;   // a kludgy place to put this...
@@ -316,36 +312,31 @@ static int getHighBitIndex (unsigned int x) {
 // shift x left by i, where i can be positive or negative
 #define SHIFTL(x,i) (((i) >= 0) ? ((x) << (i)) : ((x) >> (-i)))
 
-
 static void captureFrame (int num) {
-  fprintf (stderr, "capturing frame %04d\n", num);
-
+  int bits;
+  glGetIntegerv(GL_ALPHA_BITS, &bits);
+  fprintf (stderr, "capturing frame %04d %d\n", num, bits);
   char s[100];
-  sprintf (s, "frame/frame%04d.ppm", num);
-  FILE *f = fopen (s, "wb");
-  if (!f) dsError ("can't open \"%s\" for writing", s);
-  fprintf (f, "P6\n%d %d\n255\n", width, height);
-  XImage *image = XGetImage (display, win, 0, 0, width, height, ~0, ZPixmap);
-
-  int rshift = 7 - getHighBitIndex (image->red_mask);
-  int gshift = 7 - getHighBitIndex (image->green_mask);
-  int bshift = 7 - getHighBitIndex (image->blue_mask);
-
-  for (int y = 0; y < height; y++) {
-    for (int x = 0; x < width; x++) {
-      unsigned long pixel = XGetPixel (image, x, y);
-      unsigned char b[3];
-      b[0] = SHIFTL(pixel & image->red_mask, rshift);
-      b[1] = SHIFTL(pixel & image->green_mask, gshift);
-      b[2] = SHIFTL(pixel & image->blue_mask, bshift);
-      fwrite (b, 3, 1, f);
-    }
+  sprintf (s, "frame/frame%04d.png", num);
+  
+  FIBITMAP *image2 = FreeImage_AllocateT(FIT_BITMAP, width, height, 32);
+  unsigned char * pixels2 = (unsigned char *)FreeImage_GetBits(image2);
+//   glPixelStorei(GL_PACK_ALIGNMENT, 4);
+  glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels2);
+  unsigned char temp;
+  int totalPixels = width*height;
+  for (int i = 0; i < totalPixels; i++){
+    temp = pixels2[i*4];
+    pixels2[i*4] = pixels2[i*4 + 2];
+    pixels2[i*4 + 2] = temp; 
   }
-  fclose (f);
-  XDestroyImage (image);
+  image2 = FreeImage_ConvertFromRawBits(pixels2, width, height, 4 * width, 32, FI_RGBA_RED, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK, FALSE);
+  FreeImage_Save(FIF_PNG, image2, s, 0);
+  FreeImage_Unload(image2);
+  return;
 }
 
-void processDrawFrame(int *frame, dsFunctions *fn) {
+void processDrawFrame(int *frame, dsFunctions *fn, int writeframes) {
   dsDrawFrame (width, height, fn, pausemode && !singlestep);
   singlestep = 0;
 
@@ -421,7 +412,7 @@ void dsPlatformSimLoop (int window_width, int window_height, dsFunctions *fn,
     double curr = tv.tv_sec + (double) tv.tv_usec / 1000000.0 ;
     if (curr - prev >= 1.0 / 60.0) {
       prev = curr;
-      processDrawFrame(&frame, fn);
+      processDrawFrame(&frame, fn, 0);
     } else
       microsleep(1000);
 #else
@@ -460,16 +451,22 @@ extern "C" double dsElapsedTime() {
 #endif
 }
 
-void HACKdraw(dsFunctions *fn) {
-  int frame = 1;
+void HACKdraw(dsFunctions *fn, int* myframe, int capture);
 
+void HACKdraw(dsFunctions *fn) {
+  int p = 0;
+  HACKdraw(fn, &p, p);
+}
+
+void HACKdraw(dsFunctions *fn, int* myframe, int capture) {
+  
   XEvent event;
   while (XPending (display)) {
     XNextEvent (display, &event);
     handleEvent (event, fn);
   }
 
-  processDrawFrame(&frame, fn);
+  processDrawFrame(myframe, fn, capture);
 }
 
 void HACKclose() {

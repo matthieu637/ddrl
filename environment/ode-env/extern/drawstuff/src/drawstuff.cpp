@@ -82,16 +82,16 @@ manage openGL state changes better
 #define LIGHTY (0.4f)
 
 // ground and sky
-#define SHADOW_INTENSITY (0.65f)
+#define SHADOW_INTENSITY (0.35f)
 #define GROUND_R (0.5f)   // ground color for when there's no texture
 #define GROUND_G (0.5f)
-#define GROUND_B (0.3f)
+#define GROUND_B (0.5f)
 
-const float ground_scale = 1.0f / 1.0f; // ground texture scale (1/size)
+const float ground_scale = 1.0f / 3.f; // ground texture scale (1/size)
 const float ground_ofsx = 0.5;    // offset of ground texture
 const float ground_ofsy = 0.5;
-const float sky_scale = 1.0f / 4.0f; // sky texture scale (1/size)
-const float sky_height = 1.0f;    // sky height above viewpoint
+const float sky_scale = 1.0f / 12.0f; // sky texture scale (1/size)
+const float sky_height = 1.f;    // sky height above viewpoint
 
 //***************************************************************************
 // misc mathematics stuff
@@ -512,7 +512,7 @@ static void drawPatch (float p1[3], float p2[3], float p3[3], int level) {
 
 // draw a sphere of radius 1
 
-static int sphere_quality = 6;
+static int sphere_quality = 22;
 
 static void drawSphere() {
   // icosahedron data for an icosahedron of radius 1.0
@@ -639,7 +639,7 @@ static void drawTriangleD (const double *v0, const double *v1, const double *v2,
 
 // draw a capped cylinder of length l and radius r, aligned along the x axis
 
-static int capped_cylinder_quality = 20;
+static int capped_cylinder_quality = 50;
 
 static void drawCapsule (float l, float r) {
   int i, j;
@@ -958,8 +958,8 @@ static void drawSky (float view_xyz[3]) {
   glVertex3f (ssize + view_xyz[0], -ssize + view_xyz[1], z);
   glEnd();
 
-  offset = offset + 0.002f;
-  if (offset > 1) offset -= 1;
+   offset = offset + 0.0001f;
+   if (offset > 1) offset -= 1;
 
   glDepthFunc (GL_LESS);
   glDepthRange (0, 1);
@@ -993,8 +993,8 @@ static void drawGround() {
   glFogf (GL_FOG_END, 5.0);
   */
 
-  const float gsize = 100.0f;
-  const float offset = 0; // -0.001f; ... polygon offsetting doesn't work well
+  const float gsize = 300.0f;
+  const float offset = 0.f; // -0.001f; ... polygon offsetting doesn't work well
 
   glBegin (GL_QUADS);
   glNormal3f (0, 0, 1);
@@ -1048,6 +1048,32 @@ static void drawPyramidGrid() {
       glPopMatrix();
     }
   }
+  
+  for (int i = 2; i <= 800; i++) {
+    for (int j = -1; j <= 1; j++) {
+      if(j==0)
+        continue;
+      glPushMatrix();
+      glTranslatef ((float)i, (float)j, (float)0);
+      if (i == 1 && j == 0) setColor (1, 0, 0, 1);
+      else if (i == 0 && j == 1) setColor (0, 0, 1, 1);
+      else setColor (1, 1, 0, 1);
+      const float k = 0.03f;
+      glBegin (GL_TRIANGLE_FAN);
+      glNormal3f (0, -1, 1);
+      glVertex3f (0, 0, k);
+      glVertex3f (-k, -k, 0);
+      glVertex3f ( k, -k, 0);
+      glNormal3f (1, 0, 1);
+      glVertex3f ( k, k, 0);
+      glNormal3f (0, 1, 1);
+      glVertex3f (-k, k, 0);
+      glNormal3f (-1, 0, 1);
+      glVertex3f (-k, -k, 0);
+      glEnd();
+      glPopMatrix();
+    }
+  }
 }
 
 
@@ -1067,6 +1093,9 @@ void dsDrawFrame (int width, int height, dsFunctions *fn, int pause) {
   glEnable (GL_CULL_FACE);
   glCullFace (GL_BACK);
   glFrontFace (GL_CCW);
+  glEnable(GL_BLEND);
+  glEnable(GL_ALPHA_BITS);
+  glEnable(GL_POLYGON_STIPPLE);
 
   // setup viewport
   glViewport (0, 0, width, height);
@@ -1095,8 +1124,9 @@ void dsDrawFrame (int width, int height, dsFunctions *fn, int pause) {
   glColor3f (1.0, 1.0, 1.0);
 
   // clear the window
-  glClearColor (1., 1., 1., 1.);
+  glClearColor (0., 0., 0., 0.);
   glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//   glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
 
   // snapshot camera position (in MS Windows it is changed by the GUI thread)
   float view2_xyz[3];
@@ -1115,7 +1145,7 @@ void dsDrawFrame (int width, int height, dsFunctions *fn, int pause) {
   glLightfv (GL_LIGHT0, GL_POSITION, light_position);
 
   // draw the background (ground, sky etc)
-//   drawSky (view2_xyz);
+  drawSky (view2_xyz);
   drawGround();
 
   // draw the little markers on the ground
@@ -1126,12 +1156,16 @@ void dsDrawFrame (int width, int height, dsFunctions *fn, int pause) {
   
   glEnable(GL_POLYGON_SMOOTH);
   glEnable(GL_BLEND);
+  glEnable(GL_ALPHA_BITS);
   glDisable(GL_DEPTH_TEST);
   glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST);
   glHint( GL_LINE_SMOOTH_HINT, GL_NICEST );
-  glBlendFunc( GL_SRC_ALPHA_SATURATE, GL_ONE ) ;
-  glEnable(GL_MULTISAMPLE); 
+  glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+//   glBlendFunc( GL_SRC_ALPHA_SATURATE, GL_ONE ) ;
+//   glBlendFunc(GL_ONE_MINUS_DST_ALPHA,GL_DST_ALPHA);
+  glEnable(GL_MULTISAMPLE);
   glEnable(GL_MULTISAMPLE_ARB);
+  glEnable(GL_POLYGON_STIPPLE);
   
   glDisable (GL_TEXTURE_2D);
   glShadeModel (GL_FLAT);
@@ -1196,8 +1230,9 @@ static void setupDrawingMode() {
 
   if (color[3] < 1) {
     glEnable (GL_BLEND);
-//     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glBlendFunc( GL_SRC_ALPHA_SATURATE, GL_ONE ) ;
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+//     glBlendFunc( GL_SRC_ALPHA_SATURATE, GL_ONE ) ;
+//     glBlendFunc(GL_ONE_MINUS_DST_ALPHA,GL_DST_ALPHA);
   } else {
     glDisable (GL_BLEND);
   }

@@ -40,7 +40,7 @@ $COMMAND $ARGS >& /dev/null
 
 for file in *.struct.data ; do
 	python2 $CAFFE_PATH/python/draw_net.py $file $file.pdf
-#	python2 $CAFFE_PATH/python/draw_net.py $file $file.dot
+	python2 $CAFFE_PATH/python/draw_net.py $file $file.dot
 #	python2 $CAFFE_PATH/python/draw_net_old.py $file $file.old.pdf
 done
 
@@ -50,7 +50,8 @@ done
 #xdot Critic.1.struct.data.dot
 #xdot Critic.1.struct.data.old.dot
 
+echo $tmp
 okular *.pdf
 
-rm -rf $tmp
+#rm -rf $tmp
 

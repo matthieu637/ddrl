@@ -11,7 +11,7 @@
 
 class HalfCheetahWorldView : public HalfCheetahWorld {
  public:
-  HalfCheetahWorldView(const std::string &path, const hcheetah_physics phy);
+  HalfCheetahWorldView(const std::string &path, const hcheetah_physics phy, bool capture);
   ~HalfCheetahWorldView();
   void step(const std::vector<double> &motors) override;
   void step_core(const std::vector<double> &motors) override;
@@ -27,6 +27,7 @@ protected:
   tbb::tbb_thread *eventThread;
   dsFunctions fn;
   bool requestEnd;
+  double capture;
 
   // specific keyboard behavior
   double speed;

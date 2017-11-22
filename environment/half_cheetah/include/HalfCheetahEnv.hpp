@@ -50,7 +50,8 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
     init.bounce_vel = 0;    
     if (init.bounce >= 0.0000f)
       init.bounce_vel = pt->get<double>("environment.bounce_vel");
-    visible     = vm->count("view");
+    bool visible = vm->count("view");
+    bool capture = vm->count("capture");
     
     init.predev = 0;
     try {
@@ -81,7 +82,7 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
     }
 
     if (visible)
-      instance = new HalfCheetahWorldView("data/textures", init);
+      instance = new HalfCheetahWorldView("data/textures", init, capture);
     else
       instance = new HalfCheetahWorld(init);
   }
@@ -113,7 +114,6 @@ class HalfCheetahEnv : public arch::AEnvironment<> {
   }
 
  private:
-  bool visible = false;
   HalfCheetahWorld* instance;
   std::vector<double> internal_state;
 };

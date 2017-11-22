@@ -33,6 +33,7 @@ class EnvProgOptions {
     boost::program_options::options_description desc(
       "Allowed environment options");
     desc.add_options()("view", "display the environment [default : false]");
+    desc.add_options()("capture", "capture a video of the environment [default : false]");
     return desc;
   }
 };

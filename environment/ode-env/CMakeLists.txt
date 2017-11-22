@@ -24,7 +24,7 @@ if(APPLE)
 else()
 	find_package(X11)
 	set(drawstuff_src ${drawstuff_src} extern/drawstuff/src/x11.cpp)
-	set(draw_lib ${X11_LIBRARIES})
+	set(draw_lib ${X11_LIBRARIES} -lfreeimage )
 endif()
 
 
