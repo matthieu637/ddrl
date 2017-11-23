@@ -80,10 +80,12 @@ void threadloopHalfCheetah(const std::string& goodpath) {
   float xyz[3] = {-1.43*2, -3.44, 1.05};
   float hpr[3] = {47, -10, -1.3};
   dsSetViewpoint(xyz, hpr);
+  int p = 0;
+  
 
   while (!inst->requestEnd) {
     Mutex::scoped_lock lock(inst->mutex_reset);
-    HACKdraw(&inst->fn);
+    HACKdrawC(&inst->fn, &p, inst->capture);
     lock.release();
     //wait time between frame draw
     usleep(1 * 1000);//each milisecond -> 1000fps

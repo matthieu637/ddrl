@@ -451,14 +451,12 @@ extern "C" double dsElapsedTime() {
 #endif
 }
 
-void HACKdraw(dsFunctions *fn, int* myframe, int capture);
-
 void HACKdraw(dsFunctions *fn) {
   int p = 0;
-  HACKdraw(fn, &p, p);
+  HACKdrawC(fn, &p, 0);
 }
 
-void HACKdraw(dsFunctions *fn, int* myframe, int capture) {
+void HACKdrawC(dsFunctions *fn, int* myframe, int capture) {
   
   XEvent event;
   while (XPending (display)) {
