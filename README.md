@@ -51,7 +51,7 @@ However, it needs a modified version of Caffe : https://github.com/matthieu637/c
 
 ### Archlinux
 ```
-yaourt -Sy boost ode openblas-lapack hdf5 protobuf google-glog gflags leveldb snappy lmdb cuda xz cmake gtest
+yaourt -Sy boost ode openblas-lapack hdf5 protobuf google-glog gflags leveldb snappy lmdb cuda xz cmake gtest freeimage
 cd any_directory_you_want
 git clone https://github.com/matthieu637/ddrl
 mkdir caffe_compilation 
@@ -68,7 +68,7 @@ cd ../ddrl/
 ```
 apt-get update
 #base
-apt-get install libtool libboost-all-dev libtbb-dev libglew-dev python cmake libgtest-dev automake unzip
+apt-get install libtool libboost-all-dev libtbb-dev libglew-dev python cmake libgtest-dev automake unzip libfreeimage-dev
 #caffe
 apt-get install nvidia-cuda-dev nvidia-cuda-toolkit libprotobuf-dev libleveldb-dev libsnappy-dev protobuf-compiler libopenblas-dev libgflags-dev libgoogle-glog-dev liblmdb-dev libhdf5-serial-dev
 #optional for developer
