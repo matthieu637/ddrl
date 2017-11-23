@@ -331,6 +331,7 @@ void HACKinitOSX(int w, int h, dsFunctions *fn);
 #else
 void HACKinitX11(int w, int h, dsFunctions *fn);
 #endif
+void HACKdrawC(dsFunctions *fn, int* myframe, int capture);
 void HACKdraw(dsFunctions *fn);
 void HACKclose();
 
