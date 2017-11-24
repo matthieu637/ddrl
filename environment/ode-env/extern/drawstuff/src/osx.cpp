@@ -365,6 +365,9 @@ void HACKdraw(dsFunctions *fn) {
 //	}
 }
 
+void HACKdrawC(dsFunctions *fn, int* myframe, int capture){
+}
+
 void HACKclose() {
 	dsStopGraphics();
 }
