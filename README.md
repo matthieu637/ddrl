@@ -115,17 +115,30 @@ cd ddrl
 ### Mac
 ```
 #if you run a version lower than sierra (example on mavericks)
-#you need to install an up-to-date llvm version for c++11 features
-brew tap homebrew/versions
-brew install llvm38
+#you need to install an up-to-date llvm version for c++11 features with :
+#brew tap homebrew/versions
+#brew install llvm38
 
-#install cuda toolkit from internet (not only cudadriver)
 #install brew
 brew update
 brew install cmake libtool findutils coreutils boost protobuf homebrew/science/hdf5 snappy leveldb gflags glog szip tbb lmdb
+brew install --with-double-precision ode
 
-#then do the equivalent of ubuntu compilation steps
+#caffe compilation
+cd any_directory_you_want
+git clone https://github.com/matthieu637/caffe.git
+mkdir caffe/build
+cd caffe/build
+cmake ../ -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCPU_ONLY=On -DCMAKE_INSTALL_PREFIX:PATH=/usr/local/
+make -j4
+sudo make install
+cd ../..
+
+# then you can compile ddrl
+git clone https://github.com/matthieu637/ddrl
+cd ddrl
+./fullBuild
 ```
 
 ### no access to sudo
-if you don't have access to sudo, you cant adapt the script under scripts/nosudo-install
+if you don't have access to sudo, you can adapt the script under scripts/nosudo-install
