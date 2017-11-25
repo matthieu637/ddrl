@@ -12,6 +12,8 @@ find_library( HALF_CHEETAH_LIBRARY
   NAMES ${HALF_CHEETAH_NAME}
   PATHS
   "${ROOT_DRL_PATH}/environment/half_cheetah/lib"
+  "${ROOT_DRL_PATH}/environment/half_cheetah/lib/Release"
+  "${ROOT_DRL_PATH}/environment/half_cheetah/lib/Debug"
 )
 
 find_package(ODEEnv)
