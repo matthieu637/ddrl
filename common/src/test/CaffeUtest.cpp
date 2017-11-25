@@ -378,8 +378,8 @@ TEST(MLP, CaffeCopyWeightsActor) {
 
       MLP actor(1, {8}, 1, 0.01f, batch_size, hidden_layer, 0, batch_norm);//train
       MLP actor_nobn(1, {8}, 1, 0.01f, batch_size, hidden_layer, 0, 0);
-      EXPECT_EQ(actor_nobn.number_of_parameters(false), 25);
-      EXPECT_GT(actor.number_of_parameters(false), 25);
+      EXPECT_EQ(actor_nobn.number_of_parameters(false), (uint) 25);
+      EXPECT_GT(actor.number_of_parameters(false), (uint) 25);
     }
   }
 }
@@ -1320,7 +1320,7 @@ TEST(MLP, DevelopmentalLayerHeuristic1) {
           delete all_actions_outputs;
           delete all_actions_outputs2;
         }
-        actor.inform(0);
+        actor.inform(0, 0.f);
         {
           auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
           auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns

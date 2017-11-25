@@ -85,6 +85,9 @@ function cmakeBuildRecall(){
 	if [ $XCODE -eq 0 ] ; then
 		make -j $CPU >& $tmplog
 		stopOnError $? $tmplog
+	else
+		xcodebuild >& $tmplog
+		stopOnError $? $tmplog
 	fi
 
 	mv $tmplog build.log

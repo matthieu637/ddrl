@@ -239,17 +239,17 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     last_trajectory_a.clear();
     
     if(std::is_same<NN, DODevMLP>::value){
-      if(static_cast<DODevMLP *>(qnn)->inform(episode)){
+      if(static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward)){
         LOG_INFO("reset learning catched");
         trajectory.clear();
       }
-      if(static_cast<DODevMLP *>(ann)->inform(episode)){
+      if(static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward)){
         LOG_INFO("reset learning catched");
         trajectory.clear();
       }
-      static_cast<DODevMLP *>(qnn_target)->inform(episode);
-      static_cast<DODevMLP *>(ann_target)->inform(episode);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode);
+      static_cast<DODevMLP *>(qnn_target)->inform(episode, last_sum_weighted_reward);
+      static_cast<DODevMLP *>(ann_target)->inform(episode, last_sum_weighted_reward);
+      static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
     }
   }
   

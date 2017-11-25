@@ -56,8 +56,8 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   typedef NN PolicyImpl;
 
   NFACVMemAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0), normst(_nb_sensors,
-        0.f) {
+    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors), normst(_nb_sensors,
+        0.f), empty_action(0) {
 
   }
 
@@ -82,7 +82,7 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                  bool learning, bool goal_reached, bool) {
+                                  bool learning, bool goal_reached, bool) override {
 
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(sensors);
@@ -328,9 +328,9 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     trajectory.clear();
 
     if(std::is_same<NN, DODevMLP>::value) {
-      static_cast<DODevMLP *>(vnn)->inform(episode);
-      static_cast<DODevMLP *>(ann)->inform(episode);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode);
+      static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
+      static_cast<DODevMLP *>(ann)->inform(episode, this->last_sum_weighted_reward);
+      static_cast<DODevMLP *>(ann_testing)->inform(episode, this->last_sum_weighted_reward);
     }
 
     double* weights = new double[ann->number_of_parameters(false)];

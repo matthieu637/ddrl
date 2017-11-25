@@ -36,7 +36,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
   }
 
   const std::vector<double>& _run(double , const std::vector<double>& sensors,
-                                 bool, bool, bool) {
+                                 bool, bool, bool) override {
 
     vector<double>* next_action = ann->computeOut(sensors);
 
@@ -165,7 +165,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     scores.clear();
     
     if(std::is_same<NN, DODevMLP>::value)
-      if(static_cast<DODevMLP *>(ann)->inform(episode)){
+      if(static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward)){
         LOG_INFO("reset learning catched");
         const double* parameters = nullptr;
         parameters = getBestSolution();
