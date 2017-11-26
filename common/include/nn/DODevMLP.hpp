@@ -30,7 +30,7 @@ class DODevMLP : public MLP {
     MLP(m, copy_solver, _phase), disable_st_control(m.disable_st_control), 
     disable_ac_control(m.disable_ac_control), heuristic(m.heuristic), 
     reset_learning_algo(m.reset_learning_algo), intrasec_motivation(m.intrasec_motivation),
-    im_window(m.im_window), im_smooth(m.im_smooth), im_index(m.im_index) {
+    im_window(m.im_window), im_smooth(m.im_smooth), im_index(m.im_index), ewc(m.ewc) {
     st_control = new std::vector<uint>(*m.st_control);
     ac_control = new std::vector<uint>(*m.ac_control);
     if(heuristic == 1)
@@ -48,6 +48,10 @@ class DODevMLP : public MLP {
       delete heuristic_devpoints;
     if(heuristic_linearcoef != nullptr)
       delete heuristic_linearcoef;
+    if(best_param != nullptr)
+      delete best_param;
+    if(fisher != nullptr)
+      delete fisher;
   }
 
   virtual void exploit(boost::property_tree::ptree* pt, MLP* actor) override {
@@ -60,6 +64,7 @@ class DODevMLP : public MLP {
     ac_control = bib::to_array<uint>(pt->get<std::string>("devnn.ac_control"));
     heuristic = 0;
     intrasec_motivation = false;
+    ewc = -1.f;
     try {
       heuristic = pt->get<uint>("devnn.heuristic");
       if((heuristic == 1 && st_probabilistic != 1) || (heuristic == 1 && ac_probabilistic != 1)){
@@ -117,6 +122,11 @@ class DODevMLP : public MLP {
     
     try {
       reset_learning_algo = pt->get<bool>("devnn.reset_learning_algo");
+    } catch(boost::exception const& ) {
+    }
+    
+    try {
+      ewc = pt->get<double>("devnn.ewc");
     } catch(boost::exception const& ) {
     }
     
@@ -460,6 +470,99 @@ public:
     neural_net->BackwardFrom(layer);
   }
   
+  double ewc_cost() override {
+    if(ewc < 0.f)
+      return 0.f;
+    double cost = 0.f;
+    uint k=0;
+    const auto& from_params = neural_net->params();
+    for (uint i = 0; i < from_params.size(); ++i) {//TODO : ignore weight connected to disable connec
+      if(neural_net->params_lr()[i] != 0.0f){
+        auto& from_blob = from_params[i];
+        auto weight = from_blob->cpu_data();
+        for(int j=0;j<from_blob->count();j++){
+          double x = (best_param->at(k) - weight[j]);
+          cost += x*x*fisher->at(k);
+          k++;
+        }
+      }
+    }
+    return cost * ewc;
+  }
+  
+  bool ewc_enabled() override {
+    return ewc >= 0.f;
+  }
+  
+  void ewc_setup(const std::vector<double>& sensors, const std::vector<double>& motors){
+    if(!ewc_enabled())
+      return ;
+    
+    if(best_param != nullptr)
+      delete best_param;
+    
+    best_param = new std::vector<double>(number_of_parameters(true));
+    uint k=0;
+    const auto& from_params = neural_net->params();
+    for (uint i = 0; i < from_params.size(); ++i) {
+      if(neural_net->params_lr()[i] != 0.0f){
+        auto& from_blob = from_params[i];
+        auto bestweight = from_blob->cpu_data();
+        for(int j=0;j<from_blob->count();j++){
+          best_param->at(k) = bestweight[j];
+          k++;
+        }
+      }
+    }
+    
+    if(fisher != nullptr)
+      delete fisher;
+    fisher = computeFisherEWC(sensors, motors);
+    
+  }
+  
+  std::vector<double>* computeFisherEWC(const std::vector<double>& sensors, const std::vector<double>& motors){
+    ZeroGradParameters();
+    if(size_input_state == size_sensors)
+      InputDataIntoLayers(&sensors, NULL, NULL, add_loss_layer || size_motors == 0);//pi or V
+    else
+      InputDataIntoLayers(&sensors, &motors, nullptr, true);//Q
+    
+    auto fisher = new std::vector<double>(number_of_parameters(true));
+    neural_net->Forward(nullptr);
+    
+    if(size_input_state != size_sensors || size_motors == 0){//Q or V
+      const auto q_values_blob = neural_net->blob_by_name(q_values_blob_name);
+      auto prob = q_values_blob->cpu_data();
+      double* q_values_diff = q_values_blob->mutable_cpu_diff();
+      for (uint i=0;i<kMinibatchSize;i++)
+        q_values_diff[q_values_blob->offset(i,0,0,0)] = -1.0f / prob[i] ;
+      critic_backward();
+    } else { //pi
+      const auto actions_values_blob = neural_net->blob_by_name(actions_blob_name);
+      auto prob = actions_values_blob->cpu_data();
+      double* actions_values_diff = actions_values_blob->mutable_cpu_diff();
+      for (uint i=0;i<kMinibatchSize;i++)
+        for (uint j=0;j<size_motors;j++)
+          actions_values_diff[actions_values_blob->offset(i,j,0,0)] = -1.0f / prob[actions_values_blob->offset(i,j,0,0)] ;
+      actor_backward();
+    }
+    
+    uint k=0;
+    for (uint i = 0; i < neural_net->params().size(); ++i) {
+      auto blob = neural_net->params()[i];
+      auto derriv = blob->cpu_diff();
+      for(int y=0; y <blob->count(); y++){
+        fisher->at(k) = derriv[y] * derriv[y];
+        k++;
+      }
+    }
+    
+    ZeroGradParameters();
+    
+    return fisher;
+  }
+  
 private:
   bool disable_st_control = false;
   bool disable_ac_control = false; //for vnn
@@ -472,8 +575,11 @@ private:
   bool intrasec_motivation;
   int im_window, im_smooth;
   uint im_index = 0;
+  double ewc = -1.f;
   
   std::vector<double> all_scores;
+  std::vector<double>* best_param = nullptr;
+  std::vector<double>* fisher = nullptr;
 };
 
 #endif
