@@ -13,8 +13,8 @@ find_package(OpenGL)
 find_package(CommonDRL)
 include(${ROOT_DRL_PATH}/common/cmake/ODEConfig.cmake)
 
-include_directories(${CMAKE_SOURCE_DIR}/include ${ODE_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/extern/drawstuff/include/ ${COMMON_DRL_INCLUDE_DIRS})
-
+include_directories(${CMAKE_SOURCE_DIR}/include ${ODE_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/extern/drawstuff/include/ 
+	${COMMON_DRL_INCLUDE_DIRS})
 
 set(drawstuff_src extern/drawstuff/src/drawstuff.cpp)
 if(APPLE)
@@ -23,8 +23,10 @@ if(APPLE)
 	set(draw_lib ${GLUT_LIBRARIES})
 else()
 	find_package(X11)
+	find_package(FreeImage)
+	include_directories(${FREEIMAGE_INCLUDE_DIRS})
 	set(drawstuff_src ${drawstuff_src} extern/drawstuff/src/x11.cpp)
-	set(draw_lib ${X11_LIBRARIES} -lfreeimage )
+	set(draw_lib ${X11_LIBRARIES} ${FREEIMAGE_LIBRARY})
 endif()
 
 
