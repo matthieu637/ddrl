@@ -21,11 +21,11 @@ class CartpoleEnv : public arch::AEnvironment<> {
     delete instance;
   }
 
-  const std::vector<double>& perceptions() const {
+  const std::vector<double>& perceptions() const override {
     return instance->state();
   }
 
-  double performance() const {
+  double performance() const override {
     if(instance->goal_state())
       return 0;
     else if(final_state()){
@@ -35,19 +35,19 @@ class CartpoleEnv : public arch::AEnvironment<> {
     return -1.f;
   }
 
-  bool final_state() const {
+  bool final_state() const override {
     return instance->final_state();
   }
 
-  unsigned int number_of_actuators() const {
+  unsigned int number_of_actuators() const override {
     return instance->activated_motors();
   }
-  unsigned int number_of_sensors() const {
+  unsigned int number_of_sensors() const override {
     return instance->state().size();
   }
 
  private:
-  void _unique_invoke(boost::property_tree::ptree* properties, boost::program_options::variables_map* vm) {
+  void _unique_invoke(boost::property_tree::ptree* properties, boost::program_options::variables_map* vm) override {
     visible     = vm->count("view");
 
     bool add_time_in_state = false;
@@ -74,7 +74,7 @@ class CartpoleEnv : public arch::AEnvironment<> {
       instance = new CartpoleWorld(add_time_in_state, normalization, *normalized_vector);
   }
 
-  void _apply(const std::vector<double>& actuators) {
+  void _apply(const std::vector<double>& actuators) override {
     instance->step(actuators, current_step, max_step_per_instance);
   }
 

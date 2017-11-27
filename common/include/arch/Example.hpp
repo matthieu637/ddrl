@@ -118,11 +118,11 @@ class SimpleEnv1D : public arch::AEnvironment<> {
       s[1] = -1.f;
   }
   
-  const std::vector<double>& perceptions() const {
+  const std::vector<double>& perceptions() const override {
     return s;
   }
   
-  unsigned int number_of_actuators() const {
+  unsigned int number_of_actuators() const override {
     return 1;
   }
   
@@ -130,18 +130,18 @@ class SimpleEnv1D : public arch::AEnvironment<> {
     return performance() >= 0.;
   }
   
-  unsigned int number_of_sensors() const {
+  unsigned int number_of_sensors() const override {
     return s.size();
   }
   
-  double performance() const {
+  double performance() const override {
 //     y_1\left(x,b,a\right)=\frac{1}{a\sqrt{2\pi }}e^{-\frac{\left(x-b\right)^2}{2a^2}}
 //     -4+y_1\left(x,\ 0.7,\ 0.05\right)+y_1\left(x,\ 1,\ 0.1\right)+10\cdot y_1\left(x,\ -0.7,\ 1\right)
 //     return -4 + gaussian<double>(s[0], 0.7f, 0.05) + gaussian<double>(s[0], 1.f, 0.1f) + 10.f * gaussian<double>(s[0], -0.7f, 1.f);
     return -1.f + gaussian<double>(s[0], 0.7f, 0.05);
   }
   
-  void _apply(const std::vector<double>& a) {
+  void _apply(const std::vector<double>& a) override {
     s[0] = s[0] + a[0]/ 2.f; 
     if( s[0] > 1.f)
       s[0] = 1.f;
@@ -177,19 +177,19 @@ class SimpleEnv1DFixedTraj : public arch::AEnvironment<> {
     current_episode = -1;
   }
   
-  void _reset_episode() {
+  void _reset_episode() override {
     current_step = 0;
     current_episode++;
   }
   
-  const std::vector<double>& perceptions() const {   
+  const std::vector<double>& perceptions() const override {
     if(current_episode <= 1)
       return s[current_step];
     
     return s_goal[current_step];
   }
   
-  unsigned int number_of_actuators() const {
+  unsigned int number_of_actuators() const override {
     return 1;
   }
   
@@ -200,18 +200,18 @@ class SimpleEnv1DFixedTraj : public arch::AEnvironment<> {
     return current_step >= 2;
   }
   
-  unsigned int number_of_sensors() const {
+  unsigned int number_of_sensors() const override {
     return 1;
   }
   
-  double performance() const {
+  double performance() const override {
     if(current_episode <= 1 || current_step < 2)
       return -1.f;
     
     return 1.f;
   }
   
-  void _apply(const std::vector<double>&) {
+  void _apply(const std::vector<double>&) override {
     current_step++;
   }
   

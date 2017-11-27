@@ -77,7 +77,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                  bool learning, bool goal_reached, bool) {
+                                  bool learning, bool goal_reached, bool) override {
 
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(sensors);
@@ -218,9 +218,9 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     }
 
     if(std::is_same<NN, DODevMLP>::value) {
-      static_cast<DODevMLP *>(vnn)->inform(episode);
-      static_cast<DODevMLP *>(ann)->inform(episode);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode);
+      static_cast<DODevMLP *>(vnn)->inform(episode, last_sum_weighted_reward);
+      static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward);
+      static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
     }
 
     double* weights = new double[ann->number_of_parameters(false)];
@@ -837,7 +837,6 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       for (li=0; li < all_size; li++) {
         //           diff[li] = diff[li] + all_V->at(li);
         deltas[li] = diff[li];
-        ++li;
       }
     }
 

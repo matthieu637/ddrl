@@ -12,6 +12,8 @@ find_library( CARTPOLE_LIBRARY
   NAMES ${CARTPOLE_NAME}
   PATHS
   "${ROOT_DRL_PATH}/environment/cartpole/lib"
+  "${ROOT_DRL_PATH}/environment/cartpole/lib/Debug"
+  "${ROOT_DRL_PATH}/environment/cartpole/lib/Release"
 )
 
 find_package(ODEEnv)

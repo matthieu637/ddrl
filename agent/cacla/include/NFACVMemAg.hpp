@@ -56,8 +56,8 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   typedef NN PolicyImpl;
 
   NFACVMemAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0), normst(_nb_sensors,
-        0.f) {
+    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors), normst(_nb_sensors,
+        0.f), empty_action(0) {
 
   }
 
@@ -68,7 +68,7 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     delete qnn;
     delete qnn_target;
     delete ann_best;
-    if(newidea)
+    if(newidea > 0)
       delete ann_behav;
     if(smooth_udpate_mem)
       delete ann_smooth;
@@ -82,10 +82,17 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                  bool learning, bool goal_reached, bool) {
+                                  bool learning, bool goal_reached, bool) override {
 
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(sensors);
+    
+    if(learning && newidea == 2 && last_action.get() != nullptr){
+      //might be more adapted to sparse reward?
+      auto ac_explo = ann_behav->computeOut(last_state);
+      reward = reward + beta * (1.f - l2dista(*last_action,*ac_explo));
+      delete ac_explo;
+    }
 
     if (last_action.get() != nullptr && learning) {
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached};
@@ -111,7 +118,7 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 //     }
 //     if(false) {
     if(learning) {
-      if(!newidea) {
+      if(newidea == 0) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
@@ -159,9 +166,52 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             }
           }
         }
-      } else if(bib::Utils::rand01() < noise){
+      } else if(newidea == 1 && bib::Utils::rand01() < noise){
         delete next_action;
         next_action = ann_behav->computeOut(sensors);
+      } else if(newidea == 2){
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+        delete next_action;
+        next_action = randomized_action;
+      } else if(newidea == 3){
+        auto ac_explo = ann_behav->computeOut(sensors);
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*ac_explo, noise);
+        delete next_action;
+        delete ac_explo;
+        next_action = randomized_action;
+      } else if(newidea == 4){
+        auto ac_explo = ann_behav->computeOut(sensors);
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*ac_explo, noise);
+        for(uint j=0;j<this->nb_motors;j++){
+          if(next_action->at(j) <= randomized_action->at(j) && randomized_action->at(j) <= ac_explo->at(j))
+            next_action->at(j) = randomized_action->at(j);
+          else if(next_action->at(j) <= randomized_action->at(j) && randomized_action->at(j) >= ac_explo->at(j) && next_action->at(j) <= ac_explo->at(j) )
+            next_action->at(j) = ac_explo->at(j);
+          else if(next_action->at(j) <= randomized_action->at(j) && randomized_action->at(j) >= ac_explo->at(j) && next_action->at(j) >= ac_explo->at(j) 
+            && ac_explo->at(j) <= next_action->at(j) - (randomized_action->at(j) - next_action->at(j)))
+            next_action->at(j) = next_action->at(j) - (randomized_action->at(j) - next_action->at(j));
+          else if(next_action->at(j) <= randomized_action->at(j) && randomized_action->at(j) >= ac_explo->at(j) && next_action->at(j) >= ac_explo->at(j) 
+            && ac_explo->at(j) >= next_action->at(j) - (randomized_action->at(j) - next_action->at(j)))
+            next_action->at(j) = ac_explo->at(j);
+          else if(next_action->at(j) >= randomized_action->at(j) && randomized_action->at(j) >= ac_explo->at(j))
+            next_action->at(j) = randomized_action->at(j);
+          else if(next_action->at(j) >= randomized_action->at(j) && randomized_action->at(j) <= ac_explo->at(j) && next_action->at(j) >= ac_explo->at(j))
+            next_action->at(j) = ac_explo->at(j);
+          else if(next_action->at(j) >= randomized_action->at(j) && randomized_action->at(j) <= ac_explo->at(j) && next_action->at(j) <= ac_explo->at(j)
+            && ac_explo->at(j) >= next_action->at(j) + (next_action->at(j) - randomized_action->at(j)) )
+            next_action->at(j) = next_action->at(j) + (next_action->at(j) - randomized_action->at(j));
+          else if(next_action->at(j) >= randomized_action->at(j) && randomized_action->at(j) <= ac_explo->at(j) && next_action->at(j) <= ac_explo->at(j)
+            && ac_explo->at(j) <= next_action->at(j) + (next_action->at(j) - randomized_action->at(j)) )
+            next_action->at(j) = ac_explo->at(j);
+            
+          if(next_action->at(j) > 1.0)
+            next_action->at(j) = 1.;
+          else if(next_action->at(j) < -1.0)
+            next_action->at(j) = -1.;
+        }
+          
+        delete randomized_action;
+        delete ac_explo;
       }
     }
     last_action.reset(next_action);
@@ -197,8 +247,10 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     replay_memory           = pt->get<uint>("agent.replay_memory");
     smooth_udpate_mem       = pt->get<bool>("agent.smooth_udpate_mem");
     qoffofcurrentpol        = pt->get<bool>("agent.qoffofcurrentpol");
-    newidea                 = pt->get<bool>("agent.newidea");
+    newidea                 = pt->get<uint>("agent.newidea");
+    spacedist               = pt->get<uint>("agent.spacedist");
     exploration_strat       = pt->get<uint>("agent.exploration_strat");
+    beta                    = pt->get<double>("agent.beta");
     corrected_update_ac     = false;
     gae                     = false;
     inverting_gradient      = false;
@@ -259,7 +311,7 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       ann_smooth = new NN(*ann, false);
       ann_smooth->increase_batchsize(kMinibatchSize);
     }
-    if(newidea) {
+    if(newidea > 0) {
       ann_behav = new NN(*ann, true);
       ann_behav->increase_batchsize(kMinibatchSize);
     }
@@ -276,9 +328,9 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     trajectory.clear();
 
     if(std::is_same<NN, DODevMLP>::value) {
-      static_cast<DODevMLP *>(vnn)->inform(episode);
-      static_cast<DODevMLP *>(ann)->inform(episode);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode);
+      static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
+      static_cast<DODevMLP *>(ann)->inform(episode, this->last_sum_weighted_reward);
+      static_cast<DODevMLP *>(ann_testing)->inform(episode, this->last_sum_weighted_reward);
     }
 
     double* weights = new double[ann->number_of_parameters(false)];
@@ -446,7 +498,7 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       all_sample.pop_front();
     all_sample.push_back(sa);
 
-    if(newidea) {
+    if(newidea > 0) {
       behaviorpolicy_update();
       return;
     }
@@ -539,21 +591,33 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       i++;
     }
 
-    std::vector<double> weights(traj.size()*traj.size());
-    i=0;
-    for (auto s0 : traj) {
-      for (auto st : traj) {
-        l2distupdate(s0.s, st.s);
-        i++;
+    std::vector<double> weights(traj.size()*traj.size(), 1.f);
+    if(spacedist == 0){
+      i=0;
+      for (auto s0 : traj) {
+        for (auto st : traj) {
+          l2distupdate(s0.s, st.s);
+          i++;
+        }
       }
-    }
-    i=0;
-    for (auto s0 : traj) {
-      for (auto st : traj) {
-        weights[i] = 1.f - l2dist(s0.s, st.s);
-        if(weights[i]<= 0.000001)
-          weights[i]=0.000001;
-        i++;
+      i=0;
+      for (auto s0 : traj) {
+        for (auto st : traj) {
+          weights[i] = 1.f - l2dist(s0.s, st.s);
+          if(weights[i]<= 0.000001)
+            weights[i]=0.000001;
+          i++;
+        }
+      }
+    } else if(spacedist == 1){
+      i=0;
+      for (auto s0 : traj) {
+        for (auto st : traj) {
+          weights[i] = 1.f - l2dist(s0.a, st.a);
+          if(weights[i]<= 0.000001)
+            weights[i]=0.000001;
+          i++;
+        }
       }
     }
 
@@ -612,6 +676,15 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       r += (d*d)/normst[i];
     }
     return r/((double) a.size());
+  }
+  
+  double l2dista(const std::vector<double>& a, const std::vector<double>& b) const {
+    double r = 0.f;
+    for(uint i=0; i<a.size(); i++) {
+      double d = (a[i] - b[i]);
+      r += (d*d);
+    }
+    return sqrt(r)/(2.f * (double) a.size());
   }
 
   void end_episode(bool learning) override {
@@ -879,9 +952,10 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 //   mem part
   NN* ann_best, *ann_smooth, *ann_behav;
   double best_learning_perf;
-  bool smooth_udpate_mem, qoffofcurrentpol, newidea;
-  uint exploration_strat;
+  bool smooth_udpate_mem, qoffofcurrentpol;
+  uint exploration_strat, newidea, spacedist;
   std::vector<double> normst;
+  double beta;
 
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
