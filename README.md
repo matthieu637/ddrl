@@ -121,7 +121,7 @@ cd ddrl
 
 #install brew
 brew update
-brew install cmake libtool findutils coreutils boost protobuf homebrew/science/hdf5 snappy leveldb gflags glog szip tbb lmdb
+brew install cmake libtool findutils coreutils boost protobuf homebrew/science/hdf5 snappy leveldb gflags glog szip tbb lmdb gnu-sed
 brew install --with-double-precision ode
 
 #caffe compilation
@@ -153,7 +153,7 @@ A .ini file is needed to describe the experience you want to run (neural network
 ```
 #run the humanoid envionment with CMA-ES 
 cd agent/cmaes/build/debug/
-./humanoid --config cmaes-humnaoid.ini --view
+./humanoid --config cmaes-humanoid.ini --view
 ```
 
 For now, on mac, the only working view is humanoid. Others environments can be run without view.
