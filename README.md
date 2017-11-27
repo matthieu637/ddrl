@@ -151,9 +151,17 @@ if you don't have access to sudo, you can adapt the script under scripts/nosudo-
 
 A .ini file is needed to describe the experience you want to run (neural network architecture, episodes, etc.).
 ```
-#run the humanoid envionment with CMA-ES 
+#run the humanoid envionment with CMA-ES (debug version)
+cd agent/cmaes/build/debug/
+./humanoid --config cmaes-humanoid.ini
+
+#run the humanoid environment with CMA-ES (release version with Xcode)
+cd agent/cmaes/build/release/Release/
+./humanoid --config ../cmaes-humanoid.ini
+
+#run the humanoid envionment with CMA-ES (debug version + view)
 cd agent/cmaes/build/debug/
 ./humanoid --config cmaes-humanoid.ini --view
 ```
 
-For now, on mac, the only working view is humanoid. Others environments can be run without view.
+The view option doesn't work on Mac because the GLUT thread need to be the main thread.
