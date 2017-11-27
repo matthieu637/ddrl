@@ -898,7 +898,7 @@ class NeuralFittedMultiACAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptio
   uint batch_norm, sampling_strategy, weighting_strategy, last_layer_actor,
        hidden_layer_type, multi_policies, policy_selection, policy_selected;
   bool learning, reset_qnn, inverting_grad;
-  bool reset_ann, no_forgot_offline, mixed_sampling, force_same_data_mp;
+  bool reset_ann, no_forgot_offline, force_same_data_mp;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

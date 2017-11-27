@@ -11,6 +11,8 @@ find_library( HUMANOID_LIBRARY
   NAMES ${HUMANOID_NAME}
   PATHS
   "${ROOT_DRL_PATH}/environment/humanoid/lib"
+  "${ROOT_DRL_PATH}/environment/humanoid/lib/Debug"
+  "${ROOT_DRL_PATH}/environment/humanoid/lib/Release"
 )
 
 find_package(ODEEnv)

@@ -4,6 +4,8 @@
 #include "MLP.hpp"
 #include "bib/IniParser.hpp"
 
+#define LOWER_REWARD -1e8
+
 class DODevMLP : public MLP {
  public:
 
@@ -27,7 +29,8 @@ class DODevMLP : public MLP {
   DODevMLP(const DODevMLP& m, bool copy_solver, ::caffe::Phase _phase = ::caffe::Phase::TRAIN) : 
     MLP(m, copy_solver, _phase), disable_st_control(m.disable_st_control), 
     disable_ac_control(m.disable_ac_control), heuristic(m.heuristic), 
-    reset_learning_algo(m.reset_learning_algo) {
+    reset_learning_algo(m.reset_learning_algo), intrasec_motivation(m.intrasec_motivation),
+    im_window(m.im_window), im_smooth(m.im_smooth), im_index(m.im_index), ewc(m.ewc) {
     st_control = new std::vector<uint>(*m.st_control);
     ac_control = new std::vector<uint>(*m.ac_control);
     if(heuristic == 1)
@@ -45,6 +48,10 @@ class DODevMLP : public MLP {
       delete heuristic_devpoints;
     if(heuristic_linearcoef != nullptr)
       delete heuristic_linearcoef;
+    if(best_param != nullptr)
+      delete best_param;
+    if(fisher != nullptr)
+      delete fisher;
   }
 
   virtual void exploit(boost::property_tree::ptree* pt, MLP* actor) override {
@@ -56,6 +63,8 @@ class DODevMLP : public MLP {
     st_control = bib::to_array<uint>(pt->get<std::string>("devnn.st_control"));
     ac_control = bib::to_array<uint>(pt->get<std::string>("devnn.ac_control"));
     heuristic = 0;
+    intrasec_motivation = false;
+    ewc = -1.f;
     try {
       heuristic = pt->get<uint>("devnn.heuristic");
       if((heuristic == 1 && st_probabilistic != 1) || (heuristic == 1 && ac_probabilistic != 1)){
@@ -68,6 +77,20 @@ class DODevMLP : public MLP {
       }
       LOG_INFO("catch heuristic " <<heuristic);
     } catch(boost::exception const& ) {
+    }
+    
+    try {
+      intrasec_motivation = pt->get<bool>("devnn.intrasec_motivation");
+      if(intrasec_motivation && heuristic != 1){
+        LOG_INFO("intrasec motiv works only with determinist activation and heuristic = 1");
+        exit(1);
+      }
+    } catch(boost::exception const& ) {
+    }
+    
+    if(intrasec_motivation){
+      im_smooth = pt->get<int>("devnn.im_smooth");
+      im_window = pt->get<int>("devnn.im_window");
     }
     
     if(heuristic == 1){
@@ -101,7 +124,12 @@ class DODevMLP : public MLP {
       reset_learning_algo = pt->get<bool>("devnn.reset_learning_algo");
     } catch(boost::exception const& ) {
     }
-
+    
+    try {
+      ewc = pt->get<double>("devnn.ewc");
+    } catch(boost::exception const& ) {
+    }
+    
     if((ac_scale && ac_probabilistic != 0) || (st_scale && st_probabilistic != 0)) {
       LOG_ERROR("if not probabilistic then why scaling? of how much?");
       exit(1);
@@ -352,10 +380,65 @@ class DODevMLP : public MLP {
     return catch_change;
   }
   
+  bool developIM(int episode, double score){
+    bool changed = false;
+    
+    //update stats
+    all_scores.push_back(score);
+    
+    double new_e = 0.f;
+    double new_ew = 0.f;
+    for(int i=0;i<im_smooth;i++){
+      if(episode - i < 0)
+        new_e += LOWER_REWARD;
+      else
+        new_e += all_scores[episode-i];
+      if(episode - i - im_window < 0)
+        new_ew += LOWER_REWARD;
+      else
+        new_ew += all_scores[episode-i-im_window];
+    }
+    new_e *= 1./(double) im_smooth;
+    new_ew *= 1./(double) im_smooth;
+    
+    //decide if changed
+    changed = new_e - new_ew < 0;
+    
+    //change corresponding weights
+    if(changed){
+      uint heuristic_devpoints_index=0;
+      for(auto k : *heuristic_devpoints){
+        if(k <= im_index){
+          if(heuristic_devpoints_index < st_control->size()){
+            auto blob_st = neural_net->layer_by_name("devnn_states")->blobs()[0];
+            auto data = blob_st->mutable_cpu_data();
+            data[heuristic_devpoints_index] = 1.f;
+            LOG_INFO("dev point st " << st_control->at(heuristic_devpoints_index) );
+          } else if(heuristic_devpoints_index < st_control->size() + ac_control->size() && !disable_ac_control) {
+            auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
+            auto data = blob_ac->mutable_cpu_data();
+            data[heuristic_devpoints_index - st_control->size()] = 1.f;
+            LOG_INFO("dev point ac " << ac_control->at(heuristic_devpoints_index - st_control->size()) );
+          }
+        }
+        heuristic_devpoints_index++;
+      }
+      im_index++;
+      
+      all_scores.clear();
+    }
+    
+    return changed;
+  }
+  
 public:
 //   Used by others
-  bool inform(uint episode_){
-    bool changed = develop(episode_);
+  bool inform(uint episode_, double score){
+    bool changed = false;
+    if(intrasec_motivation)
+      changed = developIM(episode_, score);
+    else
+      changed = develop(episode_);
     
     return reset_learning_algo && changed;
   }
@@ -387,6 +470,99 @@ public:
     neural_net->BackwardFrom(layer);
   }
   
+  double ewc_cost() override {
+    if(ewc < 0.f)
+      return 0.f;
+    double cost = 0.f;
+    uint k=0;
+    const auto& from_params = neural_net->params();
+    for (uint i = 0; i < from_params.size(); ++i) {//TODO : ignore weight connected to disable connec
+      if(neural_net->params_lr()[i] != 0.0f){
+        auto& from_blob = from_params[i];
+        auto weight = from_blob->cpu_data();
+        for(int j=0;j<from_blob->count();j++){
+          double x = (best_param->at(k) - weight[j]);
+          cost += x*x*fisher->at(k);
+          k++;
+        }
+      }
+    }
+    return cost * ewc;
+  }
+  
+  bool ewc_enabled() override {
+    return ewc >= 0.f;
+  }
+  
+  void ewc_setup(const std::vector<double>& sensors, const std::vector<double>& motors){
+    if(!ewc_enabled())
+      return ;
+    
+    if(best_param != nullptr)
+      delete best_param;
+    
+    best_param = new std::vector<double>(number_of_parameters(true));
+    uint k=0;
+    const auto& from_params = neural_net->params();
+    for (uint i = 0; i < from_params.size(); ++i) {
+      if(neural_net->params_lr()[i] != 0.0f){
+        auto& from_blob = from_params[i];
+        auto bestweight = from_blob->cpu_data();
+        for(int j=0;j<from_blob->count();j++){
+          best_param->at(k) = bestweight[j];
+          k++;
+        }
+      }
+    }
+    
+    if(fisher != nullptr)
+      delete fisher;
+    fisher = computeFisherEWC(sensors, motors);
+    
+  }
+  
+  std::vector<double>* computeFisherEWC(const std::vector<double>& sensors, const std::vector<double>& motors){
+    ZeroGradParameters();
+    if(size_input_state == size_sensors)
+      InputDataIntoLayers(&sensors, NULL, NULL, add_loss_layer || size_motors == 0);//pi or V
+    else
+      InputDataIntoLayers(&sensors, &motors, nullptr, true);//Q
+    
+    auto fisher = new std::vector<double>(number_of_parameters(true));
+    neural_net->Forward(nullptr);
+    
+    if(size_input_state != size_sensors || size_motors == 0){//Q or V
+      const auto q_values_blob = neural_net->blob_by_name(q_values_blob_name);
+      auto prob = q_values_blob->cpu_data();
+      double* q_values_diff = q_values_blob->mutable_cpu_diff();
+      for (uint i=0;i<kMinibatchSize;i++)
+        q_values_diff[q_values_blob->offset(i,0,0,0)] = -1.0f / prob[i] ;
+      critic_backward();
+    } else { //pi
+      const auto actions_values_blob = neural_net->blob_by_name(actions_blob_name);
+      auto prob = actions_values_blob->cpu_data();
+      double* actions_values_diff = actions_values_blob->mutable_cpu_diff();
+      for (uint i=0;i<kMinibatchSize;i++)
+        for (uint j=0;j<size_motors;j++)
+          actions_values_diff[actions_values_blob->offset(i,j,0,0)] = -1.0f / prob[actions_values_blob->offset(i,j,0,0)] ;
+      actor_backward();
+    }
+    
+    uint k=0;
+    for (uint i = 0; i < neural_net->params().size(); ++i) {
+      auto blob = neural_net->params()[i];
+      auto derriv = blob->cpu_diff();
+      for(int y=0; y <blob->count(); y++){
+        fisher->at(k) = derriv[y] * derriv[y];
+        k++;
+      }
+    }
+    
+    ZeroGradParameters();
+    
+    return fisher;
+  }
+  
 private:
   bool disable_st_control = false;
   bool disable_ac_control = false; //for vnn
@@ -396,6 +572,14 @@ private:
   std::vector<uint>* st_control = nullptr;
   std::vector<uint>* ac_control = nullptr;
   bool reset_learning_algo = false;
+  bool intrasec_motivation;
+  int im_window, im_smooth;
+  uint im_index = 0;
+  double ewc = -1.f;
+  
+  std::vector<double> all_scores;
+  std::vector<double>* best_param = nullptr;
+  std::vector<double>* fisher = nullptr;
 };
 
 #endif

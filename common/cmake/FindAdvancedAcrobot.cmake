@@ -12,6 +12,8 @@ find_library( ADVANCED_ACROBOT_LIBRARY
   NAMES ${ADVANCED_ACROBOT_NAME}
   PATHS
   "${ROOT_DRL_PATH}/environment/advanced-acrobot/lib"
+  "${ROOT_DRL_PATH}/environment/advanced-acrobot/lib/Debug"
+  "${ROOT_DRL_PATH}/environment/advanced-acrobot/lib/Release"
 )
 
 find_package(ODEEnv)

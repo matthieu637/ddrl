@@ -137,8 +137,23 @@ cd ../..
 # then you can compile ddrl
 git clone https://github.com/matthieu637/ddrl
 cd ddrl
+#if you want to use make to compile 
 ./fullBuild
+#or if you want to use Xcode projects
+./fullBuild xcode
 ```
 
 ### no access to sudo
 if you don't have access to sudo, you can adapt the script under scripts/nosudo-install
+
+
+## Usage
+
+A .ini file is needed to describe the experience you want to run (neural network architecture, episodes, etc.).
+```
+#run the humanoid envionment with CMA-ES 
+cd agent/cmaes/build/debug/
+./humanoid --config cmaes-humnaoid.ini --view
+```
+
+For now, on mac, the only working view is humanoid. Others environments can be run without view.
