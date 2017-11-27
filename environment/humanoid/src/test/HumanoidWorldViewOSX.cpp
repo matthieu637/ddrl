@@ -154,7 +154,6 @@ HumanoidWorldView::~HumanoidWorldView() {
 }
 
 void HumanoidWorldView::step(const std::vector<double>& motors) {
-  LOG_DEBUG("step2");
   std::vector<double> modified_motors(motors.size(), 0);
   if (!inst->ignoreMotor) {
     if(inst->modified_motor <= -2.f)
@@ -175,7 +174,6 @@ void HumanoidWorldView::step(const std::vector<double>& motors) {
   
 
   usleep(3*WORLD_STEP / speed * 1000 * 1000);  // needed to don't be faster than the view
-  LOG_DEBUG("step");
 }
 
 void HumanoidWorldView::resetPositions(std::vector<double> & result_stoch, const std::vector<double>& given_stoch) {

@@ -83,7 +83,11 @@ function inject_line_in_section(){
 	else
 		#escape [section] to \[section\]
 		section=`echo $section | sed -e 's/[[]/\\\[/' | sed -e 's/[]]/\\\]/' `
-		sed -i "s/\($section\)/$line\n\1/" $file
+		if [ $MAC -eq 1 ] ; then
+			gsed -i "/$section/i \\$line" $file
+		else
+			sed -i "/$section/i \\$line" $file
+		fi
 	fi
 }
 

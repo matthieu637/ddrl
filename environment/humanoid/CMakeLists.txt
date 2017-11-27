@@ -42,7 +42,10 @@ endif()
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/ode-env/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 
-#execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash ${ROOT_DRL_PATH}/common/data/minimal_config.ini data/humanoid.ini config.ini)
+execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash 
+	${ROOT_DRL_PATH}/common/data/minimal_config.ini 
+	${CMAKE_CURRENT_BINARY_DIR}/data/humanoid.ini 
+	${CMAKE_CURRENT_BINARY_DIR}/config.ini)
 
 #-------------------
 # Unit Test
