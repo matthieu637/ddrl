@@ -393,7 +393,7 @@ class MLP {
 // //     neural_net->Init(net_param_init);
 //
 //   }
-
+  
   void increase_batchsize(uint new_batch_size) {
     kMinibatchSize = new_batch_size;
 
@@ -661,6 +661,14 @@ class MLP {
     }
 
     return sum;
+  }
+  
+  virtual double ewc_cost() {
+    return 0.f;
+  }
+  
+  virtual bool ewc_enabled() {
+    return false;
   }
 
   boost::shared_ptr<caffe::Net<double>> getNN() {

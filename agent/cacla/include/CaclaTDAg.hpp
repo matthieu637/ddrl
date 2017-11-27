@@ -35,7 +35,7 @@ class CaclaTDAg : public arch::ARLAgent<> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                  bool learning, bool goal_reached, bool) {
+                                  bool learning, bool goal_reached, bool) override {
 
     vector<double>* next_action ;
     if(learning)
@@ -233,7 +233,6 @@ class CaclaTDAg : public arch::ARLAgent<> {
 
   bool gaussian_policy, with_delta, pos_delta;
   double gradient_step_proba;
-  bool gradient_step;
   uint shrink_ga;
 
   std::shared_ptr<std::vector<double>> last_action;

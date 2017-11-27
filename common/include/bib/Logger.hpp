@@ -210,7 +210,6 @@ class Logger : public Singleton<Logger> {
   bool ignored_buffer_enable = false;
   std::list<std::stringstream *> buff;
   std::list<std::stringstream *> ignored_buffer;
-  unsigned int buffer_index = 0;
   std::map<std::string, std::ofstream *> open_files;
 };
 }  // namespace bib

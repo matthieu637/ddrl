@@ -35,7 +35,7 @@ class BaseCaclaAg : public arch::ARLAgent<> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                  bool learning, bool goal_reached, bool) {
+                                  bool learning, bool goal_reached, bool) override {
 
     vector<double>* next_action ;
     if(learning)

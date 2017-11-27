@@ -108,7 +108,9 @@ class ARLAgent : public AAgent<ProgOptions> {
   void start_episode(const std::vector<double>& perceptions, bool learning) override {
     time_for_ac = 1;
     inter_rewards.clear();
+    last_sum_weighted_reward = sum_weighted_reward;
     sum_weighted_reward = 0;
+    
     global_pow_gamma = 1.000000000f;
     
     if(history_size == 1)
@@ -203,7 +205,7 @@ protected:
   * @param command_args
   * @return void
   */
-  virtual void _unique_invoke(boost::property_tree::ptree* , boost::program_options::variables_map*) {}
+  virtual void _unique_invoke(boost::property_tree::ptree* , boost::program_options::variables_map*) override {}
 
 
 private:
@@ -218,7 +220,8 @@ private:
   double reward_scale;
   
 protected:
-  double sum_weighted_reward;
+  double sum_weighted_reward = 0;
+  double last_sum_weighted_reward = 0;
   double gamma;
   uint nb_motors;
   uint state_size;

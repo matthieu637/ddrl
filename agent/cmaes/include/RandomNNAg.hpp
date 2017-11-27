@@ -24,7 +24,7 @@ class RandomNNAg : public arch::ARLAgent<arch::AgentProgOptions> {
   }
 
   const std::vector<double>& _run(double, const std::vector<double>& sensors,
-                                  bool, bool, bool) {
+                                  bool, bool, bool) override {
 
     vector<double>* next_action = ann->computeOut(sensors);
     last_action.reset(next_action);
