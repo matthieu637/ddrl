@@ -327,11 +327,11 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     trajectory.clear();
 
-    if(std::is_same<NN, DODevMLP>::value) {
-      static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann)->inform(episode, this->last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode, this->last_sum_weighted_reward);
-    }
+//     if(std::is_same<NN, DODevMLP>::value) {
+//       static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
+//       static_cast<DODevMLP *>(ann)->inform(episode, this->last_sum_weighted_reward);
+//       static_cast<DODevMLP *>(ann_testing)->inform(episode, this->last_sum_weighted_reward);
+//     }
 
     double* weights = new double[ann->number_of_parameters(false)];
     ann->copyWeightsTo(weights, false);

@@ -1312,10 +1312,12 @@ TEST(MLP, DevelopmentalLayerHeuristic1) {
           auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
           auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
 
-          for (uint i =0; i < batch_size; i++)
-            for (uint j =0; j < 4; j++)
+          for (uint i =0; i < batch_size; i++){
+            for (uint j =0; j < 4; j++){
               if(all_actions_outputs->at(i*4+j) != 0 && sensors[i*3+1] > 0.0001 && sensors[i*3+2] > 0.0001)
                 EXPECT_NE(all_actions_outputs->at(i*4+j), all_actions_outputs2->at(i*4+j));
+            }
+          }
 
           delete all_actions_outputs;
           delete all_actions_outputs2;

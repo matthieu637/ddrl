@@ -170,7 +170,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     }
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool) override {
+  void _start_episode(const std::vector<double>& sensors, bool learning) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -180,7 +180,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     trajectory.clear();
     
-    if(std::is_same<NN, DODevMLP>::value){
+    if(std::is_same<NN, DODevMLP>::value && learning){
       static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
       static_cast<DODevMLP *>(ann)->inform(episode, this->last_sum_weighted_reward);
       static_cast<DODevMLP *>(ann_testing)->inform(episode, this->last_sum_weighted_reward);

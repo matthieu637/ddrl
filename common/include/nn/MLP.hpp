@@ -670,6 +670,14 @@ class MLP {
   virtual bool ewc_enabled() {
     return false;
   }
+  
+  virtual void fisher_sample(const std::vector<double>*, const std::vector<double>*){
+    
+  }
+  
+  virtual void reset_fisher_sample(double) {
+    
+  }
 
   boost::shared_ptr<caffe::Net<double>> getNN() {
     return neural_net;

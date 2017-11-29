@@ -217,7 +217,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       trajectories.push_back(std::shared_ptr<trajectory>(t));
     }
 
-    if(std::is_same<NN, DODevMLP>::value) {
+    if(std::is_same<NN, DODevMLP>::value && learning) {
       static_cast<DODevMLP *>(vnn)->inform(episode, last_sum_weighted_reward);
       static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward);
       static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);

@@ -234,19 +234,19 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     last_trajectory_a.clear();
     
-    if(std::is_same<NN, DODevMLP>::value){
-      if(static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward)){
-        LOG_INFO("reset learning catched");
-        trajectory.clear();
-      }
-      if(static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward)){
-        LOG_INFO("reset learning catched");
-        trajectory.clear();
-      }
-      static_cast<DODevMLP *>(qnn_target)->inform(episode, last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann_target)->inform(episode, last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
-    }
+//     if(std::is_same<NN, DODevMLP>::value){
+//       if(static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward)){
+//         LOG_INFO("reset learning catched");
+//         trajectory.clear();
+//       }
+//       if(static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward)){
+//         LOG_INFO("reset learning catched");
+//         trajectory.clear();
+//       }
+//       static_cast<DODevMLP *>(qnn_target)->inform(episode, last_sum_weighted_reward);
+//       static_cast<DODevMLP *>(ann_target)->inform(episode, last_sum_weighted_reward);
+//       static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
+//     }
   }
   
   void sample_transition(std::vector<sample>& traj, const std::deque<sample>& from){
@@ -416,7 +416,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       
       const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
       auto ac_diff = actor_actions_blob->mutable_cpu_diff();
-      for(i=0; i<actor_actions_blob->count(); i++) {
+      for(i=0; i<(uint) actor_actions_blob->count(); i++) {
         if(disable_back[i]) {
           ac_diff[i] = critic_action_diff[i];
         } else {

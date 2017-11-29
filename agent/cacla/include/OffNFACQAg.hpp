@@ -216,11 +216,11 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
       trajectories.push_back(std::shared_ptr<trajectory>(t));
     }
 
-    if(std::is_same<NN, DODevMLP>::value) {
-      static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
-    }
+//     if(std::is_same<NN, DODevMLP>::value) {
+//       static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward);
+//       static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward);
+//       static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
+//     }
 
     double* weights = new double[ann->number_of_parameters(false)];
     ann->copyWeightsTo(weights, false);
