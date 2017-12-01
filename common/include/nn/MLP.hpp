@@ -464,7 +464,17 @@ class MLP {
       InputDataIntoLayers(&sensors, &motors, &q);
     else
       InputDataIntoLayers(&sensors, nullptr, &q);
-    solver->Step(iter);
+    if(!ewc_enabled())
+      solver->Step(iter);
+    else {
+      for(uint i=0;i<iter;i++){
+        neural_net->ClearParamDiffs();
+        neural_net->ForwardBackward();
+        regularize();
+        solver->ApplyUpdate();
+        solver->set_iter(solver->iter() + 1);
+      }
+    }
   }
 
   void learn_batch_lw(const std::vector<double>& sensors, const std::vector<double>& motors, const std::vector<double>& q,
@@ -474,7 +484,17 @@ class MLP {
     else 
       InputDataIntoLayers(&sensors, nullptr, &q);
     setWeightedSampleVector(&lw, false);
-    solver->Step(iter);
+    if(!ewc_enabled())
+      solver->Step(iter);
+    else {
+      for(uint i=0;i<iter;i++){
+        neural_net->ClearParamDiffs();
+        neural_net->ForwardBackward();
+        regularize();
+        solver->ApplyUpdate();
+        solver->set_iter(solver->iter() + 1);
+      }
+    }
   }
 
   virtual double computeOutVF(const std::vector<double>& sensors, const std::vector<double>& motors) {
@@ -676,6 +696,10 @@ class MLP {
   }
   
   virtual void reset_fisher_sample(double) {
+    
+  }
+  
+  virtual void regularize() {
     
   }
 
