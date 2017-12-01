@@ -914,7 +914,9 @@ protected:
 //     LOG_DEBUG("" << (ip_param->has_bias_term() ? "oui" : "non"));
 //    LOG_DEBUG(ip_param->has_bias_term());
 //     ip_param->set_bias_term(true);
-//     caffe::FillerParameter* bias_filler = ip_param->mutable_bias_filler();
+    caffe::FillerParameter* bias_filler = ip_param->mutable_bias_filler();
+    bias_filler->set_type("gaussian");
+    bias_filler->set_std(0.01);
 //     bias_filler->set_type("constant");
 //     bias_filler->set_value(1);
 //     bias already here but not in first blob but set to 0?

@@ -717,16 +717,11 @@ class DODevMLP : public MLP {
         auto weight = from_blob->cpu_data();
         auto weight_diff = from_blob->mutable_cpu_diff();
         for(int j=0; j<from_blob->count(); j++) {
-          weight_diff[i] += ewc * fisher->at(k) * (weight[i] - best_param_previous_task->at(k)) ;
+          weight_diff[j] += ewc * fisher->at(k) * (weight[j] - best_param_previous_task->at(k)) ;
           k++;
         }
       }
     }
-
-//     std::vector<double>* p = new std::vector<double>(number_of_parameters(true));
-//     this->copyWeightsTo(p->data(), true);
-//     bib::Logger::PRINT_ELEMENTS(*p, " weight ");
-//     delete p;
   }
 
   bool ewc_enabled() override {

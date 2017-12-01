@@ -81,6 +81,12 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(sensors);
+    
+    if(learning){
+      ann->fisher_sample(&sensors, nullptr);
+      vnn->fisher_sample(&sensors, nullptr);
+      ann_testing->fisher_sample(&sensors, nullptr);
+    }
 
     if (last_action.get() != nullptr && learning) {
       double p0 = 1.f;
@@ -458,6 +464,10 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     //     LOG_FILE("policy_exploration", ann->hash());
     if(!learning)
       return;
+    
+    ann->reset_fisher_sample(sum_weighted_reward);
+    vnn->reset_fisher_sample(sum_weighted_reward);
+    ann_testing->reset_fisher_sample(sum_weighted_reward);
 
     uint all_size = alltransitions();
     if(all_size > 0) {
@@ -598,6 +608,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
             }
           }
           ann->actor_backward();
+          ann->regularize();
           ann->getSolver()->ApplyUpdate();
           ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
           delete ac_out;
@@ -676,6 +687,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
             ac_diff[i] = -x*deltas_blob[i];
         }
         ann->actor_backward();
+        ann->regularize();
         ann->getSolver()->ApplyUpdate();
         ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
         delete ac_out;
@@ -884,6 +896,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
           }
         }
         ann->actor_backward();
+        ann->regularize();
         ann->getSolver()->ApplyUpdate();
         ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
         delete ac_out;

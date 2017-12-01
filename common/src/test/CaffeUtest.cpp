@@ -355,8 +355,9 @@ TEST(MLP, CaffeCopyActor) {
           EXPECT_DOUBLE_EQ(all_actions_outputs->at(i), all_actions_outputs2->at(i));
           EXPECT_DOUBLE_EQ(all_actions_outputs4->at(i), all_actions_outputs3->at(i));
           EXPECT_DOUBLE_EQ(all_actions_outputs4->at(i), all_actions_outputs5->at(i));
-          if(batch_norm == 0) //is not the same because batch norm is not learning
+          if(batch_norm == 0){ //is not the same because batch norm is not learning
             EXPECT_DOUBLE_EQ(all_actions_outputs2->at(i), all_actions_outputs3->at(i));
+          }
         }
         delete all_actions_outputs;
         delete all_actions_outputs2;
@@ -1312,12 +1313,11 @@ TEST(MLP, DevelopmentalLayerHeuristic1) {
           auto all_actions_outputs = actor.computeOutBatch(sensors);//batch norm learns
           auto all_actions_outputs2 = actor2.computeOutBatch(sensors);//batch norm learns
 
-          for (uint i =0; i < batch_size; i++){
-            for (uint j =0; j < 4; j++){
-              if(all_actions_outputs->at(i*4+j) != 0 && sensors[i*3+1] > 0.0001 && sensors[i*3+2] > 0.0001)
+          for (uint i =0; i < batch_size; i++)
+            for (uint j =0; j < 4; j++)
+              if(all_actions_outputs->at(i*4+j) != 0 && sensors[i*3+1] > 0.0001 && sensors[i*3+2] > 0.0001){
                 EXPECT_NE(all_actions_outputs->at(i*4+j), all_actions_outputs2->at(i*4+j));
-            }
-          }
+              }
 
           delete all_actions_outputs;
           delete all_actions_outputs2;
