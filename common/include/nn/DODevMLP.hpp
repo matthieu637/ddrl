@@ -591,14 +591,22 @@ class DODevMLP : public MLP {
         for(int i=0; i<actions_values_blob->count(); i++)
           if(fabs(prob[i]) <= 1e-8)
             prob[i]=1e-8 * (bib::Utils::rand01() > 0.5 ?  1.f : -1.f);
-          
-          double* actions_values_diff = actions_values_blob->mutable_cpu_diff();
+
+        double* actions_values_diff = actions_values_blob->mutable_cpu_diff();
         ASSERT(kMinibatchSize * size_motors == (uint) actions_values_blob->count(), "size pb");
         for (uint i=0; i<kMinibatchSize; i++)
           for (uint j=0; j<size_motors; j++)
             actions_values_diff[actions_values_blob->offset(i,j,0,0)] = 1.0f / prob[actions_values_blob->offset(i,j,0,0)];
-      } else if(fisher_method == 2){
-        
+      } else if(fisher_method == 2) {
+        double* actions_values_diff = actions_values_blob->mutable_cpu_diff();
+        for (uint i=0; i<kMinibatchSize; i++)
+          for (uint j=0; j<size_motors; j++)
+            actions_values_diff[actions_values_blob->offset(i,j,0,0)] = 1.0f;
+      } else if(fisher_method == 3) {
+        double* actions_values_diff = actions_values_blob->mutable_cpu_diff();
+        for (uint i=0; i<kMinibatchSize; i++)
+          for (uint j=0; j<size_motors; j++)
+            actions_values_diff[actions_values_blob->offset(i,j,0,0)] = -1.0f;
       }
       actor_backward();
     }
