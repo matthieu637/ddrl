@@ -184,8 +184,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     trajectory.clear();
     
-    if(std::is_same<NN, DODevMLP>::value && learning){
-      static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
+    if(std::is_same<NN, DODevMLP>::value && !learning){
+      //static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
       static_cast<DODevMLP *>(ann)->inform(episode, this->last_sum_weighted_reward);
     }
     
@@ -346,10 +346,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   void end_episode(bool learning) override {
 //     LOG_FILE("policy_exploration", ann->hash());
-    if(!learning)
+    if(!learning){
+      ann->reset_fisher_sample(this->sum_weighted_reward);
       return;
+    }
     
-    ann->reset_fisher_sample(this->sum_weighted_reward);
+    //ann->reset_fisher_sample(this->sum_weighted_reward);
     vnn->reset_fisher_sample(this->sum_weighted_reward);
 
     if(trajectory.size() > 0){

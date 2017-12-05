@@ -663,6 +663,12 @@ class DODevMLP : public MLP {
       return;
 
     uint k=0;
+    double ewc_decay_factor_ = 1.f;
+    if(ewc_decay >= 0.f){
+      ewc_decay_factor_ = ewc_decay_multiplier;
+      ewc_decay_multiplier *= ewc_decay;
+    }
+      
     const auto& from_params = neural_net->params();
     for (uint i = 0; i < from_params.size(); ++i) {
       if(neural_net->params_lr()[i] != 0.0f) {
@@ -670,7 +676,7 @@ class DODevMLP : public MLP {
         auto weight = from_blob->cpu_data();
         auto weight_diff = from_blob->mutable_cpu_diff();
         for(int j=0; j<from_blob->count(); j++) {
-          weight_diff[j] += ewc * fisher->at(k) * (weight[j] - best_param_previous_task->at(k)) ;
+          weight_diff[j] += ewc * ewc_decay_factor_ * fisher->at(k) * (weight[j] - best_param_previous_task->at(k)) ;
           k++;
         }
       }
@@ -692,8 +698,8 @@ class DODevMLP : public MLP {
 
   void reset_fisher_sample(double score) override {
     if(ewc_enabled()) {
-//       if(score > best_score) {
-      if(true) {
+      if(score > best_score) {
+//       if(true) {
         best_score = score;
 
         if(best_param != nullptr)
