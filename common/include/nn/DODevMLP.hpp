@@ -144,6 +144,12 @@ class DODevMLP : public MLP {
         ewc_decay = pt->get<double>("devnn.ewc_decay");
     } catch(boost::exception const& ) {
     }
+    
+    try {
+      if(ewc >= 0.f)
+        beta = pt->get<double>("devnn.beta");
+    } catch(boost::exception const& ) {
+    }
 
     if((ac_scale && ac_probabilistic != 0) || (st_scale && st_probabilistic != 0)) {
       LOG_ERROR("if not probabilistic then why scaling? of how much?");
@@ -540,104 +546,25 @@ class DODevMLP : public MLP {
 //     std::string s = " best " + neural_net->name();
 //     bib::Logger::PRINT_ELEMENTS(*best_param_previous_task, s.c_str());
 
-    if(fisher != nullptr)
-      delete fisher;
-    int batch_size = fisher_sample_sensors_best.size()/this->size_sensors;
-    int previous_batch_size = this->kMinibatchSize;
-    if(previous_batch_size != batch_size)
-      increase_batchsize(batch_size);
-    fisher = computeFisherEWC(fisher_sample_sensors_best, fisher_sample_actions_best);
-//     bib::Logger::PRINT_ELEMENTS(*fisher, " fisher ");
-    if(previous_batch_size != batch_size)
-      increase_batchsize(previous_batch_size);
+//     if(fisher != nullptr)
+//       delete fisher;
+    computeFisherEWC(fisher_sample_sensors_best, fisher_sample_actions_best);
+    stopFisherUpdate = true;
+    //bib::Logger::PRINT_ELEMENTS(*fisher, " fisher ");
   }
 
-  std::vector<double>* computeFisherEWC(const std::vector<double>& sensors, const std::vector<double>& motors) {
-    ZeroGradParameters();
-    if(size_input_state == size_sensors)
-      InputDataIntoLayers(&sensors, NULL, NULL, add_loss_layer || size_motors == 0);//pi or V
-    else
-      InputDataIntoLayers(&sensors, &motors, nullptr, true);//Q
-
-    auto fisher = new std::vector<double>(number_of_parameters(true));
-    neural_net->Forward(nullptr);
-
-    if(size_input_state != size_sensors || size_motors == 0) { //Q or V
-      const auto q_values_blob = neural_net->blob_by_name(q_values_blob_name);
-      auto prob = q_values_blob->mutable_cpu_data();
-      if(fisher_method == 0) {
-        for(int i=0; i<q_values_blob->count(); i++)
-          if(fabs(prob[i]) <= 1e-8)
-            prob[i]=1e-8 * (bib::Utils::rand01() > 0.5 ?  1.f : -1.f);
-      }
-      double* q_values_diff = q_values_blob->mutable_cpu_diff();
-      for (uint i=0; i<kMinibatchSize; i++)
-        q_values_diff[q_values_blob->offset(i,0,0,0)] = -1.0f / prob[i] ;
-      critic_backward();
-    } else { //pi
-      const auto actions_values_blob = neural_net->blob_by_name(actions_blob_name);
-      auto prob = actions_values_blob->mutable_cpu_data();
-      if(fisher_method == 0) {
-        for(int i=0; i<actions_values_blob->count(); i++)
-          if(fabs(prob[i]) <= 1e-8)
-            prob[i]=1e-8 * (bib::Utils::rand01() > 0.5 ?  1.f : -1.f);
-
-        double* actions_values_diff = actions_values_blob->mutable_cpu_diff();
-        ASSERT(kMinibatchSize * size_motors == (uint) actions_values_blob->count(), "size pb");
-        for (uint i=0; i<kMinibatchSize; i++)
-          for (uint j=0; j<size_motors; j++)
-            actions_values_diff[actions_values_blob->offset(i,j,0,0)] = -1.0f / prob[actions_values_blob->offset(i,j,0,0)];
-      } else if(fisher_method == 1) {
-        for(int i=0; i<actions_values_blob->count(); i++)
-          if(fabs(prob[i]) <= 1e-8)
-            prob[i]=1e-8 * (bib::Utils::rand01() > 0.5 ?  1.f : -1.f);
-
-        double* actions_values_diff = actions_values_blob->mutable_cpu_diff();
-        ASSERT(kMinibatchSize * size_motors == (uint) actions_values_blob->count(), "size pb");
-        for (uint i=0; i<kMinibatchSize; i++)
-          for (uint j=0; j<size_motors; j++)
-            actions_values_diff[actions_values_blob->offset(i,j,0,0)] = 1.0f / prob[actions_values_blob->offset(i,j,0,0)];
-      } else if(fisher_method == 2) {
-        double* actions_values_diff = actions_values_blob->mutable_cpu_diff();
-        for (uint i=0; i<kMinibatchSize; i++)
-          for (uint j=0; j<size_motors; j++)
-            actions_values_diff[actions_values_blob->offset(i,j,0,0)] = 1.0f;
-      } else if(fisher_method == 3) {
-        double* actions_values_diff = actions_values_blob->mutable_cpu_diff();
-        for (uint i=0; i<kMinibatchSize; i++)
-          for (uint j=0; j<size_motors; j++)
-            actions_values_diff[actions_values_blob->offset(i,j,0,0)] = -1.0f;
-      }
-      actor_backward();
-    }
-
-    uint k=0;
-    ASSERT(neural_net->params_lr().size() == neural_net->params().size(), "size pb");
-    for (uint i = 0; i < neural_net->params().size(); ++i) {
-      if(neural_net->params_lr()[i] != 0.0f) {
-        auto blob = neural_net->params()[i];
-        auto derriv = blob->cpu_diff();
-        for(int y=0; y <blob->count(); y++) {
-          fisher->at(k) = derriv[y] * derriv[y];
-          k++;
-        }
-      }
-    }
-    ASSERT(k == fisher->size(), "size pb");
-
-    ZeroGradParameters();
-
+  std::vector<double>* computeFisherEWC(const std::vector<double>&, const std::vector<double>&) {
     //     ignore weight connected to disable connec
     //     already fine with this computation of fisher matrix
-    //     bib::Logger::PRINT_ELEMENTS(*fisher, "fisher ");
-    //     LOG_DEBUG(std::count( fisher->begin(), fisher->end(), 0.0f ));
-    //     LOG_DEBUG(4*2+3*2 << " " << 3*2+3*2 << " " << 3*2);
 
+    for(uint i=0; i<fisher->size(); i++)
+      fisher->at(i) = fisher->at(i) / fisher_nbr;
+    
     double fmax_ = *std::max_element(fisher->begin(), fisher->end());
     for(uint i=0; i<fisher->size(); i++)
       fisher->at(i) = fisher->at(i) / fmax_;
 
-    return fisher;
+    return nullptr;
   }
 
  public:
@@ -650,6 +577,32 @@ class DODevMLP : public MLP {
       changed = develop(episode_);
 
     return reset_learning_algo && changed;
+  }
+  
+  void updateFisher(double number_sample) override {
+    if(stopFisherUpdate){
+      return;
+    }
+    
+    if(fisher == nullptr) {
+      fisher = new std::vector<double>(number_of_parameters(true), 0.f);
+      fisher_nbr = 0.f;
+    }
+      
+    uint k=0;
+    ASSERT(neural_net->params_lr().size() == neural_net->params().size(), "size pb");
+    for (uint i = 0; i < neural_net->params().size(); ++i) {
+      if(neural_net->params_lr()[i] != 0.0f) {
+        auto blob = neural_net->params()[i];
+        auto derriv = blob->cpu_diff();
+        for(int y=0; y <blob->count(); y++) {
+          fisher->at(k) = fisher->at(k) * beta + (derriv[y] * derriv[y]) * number_sample;
+          k++;
+        }
+      }
+    }
+    fisher_nbr = fisher_nbr * beta + number_sample;
+    ASSERT(k == fisher->size(), "size pb");
   }
 
   void soft_update(const MLP& from, double tau) override {
@@ -739,7 +692,8 @@ class DODevMLP : public MLP {
 
   void reset_fisher_sample(double score) override {
     if(ewc_enabled()) {
-      if(score > best_score) {
+//       if(score > best_score) {
+      if(true) {
         best_score = score;
 
         if(best_param != nullptr)
@@ -780,15 +734,18 @@ class DODevMLP : public MLP {
   double ewc_decay = -1.f;
   double ewc_decay_multiplier = 1.f;
   uint fisher_method=0;
+  double beta;
 
   std::vector<double> all_scores;
   std::vector<double>* best_param = nullptr;
   std::vector<double>* best_param_previous_task = nullptr;
   std::vector<double>* fisher = nullptr;
+  double fisher_nbr;
   std::vector<double> fisher_sample_sensors, fisher_sample_sensors_best;
   std::vector<double> fisher_sample_actions, fisher_sample_actions_best;
   uint last_episode_changed = 0;
   double best_score = std::numeric_limits<double>::lowest();
+  bool stopFisherUpdate = false;
 };
 
 #endif

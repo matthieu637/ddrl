@@ -493,6 +493,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             }
           }
           ann->actor_backward();
+          ann->updateFisher(n);
           ann->regularize();
           ann->getSolver()->ApplyUpdate();
           ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);

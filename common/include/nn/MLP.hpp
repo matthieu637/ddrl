@@ -702,6 +702,10 @@ class MLP {
   virtual void regularize() {
     
   }
+  
+  virtual void updateFisher(double) {
+    
+  }
 
   boost::shared_ptr<caffe::Net<double>> getNN() {
     return neural_net;
