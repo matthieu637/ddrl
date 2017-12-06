@@ -396,7 +396,7 @@ class DODevMLP : public MLP {
     bool catch_change = false;
     bool will_change = going_to_develop(episode);
     if(will_change)
-      ewc_setup();
+      ewc_setup(episode);
 
     if(heuristic == 1) {
       for(uint heuristic_devpoints_index=0; heuristic_devpoints_index < heuristic_devpoints->size() ;
@@ -441,10 +441,6 @@ class DODevMLP : public MLP {
       }
     }
 
-    if(catch_change) { //used by EWC cost
-      last_episode_changed = episode;
-      ASSERT(catch_change == will_change, "pb");
-    }
     return catch_change;
   }
 
@@ -480,10 +476,9 @@ class DODevMLP : public MLP {
 
     //change corresponding weights
     if(changed) {
-      ewc_setup();
+      ewc_setup(last_episode_changed + all_scores.size());
       update_DL_IM();
 
-      last_episode_changed += all_scores.size();
       all_scores.clear();
     }
 
@@ -533,26 +528,6 @@ class DODevMLP : public MLP {
     im_index++;
   }
 
-  void ewc_setup() {
-    if(!ewc_enabled() || best_param ==nullptr)
-      return ;
-
-    ewc_decay_multiplier = 1.f;
-
-    if(best_param_previous_task != nullptr)
-      delete best_param_previous_task;
-    best_param_previous_task = new std::vector<double>(*best_param);
-    this->copyWeightsFrom(best_param_previous_task->data(), true);
-//     std::string s = " best " + neural_net->name();
-//     bib::Logger::PRINT_ELEMENTS(*best_param_previous_task, s.c_str());
-
-//     if(fisher != nullptr)
-//       delete fisher;
-    computeFisherEWC(fisher_sample_sensors_best, fisher_sample_actions_best);
-    stopFisherUpdate = true;
-    //bib::Logger::PRINT_ELEMENTS(*fisher, " fisher ");
-  }
-
   std::vector<double>* computeFisherEWC(const std::vector<double>&, const std::vector<double>&) {
     //     ignore weight connected to disable connec
     //     already fine with this computation of fisher matrix
@@ -575,8 +550,30 @@ class DODevMLP : public MLP {
       changed = developIM(episode_, score);
     else
       changed = develop(episode_);
-
-    return reset_learning_algo && changed;
+//TODO: check me
+//     return reset_learning_algo && changed;
+    return changed;
+  }
+  
+  void ewc_setup(uint episode) {
+    if(!ewc_enabled() || best_param ==nullptr)
+      return ;
+    
+    last_episode_changed = episode;
+    ewc_decay_multiplier = 1.f;
+    
+    if(best_param_previous_task != nullptr)
+      delete best_param_previous_task;
+    best_param_previous_task = new std::vector<double>(*best_param);
+    this->copyWeightsFrom(best_param_previous_task->data(), true);
+    //     std::string s = " best " + neural_net->name();
+    //     bib::Logger::PRINT_ELEMENTS(*best_param_previous_task, s.c_str());
+    
+    //     if(fisher != nullptr)
+    //       delete fisher;
+    computeFisherEWC(fisher_sample_sensors_best, fisher_sample_actions_best);
+    stopFisherUpdate = true;
+    bib::Logger::PRINT_ELEMENTS(*fisher, " fisher ");
   }
   
   void updateFisher(double number_sample) override {

@@ -470,6 +470,7 @@ class MLP {
       for(uint i=0;i<iter;i++){
         neural_net->ClearParamDiffs();
         neural_net->ForwardBackward();
+        updateFisher(kMinibatchSize);
         regularize();
         solver->ApplyUpdate();
         solver->set_iter(solver->iter() + 1);

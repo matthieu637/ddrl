@@ -186,7 +186,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     
     if(std::is_same<NN, DODevMLP>::value && !learning){
       //static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann)->inform(episode, this->last_sum_weighted_reward);
+      bool changed = static_cast<DODevMLP *>(ann)->inform(episode, this->last_sum_weighted_reward);
+      if(changed && vnn->ewc_enabled())
+        static_cast<DODevMLP *>(vnn)->ewc_setup(episode);
     }
     
     double* weights = new double[ann->number_of_parameters(false)];
@@ -259,6 +261,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               i++;
             }
             vnn->critic_backward();
+            vnn->updateFisher(trajectory.size());
             vnn->regularize();
             vnn->getSolver()->ApplyUpdate();
             vnn->getSolver()->set_iter(vnn->getSolver()->iter() + 1);
@@ -348,11 +351,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 //     LOG_FILE("policy_exploration", ann->hash());
     if(!learning){
       ann->reset_fisher_sample(this->sum_weighted_reward);
+      vnn->reset_fisher_sample(this->sum_weighted_reward);
       return;
     }
     
     //ann->reset_fisher_sample(this->sum_weighted_reward);
-    vnn->reset_fisher_sample(this->sum_weighted_reward);
+//     vnn->reset_fisher_sample(this->sum_weighted_reward);
 
     if(trajectory.size() > 0){
       vnn->increase_batchsize(trajectory.size());
