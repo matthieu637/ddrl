@@ -691,12 +691,8 @@ class MLP {
   virtual bool ewc_enabled() {
     return false;
   }
-  
-  virtual void fisher_sample(const std::vector<double>*, const std::vector<double>*){
     
-  }
-  
-  virtual void reset_fisher_sample(double) {
+  virtual void update_best_param_previous_task(double) {
     
   }
   
@@ -706,6 +702,10 @@ class MLP {
   
   virtual void updateFisher(double) {
     
+  }
+  
+  bool isCritic(){
+    return size_input_state != size_sensors || size_motors == 0;
   }
 
   boost::shared_ptr<caffe::Net<double>> getNN() {

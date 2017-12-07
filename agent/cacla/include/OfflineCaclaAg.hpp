@@ -77,10 +77,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(sensors);
-    if(learning){
-        ann->fisher_sample(&sensors, nullptr);
-        vnn->fisher_sample(&sensors, nullptr);
-    }
     if (last_action.get() != nullptr && learning)
       trajectory.push_back( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
 
@@ -184,11 +180,15 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     trajectory.clear();
     
-    if(std::is_same<NN, DODevMLP>::value && !learning){
-      //static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
-      bool changed = static_cast<DODevMLP *>(ann)->inform(episode, this->last_sum_weighted_reward);
-      if(changed && vnn->ewc_enabled())
-        static_cast<DODevMLP *>(vnn)->ewc_setup(episode);
+    if(std::is_same<NN, DODevMLP>::value && learning){
+      DODevMLP * ann_cast = static_cast<DODevMLP *>(ann);
+      bool changed_ann = std::get<1>(ann_cast->inform(episode, this->last_sum_weighted_reward));
+      bool changed_vnn = std::get<1>(static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward));
+      if(ann_cast->ewc_enabled() && ann_cast->ewc_force_constraint()){
+        if(changed_ann && !changed_vnn)
+          static_cast<DODevMLP *>(vnn)->ewc_setup(episode);
+//         else if(changed_vnn && !changed_ann) //impossible cause of ann structure
+      }
     }
     
     double* weights = new double[ann->number_of_parameters(false)];
@@ -349,14 +349,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   void end_episode(bool learning) override {
 //     LOG_FILE("policy_exploration", ann->hash());
-    if(!learning){
-      ann->reset_fisher_sample(this->sum_weighted_reward);
-      vnn->reset_fisher_sample(this->sum_weighted_reward);
+    if(!learning)
       return;
-    }
     
-    //ann->reset_fisher_sample(this->sum_weighted_reward);
-//     vnn->reset_fisher_sample(this->sum_weighted_reward);
+    ann->update_best_param_previous_task(this->sum_weighted_reward);
+    vnn->update_best_param_previous_task(this->sum_weighted_reward);
 
     if(trajectory.size() > 0){
       vnn->increase_batchsize(trajectory.size());

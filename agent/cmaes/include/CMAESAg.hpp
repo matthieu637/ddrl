@@ -36,10 +36,8 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
   }
 
   const std::vector<double>& _run(double, const std::vector<double>& sensors,
-                                  bool learning, bool, bool) override {
+                                  bool, bool, bool) override {
 
-    if(learning)
-      ann->fisher_sample(&sensors, nullptr);
     vector<double>* next_action = ann->computeOut(sensors);
 
 //  CMA-ES already implement exploration in parameter space
@@ -122,6 +120,16 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
         exit(1);
       }
     }
+    
+    if(std::is_same<NN, DODevMLP>::value){
+      try {
+        if(pt->get<double>("devnn.ewc") >= 0.){
+          LOG_ERROR("CMA-ES doesn't rely on gradient (difficult to compute Fisher Matrix)");
+          exit(1);
+        }
+      } catch(boost::exception const& ) {
+      }
+    }
   }
 
   bool is_feasible(const double* parameters) {
@@ -167,9 +175,11 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
     last_action = nullptr;
     scores.clear();
 
-    if(std::is_same<NN, DODevMLP>::value) {
+    if(std::is_same<NN, DODevMLP>::value && learning) {
       auto dodevmlp = static_cast<DODevMLP *>(ann);
-      if(learning && dodevmlp->inform(episode, last_sum_weighted_reward)) {
+      bool reset_operator, changed;
+      std::tie(reset_operator, changed) = dodevmlp->inform(episode, last_sum_weighted_reward);
+      if(reset_operator && changed) {
         LOG_INFO("reset learning catched");
 
         if(!dodevmlp->ewc_enabled()){
@@ -229,7 +239,7 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
       arFunvals[current_individual] = std::accumulate(scores.begin(), scores.end(), 0.f) / scores.size();
       
       //TODO with instance
-      ann->reset_fisher_sample(sum_weighted_reward);
+      ann->update_best_param_previous_task(sum_weighted_reward);
 
       current_individual++;
       if(current_individual >= cmaes_Get(evo, "lambda")) {

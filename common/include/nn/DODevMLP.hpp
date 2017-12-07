@@ -58,6 +58,8 @@ class DODevMLP : public MLP {
       delete best_param_previous_task;
     if(fisher != nullptr)
       delete fisher;
+    if(previous_fisher != nullptr)
+      delete previous_fisher;
   }
 
   virtual void exploit(boost::property_tree::ptree* pt, MLP* actor) override {
@@ -134,23 +136,25 @@ class DODevMLP : public MLP {
 
     try {
       ewc = pt->get<double>("devnn.ewc");
-      if(ewc >= 0.f)
-        fisher_method = pt->get<uint>("devnn.fisher_method");
-    } catch(boost::exception const& ) {
-    }
-
-    try {
-      if(ewc >= 0.f)
-        ewc_decay = pt->get<double>("devnn.ewc_decay");
     } catch(boost::exception const& ) {
     }
     
     try {
       if(ewc >= 0.f)
-        beta = pt->get<double>("devnn.beta");
+        ewc_decay = pt->get<double>("devnn.ewc_decay");
     } catch(boost::exception const& ) {
     }
 
+    if(ewc >= 0.f){
+      ewc_fisher_beta           = pt->get<double>("devnn.ewc_fisher_beta");
+      if(ewc_fisher_beta < 0){
+        LOG_ERROR("ewc_fisher_beta should be between [0;1]");
+        exit(1);
+      }
+      ewc_best_param_method     = pt->get<uint>("devnn.ewc_best_param_method");
+      ewc_for_critic            = pt->get<uint>("devnn.ewc_for_critic");
+    }
+    
     if((ac_scale && ac_probabilistic != 0) || (st_scale && st_probabilistic != 0)) {
       LOG_ERROR("if not probabilistic then why scaling? of how much?");
       exit(1);
@@ -339,14 +343,6 @@ class DODevMLP : public MLP {
         std::find(heuristic_devpoints->begin(), heuristic_devpoints->end(), 0) != heuristic_devpoints->end()) {
       update_DL_IM();
     }
-
-    if(ewc_enabled()) {
-      uint max_step = pt->get<uint>("simulation.max_episode");
-      fisher_sample_sensors.reserve(max_step * this->size_sensors);
-      fisher_sample_actions.reserve(max_step * this->size_motors);
-      fisher_sample_sensors_best.reserve(max_step * this->size_sensors);
-      fisher_sample_actions_best.reserve(max_step * this->size_motors);
-    }
   }
 
  private:
@@ -528,89 +524,27 @@ class DODevMLP : public MLP {
     im_index++;
   }
 
-  std::vector<double>* computeFisherEWC(const std::vector<double>&, const std::vector<double>&) {
-    //     ignore weight connected to disable connec
-    //     already fine with this computation of fisher matrix
-
-    for(uint i=0; i<fisher->size(); i++)
-      fisher->at(i) = fisher->at(i) / fisher_nbr;
-    
-    double fmax_ = *std::max_element(fisher->begin(), fisher->end());
-    for(uint i=0; i<fisher->size(); i++)
-      fisher->at(i) = fisher->at(i) / fmax_;
-
-    return nullptr;
-  }
-
  public:
 //   Used by others
-  bool inform(uint episode_, double score) {
+  std::tuple<bool, bool> inform(uint episode_, double score) {
     bool changed = false;
     if(intrasec_motivation)
       changed = developIM(episode_, score);
     else
       changed = develop(episode_);
-//TODO: check me
-//     return reset_learning_algo && changed;
-    return changed;
+    
+    return std::make_tuple(reset_learning_algo, changed);
   }
   
-  void ewc_setup(uint episode) {
-    if(!ewc_enabled() || best_param ==nullptr)
-      return ;
-    
-    last_episode_changed = episode;
-    ewc_decay_multiplier = 1.f;
-    
-    if(best_param_previous_task != nullptr)
-      delete best_param_previous_task;
-    best_param_previous_task = new std::vector<double>(*best_param);
-    this->copyWeightsFrom(best_param_previous_task->data(), true);
-    //     std::string s = " best " + neural_net->name();
-    //     bib::Logger::PRINT_ELEMENTS(*best_param_previous_task, s.c_str());
-    
-    //     if(fisher != nullptr)
-    //       delete fisher;
-    computeFisherEWC(fisher_sample_sensors_best, fisher_sample_actions_best);
-    stopFisherUpdate = true;
-    bib::Logger::PRINT_ELEMENTS(*fisher, " fisher ");
-  }
-  
-  void updateFisher(double number_sample) override {
-    if(stopFisherUpdate){
-      return;
-    }
-    
-    if(fisher == nullptr) {
-      fisher = new std::vector<double>(number_of_parameters(true), 0.f);
-      fisher_nbr = 0.f;
-    }
-      
-    uint k=0;
-    ASSERT(neural_net->params_lr().size() == neural_net->params().size(), "size pb");
-    for (uint i = 0; i < neural_net->params().size(); ++i) {
-      if(neural_net->params_lr()[i] != 0.0f) {
-        auto blob = neural_net->params()[i];
-        auto derriv = blob->cpu_diff();
-        for(int y=0; y <blob->count(); y++) {
-          fisher->at(k) = fisher->at(k) * beta + (derriv[y] * derriv[y]) * number_sample;
-          k++;
-        }
-      }
-    }
-    fisher_nbr = fisher_nbr * beta + number_sample;
-    ASSERT(k == fisher->size(), "size pb");
-  }
-
   void soft_update(const MLP& from, double tau) override {
     auto net_from = from.neural_net;
     auto net_to = neural_net;
-
+    
     const auto& from_params = net_from->params();
     const auto& to_params = net_to->params();
     CHECK_EQ(from_params.size(), to_params.size());
     CHECK_EQ(neural_net->params_lr().size(), to_params.size());
-
+    
     for (uint i = 0; i < from_params.size(); ++i) {
       if(neural_net->params_lr()[i] != 0.0f) {
         auto& from_blob = from_params[i];
@@ -620,29 +554,85 @@ class DODevMLP : public MLP {
       }
     }
   }
-
+  
   virtual void actor_backward() override {
     int layer = get_layer_index("devnn_actions");
-
+    
     ASSERT(layer != -1, "failed to found layer for backward");
-
+    
     neural_net->BackwardFrom(layer);
+  }
+  
+//   EWC methods
+  void ewc_setup(uint episode) {
+    if(!ewc_enabled() || best_param ==nullptr)
+      return ;
+    
+    last_episode_changed = episode;
+    ewc_decay_multiplier = 1.f;
+    best_score = std::numeric_limits<double>::lowest();
+    
+    if(best_param_previous_task != nullptr)
+      delete best_param_previous_task;
+    best_param_previous_task = new std::vector<double>(*best_param);
+    this->copyWeightsFrom(best_param_previous_task->data(), true);
+//     std::string s = " best " + neural_net->name() + " ";
+//     bib::Logger::PRINT_ELEMENTS(*best_param_previous_task, s.c_str());
+    
+    for(uint i=0; i<fisher->size(); i++)
+      fisher->at(i) = fisher->at(i) / fisher_nbr;
+    
+    double fmax_ = *std::max_element(fisher->begin(), fisher->end());
+    for(uint i=0; i<fisher->size(); i++)
+      fisher->at(i) = fisher->at(i) / fmax_;
+    
+    if(previous_fisher != nullptr)
+      delete previous_fisher;
+    previous_fisher = fisher;
+    fisher = nullptr;
+
+//     bib::Logger::PRINT_ELEMENTS(*previous_fisher, " fisher ");
+  }
+  
+  void updateFisher(double number_sample) override {
+    if(!ewc_enabled())
+      return;
+    
+    if(fisher == nullptr) {
+      fisher = new std::vector<double>(number_of_parameters(true), 0.f);
+      fisher_nbr = 0.f;
+    }
+    
+    uint k=0;
+    ASSERT(neural_net->params_lr().size() == neural_net->params().size(), "size pb");
+    for (uint i = 0; i < neural_net->params().size(); ++i) {
+      if(neural_net->params_lr()[i] != 0.0f) {
+        auto blob = neural_net->params()[i];
+        auto derriv = blob->cpu_diff();
+        for(int y=0; y <blob->count(); y++) {
+          fisher->at(k) = fisher->at(k) * ewc_fisher_beta + (derriv[y] * derriv[y]) * number_sample;
+          k++;
+        }
+      }
+    }
+    fisher_nbr = fisher_nbr * ewc_fisher_beta + number_sample;
+    ASSERT(k == fisher->size(), "size pb");
   }
 
   double ewc_cost() override {
-    if(ewc < 0.f || last_episode_changed == 0)
+    if(!ewc_enabled() || last_episode_changed == 0)
       return 0.f;
     double cost = 0.f;
     uint k=0;
     const auto& from_params = neural_net->params();
-    ASSERT(fisher->size() == best_param_previous_task->size(), "size pb");
+    ASSERT(previous_fisher->size() == best_param_previous_task->size(), "size pb");
     for (uint i = 0; i < from_params.size(); ++i) {
       if(neural_net->params_lr()[i] != 0.0f) {
         auto& from_blob = from_params[i];
         auto weight = from_blob->cpu_data();
         for(int j=0; j<from_blob->count(); j++) {
           double x = (best_param_previous_task->at(k) - weight[j]);
-          cost += x*x*fisher->at(k);
+          cost += x*x*previous_fisher->at(k);
           k++;
         }
       }
@@ -656,7 +646,7 @@ class DODevMLP : public MLP {
   }
 
   void regularize() override {
-    if(ewc < 0.f || last_episode_changed == 0)
+    if(!ewc_enabled() || last_episode_changed == 0)
       return;
 
     uint k=0;
@@ -673,7 +663,7 @@ class DODevMLP : public MLP {
         auto weight = from_blob->cpu_data();
         auto weight_diff = from_blob->mutable_cpu_diff();
         for(int j=0; j<from_blob->count(); j++) {
-          weight_diff[j] += ewc * ewc_decay_factor_ * fisher->at(k) * (weight[j] - best_param_previous_task->at(k)) ;
+          weight_diff[j] += ewc * ewc_decay_factor_ * previous_fisher->at(k) * (weight[j] - best_param_previous_task->at(k)) ;
           k++;
         }
       }
@@ -681,22 +671,25 @@ class DODevMLP : public MLP {
   }
 
   bool ewc_enabled() override {
-    return ewc >= 0.f;
+    bool ewc_var = ewc >= 0.f;
+    if(!isCritic()) //actor
+      return ewc_var;
+    
+    return ewc_var && ewc_for_critic >= 1;
   }
 
-  void fisher_sample(const std::vector<double>* sensors,
-                     const std::vector<double>* actions=nullptr) override {
+  void update_best_param_previous_task(double score) override {
     if(ewc_enabled()) {
-      fisher_sample_sensors.insert(fisher_sample_sensors.end(), sensors->begin(), sensors->end());
-      if(actions != nullptr)
-        fisher_sample_actions.insert(fisher_sample_actions.end(), actions->begin(), actions->end());
-    }
-  }
-
-  void reset_fisher_sample(double score) override {
-    if(ewc_enabled()) {
-      if(score > best_score) {
-//       if(true) {
+      bool going_to_update = false;
+      switch (ewc_best_param_method){
+        case 0 ://best
+          going_to_update = score > best_score;
+          break;
+        case 1 ://last
+          going_to_update = true;
+          break;
+      }
+      if(going_to_update) {
         best_score = score;
 
         if(best_param != nullptr)
@@ -704,24 +697,18 @@ class DODevMLP : public MLP {
 
         best_param = new std::vector<double>(number_of_parameters(true));
         this->copyWeightsTo(best_param->data(), true);
-
-        fisher_sample_sensors_best.clear();
-        fisher_sample_actions_best.clear();
-
-        fisher_sample_sensors_best.insert(fisher_sample_sensors_best.end(),
-                                          fisher_sample_sensors.begin(), fisher_sample_sensors.end());
-        fisher_sample_actions_best.insert(fisher_sample_actions_best.end(),
-                                          fisher_sample_actions.begin(), fisher_sample_actions.end());
       }
-
-      fisher_sample_sensors.clear();
-      fisher_sample_actions.clear();
 
       ewc_decay_multiplier *= ewc_decay;
     }
   }
+  
+  bool ewc_force_constraint(){
+    return ewc_for_critic == 2;
+  }
 
  private:
+//    structure of activation
   bool disable_st_control = false;
   bool disable_ac_control = false; //for vnn
   uint heuristic = 0;
@@ -730,25 +717,26 @@ class DODevMLP : public MLP {
   std::vector<uint>* st_control = nullptr;
   std::vector<uint>* ac_control = nullptr;
   bool reset_learning_algo = false;
+//   intrasec motivation
   bool intrasec_motivation;
   int im_window, im_smooth;
   uint im_index = 0;
+//   Elastic weight consolidation
   double ewc = -1.f;
   double ewc_decay = -1.f;
   double ewc_decay_multiplier = 1.f;
-  uint fisher_method=0;
-  double beta;
+  double ewc_fisher_beta;
+  uint ewc_best_param_method;//0 for best, 1 for last
+  uint ewc_for_critic; // 0 no EWC for critic - 1 EWC for critic - 2 EWC for critic forced by actor
 
   std::vector<double> all_scores;
   std::vector<double>* best_param = nullptr;
   std::vector<double>* best_param_previous_task = nullptr;
   std::vector<double>* fisher = nullptr;
+  std::vector<double>* previous_fisher = nullptr;
   double fisher_nbr;
-  std::vector<double> fisher_sample_sensors, fisher_sample_sensors_best;
-  std::vector<double> fisher_sample_actions, fisher_sample_actions_best;
   uint last_episode_changed = 0;
   double best_score = std::numeric_limits<double>::lowest();
-  bool stopFisherUpdate = false;
 };
 
 #endif

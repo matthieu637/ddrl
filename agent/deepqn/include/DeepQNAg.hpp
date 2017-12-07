@@ -228,7 +228,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       qnn_target = new NN(*qnn, false);
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool) override {
+  void _start_episode(const std::vector<double>& sensors, bool learning) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -238,12 +238,15 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     last_trajectory_a.clear();
     
-    if(std::is_same<NN, DODevMLP>::value){
-      if(static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward)){
+    if(std::is_same<NN, DODevMLP>::value && learning){
+      bool reset_operator, changed;
+      std::tie(reset_operator, changed) = static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward);
+      if(reset_operator && changed){
         LOG_INFO("reset learning catched");
         trajectory.clear();
       }
-      if(static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward)){
+      std::tie(reset_operator, changed) = static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward);
+      if(reset_operator && changed){
         LOG_INFO("reset learning catched");
         trajectory.clear();
       }
