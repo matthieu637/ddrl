@@ -41,11 +41,12 @@ class DODevMLP : public MLP {
       heuristic_devpoints = new std::vector<uint>(*m.heuristic_devpoints);
     else if(heuristic == 2)
       heuristic_linearcoef = new std::vector<double>(*m.heuristic_linearcoef);
-    ac_informed_state = new std::vector<uint>(*m.ac_informed_state);
     if(ewc >= 0.f)
       LOG_WARNING("be careful not sure it's working");
-    if(informed_sensorimotor_space)
+    if(informed_sensorimotor_space){
       pd_controller_factor = new std::vector<double>(*m.pd_controller_factor);
+      ac_informed_state = new std::vector<uint>(*m.ac_informed_state);
+    }
   }
 
   virtual ~DODevMLP() {
@@ -746,7 +747,7 @@ class DODevMLP : public MLP {
     if(informed_sensorimotor_space && ac_control->size() > 0 && !isCritic()){
       auto blob_dev_weights = neural_net->learnable_params()[neural_net->learnable_params().size()-1];
       auto weights = blob_dev_weights->cpu_data();
-      ASSERT(blob_dev_weights->count() == ac_control->size(), "pb size");
+      ASSERT((uint)blob_dev_weights->count() == ac_control->size(), "pb size");
       for(int i=0;i<blob_dev_weights->count();i++){
         if(weights[i] < 0.5){ //dimension should not be controled
           uint st_index = ac_informed_state->at(ac_control->at(i)*2);
