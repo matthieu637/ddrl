@@ -34,13 +34,18 @@ class DODevMLP : public MLP {
     disable_ac_control(m.disable_ac_control), heuristic(m.heuristic),
     reset_learning_algo(m.reset_learning_algo), intrasec_motivation(m.intrasec_motivation),
     im_window(m.im_window), im_smooth(m.im_smooth), im_index(m.im_index), ewc(m.ewc),
-    last_episode_changed(m.last_episode_changed) {
+    last_episode_changed(m.last_episode_changed), informed_sensorimotor_space(m.informed_sensorimotor_space){
     st_control = new std::vector<uint>(*m.st_control);
     ac_control = new std::vector<uint>(*m.ac_control);
     if(heuristic == 1)
       heuristic_devpoints = new std::vector<uint>(*m.heuristic_devpoints);
     else if(heuristic == 2)
       heuristic_linearcoef = new std::vector<double>(*m.heuristic_linearcoef);
+    ac_informed_state = new std::vector<uint>(*m.ac_informed_state);
+    if(ewc >= 0.f)
+      LOG_WARNING("be careful not sure it's working");
+    if(informed_sensorimotor_space)
+      pd_controller_factor = new std::vector<double>(*m.pd_controller_factor);
   }
 
   virtual ~DODevMLP() {
@@ -60,6 +65,10 @@ class DODevMLP : public MLP {
       delete fisher;
     if(previous_fisher != nullptr)
       delete previous_fisher;
+    if(ac_informed_state != nullptr)
+      delete ac_informed_state;
+    if(pd_controller_factor != nullptr)
+      delete pd_controller_factor;
   }
 
   virtual void exploit(boost::property_tree::ptree* pt, MLP* actor) override {
@@ -132,6 +141,30 @@ class DODevMLP : public MLP {
     try {
       reset_learning_algo = pt->get<bool>("devnn.reset_learning_algo");
     } catch(boost::exception const& ) {
+    }
+    informed_sensorimotor_space = false;
+    try {
+      informed_sensorimotor_space = pt->get<bool>("devnn.informed_sensorimotor_space");
+    } catch(boost::exception const& ) {
+    }
+    if(informed_sensorimotor_space && !isCritic()){
+      ac_informed_state = bib::to_array<uint>(pt->get<std::string>("devnn.ac_informed_state"));
+      pd_controller_factor = bib::to_array<double>(pt->get<std::string>("devnn.pd_controller_factor"));
+      
+      if(ac_informed_state->size() != (uint) size_motors * 2){
+        LOG_ERROR("wrong ac_informed_state " << ac_informed_state->size() );
+        exit(1);
+      }
+    }
+    
+    if(informed_sensorimotor_space && ac_probabilistic ==0){
+      LOG_ERROR("informed_sensorimotor_space is not implemented with proba action");
+      exit(1);
+    }
+    
+    if(informed_sensorimotor_space && heuristic == 2){
+      LOG_ERROR("informed_sensorimotor_space is not implemented with proba action");
+      exit(1);
     }
 
     try {
@@ -682,7 +715,9 @@ class DODevMLP : public MLP {
     if(ewc_enabled()) {
       bool going_to_update = false;
       switch (ewc_best_param_method){
-        case 0 ://best
+        case 3 ://keep a recent "good" performance
+        case 2 ://learning from best sample in learning (might never be as good as sample)
+        case 0 ://best param in learning
           going_to_update = score > best_score;
           break;
         case 1 ://last
@@ -706,6 +741,21 @@ class DODevMLP : public MLP {
   bool ewc_force_constraint(){
     return ewc_for_critic == 2;
   }
+//   Informed sensorimotor space
+  void neutral_action(const std::vector<double>& state, std::vector<double>* action) override {
+    if(informed_sensorimotor_space && ac_control->size() > 0 && !isCritic()){
+      auto blob_dev_weights = neural_net->learnable_params()[neural_net->learnable_params().size()-1];
+      auto weights = blob_dev_weights->cpu_data();
+      ASSERT(blob_dev_weights->count() == ac_control->size(), "pb size");
+      for(int i=0;i<blob_dev_weights->count();i++){
+        if(weights[i] < 0.5){ //dimension should not be controled
+          uint st_index = ac_informed_state->at(ac_control->at(i)*2);
+          action->at(ac_control->at(i)) = (2.0f/M_PI) * 
+              atan(pd_controller_factor->at(0)*state[st_index] + pd_controller_factor->at(1) * state[st_index+1]) * pd_controller_factor->at(2);
+        }
+      }
+    }
+  }
 
  private:
 //    structure of activation
@@ -728,6 +778,10 @@ class DODevMLP : public MLP {
   double ewc_fisher_beta;
   uint ewc_best_param_method;//0 for best, 1 for last
   uint ewc_for_critic; // 0 no EWC for critic - 1 EWC for critic - 2 EWC for critic forced by actor
+//   Informed sensorimotor space
+  bool informed_sensorimotor_space;
+  std::vector<uint>* ac_informed_state = nullptr;
+  std::vector<double>* pd_controller_factor = nullptr;
 
   std::vector<double> all_scores;
   std::vector<double>* best_param = nullptr;

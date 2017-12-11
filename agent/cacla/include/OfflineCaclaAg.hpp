@@ -93,6 +93,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     }
     last_action.reset(next_action);
 
+    ann_testing->neutral_action(sensors, next_action);
 
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)

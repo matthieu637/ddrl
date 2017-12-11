@@ -704,6 +704,10 @@ class MLP {
     
   }
   
+  virtual void neutral_action(const std::vector<double>&, std::vector<double>*){
+    
+  }
+  
   bool isCritic(){
     return size_input_state != size_sensors || size_motors == 0;
   }
