@@ -169,6 +169,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       } catch(boost::exception const& ) {
       }
     }
+    
+    bestever_score = std::numeric_limits<double>::lowest();
   }
 
   void _start_episode(const std::vector<double>& sensors, bool learning) override {
@@ -525,9 +527,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       episode++;
   }
 
-  void save(const std::string& path, bool, bool) override {
-    ann->save(path+".actor");
-    vnn->save(path+".critic");
+  void save(const std::string& path, bool savebest, bool learning) override {
+    if(savebest) {
+      if(!learning && this->sum_weighted_reward >= bestever_score) {
+        bestever_score = this->sum_weighted_reward;
+        ann->save(path+".actor");
+      }
+    } else {
+      ann->save(path+".actor");
+      vnn->save(path+".critic");
+    } 
   }
   
   void save_run() override {
@@ -605,6 +614,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
   std::vector<double> empty_action; //dummy action cause c++ cannot accept null reference
+  double bestever_score;
   
   struct algo_state {
     uint episode;
