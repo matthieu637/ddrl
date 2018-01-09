@@ -29,6 +29,6 @@ build() {
 }
 
 package() {
-        cd "$srcdir/$pkgname/build"
+        cd "$srcdir/caffe/build"
         make install
 }
