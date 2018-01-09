@@ -255,16 +255,20 @@ class CMAESAg : public arch::ARLAgent<arch::AgentProgOptions> {
   void save(const std::string& path, bool save_best, bool) override {
     if(!save_best || !cmaes_UpdateDistribution_done_once) {
       ann->save(path+".actor");
-    } else {
-      //TODO : check this part, apparently it modify the learning
-      LOG_WARNING("be careful it might be a problem here");
-      NN* to_be_restaured = new NN(*ann, false);
-      const double* parameters = getBestSolution();
-      loadPolicyParameters(parameters);
+    } else if(save_best && -sum_weighted_reward < xbestever_score ) {
+      xbestever_score = -sum_weighted_reward;
       ann->save(path+".actor");
-      delete ann;
-      ann = to_be_restaured;
     }
+//     else {
+//       //TODO : check this part, apparently it modify the learning
+//       LOG_WARNING("be careful it might be a problem here");
+//       NN* to_be_restaured = new NN(*ann, false);
+//       const double* parameters = getBestSolution();
+//       loadPolicyParameters(parameters);
+//       ann->save(path+".actor");
+//       delete ann;
+//       ann = to_be_restaured;
+//     }
   }
 
   void load(const std::string& path) override {
