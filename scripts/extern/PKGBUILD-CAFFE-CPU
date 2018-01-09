@@ -17,7 +17,7 @@ source=("git+https://github.com/matthieu637/caffe.git")
 sha256sums=('SKIP')
 
 build() {
-    cd "$srcdir/$pkgname"
+    cd "$srcdir/caffe"
     rm -fr build
     mkdir build
     cd build
