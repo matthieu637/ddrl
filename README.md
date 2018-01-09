@@ -60,7 +60,7 @@ cp ../ddrl/scripts/extern/PKGBUILD-CAFFE-CPU PKGBUILD
 makepkg
 pacman -U caffe-git-1-x86_64.pkg.tar.xz
 cd ../ddrl/
-./fullBuild
+./fullBuild.bash
 ```
 
 ### Ubuntu > 14.04
@@ -108,7 +108,7 @@ cd ../..
 # then you can finnaly compile ddrl
 git clone https://github.com/matthieu637/ddrl
 cd ddrl
-./fullBuild
+./fullBuild.bash
 
 ```
 
@@ -138,9 +138,9 @@ cd ../..
 git clone https://github.com/matthieu637/ddrl
 cd ddrl
 #if you want to use make to compile 
-./fullBuild
+./fullBuild.bash
 #or if you want to use Xcode projects
-./fullBuild xcode
+./fullBuild.bash xcode
 ```
 
 ### no access to sudo
