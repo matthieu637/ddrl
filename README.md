@@ -58,7 +58,7 @@ mkdir caffe_compilation
 cd caffe_compilation
 cp ../ddrl/scripts/extern/PKGBUILD-CAFFE-CPU PKGBUILD
 makepkg
-pacman -U caffe-git-1-x86_64.pkg.tar.xz
+pacman -U caffe-ddrl-git-1-x86_64.pkg.tar.xz
 cd ../ddrl/
 ./fullBuild.bash
 ```
