@@ -187,9 +187,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     last_action = nullptr;
     last_pure_action = nullptr;
-
-    if(episode % update_each_episode == 0)
-      trajectory.clear();
     
     if(std::is_same<NN, DODevMLP>::value && learning){
       DODevMLP * ann_cast = static_cast<DODevMLP *>(ann);
@@ -531,6 +528,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(!update_critic_first){
       update_critic();
     }
+    
+    trajectory.clear();
   }
   
   void end_instance(bool learning) override {
