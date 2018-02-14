@@ -103,6 +103,11 @@ class Simulator {
         //  testing during learning
         run_episode(false, episode, test_episode, stat);
       }
+      
+      if(test_episode_per_episode < -1 && episode % (-test_episode_per_episode) == 0) {
+        //  testing during learning
+        run_episode(false, episode, 0, stat);
+      }
     }
 
     for (unsigned int test_episode = 0; test_episode < test_episode_at_end; test_episode++) {
@@ -210,7 +215,7 @@ class Simulator {
 
     if(!learning) {
       display = (episode+tepisode) % display_log_each == 0;
-      dump = (episode+tepisode) % dump_log_each == 0;
+      dump = true; //unless why do you compute it ?
     }
 
     if (dump || display) {
@@ -295,7 +300,7 @@ class Simulator {
     boost::property_tree::ini_parser::read_ini(config_file, *properties);
 
     max_episode                 = properties->get<unsigned int>("simulation.max_episode");
-    test_episode_per_episode    = properties->get<unsigned int>("simulation.test_episode_per_episode");
+    test_episode_per_episode    = properties->get<int>("simulation.test_episode_per_episode");
     test_episode_at_end         = properties->get<unsigned int>("simulation.test_episode_at_end");
 
     dump_log_each               = properties->get<unsigned int>("simulation.dump_log_each");
@@ -331,7 +336,7 @@ class Simulator {
     }
   };
   unsigned int max_episode;
-  unsigned int test_episode_per_episode;
+  int test_episode_per_episode;
   unsigned int test_episode_at_end;
 
   unsigned int dump_log_each;
