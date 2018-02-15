@@ -95,7 +95,7 @@ class Simulator {
     Stat stat;
 
     time_spend.start();
-    for (uint episode = starting_ep; episode < fepisode; episode++) {
+    for (int episode = starting_ep; episode < fepisode; episode++) {
       //  learning
       run_episode(true, episode, 0, stat);
 
