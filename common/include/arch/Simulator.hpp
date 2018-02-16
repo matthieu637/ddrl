@@ -99,7 +99,7 @@ class Simulator {
       //  learning
       run_episode(true, episode, 0, stat);
 
-      for (unsigned int test_episode = 0; test_episode < test_episode_per_episode; test_episode++) {
+      for (int test_episode = 0; test_episode < test_episode_per_episode; test_episode++) {
         //  testing during learning
         run_episode(false, episode, test_episode, stat);
       }
