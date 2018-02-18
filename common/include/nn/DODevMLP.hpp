@@ -45,7 +45,6 @@ class DODevMLP : public MLP {
       LOG_WARNING("be careful not sure it's working");
     if(informed_sensorimotor_space){
       pd_controller_factor = new std::vector<double>(*m.pd_controller_factor);
-      ac_informed_state = new std::vector<uint>(*m.ac_informed_state);
     }
   }
 
@@ -66,8 +65,6 @@ class DODevMLP : public MLP {
       delete fisher;
     if(previous_fisher != nullptr)
       delete previous_fisher;
-    if(ac_informed_state != nullptr)
-      delete ac_informed_state;
     if(pd_controller_factor != nullptr)
       delete pd_controller_factor;
   }
@@ -149,11 +146,10 @@ class DODevMLP : public MLP {
     } catch(boost::exception const& ) {
     }
     if(informed_sensorimotor_space && !isCritic()){
-      ac_informed_state = bib::to_array<uint>(pt->get<std::string>("devnn.ac_informed_state"));
       pd_controller_factor = bib::to_array<double>(pt->get<std::string>("devnn.pd_controller_factor"));
       
-      if(ac_informed_state->size() != (uint) size_motors * 2){
-        LOG_ERROR("wrong ac_informed_state " << ac_informed_state->size() );
+      if(pd_controller_factor->size() != (uint) size_motors){
+        LOG_ERROR("wrong pd_controller_factor " << pd_controller_factor->size() );
         exit(1);
       }
     }
@@ -743,16 +739,14 @@ class DODevMLP : public MLP {
     return ewc_for_critic == 2;
   }
 //   Informed sensorimotor space
-  void neutral_action(const std::vector<double>& state, std::vector<double>* action) override {
+  void neutral_action(const std::vector<double>&, std::vector<double>* action) override {
     if(informed_sensorimotor_space && ac_control->size() > 0 && !isCritic()){
       auto blob_dev_weights = neural_net->learnable_params()[neural_net->learnable_params().size()-1];
       auto weights = blob_dev_weights->cpu_data();
       ASSERT((uint)blob_dev_weights->count() == ac_control->size(), "pb size");
       for(int i=0;i<blob_dev_weights->count();i++){
         if(weights[i] < 0.5){ //dimension should not be controled
-          uint st_index = ac_informed_state->at(ac_control->at(i)*2);
-          action->at(ac_control->at(i)) = (2.0f/M_PI) * 
-              atan(pd_controller_factor->at(0)*state[st_index] + pd_controller_factor->at(1) * state[st_index+1]) * pd_controller_factor->at(2);
+            action->at(ac_control->at(i)) = pd_controller_factor->at(ac_control->at(i));
         }
       }
     }
@@ -781,7 +775,6 @@ class DODevMLP : public MLP {
   uint ewc_for_critic; // 0 no EWC for critic - 1 EWC for critic - 2 EWC for critic forced by actor
 //   Informed sensorimotor space
   bool informed_sensorimotor_space;
-  std::vector<uint>* ac_informed_state = nullptr;
   std::vector<double>* pd_controller_factor = nullptr;
 
   std::vector<double> all_scores;
