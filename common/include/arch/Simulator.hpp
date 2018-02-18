@@ -95,13 +95,18 @@ class Simulator {
     Stat stat;
 
     time_spend.start();
-    for (uint episode = starting_ep; episode < fepisode; episode++) {
+    for (int episode = starting_ep; episode < fepisode; episode++) {
       //  learning
       run_episode(true, episode, 0, stat);
 
-      for (unsigned int test_episode = 0; test_episode < test_episode_per_episode; test_episode++) {
+      for (int test_episode = 0; test_episode < test_episode_per_episode; test_episode++) {
         //  testing during learning
         run_episode(false, episode, test_episode, stat);
+      }
+      
+      if(test_episode_per_episode < -1 && episode % (-test_episode_per_episode) == 0) {
+        //  testing during learning
+        run_episode(false, episode, 0, stat);
       }
     }
 
@@ -210,7 +215,7 @@ class Simulator {
 
     if(!learning) {
       display = (episode+tepisode) % display_log_each == 0;
-      dump = (episode+tepisode) % dump_log_each == 0;
+      dump = true; //unless why do you compute it ?
     }
 
     if (dump || display) {
@@ -221,10 +226,10 @@ class Simulator {
         bib::Dumper<Agent, bool, bool> agent_dump(ag, true, false);
         LOG_INFO((learning ? "L " : "T ")
                  << std::left << std::setw(6) << std::setfill(' ') << episode
-                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.mean
-                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.var
-                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.max
-                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.min
+//                  << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.mean
+//                  << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.var
+//                  << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.max
+//                  << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.min
                  << std::left << std::setw(7) << std::fixed << step
                  << " " << agent_dump << " " << env_dump);
       }
@@ -234,8 +239,9 @@ class Simulator {
         bib::Dumper<Agent, bool, bool> agent_dump(ag, false, true);
         LOG_FILE(learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :
                  std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE,
-                 episode << " " << reward_stats.mean << " " << reward_stats.var << " " <<
-                 reward_stats.max << " " << reward_stats.min << " " << step << " " << agent_dump << " " << env_dump);
+                 episode << " " 
+//                  << reward_stats.mean << " " << reward_stats.var << " " << reward_stats.max << " " << reward_stats.min << " " 
+                 << step << " " << agent_dump << " " << env_dump);
       }
     }
   }
@@ -295,7 +301,7 @@ class Simulator {
     boost::property_tree::ini_parser::read_ini(config_file, *properties);
 
     max_episode                 = properties->get<unsigned int>("simulation.max_episode");
-    test_episode_per_episode    = properties->get<unsigned int>("simulation.test_episode_per_episode");
+    test_episode_per_episode    = properties->get<int>("simulation.test_episode_per_episode");
     test_episode_at_end         = properties->get<unsigned int>("simulation.test_episode_at_end");
 
     dump_log_each               = properties->get<unsigned int>("simulation.dump_log_each");
@@ -331,7 +337,7 @@ class Simulator {
     }
   };
   unsigned int max_episode;
-  unsigned int test_episode_per_episode;
+  int test_episode_per_episode;
   unsigned int test_episode_at_end;
 
   unsigned int dump_log_each;

@@ -125,6 +125,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     corrected_update_ac     = false;
     gae                     = false;
     inverting_gradient      = false;
+    update_each_episode = 1;
+    
+    try {
+      update_each_episode     = pt->get<uint>("agent.update_each_episode");
+    } catch(boost::exception const& ) {
+    }
+    
     try {
       corrected_update_ac   = pt->get<bool>("agent.corrected_update_ac");
     } catch(boost::exception const& ) {
@@ -180,8 +187,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     last_action = nullptr;
     last_pure_action = nullptr;
-
-    trajectory.clear();
     
     if(std::is_same<NN, DODevMLP>::value && learning){
       DODevMLP * ann_cast = static_cast<DODevMLP *>(ann);
@@ -357,6 +362,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     
     ann->update_best_param_previous_task(this->sum_weighted_reward);
     vnn->update_best_param_previous_task(this->sum_weighted_reward);
+    
+    if(episode % update_each_episode != 0)
+      return;
 
     if(trajectory.size() > 0){
       vnn->increase_batchsize(trajectory.size());
@@ -520,6 +528,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(!update_critic_first){
       update_critic();
     }
+    
+    trajectory.clear();
   }
   
   void end_instance(bool learning) override {
@@ -615,6 +625,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   std::vector<uint>* hidden_unit_a;
   std::vector<double> empty_action; //dummy action cause c++ cannot accept null reference
   double bestever_score;
+  int update_each_episode;
   
   struct algo_state {
     uint episode;
