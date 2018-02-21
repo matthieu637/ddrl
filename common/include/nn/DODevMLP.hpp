@@ -711,9 +711,18 @@ class DODevMLP : public MLP {
   void update_best_param_previous_task(double score) override {
     if(ewc_enabled()) {
       bool going_to_update = false;
+      bool too_old;
       switch (ewc_best_param_method){
-        case 3 ://keep a recent "good" performance
-        case 2 ://learning from best sample in learning (might never be as good as sample)
+        case 3 ://use critic
+        case 2 ://keep a recent "good" performance
+          too_old = last_update_best_param > 50;
+          last_update_best_param++;
+          going_to_update = (score > best_score) || too_old;
+          if(going_to_update){
+            last_update_best_param = 0;
+            //best score can be decreased
+          }
+          break;
         case 0 ://best param in learning
           going_to_update = score > best_score;
           break;
@@ -784,6 +793,7 @@ class DODevMLP : public MLP {
   std::vector<double>* previous_fisher = nullptr;
   double fisher_nbr;
   uint last_episode_changed = 0;
+  uint last_update_best_param = 0;
   double best_score = std::numeric_limits<double>::lowest();
 };
 
