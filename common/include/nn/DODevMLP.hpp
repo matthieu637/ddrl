@@ -713,7 +713,7 @@ class DODevMLP : public MLP {
       bool going_to_update = false;
       bool too_old;
       switch (ewc_best_param_method){
-        case 3 ://use critic
+        case 4 ://use critic (best+recent)
         case 2 ://keep a recent "good" performance
           too_old = last_update_best_param > 50;
           last_update_best_param++;
@@ -723,6 +723,7 @@ class DODevMLP : public MLP {
             //best score can be decreased
           }
           break;
+        case 3 ://use critic (best)
         case 0 ://best param in learning
           going_to_update = score > best_score;
           break;
@@ -759,6 +760,10 @@ class DODevMLP : public MLP {
         }
       }
     }
+  }
+  
+  uint ewc_best_method() override {
+    return ewc_best_param_method;
   }
 
  private:

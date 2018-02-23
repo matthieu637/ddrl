@@ -205,7 +205,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     delete[] weights;
   }
 
-  void update_critic() {
+  double update_critic() {
+    double V_pi_s0 = 0.f;
     if (trajectory.size() > 0) {
       //remove trace of old policy
       auto iter = [&]() {
@@ -305,6 +306,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             ++li;
           }
           
+          V_pi_s0 = diff[0];
           vnn->learn_batch(all_states, empty_action, diff, stoch_iter_critic);
 // // 
 // //        The mechanic formula
@@ -353,6 +355,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       for(uint i=0; i<number_fitted_iteration; i++)
         iter();
     }
+    
+    return V_pi_s0;
   }
 
   void end_episode(bool learning) override {
@@ -360,9 +364,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(!learning)
       return;
     
-    ann->update_best_param_previous_task(this->sum_weighted_reward);
-    vnn->update_best_param_previous_task(this->sum_weighted_reward);
-    
+    if(ann->ewc_best_method() < 3){
+      ann->update_best_param_previous_task(this->sum_weighted_reward);
+      vnn->update_best_param_previous_task(this->sum_weighted_reward);
+    }    
+      
     if(episode % update_each_episode != 0)
       return;
 
@@ -372,8 +378,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         vnn_testing->increase_batchsize(trajectory.size());
     }
     
+    double V_pi_s0 = 0;
     if(update_critic_first)
-      update_critic();
+      V_pi_s0 = update_critic();
+    
+    if(ann->ewc_best_method() >= 3){
+      ann->update_best_param_previous_task(V_pi_s0);
+      vnn->update_best_param_previous_task(V_pi_s0);
+    }
 
     if (trajectory.size() > 0) {
       std::vector<double> sensors(trajectory.size() * nb_sensors);

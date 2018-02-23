@@ -708,6 +708,10 @@ class MLP {
     
   }
   
+  virtual uint ewc_best_method() {
+    return 0;
+  }
+  
   bool isCritic(){
     return size_input_state != size_sensors || size_motors == 0;
   }
