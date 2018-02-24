@@ -713,6 +713,10 @@ class DODevMLP : public MLP {
       bool going_to_update = false;
       bool too_old;
       switch (ewc_best_param_method){
+        case 5 ://random (proof of concept)
+          last_update_best_param++;
+          going_to_update = last_update_best_param == 1;
+          break;
         case 4 ://use critic (best+recent)
         case 2 ://keep a recent "good" performance
           too_old = last_update_best_param > 50;
