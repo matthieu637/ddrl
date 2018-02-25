@@ -124,10 +124,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
                                  bool learning, bool goal_reached, bool) override {
 
     // protect batch norm from testing data and poor data
-    double* weights = new double[ann->number_of_parameters(false)];
-    ann->copyWeightsTo(weights, false);
-    ann_testing->copyWeightsFrom(weights, false);
-    delete[] weights;
     vector<double>* next_action = ann_testing->computeOut(sensors);
     
     if (last_action.get() != nullptr && learning){
@@ -137,10 +133,12 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
-      if(gaussian_policy){
+      if(gaussian_policy == 1){
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
+      } else if(gaussian_policy == 2){
+        
       } else if(bib::Utils::rand01() < noise){ //e-greedy
         for (uint i = 0; i < next_action->size(); i++)
           next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
@@ -169,7 +167,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     hidden_unit_q           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_q"));
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
-    gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
+    gaussian_policy         = pt->get<uint>("agent.gaussian_policy");
     kMinibatchSize          = pt->get<uint>("agent.mini_batch_size");
     replay_memory           = pt->get<uint>("agent.replay_memory");
     inverting_grad          = pt->get<bool>("agent.inverting_grad");
@@ -438,7 +436,11 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       delete q_targets;
       delete all_actions_outputs;
     }
-  
+    
+    double* weights = new double[ann->number_of_parameters(false)];
+    ann->copyWeightsTo(weights, false);
+    ann_testing->copyWeightsFrom(weights, false);
+    delete[] weights;
   }
   
   double criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions) override {
@@ -446,7 +448,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
   
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
-    return new arch::Policy<MLP>(new MLP(*ann, true) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
+    return nullptr;
   }
 
   void save(const std::string& path, bool save_best, bool) override {
@@ -542,7 +544,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   double alpha_v;
   double decay_v;
   
-  bool gaussian_policy;
+  uint gaussian_policy;
   std::vector<uint>* hidden_unit_q;
   std::vector<uint>* hidden_unit_a;
   uint kMinibatchSize;

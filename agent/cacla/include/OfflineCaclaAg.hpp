@@ -509,12 +509,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                 }
               }
               else {
-                double fabs_x = fabs(x);
-                if(fabs_x <= corrected_update_ac_factor)
-                  ac_diff[i] = sign(x) * sign(deltas_blob[i]) * (sqrt(fabs_x) 
-                  - sqrt(corrected_update_ac_factor) - sign(deltas_blob[i]) * deltas_blob[i]/corrected_update_ac_factor );
-                else
-                  ac_diff[i] = -deltas_blob[i] / x;
+                ac_diff[i] = -x * (corrected_update_ac_factor + fabs(deltas_blob[i]));
               }
             }
           }
