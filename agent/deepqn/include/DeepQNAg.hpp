@@ -16,6 +16,7 @@
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
+#include "bib/OrnsteinUhlenbeckNoise.hpp"
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 
@@ -114,6 +115,9 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       delete i.qnn;
     }
     
+    if(oun == nullptr)
+      delete oun;
+    
 #ifdef POOL_FOR_TESTING
     for (auto i : best_pol_population)
       delete i.ann;
@@ -138,7 +142,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         delete next_action;
         next_action = randomized_action;
       } else if(gaussian_policy == 2){
-        
+        oun->step(*next_action);
       } else if(bib::Utils::rand01() < noise){ //e-greedy
         for (uint i = 0; i < next_action->size(); i++)
           next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
@@ -197,6 +201,12 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       LOG_INFO("GPU mode");
     }
 #endif
+
+    if(gaussian_policy == 2){
+      double oun_theta = pt->get<double>("agent.noise2");
+      double oun_dt = pt->get<double>("agent.noise3");
+      oun = new bib::OrnsteinUhlenbeckNoise<double>(this->nb_motors, noise, oun_theta, oun_dt);
+    }
     
     ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, 
                  hidden_layer_type, actor_output_layer_type, batch_norm_actor, false, momentum);
@@ -231,6 +241,9 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
+    if(oun == nullptr)
+      oun->reset();
+    
     last_action = nullptr;
     last_pure_action = nullptr;
     
@@ -563,6 +576,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::deque<std::vector<double>> last_trajectory_a;
   
   uint episode = 0;
+  bib::OrnsteinUhlenbeckNoise<double>* oun = nullptr;
   
   struct my_pol_dpmt{
     MLP* ann;

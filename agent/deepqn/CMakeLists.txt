@@ -58,9 +58,9 @@ add_executable(half-cheetah-nfac src/test/NFACHalfCheetah.cpp ${all_include} ${a
 target_link_libraries(half-cheetah-nfac
   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
-add_executable(half-cheetah-nfmac src/test/NFMACHalfCheetah.cpp ${all_include} ${all_sources} )
-target_link_libraries(half-cheetah-nfmac
-  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+# add_executable(half-cheetah-nfmac src/test/NFMACHalfCheetah.cpp ${all_include} ${all_sources} )
+# target_link_libraries(half-cheetah-nfmac
+#   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
 add_executable(humanoid src/test/Humanoid.cpp ${all_include} ${all_sources} )
 target_link_libraries(humanoid 

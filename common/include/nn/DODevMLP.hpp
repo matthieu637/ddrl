@@ -34,7 +34,7 @@ class DODevMLP : public MLP {
     disable_ac_control(m.disable_ac_control), heuristic(m.heuristic),
     reset_learning_algo(m.reset_learning_algo), intrasec_motivation(m.intrasec_motivation),
     im_window(m.im_window), im_smooth(m.im_smooth), im_index(m.im_index), ewc(m.ewc),
-    last_episode_changed(m.last_episode_changed), informed_sensorimotor_space(m.informed_sensorimotor_space){
+    informed_sensorimotor_space(m.informed_sensorimotor_space), last_episode_changed(m.last_episode_changed) {
     st_control = new std::vector<uint>(*m.st_control);
     ac_control = new std::vector<uint>(*m.ac_control);
     if(heuristic == 1)

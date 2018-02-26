@@ -91,7 +91,7 @@ class Simulator {
     return fepisode;
   }
 
-  void run_loop(uint starting_ep, uint fepisode){
+  void run_loop(uint starting_ep, int fepisode){
     Stat stat;
 
     time_spend.start();
@@ -136,7 +136,7 @@ class Simulator {
   }
 
  protected:
-  virtual void run_episode(bool learning, unsigned int lepisode, unsigned int tepisode, Stat& stat) {
+  virtual void run_episode(bool learning, unsigned int lepisode, int tepisode, Stat& stat) {
     env->reset_episode(learning);
     std::list<double> all_rewards;
     agent->start_instance(learning);
@@ -210,6 +210,7 @@ class Simulator {
   void dump_and_display(unsigned int episode, unsigned int instance, unsigned int tepisode,
                         const std::list<double>& all_rewards, Environment* env,
                         Agent* ag, bool learning, uint step) {
+    (void) all_rewards;
     bool display = episode % display_log_each == 0;
     bool dump = episode % dump_log_each == 0;
 
@@ -219,7 +220,7 @@ class Simulator {
     }
 
     if (dump || display) {
-      bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
+//       bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
 
       if (display && ((display_learning && learning) || !learning)) {
         bib::Dumper<Environment, bool, bool> env_dump(env, true, false);
