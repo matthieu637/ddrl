@@ -241,7 +241,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
-    if(oun == nullptr)
+    if(gaussian_policy == 2)
       oun->reset();
     
     last_action = nullptr;

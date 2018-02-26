@@ -10,6 +10,7 @@
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
+#include "bib/OrnsteinUhlenbeckNoise.hpp"
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 #include "nn/MLP.hpp"
@@ -70,6 +71,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     delete hidden_unit_v;
     delete hidden_unit_a;
+    
+    if(oun == nullptr)
+      delete oun;
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
@@ -82,10 +86,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
-      if(gaussian_policy) {
+      if(gaussian_policy == 1) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
+      } else if(gaussian_policy == 2){
+        oun->step(*next_action);
       } else if(bib::Utils::rand01() < noise) { //e-greedy
         for (uint i = 0; i < next_action->size(); i++)
           next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
@@ -108,7 +114,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     hidden_unit_v           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
-    gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
+    gaussian_policy         = pt->get<uint>("agent.gaussian_policy");
     update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
     update_critic_first     = pt->get<bool>("agent.update_critic_first");
@@ -126,6 +132,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     gae                     = false;
     inverting_gradient      = false;
     update_each_episode = 1;
+    
+    if(gaussian_policy == 2){
+      double oun_theta = pt->get<double>("agent.noise2");
+      double oun_dt = pt->get<double>("agent.noise3");
+      oun = new bib::OrnsteinUhlenbeckNoise<double>(this->nb_motors, noise, oun_theta, oun_dt);
+    }
     
     try {
       update_each_episode     = pt->get<uint>("agent.update_each_episode");
@@ -187,6 +199,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     last_action = nullptr;
     last_pure_action = nullptr;
+    
+    if(gaussian_policy == 2)
+      oun->reset();
     
     if(std::is_same<NN, DODevMLP>::value && learning){
       DODevMLP * ann_cast = static_cast<DODevMLP *>(ann);
@@ -609,7 +624,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   uint episode = 0;
 
   double noise;
-  bool gaussian_policy, vnn_from_scratch, update_critic_first,
+  uint gaussian_policy;
+  bool vnn_from_scratch, update_critic_first,
         update_delta_neg, corrected_update_ac, gae;
   bool inverting_gradient;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
@@ -633,6 +649,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   std::vector<double> empty_action; //dummy action cause c++ cannot accept null reference
   double bestever_score;
   int update_each_episode;
+  bib::OrnsteinUhlenbeckNoise<double>* oun = nullptr;
   
   struct algo_state {
     uint episode;
