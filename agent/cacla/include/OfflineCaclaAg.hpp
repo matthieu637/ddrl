@@ -90,8 +90,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
-      } else if(gaussian_policy == 2){
+      } else if(gaussian_policy == 2) {
         oun->step(*next_action);
+      } else if(gaussian_policy == 3 && bib::Utils::rand01() < noise2) {
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+        delete next_action;
+        next_action = randomized_action;
+      } else if(gaussian_policy == 4) {
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise * pow(noise2, noise3 - ((double) step)));
+        delete next_action;
+        next_action = randomized_action;
       } else if(bib::Utils::rand01() < noise) { //e-greedy
         for (uint i = 0; i < next_action->size(); i++)
           next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
@@ -105,6 +113,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
+    step++;
+    
     return *next_action;
   }
 
@@ -137,6 +147,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       double oun_theta = pt->get<double>("agent.noise2");
       double oun_dt = pt->get<double>("agent.noise3");
       oun = new bib::OrnsteinUhlenbeckNoise<double>(this->nb_motors, noise, oun_theta, oun_dt);
+    } else if (gaussian_policy == 3){
+      noise2 = pt->get<double>("agent.noise2");
+    } else if (gaussian_policy == 4){
+      noise2 = pt->get<double>("agent.noise2");
+      noise3 = pt->get<double>("agent.noise3");
     }
     
     try {
@@ -200,6 +215,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     last_action = nullptr;
     last_pure_action = nullptr;
     
+    step = 0;
     if(gaussian_policy == 2)
       oun->reset();
     
@@ -622,8 +638,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
  private:
   uint nb_sensors;
   uint episode = 0;
+  uint step = 0;
 
-  double noise;
+  double noise, noise2, noise3;
   uint gaussian_policy;
   bool vnn_from_scratch, update_critic_first,
         update_delta_neg, corrected_update_ac, gae;
