@@ -368,11 +368,6 @@ class DODevMLP : public MLP {
           data[i] = 0.0f;
       }
     }
-
-    if(intrasec_motivation &&
-        std::find(heuristic_devpoints->begin(), heuristic_devpoints->end(), 0) != heuristic_devpoints->end()) {
-      update_DL_IM();
-    }
   }
 
  private:
@@ -471,11 +466,13 @@ class DODevMLP : public MLP {
   }
 
   bool developIM(int episode, double score) {
-    if(episode == 0)
-      return false;
+    if(episode == 0){
+      update_DL_IM();
+      return true;
+    }
 
     bool changed = false;
-
+    int rep_display = episode;
     episode = episode - last_episode_changed - 1;//because called during starting episode
     //update stats
     all_scores.push_back(score);
@@ -499,9 +496,10 @@ class DODevMLP : public MLP {
     changed = new_e - new_ew <= 0.f &&
               episode >= (im_smooth + im_window) &&
               still_something_to_develop();
-
+              
     //change corresponding weights
     if(changed) {
+      LOG_INFO(this->getNN()->name() << " catch development at " << rep_display << " : " << im_index);
       ewc_setup(last_episode_changed + all_scores.size());
       update_DL_IM();
 
@@ -540,13 +538,17 @@ class DODevMLP : public MLP {
         if(heuristic_devpoints_index < st_control->size()) {
           auto blob_st = neural_net->layer_by_name("devnn_states")->blobs()[0];
           auto data = blob_st->mutable_cpu_data();
-          data[heuristic_devpoints_index] = 1.f;
-          LOG_INFO("dev point st " << st_control->at(heuristic_devpoints_index) );
+          if(data[heuristic_devpoints_index] < 0.5f) {
+            data[heuristic_devpoints_index] = 1.f;
+            LOG_INFO(this->getNN()->name() << " dev point st " << st_control->at(heuristic_devpoints_index) );
+          }
         } else if(heuristic_devpoints_index < st_control->size() + ac_control->size() && !disable_ac_control) {
           auto blob_ac = neural_net->layer_by_name("devnn_actions")->blobs()[0];
           auto data = blob_ac->mutable_cpu_data();
-          data[heuristic_devpoints_index - st_control->size()] = 1.f;
-          LOG_INFO("dev point ac " << ac_control->at(heuristic_devpoints_index - st_control->size()) );
+          if(data[heuristic_devpoints_index - st_control->size()] < 0.5f){
+            data[heuristic_devpoints_index - st_control->size()] = 1.f;
+            LOG_INFO(this->getNN()->name() << " dev point ac " << ac_control->at(heuristic_devpoints_index - st_control->size()) );
+          }
         }
       }
       heuristic_devpoints_index++;
@@ -597,6 +599,8 @@ class DODevMLP : public MLP {
   void ewc_setup(uint episode) {
     if(!ewc_enabled() || best_param ==nullptr)
       return ;
+    
+    LOG_INFO(this->getNN()->name() << " fisher computed and saved");
     
     last_episode_changed = episode;
     ewc_decay_multiplier = 1.f;

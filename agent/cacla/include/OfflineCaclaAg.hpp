@@ -222,10 +222,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(std::is_same<NN, DODevMLP>::value && learning){
       DODevMLP * ann_cast = static_cast<DODevMLP *>(ann);
       bool changed_ann = std::get<1>(ann_cast->inform(episode, this->last_sum_weighted_reward));
-      bool changed_vnn = std::get<1>(static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward));
-      if(ann_cast->ewc_enabled() && ann_cast->ewc_force_constraint()){
-        if(changed_ann && !changed_vnn)
-          static_cast<DODevMLP *>(vnn)->ewc_setup(episode);
+//       don't need to inform vnn because they share parameters
+//       static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
+      if(changed_ann && ann_cast->ewc_enabled() && ann_cast->ewc_force_constraint()){
+        static_cast<DODevMLP *>(vnn)->ewc_setup(episode);
 //         else if(changed_vnn && !changed_ann) //impossible cause of ann structure
       }
     }
