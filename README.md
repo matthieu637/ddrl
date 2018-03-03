@@ -58,7 +58,7 @@ mkdir caffe_compilation
 cd caffe_compilation
 cp ../ddrl/scripts/extern/PKGBUILD-CAFFE-CPU PKGBUILD
 makepkg
-pacman -U caffe-ddrl-git-1-x86_64.pkg.tar.xz
+sudo pacman -U caffe-ddrl-git-1-x86_64.pkg.tar.xz
 cd ../ddrl/
 ./fullBuild.bash
 ```
@@ -66,13 +66,13 @@ cd ../ddrl/
 ### Ubuntu > 14.04
 
 ```
-apt-get update
+sudo apt-get update
 #base
-apt-get install libtool libboost-all-dev libtbb-dev libglew-dev python cmake libgtest-dev automake unzip libfreeimage-dev
+sudo apt-get install libtool libboost-all-dev libtbb-dev libglew-dev python cmake libgtest-dev automake unzip libfreeimage-dev
 #caffe
-apt-get install nvidia-cuda-dev nvidia-cuda-toolkit libprotobuf-dev libleveldb-dev libsnappy-dev protobuf-compiler libopenblas-dev libgflags-dev libgoogle-glog-dev liblmdb-dev libhdf5-serial-dev
+sudo apt-get install nvidia-cuda-dev nvidia-cuda-toolkit libprotobuf-dev libleveldb-dev libsnappy-dev protobuf-compiler libopenblas-dev libgflags-dev libgoogle-glog-dev liblmdb-dev libhdf5-serial-dev
 #optional for developer
-apt-get install astyle cppcheck doxygen valgrind htop
+sudo apt-get install astyle cppcheck doxygen valgrind htop
 
 cd any_directory_you_want
 # gtest compilation
@@ -91,7 +91,7 @@ cd caffe/build
 cmake ../ -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCPU_ONLY=On -DCMAKE_INSTALL_PREFIX:PATH=/usr/local/
 make -j4
 sudo make install
-cd ..
+cd ../..
 
 # ode compilation needed if official packages is under 0.14
 mkdir ode
