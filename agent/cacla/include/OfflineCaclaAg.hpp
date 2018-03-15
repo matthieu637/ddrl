@@ -219,6 +219,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(gaussian_policy == 2)
       oun->reset();
     
+    ratio_valid_advantage = -1;
+    
     if(std::is_same<NN, DODevMLP>::value && learning){
       DODevMLP * ann_cast = static_cast<DODevMLP *>(ann);
       bool changed_ann = std::get<1>(ann_cast->inform(episode, this->last_sum_weighted_reward));
@@ -486,6 +488,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       
       uint n=0;
       li=0;
+//       double dmax = std::max((double)0.f, *std::max_element(deltas.begin(), deltas.end()));
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
         sample sm = *it;
 
@@ -503,6 +506,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         li++;
       }
 
+      ratio_valid_advantage = ((float)n) / ((float) trajectory.size());
+      
       if(n > 0) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++){
           ann->increase_batchsize(trajectory.size());
@@ -538,9 +543,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                   else if (ac_diff[i] > 0)
                     ac_diff[i] *= (ac_out->at(i) - min_) / (max_ - min_);
                 }
-              }
-              else {
-                ac_diff[i] = -x * (corrected_update_ac_factor + fabs(deltas_blob[i]));
+              } else {
+                if(bib::Utils::rand01() < 0.4)
+                  ac_diff[i] = -x ;//* (corrected_update_ac_factor + fabs(deltas_blob[i]));
+                else
+                  ac_diff[i] = 0.00000000f;
               }
             }
           }
@@ -567,6 +574,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       update_critic();
     }
     
+    nb_sample_update= trajectory.size();
     trajectory.clear();
   }
   
@@ -620,13 +628,15 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
  protected:
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << this->sum_weighted_reward << " " << std::setw(
-          8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << trajectory.size();
+          8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << nb_sample_update <<
+          " " << std::setprecision(3) << ratio_valid_advantage ;
   }
 
   void _dump(std::ostream& out) const override {
     out << std::setw(25) << std::fixed << std::setprecision(22) <<
     this->sum_weighted_reward << " " << std::setw(8) << std::fixed <<
-        std::setprecision(5) << vnn->error() << " " << trajectory.size() ;
+        std::setprecision(5) << vnn->error() << " " << nb_sample_update <<
+        " " << std::setprecision(3) << ratio_valid_advantage ;
   }
   
   double sign(double x){
@@ -667,6 +677,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   double bestever_score;
   int update_each_episode;
   bib::OrnsteinUhlenbeckNoise<double>* oun = nullptr;
+  float ratio_valid_advantage=0;
+  int nb_sample_update = 0;
   
   struct algo_state {
     uint episode;

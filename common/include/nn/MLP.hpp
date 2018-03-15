@@ -491,6 +491,7 @@ class MLP {
       for(uint i=0;i<iter;i++){
         neural_net->ClearParamDiffs();
         neural_net->ForwardBackward();
+        updateFisher(kMinibatchSize);
         regularize();
         solver->ApplyUpdate();
         solver->set_iter(solver->iter() + 1);
@@ -1071,15 +1072,6 @@ protected:
   }
   
 public:
-  void stepCritic(const std::vector<double>& sensors, const std::vector<double>& motors, 
-                  const std::vector<double>& q, uint iter=1, const std::vector<double>* lw = nullptr){
-    InputDataIntoLayers(&sensors, &motors, &q);
-    if(lw != nullptr)
-      setWeightedSampleVector(lw, false);
-    
-    solver->Step(iter);
-  }
-
   void ZeroGradParameters() {
     caffe::Net<double>& net = *neural_net;
     for (uint i = 0; i < net.params().size(); ++i) {

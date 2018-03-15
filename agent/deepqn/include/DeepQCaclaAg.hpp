@@ -177,7 +177,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     onpolac                 = pt->get<bool>("agent.onpolac");
     qmu                     = pt->get<bool>("agent.qmu");
     
-    if(recompute_next_ac && !aac_target) {
+    if(recompute_next_ac && aac_target) {
       LOG_DEBUG("recompute_next_ac useless");
       exit(1);
     }
@@ -234,19 +234,8 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     last_trajectory_a.clear();
     
-//     if(std::is_same<NN, DODevMLP>::value){
-//       if(static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward)){
-//         LOG_INFO("reset learning catched");
-//         trajectory.clear();
-//       }
-//       if(static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward)){
-//         LOG_INFO("reset learning catched");
-//         trajectory.clear();
-//       }
-//       static_cast<DODevMLP *>(qnn_target)->inform(episode, last_sum_weighted_reward);
-//       static_cast<DODevMLP *>(ann_target)->inform(episode, last_sum_weighted_reward);
-//       static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
-//     }
+    valid_advantage = 0;
+    invalid_advantage = 0;
   }
   
   void sample_transition(std::vector<sample>& traj, const std::deque<sample>& from){
@@ -261,9 +250,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
       return;
     
-    for(uint fupd=0;fupd<1+force_more_update;fupd++)
-    {
-    
+    for(uint fupd=0;fupd<1+force_more_update;fupd++) {
       std::vector<sample> traj(kMinibatchSize);
       sample_transition(traj, trajectory);
       
@@ -313,7 +300,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       }
       
       //Update critic
-      qnn->stepCritic(all_states, all_actions, *q_targets);
+      qnn->learn_batch(all_states, all_actions, *q_targets, 1);
       
       //Update actor
       qnn->ZeroGradParameters();
@@ -343,7 +330,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         current_all_actions = &all_actions;
       
       if(qac_sample <= 1)
-        all_mine = qnn_worker->computeOutVFBatch(all_states, *current_all_actions);
+        all_mine = qnn->computeOutVFBatch(all_states, *current_all_actions);
       else {
         all_mine = new std::vector<double>(traj.size(), 0.f);
         for(uint j=0;j<qac_sample;j++){
@@ -362,7 +349,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         current_all_next_actions = ann_worker->computeOutBatch(all_next_states);
       
       if(qnextac_sample <= 1){
-        all_nextV = qnn_worker->computeOutVFBatch(all_next_states, *current_all_next_actions);
+        all_nextV = qnn_target->computeOutVFBatch(all_next_states, *current_all_next_actions);
       } else {
         all_nextV = new std::vector<double>(traj.size(), 0.f);
         for(uint j=0;j<qnextac_sample;j++){
@@ -395,8 +382,11 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       // compute disable_back
       i=0;
       for(auto it : traj) {
-        if(deltas[i] <= 0.0000000000f)
+        if(deltas[i] <= 0.0000000000f){
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + i * this->nb_motors);
+          invalid_advantage++;
+        } else 
+          valid_advantage++;
         i++;
       }
       
@@ -404,21 +394,22 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       qnn->ZeroGradParameters();
       ann->ZeroGradParameters();
       
-      delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
-      const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
-      double* q_values_diff = q_values_blob->mutable_cpu_diff();
-      i=0;
-      for (auto it : traj)
-        q_values_diff[q_values_blob->offset(i++,0,0,0)] = -1.0f;
-      qnn->critic_backward();
-      const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
-      const double* critic_action_diff = critic_action_blob->cpu_diff();
+//       delete qnn->computeOutVFBatch(all_states, *all_actions_outputs);
+//       const auto q_values_blob = qnn->getNN()->blob_by_name(MLP::q_values_blob_name);
+//       double* q_values_diff = q_values_blob->mutable_cpu_diff();
+//       i=0;
+//       for (auto it : traj)
+//         q_values_diff[q_values_blob->offset(i++,0,0,0)] = -1.0f;
+//       qnn->critic_backward();
+//       const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
+//       const double* critic_action_diff = critic_action_blob->cpu_diff();
       
       const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
       auto ac_diff = actor_actions_blob->mutable_cpu_diff();
       for(i=0; i<(uint) actor_actions_blob->count(); i++) {
         if(disable_back[i]) {
-          ac_diff[i] = critic_action_diff[i];
+//           ac_diff[i] = critic_action_diff[i];
+          ac_diff[i] = 0.f;
         } else {
           double x = all_actions[i] - all_actions_outputs->at(i);
           ac_diff[i] = -x;
@@ -494,6 +485,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
  protected:
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << sum_weighted_reward 
+    << " " << std::setprecision(3) << ((float)(valid_advantage)/((float)(valid_advantage+invalid_advantage)))
 //     #ifndef NDEBUG
 //     << " " << std::setw(8) << std::fixed << std::setprecision(5) << noise 
 //     << " " << trajectory.size() 
@@ -507,7 +499,8 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   void _dump(std::ostream& out) const override {
     out << std::setw(25) << std::fixed << std::setprecision(22) <<
         sum_weighted_reward << " " << std::setw(8) << std::fixed <<
-        std::setprecision(5) << trajectory.size() ;
+        std::setprecision(5) << trajectory.size() << " " << std::setprecision(3) <<
+        ((float)(valid_advantage)/((float)(valid_advantage+invalid_advantage)));
   }
   
 
@@ -542,6 +535,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   uint qac_sample, qnextac_sample;
   
   uint episode = 0;
+  uint valid_advantage, invalid_advantage;
   
   struct my_pol_dpmt{
     MLP* ann;

@@ -560,7 +560,7 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     }
 
     //Update critic
-    qnn->stepCritic(all_states, all_actions, *q_targets);
+    qnn->learn_batch(all_states, all_actions, *q_targets, 1);
 
     // Soft update of targets networks
     qnn_target->soft_update(*qnn, tau_soft_update);
