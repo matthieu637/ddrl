@@ -140,6 +140,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       }
     }
     last_action.reset(next_action);
+    
+    ann_testing->neutral_action(sensors, next_action);
 
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
@@ -253,6 +255,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         //         else if(changed_vnn && !changed_ann) //impossible cause of ann structure
       }
 
+      //only ann and qnn shared parameters, others networks need their update
       static_cast<DODevMLP *>(qnn_target)->inform(episode, last_sum_weighted_reward);
       static_cast<DODevMLP *>(ann_target)->inform(episode, last_sum_weighted_reward);
       static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);

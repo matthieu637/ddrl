@@ -41,9 +41,13 @@ class DODevMLP : public MLP {
       heuristic_devpoints = new std::vector<uint>(*m.heuristic_devpoints);
     else if(heuristic == 2)
       heuristic_linearcoef = new std::vector<double>(*m.heuristic_linearcoef);
-    if(ewc >= 0.f)
+    if(ewc >= 0.f && copy_solver)
       LOG_WARNING("be careful not sure it's working");
-    if(informed_sensorimotor_space){
+    else if(ewc >= 0.f){
+      LOG_WARNING("ewc disabled for copied network (without solver)");
+      ewc = -1.f;
+    }
+    if(informed_sensorimotor_space && !isCritic()){
       pd_controller_factor = new std::vector<double>(*m.pd_controller_factor);
     }
   }
@@ -772,6 +776,14 @@ class DODevMLP : public MLP {
   
   uint ewc_best_method() override {
     return ewc_best_param_method;
+  }
+  
+  void display_devnn_states_weights(){
+    if(!disable_st_control) {
+      auto blob_st = neural_net->layer_by_name("devnn_states")->blobs()[0];
+      auto count = blob_st->count();
+      bib::Logger::PRINT_ELEMENTS(blob_st->cpu_data(), count);
+    }
   }
 
  private:
