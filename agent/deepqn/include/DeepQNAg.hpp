@@ -251,14 +251,19 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         trajectory.clear();
       }
       if(changed && ann_cast->ewc_enabled() && ann_cast->ewc_force_constraint()){
-        static_cast<DODevMLP *>(qnn)->ewc_setup(episode);
+        static_cast<DODevMLP *>(qnn)->ewc_setup();
         //         else if(changed_vnn && !changed_ann) //impossible cause of ann structure
       }
 
+      if(changed){
+        double* weights = new double[ann->number_of_parameters(false)];
+        ann->copyWeightsTo(weights, false);
+        ann_testing->copyWeightsFrom(weights, false);
+        delete[] weights;
+      }
       //only ann and qnn shared parameters, others networks need their update
       static_cast<DODevMLP *>(qnn_target)->inform(episode, last_sum_weighted_reward);
       static_cast<DODevMLP *>(ann_target)->inform(episode, last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
     }
   }
   

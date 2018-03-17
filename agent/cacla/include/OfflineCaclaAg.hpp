@@ -227,7 +227,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 //       don't need to inform vnn because they share parameters
 //       static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
       if(changed_ann && ann_cast->ewc_enabled() && ann_cast->ewc_force_constraint()){
-        static_cast<DODevMLP *>(vnn)->ewc_setup(episode);
+        static_cast<DODevMLP *>(vnn)->ewc_setup();
 //         else if(changed_vnn && !changed_ann) //impossible cause of ann structure
       }
     }

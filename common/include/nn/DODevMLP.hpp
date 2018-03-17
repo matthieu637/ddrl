@@ -421,7 +421,7 @@ class DODevMLP : public MLP {
     bool catch_change = false;
     bool will_change = going_to_develop(episode);
     if(will_change)
-      ewc_setup(episode);
+      ewc_setup();
 
     if(heuristic == 1) {
       for(uint heuristic_devpoints_index=0; heuristic_devpoints_index < heuristic_devpoints->size() ;
@@ -504,7 +504,8 @@ class DODevMLP : public MLP {
     //change corresponding weights
     if(changed) {
       LOG_INFO(this->getNN()->name() << " catch development at " << rep_display << " : " << im_index);
-      ewc_setup(last_episode_changed + all_scores.size());
+      ewc_setup();
+      last_episode_changed = last_episode_changed + all_scores.size();
       update_DL_IM();
 
       all_scores.clear();
@@ -600,13 +601,12 @@ class DODevMLP : public MLP {
   }
   
 //   EWC methods
-  void ewc_setup(uint episode) {
-    if(!ewc_enabled() || best_param ==nullptr)
+  void ewc_setup() {
+    if(!ewc_enabled() || best_param == nullptr)
       return ;
     
     LOG_INFO(this->getNN()->name() << " fisher computed and saved");
     
-    last_episode_changed = episode;
     ewc_decay_multiplier = 1.f;
     best_score = std::numeric_limits<double>::lowest();
     
@@ -658,7 +658,7 @@ class DODevMLP : public MLP {
   }
 
   double ewc_cost() override {
-    if(!ewc_enabled() || last_episode_changed == 0)
+    if(!ewc_enabled() || best_param_previous_task == nullptr)
       return 0.f;
     double cost = 0.f;
     uint k=0;
@@ -684,7 +684,7 @@ class DODevMLP : public MLP {
   }
 
   void regularize() override {
-    if(!ewc_enabled() || last_episode_changed == 0)
+    if(!ewc_enabled() || best_param_previous_task == nullptr)
       return;
 
     uint k=0;
@@ -817,7 +817,7 @@ class DODevMLP : public MLP {
   std::vector<double>* fisher = nullptr;
   std::vector<double>* previous_fisher = nullptr;
   double fisher_nbr;
-  uint last_episode_changed = 0;
+  int last_episode_changed = 0;//used only by IM
   uint last_update_best_param = 0;
   double best_score = std::numeric_limits<double>::lowest();
 };
