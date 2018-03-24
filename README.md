@@ -165,3 +165,7 @@ cd agent/cmaes/build/debug/
 ```
 
 The view option doesn't work on Mac because the GLUT thread need to be the main thread.
+
+## Optimizing hyperparameters
+
+See https://github.com/matthieu637/lhpo
