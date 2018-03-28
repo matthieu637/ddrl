@@ -7,7 +7,7 @@ my PhD thesis to develop several deep reinforcement learning agent in continuous
 <img src="environment/illustration.png" width=35% align="right" />
 
 It contains : 
-- 4 open-source and free environments using ODE (open dynamic engine) based on OpenAI/mujuco : acrobot, cartpole, half-cheetah and humanoid,
+- 4 open-source and free environments using ODE (open dynamic engine) based on OpenAI/mujuco : acrobot, cartpole, half-cheetah and humanoid. We propose those environments because the free licence of Mujoco is not enough to perform hyperparameter meta-optimization on a cluster. However a lot of deep RL algorithms relies on a large number of hyperparameters.
 
 - an implementation of DDPG with Caffe
 ```
