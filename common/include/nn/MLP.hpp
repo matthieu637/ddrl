@@ -701,6 +701,10 @@ class MLP {
     
   }
   
+  virtual void ewc_decay_update(){
+    
+  }
+  
   virtual void updateFisher(double) {
     
   }

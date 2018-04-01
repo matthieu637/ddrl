@@ -394,8 +394,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   void end_episode(bool learning) override {
 //     LOG_FILE("policy_exploration", ann->hash());
-    if(!learning)
+    if(!learning){
+      if(ann->ewc_best_method() >= 4){
+        ann->update_best_param_previous_task(this->sum_weighted_reward);
+        vnn->update_best_param_previous_task(this->sum_weighted_reward);
+      }
       return;
+    }
     
     if(ann->ewc_best_method() < 3){
       ann->update_best_param_previous_task(this->sum_weighted_reward);
@@ -414,11 +419,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     double V_pi_s0 = 0;
     if(update_critic_first)
       V_pi_s0 = update_critic();
-    
-    if(ann->ewc_best_method() >= 3){
-      ann->update_best_param_previous_task(V_pi_s0);
-      vnn->update_best_param_previous_task(V_pi_s0);
-    }
 
     if (trajectory.size() > 0) {
       std::vector<double> sensors(trajectory.size() * nb_sensors);
@@ -576,6 +576,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     
     nb_sample_update= trajectory.size();
     trajectory.clear();
+    
+    ann->ewc_decay_update();
+    vnn->ewc_decay_update();
   }
   
   void end_instance(bool learning) override {

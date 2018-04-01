@@ -147,7 +147,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
-    last_trajectory_a.push_back(*next_action);
+//     last_trajectory_a.push_back(*next_action);
     
     return *next_action;
   }
@@ -279,18 +279,20 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       ann->update_best_param_previous_task(this->sum_weighted_reward);
       qnn->update_best_param_previous_task(this->sum_weighted_reward);
       
-      MLP* cann = new MLP(*ann, false, ::caffe::Phase::TEST);
-      MLP* cqnn = new MLP(*qnn, false, ::caffe::Phase::TEST);
-      best_population.insert({cann, cqnn, sum_weighted_reward, last_trajectory_a});
-      
-      if(best_population.size() > 5){
-        //remove smallest
-        auto it = best_population.end();
-        --it;
-        delete it->ann;
-        delete it->qnn;
-        best_population.erase(it);
-      }
+      ann->ewc_decay_update();
+      qnn->ewc_decay_update();
+//      MLP* cann = new MLP(*ann, false, ::caffe::Phase::TEST);
+//      MLP* cqnn = new MLP(*qnn, false, ::caffe::Phase::TEST);
+//      best_population.insert({cann, cqnn, sum_weighted_reward, last_trajectory_a});
+//      
+//      if(best_population.size() > 5){
+//        //remove smallest
+//        auto it = best_population.end();
+//        --it;
+//        delete it->ann;
+//        delete it->qnn;
+//        best_population.erase(it);
+//      }
       
       episode++;
     }

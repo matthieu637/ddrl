@@ -689,10 +689,8 @@ class DODevMLP : public MLP {
 
     uint k=0;
     double ewc_decay_factor_ = 1.f;
-    if(ewc_decay >= 0.f){
+    if(ewc_decay >= 0.f)
       ewc_decay_factor_ = ewc_decay_multiplier;
-      ewc_decay_multiplier *= ewc_decay;
-    }
       
     const auto& from_params = neural_net->params();
     for (uint i = 0; i < from_params.size(); ++i) {
@@ -706,6 +704,11 @@ class DODevMLP : public MLP {
         }
       }
     }
+  }
+  
+  void ewc_decay_update() override {
+    if(ewc_enabled() && ewc_decay >= 0.f)
+      ewc_decay_multiplier *= ewc_decay;
   }
 
   bool ewc_enabled() override {
@@ -721,11 +724,10 @@ class DODevMLP : public MLP {
       bool going_to_update = false;
       bool too_old;
       switch (ewc_best_param_method){
-        case 5 ://random (proof of concept)
+        case 3 ://random (proof of concept)
           last_update_best_param++;
           going_to_update = last_update_best_param == 1;
           break;
-        case 4 ://use critic (best+recent)
         case 2 ://keep a recent "good" performance
           too_old = last_update_best_param > 50;
           last_update_best_param++;
@@ -735,7 +737,7 @@ class DODevMLP : public MLP {
             //best score can be decreased
           }
           break;
-        case 3 ://use critic (best)
+        case 4 ://best - cheat with testing perf
         case 0 ://best param in learning
           going_to_update = score > best_score;
           break;
@@ -752,8 +754,6 @@ class DODevMLP : public MLP {
         best_param = new std::vector<double>(number_of_parameters(true));
         this->copyWeightsTo(best_param->data(), true);
       }
-
-      ewc_decay_multiplier *= ewc_decay;
     }
   }
   
