@@ -402,7 +402,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       return;
     }
     
-    if(ann->ewc_best_method() < 3){
+    if(ann->ewc_best_method() <= 3){
       ann->update_best_param_previous_task(this->sum_weighted_reward);
       vnn->update_best_param_previous_task(this->sum_weighted_reward);
     }    

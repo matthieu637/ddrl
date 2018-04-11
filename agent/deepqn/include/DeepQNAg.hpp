@@ -139,9 +139,9 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
           next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
       }
     }
+    ann_testing->neutral_action(sensors, next_action);
     last_action.reset(next_action);
     
-    ann_testing->neutral_action(sensors, next_action);
 
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
@@ -276,8 +276,10 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
   void end_instance(bool learning) override {
     if(learning){
-      ann->update_best_param_previous_task(this->sum_weighted_reward);
-      qnn->update_best_param_previous_task(this->sum_weighted_reward);
+      if(ann->ewc_best_method() <= 3){
+        ann->update_best_param_previous_task(this->sum_weighted_reward);
+        qnn->update_best_param_previous_task(this->sum_weighted_reward);
+      }
       
       ann->ewc_decay_update();
       qnn->ewc_decay_update();
@@ -295,6 +297,9 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 //      }
       
       episode++;
+    } else if(ann->ewc_best_method() >= 4) {
+      ann->update_best_param_previous_task(this->sum_weighted_reward);
+      qnn->update_best_param_previous_task(this->sum_weighted_reward);
     }
   }
   
