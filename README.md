@@ -130,7 +130,7 @@ cd ddrl
 #install brew
 brew update
 brew install cmake libtool findutils coreutils boost protobuf homebrew/science/hdf5 snappy leveldb gflags glog szip tbb lmdb gnu-sed
-brew install --with-double-precision ode
+brew install --with-double-precision --with-shared ode
 
 #caffe compilation
 cd any_directory_you_want
