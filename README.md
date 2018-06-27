@@ -16,6 +16,8 @@ Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., … 
 - an implementation of NFAC(&lambda;)-V (extended with eligibility traces)
 ```
 Matthieu Zimmer, Yann Boniface, and Alain Dutech. Neural fitted actor-critic. In ESANN – European Symposium on Artificial Neural Networks, Computational Intelligence and Machine Learning, April 2016.
+
+Matthieu Zimmer. Developmental reinforcement learning. PhD thesis, University of Lorraine, January 2018.
 ```
 - an implementation of CMA-ES with Caffe
 ```
