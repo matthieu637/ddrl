@@ -25,14 +25,14 @@ class DevMLP : public MLP {
   DevMLP(unsigned int input, unsigned int sensors, const std::vector<uint>& hiddens, double alpha,
          uint _kMinibatchSize, double decay_v, uint hidden_layer_type, uint batch_norm, bool _weighted_sample=false, uint mom_=0) :
     MLP(input, sensors, input-sensors, _kMinibatchSize, false, _weighted_sample, hiddens.size()), policy(false) {
-    c = new constructor({hiddens, alpha, decay_v, hidden_layer_type, batch_norm, 0});
+    c = new constructor({hiddens, alpha, decay_v, hidden_layer_type, batch_norm, 0, mom_});
   }
 
 //   policy
   DevMLP(unsigned int sensors, const std::vector<uint>& hiddens, unsigned int motors, double alpha, uint _kMinibatchSize,
          uint hidden_layer_type, uint last_layer_type, uint batch_norm, bool loss_layer=false, uint mom_=0) :
     MLP(sensors, sensors, motors, _kMinibatchSize, loss_layer, false, hiddens.size()), policy(true) {
-    c = new constructor({hiddens, alpha, -1, hidden_layer_type, batch_norm, last_layer_type});
+    c = new constructor({hiddens, alpha, -1, hidden_layer_type, batch_norm, last_layer_type, mom_});
 
   }
 
@@ -396,6 +396,19 @@ class DevMLP : public MLP {
         solver_param.set_snapshot_prefix("actor");
       else
         solver_param.set_snapshot_prefix("critic");
+      if(c->momentum == 0){
+        solver_param.set_momentum(0.);
+        solver_param.set_momentum2(0.999);
+      } else if(c->momentum == 1){
+        solver_param.set_momentum(0.9);
+        solver_param.set_momentum2(0.999);
+      } else if(c->momentum == 2){
+        solver_param.set_momentum(0.);
+        solver_param.set_momentum2(0.);      
+      } else {
+        solver_param.set_momentum(0.9);
+        solver_param.set_momentum2(0.);   
+      }
 //       solver_param.set_clip_gradients(10);
 
       solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
@@ -555,6 +568,7 @@ class DevMLP : public MLP {
     uint hidden_layer_type;
     uint batch_norm;
     uint last_layer_type;
+    uint momentum;
   };
 
   bool policy;

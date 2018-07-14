@@ -464,7 +464,18 @@ class MLP {
       InputDataIntoLayers(&sensors, &motors, &q);
     else
       InputDataIntoLayers(&sensors, nullptr, &q);
-    solver->Step(iter);
+    if(!ewc_enabled())
+      solver->Step(iter);
+    else {
+      for(uint i=0;i<iter;i++){
+        neural_net->ClearParamDiffs();
+        neural_net->ForwardBackward();
+        updateFisher(kMinibatchSize);
+        regularize();
+        solver->ApplyUpdate();
+        solver->set_iter(solver->iter() + 1);
+      }
+    }
   }
 
   void learn_batch_lw(const std::vector<double>& sensors, const std::vector<double>& motors, const std::vector<double>& q,
@@ -474,7 +485,18 @@ class MLP {
     else 
       InputDataIntoLayers(&sensors, nullptr, &q);
     setWeightedSampleVector(&lw, false);
-    solver->Step(iter);
+    if(!ewc_enabled())
+      solver->Step(iter);
+    else {
+      for(uint i=0;i<iter;i++){
+        neural_net->ClearParamDiffs();
+        neural_net->ForwardBackward();
+        updateFisher(kMinibatchSize);
+        regularize();
+        solver->ApplyUpdate();
+        solver->set_iter(solver->iter() + 1);
+      }
+    }
   }
 
   virtual double computeOutVF(const std::vector<double>& sensors, const std::vector<double>& motors) {
@@ -669,6 +691,34 @@ class MLP {
   
   virtual bool ewc_enabled() {
     return false;
+  }
+    
+  virtual void update_best_param_previous_task(double) {
+    
+  }
+  
+  virtual void regularize() {
+    
+  }
+  
+  virtual void ewc_decay_update(){
+    
+  }
+  
+  virtual void updateFisher(double) {
+    
+  }
+  
+  virtual void neutral_action(const std::vector<double>&, std::vector<double>*){
+    
+  }
+  
+  virtual uint ewc_best_method() {
+    return 0;
+  }
+  
+  bool isCritic(){
+    return size_input_state != size_sensors || size_motors == 0;
   }
 
   boost::shared_ptr<caffe::Net<double>> getNN() {
@@ -882,7 +932,9 @@ protected:
 //     LOG_DEBUG("" << (ip_param->has_bias_term() ? "oui" : "non"));
 //    LOG_DEBUG(ip_param->has_bias_term());
 //     ip_param->set_bias_term(true);
-//     caffe::FillerParameter* bias_filler = ip_param->mutable_bias_filler();
+    caffe::FillerParameter* bias_filler = ip_param->mutable_bias_filler();
+    bias_filler->set_type("gaussian");
+    bias_filler->set_std(0.01);
 //     bias_filler->set_type("constant");
 //     bias_filler->set_value(1);
 //     bias already here but not in first blob but set to 0?
@@ -1024,15 +1076,6 @@ protected:
   }
   
 public:
-  void stepCritic(const std::vector<double>& sensors, const std::vector<double>& motors, 
-                  const std::vector<double>& q, uint iter=1, const std::vector<double>* lw = nullptr){
-    InputDataIntoLayers(&sensors, &motors, &q);
-    if(lw != nullptr)
-      setWeightedSampleVector(lw, false);
-    
-    solver->Step(iter);
-  }
-
   void ZeroGradParameters() {
     caffe::Net<double>& net = *neural_net;
     for (uint i = 0; i < net.params().size(); ++i) {

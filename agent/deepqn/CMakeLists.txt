@@ -26,9 +26,9 @@ add_executable(adacrobot src/test/Adacrobot.cpp ${all_include} ${all_sources} )
 target_link_libraries(adacrobot 
   ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY})
   
-add_executable(ada-nfac src/test/NFACAda.cpp ${all_include} ${all_sources} )
-target_link_libraries(ada-nfac 
-  ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY})
+# add_executable(ada-nfac src/test/NFACAda.cpp ${all_include} ${all_sources} )
+# target_link_libraries(ada-nfac 
+#   ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY})
 
 add_executable(cartpole src/test/Cartpole.cpp ${all_include} ${all_sources} )
 target_link_libraries(cartpole 
@@ -42,9 +42,9 @@ add_executable(half-cheetah-dodev src/test/DodevHalfCheetah.cpp ${all_include} $
 target_link_libraries(half-cheetah-dodev 
   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
-add_executable(cp-nfac src/test/NFACCp.cpp ${all_include} ${all_sources} )
-target_link_libraries(cp-nfac
-  ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
+# add_executable(cp-nfac src/test/NFACCp.cpp ${all_include} ${all_sources} )
+# target_link_libraries(cp-nfac
+#   ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
 add_executable(half-cheetah src/test/HalfCheetah.cpp ${all_include} ${all_sources} )
 target_link_libraries(half-cheetah 
@@ -54,13 +54,13 @@ add_executable(half-cheetah-dqc src/test/HalfCheetahDQC.cpp ${all_include} ${all
 target_link_libraries(half-cheetah-dqc 
   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
 
-add_executable(half-cheetah-nfac src/test/NFACHalfCheetah.cpp ${all_include} ${all_sources} )
-target_link_libraries(half-cheetah-nfac
-  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+# add_executable(half-cheetah-nfac src/test/NFACHalfCheetah.cpp ${all_include} ${all_sources} )
+# target_link_libraries(half-cheetah-nfac
+#   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
-add_executable(half-cheetah-nfmac src/test/NFMACHalfCheetah.cpp ${all_include} ${all_sources} )
-target_link_libraries(half-cheetah-nfmac
-  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+# add_executable(half-cheetah-nfmac src/test/NFMACHalfCheetah.cpp ${all_include} ${all_sources} )
+# target_link_libraries(half-cheetah-nfmac
+#   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
   
 add_executable(humanoid src/test/Humanoid.cpp ${all_include} ${all_sources} )
 target_link_libraries(humanoid 
@@ -82,7 +82,7 @@ execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-a
 #execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-acrobot-3l.ini data/cmaes-acrobot-3l.ini acrobot-3l.ini)
 execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-cartpole.ini data/ddpg-cp.ini cartpole-ddpg.ini)
 
-execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-acrobot.ini data/nfac-ada.ini acrobot-nfac.ini)
+# execute_process(COMMAND bash ${ROOT_DRL_PATH}/scripts/merge_ini.bash data/base-acrobot.ini data/nfac-ada.ini acrobot-nfac.ini)
 #
 # -------------------
 # Unit Test

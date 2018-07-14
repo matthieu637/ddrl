@@ -171,6 +171,12 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
       LOG_DEBUG("ac_onpolnexta with use_qmu >= -1");
       exit(1);
     }
+    
+    if(offpolicy_critic && use_qmu < -1)
+      LOG_INFO("WARNING : you learn onpolicy Q^\\mu with off_policy correction");
+    
+    if(!offpolicy_critic && use_qmu == -1)
+      LOG_INFO("WARNING : you learn offpolicy Q^\\pi without off_policy correction");
 
     ann = new NN(this->get_state_size(), *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type,
                  actor_output_layer_type,
@@ -216,11 +222,11 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
       trajectories.push_back(std::shared_ptr<trajectory>(t));
     }
 
-    if(std::is_same<NN, DODevMLP>::value) {
-      static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
-    }
+//     if(std::is_same<NN, DODevMLP>::value) {
+//       static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward);
+//       static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward);
+//       static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
+//     }
 
     double* weights = new double[ann->number_of_parameters(false)];
     ann->copyWeightsTo(weights, false);
@@ -253,7 +259,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
       std::vector<double>* all_next_actions;
       if(use_qmu >= -1)
         all_next_actions = ann->computeOutBatch(all_next_states);
-      else {
+      else {//use_qmu -2
         all_next_actions = new std::vector<double>(all_size * this->nb_motors);
         li=0;
         for(auto one_trajectory : trajectories) {
@@ -265,15 +271,17 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
               skip_first=false;
               continue;
             }
-            std::copy(it.a.begin(), it.a.end(), all_actions.begin() + li * this->nb_motors);
+            std::copy(it.a.begin(), it.a.end(), all_next_actions->begin() + li * this->nb_motors);
             li++;
           }
           
           vector<double>* next_action = ann_testing->computeOut(trajectory.back().s);
-          std::copy(next_action->begin(), next_action->end(), all_actions.begin() + li * this->nb_motors);
+          std::copy(next_action->begin(), next_action->end(), all_next_actions->begin() + li * this->nb_motors);
           delete next_action;
           li++;
         }
+        
+        ASSERT(li == all_size, "pb");
       }
       std::vector<double>* all_pi;
       if(lambda >= 0.f && offpolicy_strategy != 0 && offpolicy_critic )
@@ -573,6 +581,8 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
         }
         li++;
       }
+      
+      ASSERT(li == trajectory.size(), "pb");
 
       uint n=0;
       ann->increase_batchsize(trajectory.size());
@@ -605,9 +615,11 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
           }
         }
         std::vector<double>* all_mine;
-        if(!use_qmu_actor)
-          all_mine = qnn->computeOutVFBatch(all_states, all_actions);
-        else {
+        if(!use_qmu_actor){
+          std::vector<double>* all_pi = ann->computeOutBatch(all_states);
+          all_mine = qnn->computeOutVFBatch(all_states, *all_pi);
+          delete all_pi;
+        } else {
           std::vector<double> all_actions_mu(trajectory.size() * this->nb_motors * use_qmu);
           std::vector<double> all_states_tmp(trajectory.size() * this->get_state_size() * use_qmu);
           for(int j=0;j<use_qmu;j++){
@@ -641,6 +653,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
           deltas[li] = v_target - all_mine->at(li);
           ++li;
         }
+        ASSERT(li == trajectory.size(), "pb");
 
         if(gae) {
           //
@@ -654,6 +667,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
               diff[li] += std::pow(this->gamma * lambda, j-li) * deltas[j];
             li++;
           }
+          ASSERT(li == trajectory.size(), "pb");
 
           ASSERT(diff[trajectory.size() -1] == deltas[trajectory.size() -1], "pb lambda");
           li=0;
@@ -662,6 +676,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
             deltas[li] = diff[li];
             ++li;
           }
+          ASSERT(li == trajectory.size(), "pb");
         }
 
         li=0;
@@ -676,11 +691,14 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
   //         std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
           li++;
         }
-      
+        
+        ASSERT(li == trajectory.size(), "pb");
         delete all_nextV;
         delete all_mine;
       }
 
+      ratio_valid_advantage = ((float)n) / ((float) trajectory.size());
+      
       if(n > 0 || determinist_update) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++) {
           //learn BN
@@ -815,9 +833,11 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
         }
       }
       std::vector<double>* all_mine;
-      if(!use_qmu_actor)
-        all_mine = qnn->computeOutVFBatch(all_states, all_actions);
-      else {
+      if(!use_qmu_actor) {
+        std::vector<double>* all_pi = ann->computeOutBatch(all_states);
+        all_mine = qnn->computeOutVFBatch(all_states, *all_pi);
+        delete all_pi;
+      } else {
         std::vector<double> all_actions_mu(all_size * this->nb_motors * use_qmu);
         std::vector<double> all_states_tmp(all_size * this->get_state_size() * use_qmu);
         for(int j=0;j<use_qmu;j++){
@@ -968,6 +988,8 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
       }
     }
 
+    ratio_valid_advantage = ((float)n) / ((float) all_size);
+    
     if(n > 0 || determinist_update) {
       for(uint sia = 0; sia < stoch_iter_actor; sia++) {
         decltype(ann->computeOutBatch(all_states)) ac_out;
@@ -1057,13 +1079,14 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << this->sum_weighted_reward << " " << std::setw(
-          8) << std::fixed << std::setprecision(5) << qnn->error() << " " << noise << " " << alltransitions();
+          8) << std::fixed << std::setprecision(5) << qnn->error() << " " << noise << " " << alltransitions() <<
+          " " << ratio_valid_advantage;
   }
 
   void _dump(std::ostream& out) const override {
     out << std::setw(25) << std::fixed << std::setprecision(22) <<
         this->sum_weighted_reward << " " << std::setw(8) << std::fixed <<
-        std::setprecision(5) << qnn->error() << " " << alltransitions() ;
+        std::setprecision(5) << qnn->error() << " " << alltransitions() << " " << ratio_valid_advantage;
   }
 
   uint alltransitions() const {
@@ -1117,6 +1140,7 @@ class OffNFACQAg : public arch::ARLAgent<arch::AgentProgOptions> {
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
   std::vector<double> empty_action; //dummy action cause c++ cannot accept null reference
+  float ratio_valid_advantage;
 
   struct algo_state {
     uint episode;

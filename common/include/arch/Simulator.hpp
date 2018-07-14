@@ -91,17 +91,22 @@ class Simulator {
     return fepisode;
   }
 
-  void run_loop(uint starting_ep, uint fepisode){
+  void run_loop(uint starting_ep, int fepisode){
     Stat stat;
 
     time_spend.start();
-    for (uint episode = starting_ep; episode < fepisode; episode++) {
+    for (int episode = starting_ep; episode < fepisode; episode++) {
       //  learning
       run_episode(true, episode, 0, stat);
 
-      for (unsigned int test_episode = 0; test_episode < test_episode_per_episode; test_episode++) {
+      for (int test_episode = 0; test_episode < test_episode_per_episode; test_episode++) {
         //  testing during learning
         run_episode(false, episode, test_episode, stat);
+      }
+      
+      if(test_episode_per_episode < -1 && episode % (-test_episode_per_episode) == 0) {
+        //  testing during learning
+        run_episode(false, episode, 0, stat);
       }
     }
 
@@ -131,7 +136,7 @@ class Simulator {
   }
 
  protected:
-  virtual void run_episode(bool learning, unsigned int lepisode, unsigned int tepisode, Stat& stat) {
+  virtual void run_episode(bool learning, unsigned int lepisode, int tepisode, Stat& stat) {
     env->reset_episode(learning);
     std::list<double> all_rewards;
     agent->start_instance(learning);
@@ -205,26 +210,27 @@ class Simulator {
   void dump_and_display(unsigned int episode, unsigned int instance, unsigned int tepisode,
                         const std::list<double>& all_rewards, Environment* env,
                         Agent* ag, bool learning, uint step) {
+    (void) all_rewards;
     bool display = episode % display_log_each == 0;
     bool dump = episode % dump_log_each == 0;
 
     if(!learning) {
       display = (episode+tepisode) % display_log_each == 0;
-      dump = (episode+tepisode) % dump_log_each == 0;
+      dump = true; //unless why do you compute it ?
     }
 
     if (dump || display) {
-      bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
+//       bib::Utils::V3M reward_stats = bib::Utils::statistics(all_rewards);
 
       if (display && ((display_learning && learning) || !learning)) {
         bib::Dumper<Environment, bool, bool> env_dump(env, true, false);
         bib::Dumper<Agent, bool, bool> agent_dump(ag, true, false);
         LOG_INFO((learning ? "L " : "T ")
                  << std::left << std::setw(6) << std::setfill(' ') << episode
-                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.mean
-                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.var
-                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.max
-                 << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.min
+//                  << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.mean
+//                  << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.var
+//                  << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.max
+//                  << std::left << std::setw(7) << std::fixed << std::setprecision(3) << reward_stats.min
                  << std::left << std::setw(7) << std::fixed << step
                  << " " << agent_dump << " " << env_dump);
       }
@@ -234,8 +240,9 @@ class Simulator {
         bib::Dumper<Agent, bool, bool> agent_dump(ag, false, true);
         LOG_FILE(learning ? std::to_string(instance) + DEFAULT_DUMP_LEARNING_FILE :
                  std::to_string(instance) + "." +std::to_string(tepisode) + DEFAULT_DUMP_TESTING_FILE,
-                 episode << " " << reward_stats.mean << " " << reward_stats.var << " " <<
-                 reward_stats.max << " " << reward_stats.min << " " << step << " " << agent_dump << " " << env_dump);
+                 episode << " " 
+//                  << reward_stats.mean << " " << reward_stats.var << " " << reward_stats.max << " " << reward_stats.min << " " 
+                 << step << " " << agent_dump << " " << env_dump);
       }
     }
   }
@@ -295,7 +302,7 @@ class Simulator {
     boost::property_tree::ini_parser::read_ini(config_file, *properties);
 
     max_episode                 = properties->get<unsigned int>("simulation.max_episode");
-    test_episode_per_episode    = properties->get<unsigned int>("simulation.test_episode_per_episode");
+    test_episode_per_episode    = properties->get<int>("simulation.test_episode_per_episode");
     test_episode_at_end         = properties->get<unsigned int>("simulation.test_episode_at_end");
 
     dump_log_each               = properties->get<unsigned int>("simulation.dump_log_each");
@@ -331,7 +338,7 @@ class Simulator {
     }
   };
   unsigned int max_episode;
-  unsigned int test_episode_per_episode;
+  int test_episode_per_episode;
   unsigned int test_episode_at_end;
 
   unsigned int dump_log_each;

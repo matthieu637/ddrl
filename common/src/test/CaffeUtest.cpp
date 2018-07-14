@@ -355,8 +355,9 @@ TEST(MLP, CaffeCopyActor) {
           EXPECT_DOUBLE_EQ(all_actions_outputs->at(i), all_actions_outputs2->at(i));
           EXPECT_DOUBLE_EQ(all_actions_outputs4->at(i), all_actions_outputs3->at(i));
           EXPECT_DOUBLE_EQ(all_actions_outputs4->at(i), all_actions_outputs5->at(i));
-          if(batch_norm == 0) //is not the same because batch norm is not learning
+          if(batch_norm == 0){ //is not the same because batch norm is not learning
             EXPECT_DOUBLE_EQ(all_actions_outputs2->at(i), all_actions_outputs3->at(i));
+          }
         }
         delete all_actions_outputs;
         delete all_actions_outputs2;
@@ -648,7 +649,7 @@ TEST(MLP, DevelopmentalLayer) {
       actor.copyWeightsTo(weights, true);
       double* weights2 = new double[actor2.number_of_parameters(true)];
       actor2.copyWeightsTo(weights2, true);
-      for(uint i=1;i< actor2.number_of_parameters(true)-2; i++)
+      for(uint i=1;i< actor2.number_of_parameters(true)-1; i++)
         weights2[i]=weights[i-1];
       weights2[0]=1.f;
       weights2[actor2.number_of_parameters(true)-1]=1.f;
@@ -679,7 +680,7 @@ TEST(MLP, DevelopmentalLayer) {
         delete all_actions_outputs2;
         double proba = (((float)fit)/((float)batch_size));
         EXPECT_GE(proba, 0.52);
-        EXPECT_LE(proba, 0.67);
+        EXPECT_LE(proba, 0.68);
       }
 
       delete[] weights;
@@ -730,7 +731,7 @@ TEST(MLP, DevelopmentalLayerMoreDimension) {
       actor2.copyWeightsTo(weights2, true);
       for(uint i=0;i<3;i++)
         weights2[i]=1.f;
-      for(uint i=3;i< actor.number_of_parameters(true); i++)
+      for(uint i=3;i< actor.number_of_parameters(true) + 3; i++)
         weights2[i]=weights[i-3];
       for(uint i=actor.number_of_parameters(true); i < actor2.number_of_parameters(true)-3;i++)
         weights2[i+3]=1.f;
@@ -842,10 +843,11 @@ TEST(MLP, DevelopmentalLayerControlRestriction) {
       actor2.copyWeightsTo(weights2, true);
       for(uint i=0;i<3-1;i++)
         weights2[i]=1.f;
-      for(uint i=3-1;i< actor.number_of_parameters(true); i++)
+      for(uint i=3-1;i< actor.number_of_parameters(true) + 3-1; i++)
         weights2[i]=weights[i-(3-1)];
       for(uint i=actor.number_of_parameters(true); i < actor2.number_of_parameters(true)-(3-1);i++)
         weights2[i+(3-1)]=1.f;
+      EXPECT_EQ(actor2.number_of_parameters(true)-(3-1) - actor.number_of_parameters(true), 2);
       actor2.copyWeightsFrom(weights2, true);
       bib::Combinaison::continuous<>(iter, 3, -1, 1, 6);
       CHECK_EQ(n, batch_size*3);
@@ -1085,7 +1087,7 @@ TEST(MLP, DevelopmentalLayerScalingControl) {
       actor2.copyWeightsTo(weights2, true);
       for(uint i=0;i<3-1;i++)
         weights2[i]=1.f;
-      for(uint i=3-1;i< actor.number_of_parameters(true); i++)
+      for(uint i=3-1;i< actor.number_of_parameters(true)+3-1; i++)
         weights2[i]=weights[i-(3-1)];
       for(uint i=actor.number_of_parameters(true); i < actor2.number_of_parameters(true)-(3-1);i++)
         weights2[i+(3-1)]=1.f;
@@ -1123,12 +1125,15 @@ TEST(MLP, DevelopmentalLayerScalingControl) {
           for(uint j=0;j<4;j++){
             if(j==0 && all_actions_outputs->at(y) == all_actions_outputs2->at(y))
               fit0++;
-            else if(j==1 && std::fabs(all_actions_outputs->at(y)*(1./0.4) - all_actions_outputs2->at(y)) <= 1e-10 )
+            else if(j==1 && std::fabs(all_actions_outputs->at(y)*(1./0.4) - all_actions_outputs2->at(y)) <= 1e-8 )
               fit1++;
-            else if(j==2 && std::fabs(all_actions_outputs->at(y)*(1./0.6) - all_actions_outputs2->at(y)) <= 1e-10 )
+            else if(j==2 && std::fabs(all_actions_outputs->at(y)*(1./0.6) - all_actions_outputs2->at(y)) <= 1e-8 )
               fit2++;
-            else if(all_actions_outputs->at(y) == all_actions_outputs2->at(y))
+            else if(j==3 && all_actions_outputs->at(y) == all_actions_outputs2->at(y))
               fit3++;
+            else {
+//               LOG_DEBUG(j << " " << all_actions_outputs->at(y) <<" " << all_actions_outputs->at(y)*(1./0.4) << " " << all_actions_outputs2->at(y));
+            }
             y++;
           }
         }
@@ -1314,8 +1319,9 @@ TEST(MLP, DevelopmentalLayerHeuristic1) {
 
           for (uint i =0; i < batch_size; i++)
             for (uint j =0; j < 4; j++)
-              if(all_actions_outputs->at(i*4+j) != 0 && sensors[i*3+1] > 0.0001 && sensors[i*3+2] > 0.0001)
+              if(all_actions_outputs->at(i*4+j) != 0 && sensors[i*3+1] > 0.0001 && sensors[i*3+2] > 0.0001){
                 EXPECT_NE(all_actions_outputs->at(i*4+j), all_actions_outputs2->at(i*4+j));
+              }
 
           delete all_actions_outputs;
           delete all_actions_outputs2;

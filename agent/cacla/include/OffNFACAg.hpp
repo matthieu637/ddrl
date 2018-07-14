@@ -81,7 +81,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(sensors);
-
+    
     if (last_action.get() != nullptr && learning) {
       double p0 = 1.f;
       for(uint i=0; i < this->nb_motors; i++) {
@@ -175,26 +175,26 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
 
     ann = new NN(this->get_state_size(), *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type,
                  batch_norm_actor, true, momentum);
-    if(std::is_same<NN, DODevMLP>::value)
-      ann->exploit(pt, nullptr);
+//     if(std::is_same<NN, DODevMLP>::value)
+//       ann->exploit(pt, nullptr);
 
     vnn = new NN(this->get_state_size(), this->get_state_size(), *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic,
                  add_v_corrector && offpolicy_critic && offpolicy_strategy != 0, momentum);
-    if(std::is_same<NN, DODevMLP>::value)
-      vnn->exploit(pt, ann);
+//     if(std::is_same<NN, DODevMLP>::value)
+//       vnn->exploit(pt, ann);
 
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
     ann_testing->increase_batchsize(1);
 
-    if(std::is_same<NN, DODevMLP>::value) {
-      try {
-        if(pt->get<bool>("devnn.reset_learning_algo")) {
-          LOG_ERROR("NFAC cannot reset anything with DODevMLP");
-          exit(1);
-        }
-      } catch(boost::exception const& ) {
-      }
-    }
+//     if(std::is_same<NN, DODevMLP>::value) {
+//       try {
+//         if(pt->get<bool>("devnn.reset_learning_algo")) {
+//           LOG_ERROR("NFAC cannot reset anything with DODevMLP");
+//           exit(1);
+//         }
+//       } catch(boost::exception const& ) {
+//       }
+//     }
     
     best_testing_score = std::numeric_limits<double>::lowest();
   }
@@ -217,11 +217,11 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
       trajectories.push_back(std::shared_ptr<trajectory>(t));
     }
 
-    if(std::is_same<NN, DODevMLP>::value) {
-      static_cast<DODevMLP *>(vnn)->inform(episode, last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
-    }
+//     if(std::is_same<NN, DODevMLP>::value && learning) {
+//       static_cast<DODevMLP *>(vnn)->inform(episode, last_sum_weighted_reward);
+//       static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward);
+//       static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
+//     }
 
     double* weights = new double[ann->number_of_parameters(false)];
     ann->copyWeightsTo(weights, false);
@@ -458,6 +458,10 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
     //     LOG_FILE("policy_exploration", ann->hash());
     if(!learning)
       return;
+    
+    ann->update_best_param_previous_task(sum_weighted_reward);
+    vnn->update_best_param_previous_task(sum_weighted_reward);
+    ann_testing->update_best_param_previous_task(sum_weighted_reward);
 
     uint all_size = alltransitions();
     if(all_size > 0) {
@@ -598,6 +602,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
             }
           }
           ann->actor_backward();
+          ann->regularize();
           ann->getSolver()->ApplyUpdate();
           ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
           delete ac_out;
@@ -676,6 +681,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
             ac_diff[i] = -x*deltas_blob[i];
         }
         ann->actor_backward();
+        ann->regularize();
         ann->getSolver()->ApplyUpdate();
         ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
         delete ac_out;
@@ -884,6 +890,7 @@ class OffNFACAg : public arch::ARLAgent<arch::AgentProgOptions> {
           }
         }
         ann->actor_backward();
+        ann->regularize();
         ann->getSolver()->ApplyUpdate();
         ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
         delete ac_out;

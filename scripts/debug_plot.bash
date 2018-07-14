@@ -64,7 +64,7 @@ if [[ $save_best != "0" ]] ; then
 	higher_better=`ask_higher_better`
 fi
 
-COMMAND="one_by_one.m $STAT_FILE $dimension $save_best $higher_better more"
+COMMAND="one_by_one.m $STAT_FILE $dimension $save_best $higher_better m o r e"
 
 while [ 1 ] ; do
 	cd $1

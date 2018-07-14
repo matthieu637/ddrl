@@ -16,14 +16,10 @@
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
+#include "bib/OrnsteinUhlenbeckNoise.hpp"
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 
-// 
-// POOL_FOR_TESTING need to be define for stochastics environements
-// in order to test (learning=false) "the best" known policy
-// 
-#undef POOL_FOR_TESTING //to be checked
 
 #define DOUBLE_COMPARE_PRECISION 1e-9
 
@@ -114,20 +110,15 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       delete i.qnn;
     }
     
-#ifdef POOL_FOR_TESTING
-    for (auto i : best_pol_population)
-      delete i.ann;
-#endif
+    if(oun == nullptr)
+      delete oun;
+    
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
                                  bool learning, bool goal_reached, bool) override {
 
     // protect batch norm from testing data and poor data
-    double* weights = new double[ann->number_of_parameters(false)];
-    ann->copyWeightsTo(weights, false);
-    ann_testing->copyWeightsFrom(weights, false);
-    delete[] weights;
     vector<double>* next_action = ann_testing->computeOut(sensors);
     
     if (last_action.get() != nullptr && learning){
@@ -137,22 +128,26 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
-      if(gaussian_policy){
+      if(gaussian_policy == 1){
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
+      } else if(gaussian_policy == 2){
+        oun->step(*next_action);
       } else if(bib::Utils::rand01() < noise){ //e-greedy
         for (uint i = 0; i < next_action->size(); i++)
           next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
       }
     }
+    ann_testing->neutral_action(sensors, next_action);
     last_action.reset(next_action);
+    
 
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
-    last_trajectory_a.push_back(*next_action);
+//     last_trajectory_a.push_back(*next_action);
     
     return *next_action;
   }
@@ -169,7 +164,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     hidden_unit_q           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_q"));
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
-    gaussian_policy         = pt->get<bool>("agent.gaussian_policy");
+    gaussian_policy         = pt->get<uint>("agent.gaussian_policy");
     kMinibatchSize          = pt->get<uint>("agent.mini_batch_size");
     replay_memory           = pt->get<uint>("agent.replay_memory");
     inverting_grad          = pt->get<bool>("agent.inverting_grad");
@@ -199,6 +194,12 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       LOG_INFO("GPU mode");
     }
 #endif
+
+    if(gaussian_policy == 2){
+      double oun_theta = pt->get<double>("agent.noise2");
+      double oun_dt = pt->get<double>("agent.noise3");
+      oun = new bib::OrnsteinUhlenbeckNoise<double>(this->nb_motors, noise, oun_theta, oun_dt);
+    }
     
     ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, 
                  hidden_layer_type, actor_output_layer_type, batch_norm_actor, false, momentum);
@@ -228,28 +229,41 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       qnn_target = new NN(*qnn, false);
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool) override {
+  void _start_episode(const std::vector<double>& sensors, bool learning) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
 
+    if(gaussian_policy == 2)
+      oun->reset();
+    
     last_action = nullptr;
     last_pure_action = nullptr;
     
     last_trajectory_a.clear();
     
-    if(std::is_same<NN, DODevMLP>::value){
-      if(static_cast<DODevMLP *>(qnn)->inform(episode, last_sum_weighted_reward)){
+    if(std::is_same<NN, DODevMLP>::value && learning){
+      DODevMLP * ann_cast = static_cast<DODevMLP *>(ann);
+      bool reset_operator, changed;
+      std::tie(reset_operator, changed) = ann_cast->inform(episode, last_sum_weighted_reward);
+      if(reset_operator && changed){
         LOG_INFO("reset learning catched");
         trajectory.clear();
       }
-      if(static_cast<DODevMLP *>(ann)->inform(episode, last_sum_weighted_reward)){
-        LOG_INFO("reset learning catched");
-        trajectory.clear();
+      if(changed && ann_cast->ewc_enabled() && ann_cast->ewc_force_constraint()){
+        static_cast<DODevMLP *>(qnn)->ewc_setup();
+        //         else if(changed_vnn && !changed_ann) //impossible cause of ann structure
       }
+
+      if(changed){
+        double* weights = new double[ann->number_of_parameters(false)];
+        ann->copyWeightsTo(weights, false);
+        ann_testing->copyWeightsFrom(weights, false);
+        delete[] weights;
+      }
+      //only ann and qnn shared parameters, others networks need their update
       static_cast<DODevMLP *>(qnn_target)->inform(episode, last_sum_weighted_reward);
       static_cast<DODevMLP *>(ann_target)->inform(episode, last_sum_weighted_reward);
-      static_cast<DODevMLP *>(ann_testing)->inform(episode, last_sum_weighted_reward);
     }
   }
   
@@ -260,62 +274,32 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
      }
   }
 
-#ifdef POOL_FOR_TESTING
-  int choosenPol = 0;
-  void start_instance(bool learning) override {
-    
-    if(!learning && best_pol_population.size() > 0){
-      to_be_restaured_ann = ann;
-      auto it = best_pol_population.begin();
-      ++it;
-      
-      ann = best_pol_population.begin()->ann;
-    } else if(learning){
-      to_be_restaured_ann = new MLP(*ann, false, ::caffe::Phase::TEST);
-    }
-  }
-#endif
-
   void end_instance(bool learning) override {
-#ifdef POOL_FOR_TESTING
-    if(!learning && best_pol_population.size() > 0){
-      //restore ann
-      ann = to_be_restaured_ann;
-    } else if(learning) {
-      //not totaly stable because J(the policy stored here ) != sum_weighted_reward (online updates)
-    
-      //policies pool for testing
-      if(best_pol_population.size() == 0 || best_pol_population.rbegin()->J < sum_weighted_reward){
-        if(best_pol_population.size() > 200){
-          //remove smallest
-          auto it = best_pol_population.end();
-          --it;
-          delete it->ann;
-          best_pol_population.erase(it);
-        }
-        
-        MLP* pol_fitted_sample = to_be_restaured_ann;
-        best_pol_population.insert({pol_fitted_sample,sum_weighted_reward, 0});
-      } else
-        delete to_be_restaured_ann;
-    }
-#endif
-
     if(learning){
-      MLP* cann = new MLP(*ann, false, ::caffe::Phase::TEST);
-      MLP* cqnn = new MLP(*qnn, false, ::caffe::Phase::TEST);
-      best_population.insert({cann, cqnn, sum_weighted_reward, last_trajectory_a});
-      
-      if(best_population.size() > 5){
-        //remove smallest
-        auto it = best_population.end();
-        --it;
-        delete it->ann;
-        delete it->qnn;
-        best_population.erase(it);
+      if(ann->ewc_best_method() <= 3){
+        ann->update_best_param_previous_task(this->sum_weighted_reward);
+        qnn->update_best_param_previous_task(this->sum_weighted_reward);
       }
       
+      ann->ewc_decay_update();
+      qnn->ewc_decay_update();
+//      MLP* cann = new MLP(*ann, false, ::caffe::Phase::TEST);
+//      MLP* cqnn = new MLP(*qnn, false, ::caffe::Phase::TEST);
+//      best_population.insert({cann, cqnn, sum_weighted_reward, last_trajectory_a});
+//      
+//      if(best_population.size() > 5){
+//        //remove smallest
+//        auto it = best_population.end();
+//        --it;
+//        delete it->ann;
+//        delete it->qnn;
+//        best_population.erase(it);
+//      }
+      
       episode++;
+    } else if(ann->ewc_best_method() >= 4) {
+      ann->update_best_param_previous_task(this->sum_weighted_reward);
+      qnn->update_best_param_previous_task(this->sum_weighted_reward);
     }
   }
   
@@ -377,7 +361,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       }
       
       //Update critic
-      qnn->stepCritic(all_states, all_actions, *q_targets);
+      qnn->learn_batch(all_states, all_actions, *q_targets, 1);
       
       //Update actor
       qnn->ZeroGradParameters();
@@ -425,6 +409,8 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
       actor_actions_blob->ShareDiff(*critic_action_blob);
       ann->actor_backward();
+      ann->updateFisher(traj.size());
+      ann->regularize();
       ann->getSolver()->ApplyUpdate();
       ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
       
@@ -435,7 +421,11 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       delete q_targets;
       delete all_actions_outputs;
     }
-  
+    
+    double* weights = new double[ann->number_of_parameters(false)];
+    ann->copyWeightsTo(weights, false);
+    ann_testing->copyWeightsFrom(weights, false);
+    delete[] weights;
   }
   
   double criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions) override {
@@ -443,7 +433,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
   
   arch::Policy<MLP>* getCopyCurrentPolicy() override {
-    return new arch::Policy<MLP>(new MLP(*ann, true) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
+    return nullptr;
   }
 
   void save(const std::string& path, bool save_best, bool) override {
@@ -468,10 +458,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
   
   void save_run() override {
-#ifdef POOL_FOR_TESTING
-    LOG_DEBUG("not implemented");
-    exit(1);
-#endif
     ann->save("continue.actor");
     qnn->save("continue.critic");
     ann_target->save("continue.actor_target");
@@ -493,10 +479,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   }
   
   void load_previous_run() override {
-#ifdef POOL_FOR_TESTING
-    LOG_DEBUG("not implemented");
-    exit(1);
-#endif
     ann->load("continue.actor");
     qnn->load("continue.critic");
     ann_target->load("continue.actor_target");
@@ -539,7 +521,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   double alpha_v;
   double decay_v;
   
-  bool gaussian_policy;
+  uint gaussian_policy;
   std::vector<uint>* hidden_unit_q;
   std::vector<uint>* hidden_unit_a;
   uint kMinibatchSize;
@@ -558,6 +540,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::deque<std::vector<double>> last_trajectory_a;
   
   uint episode = 0;
+  bib::OrnsteinUhlenbeckNoise<double>* oun = nullptr;
   
   struct my_pol_dpmt{
     MLP* ann;
@@ -570,20 +553,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
   };
   std::multiset<my_pol_dpmt> best_population;
-  
-#ifdef POOL_FOR_TESTING  
-  struct my_pol{
-    MLP* ann;
-    double J;
-    uint played;
-    
-    bool operator< (const my_pol& b) const {
-      return J > b.J;
-    }
-  };
-  std::multiset<my_pol> best_pol_population;
-  MLP* to_be_restaured_ann;
-#endif  
   
   MLP* ann, *ann_target;
   MLP* qnn, *qnn_target;

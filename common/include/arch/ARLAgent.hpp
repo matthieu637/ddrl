@@ -108,8 +108,10 @@ class ARLAgent : public AAgent<ProgOptions> {
   void start_episode(const std::vector<double>& perceptions, bool learning) override {
     time_for_ac = 1;
     inter_rewards.clear();
-    last_sum_weighted_reward = sum_weighted_reward;
+    if(last_episode_learning)
+      last_sum_weighted_reward = sum_weighted_reward;
     sum_weighted_reward = 0;
+    last_episode_learning = learning;
     
     global_pow_gamma = 1.000000000f;
     
@@ -222,6 +224,7 @@ private:
 protected:
   double sum_weighted_reward = 0;
   double last_sum_weighted_reward = 0;
+  bool last_episode_learning = true;
   double gamma;
   uint nb_motors;
   uint state_size;

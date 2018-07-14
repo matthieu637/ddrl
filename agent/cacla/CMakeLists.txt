@@ -84,6 +84,9 @@ target_link_libraries(hum-cacla-off ${HUMANOID_LIBRARY} ${BASE_LIBRARIES} )
 add_executable(hum-cacla-off-dodev src/test/HumanoidCacOffDodev.cpp ${all_include} ${all_sources} )
 target_link_libraries(hum-cacla-off-dodev ${HUMANOID_LIBRARY} ${BASE_LIBRARIES} )
 
+add_executable(hum-nfacq-off src/test/HumanoidNFACQ.cpp ${all_include} ${all_sources} )
+target_link_libraries(hum-nfacq-off ${HUMANOID_LIBRARY} ${BASE_LIBRARIES} )
+
 set(LIBRARY_NAME "ddrl-cacla")
 rename_buildtype(LIBRARY_NAME)
 add_library(${LIBRARY_NAME} SHARED ${all_include} src/openai.cpp)
