@@ -53,39 +53,41 @@ do
 done < $base
 
 #
-# Inject a line before a specific [section]
+# Inject a line to a specific [section]
 #
 # <file> <section> <line>
-function inject_line_before_section(){
+function inject_line_in_section(){
 	file=$1
 	section=$2
 	line=$3
-
-	str_sections_base=`cat $base | grep -e '^[[]'`
+	
+	str_sections_base=`cat $file | grep -e '^[[]' | xargs echo`
 	read -a sections_base <<< $str_sections_base
 	
 	i=0;
-	secfinal=""
-	for sec in "${sections_base[@]}"
-	do	
-		if [[ "$sec" == "$section"  ]] ;
-		then
+	nextsection=""
+	for sec in "${sections_base[@]}" ; do
+		if [[ "$sec" == "$section"  ]] ; then
 			i=`expr $i + 1`
-			secfinal="${sections_base[$i]}"
+			nextsection="${sections_base[$i]}"
 			break
 		fi
 		i=`expr $i + 1`
 	done
-
-	section="$secfinal"
-
+	
+	section="$nextsection"
+	
 	isBlankSec=`echo "$section" | grep -v -e '^[[]' | wc -l`
 	if [[ $isBlankSec -eq 1 ]]; then
 		echo "$line" >> $file
 	else
 		#escape [section] to \[section\]
 		section=`echo $section | sed -e 's/[[]/\\\[/' | sed -e 's/[]]/\\\]/' `
-		sed -i "s/\($section\)/$line\n\1/" $file
+		if [ $MAC -eq 1 ] ; then
+			gsed -i "/$section/i \\$line" $file
+		else
+			sed -i "/$section/i \\$line" $file
+		fi
 	fi
 }
 
@@ -94,7 +96,7 @@ function inject_line_before_section(){
 #
 
 currentSection=-1
-str_sections=`cat $injector | grep -e '^[[]'`
+str_sections=`cat $base $injector | grep -e '^[[]' | awk '!x[$0]++' | xargs echo`
 read -a sections <<< $str_sections
 
 while read line
@@ -103,19 +105,16 @@ do
 	isSection=`echo "$line" | grep -e '^[[]' | wc -l`
 	isKey=`echo "$line" | grep -v -e '^#' | grep -v -e '^[[]' | grep -e '[=]' | wc -l`
 
-	if [ $isSection -eq 1 ] ; 
-	then
+	if [ $isSection -eq 1 ] ; then
 		currentSection=`expr $currentSection + 1`
-	elif [[ $isComment -eq 1 || $isKey -eq 0 ]] ; 
-	then
-		inject_line_before_section $tmp "${sections[$currentSection]}" "$line"
-	elif [ $isKey -eq 1 ] ; 
-	then
+	elif [[ $isComment -eq 1 || $isKey -eq 0 ]] ; then
+		inject_line_in_section $tmp "${sections[$currentSection]}" "$line"
+	elif [ $isKey -eq 1 ] ; then
 		key=`echo "$line" | sed -e 's/[_]/\\\_/g' | cut -d'=' -f1`
 		isDuplicate=`grep -i "^$key" $base | wc -l`
 
 		if [ $isDuplicate -eq 0 ] ; then
-			inject_line_before_section $tmp "${sections[$currentSection]}" "$line"
+			inject_line_in_section $tmp "${sections[$currentSection]}" "$line"
 		fi
 	fi
 
