@@ -19,6 +19,12 @@ Matthieu Zimmer, Yann Boniface, and Alain Dutech. Neural fitted actor-critic. In
 
 Matthieu Zimmer. Developmental reinforcement learning. PhD thesis, University of Lorraine, January 2018.
 ```
+
+- an implementation of developmental layers for NFAC(&lambda;)-V and DDPG
+```
+Matthieu Zimmer, Yann Boniface, and Alain Dutech. Developmental Reinforcement Learning through Sensorimotor Space Enlargement. Developmental reinforcement learning through sensorimotor space enlargement. In The 8th Joint IEEE International Conference on Development and Learning and on Epigenetic Robotics, September 2018.
+```
+
 - an implementation of CMA-ES with Caffe
 ```
 Auger, A., & Hansen, N. (2005). A restart CMA evolution strategy with increasing population size. In Evolutionary Computation, 2005. The 2005 IEEE Congress on (Vol. 2, pp. 1769–1776).
@@ -55,9 +61,9 @@ The neural network library used is Caffe.
 
 ## Install
 
-Main dependencies : boost (>=1.62), caffe, ode(>=0.14).
-
+Main dependencies : boost (>=1.54), caffe, ode(>=0.14).
 However, it needs a modified version of Caffe : https://github.com/matthieu637/caffe.git
+RAM+SWAP > 750 MB
 
 ### Archlinux
 ```
@@ -73,12 +79,12 @@ cd ../ddrl/
 ./fullBuild.bash
 ```
 
-### Ubuntu > 14.04
+### Ubuntu >= 14.04
 
 ```
 sudo apt-get update
 #base
-sudo apt-get install libtool libboost-serialization-dev libboost-thread-dev libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libtbb-dev libglew-dev python cmake libgtest-dev automake unzip libfreeimage-dev
+sudo apt-get install git libtool libboost-serialization-dev libboost-thread-dev libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libtbb-dev libglew-dev python cmake libgtest-dev automake unzip libfreeimage-dev
 #caffe
 sudo apt-get install nvidia-cuda-dev nvidia-cuda-toolkit libprotobuf-dev libleveldb-dev libsnappy-dev protobuf-compiler libopenblas-dev libgflags-dev libgoogle-glog-dev liblmdb-dev libhdf5-serial-dev
 #optional for developer
