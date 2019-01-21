@@ -31,4 +31,6 @@ build() {
 package() {
         cd "$srcdir/caffe/build"
         make install
+        cd "$pkgdir/usr/"
+        mv lib64 lib
 }
