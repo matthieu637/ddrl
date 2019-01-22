@@ -3,6 +3,7 @@
 #include "BaseCaclaAg.hpp"
 
 extern "C" {
+  //NFAC with off-policy trial
   OffNFACAg<MLP>* OffNFACAg_new(uint a, uint b) {
     FLAGS_minloglevel = 2;
     google::InitGoogleLogging("");
@@ -81,6 +82,7 @@ extern "C" {
     ag->load(path);
   }
 
+  //CACLA
   BaseCaclaAg* CaclaAg_new(uint a, uint b) {
     FLAGS_minloglevel = 2;
     google::InitGoogleLogging("");

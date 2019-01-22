@@ -30,3 +30,6 @@ gen-data
 *-data-*
 octave-workspace
 *.dylib
+*.data
+__pycache__
+time_elapsed

@@ -92,6 +92,11 @@ rename_buildtype(LIBRARY_NAME)
 add_library(${LIBRARY_NAME} SHARED ${all_include} src/openai.cpp)
 target_link_libraries(${LIBRARY_NAME} ${BASE_LIBRARIES} )
 
+set(LIBRARY_NAME2 "ddrl-nfac")
+rename_buildtype(LIBRARY_NAME2)
+add_library(${LIBRARY_NAME2} SHARED ${all_include} src/nfac.cpp)
+target_link_libraries(${LIBRARY_NAME2} ${BASE_LIBRARIES} )
+
 # add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
 # target_link_libraries(ada-nfac ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
 

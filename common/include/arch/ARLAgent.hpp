@@ -66,6 +66,7 @@ class ARLAgent : public AAgent<ProgOptions> {
 
       inter_rewards.clear();
       sum_weighted_reward += reward * global_pow_gamma;
+      sum_reward += reward;
       global_pow_gamma *= gamma;
     }
 
@@ -111,6 +112,7 @@ class ARLAgent : public AAgent<ProgOptions> {
     if(last_episode_learning)
       last_sum_weighted_reward = sum_weighted_reward;
     sum_weighted_reward = 0;
+    sum_reward = 0;
     last_episode_learning = learning;
     
     global_pow_gamma = 1.000000000f;
@@ -223,6 +225,7 @@ private:
   
 protected:
   double sum_weighted_reward = 0;
+  double sum_reward = 0;
   double last_sum_weighted_reward = 0;
   bool last_episode_learning = true;
   double gamma;
