@@ -4,10 +4,6 @@ import configparser
 import time
 import numpy as np
 
-
-def str2bool(v):
-  return v.lower() in ("yes", "true", "1")
-
 config = configparser.ConfigParser()
 config.read('config.ini')
 
@@ -20,6 +16,9 @@ env_name=config['simulation']['env_name']
 
 gamma=float(config['agent']['gamma'])
 iter_by_episode=1
+
+def str2bool(v):
+  return v.lower() in ("yes", "true", "1")
 
 def run_episode(env, ag, learning, episode):
     observation = env.reset()
@@ -34,22 +33,22 @@ def run_episode(env, ag, learning, episode):
     for step in range(max_steps):
         action = ag.run(reward, observation, learning, False, False)
         observation, reward, done, info = env.step(action)
-#            env.render()
+#        env.render()
         totalreward += cur_gamma * reward
         cur_gamma = gamma * cur_gamma
         undiscounted_rewards += reward
         sample_steps+=1
         if done:
             break
-    
+
     ag.run(reward, observation, learning, done, True)
     ag.end_ep(learning)
-    
+
     if episode % dump_log_each == 0:
         ag.dump(learning, episode, sample_steps, totalreward)
     if episode % display_log_each == 0:
         ag.display(learning, episode, sample_steps, totalreward)
-    
+
     return totalreward, transitions, undiscounted_rewards, sample_steps
 
 def train(env, ag, episode):
@@ -76,6 +75,14 @@ def testing(env, ag, episode):
 env = gym.make(env_name)
 observation = env.reset()
 nb_sensors = env.observation_space.shape[0]
+
+print("State space:", env.observation_space)
+print("- low:", env.observation_space.low)
+print("- high:", env.observation_space.high)
+
+print("Action space:", env.action_space)
+print("- low:", env.action_space.low)
+print("- high:", env.action_space.high)
 
 ag = NFACAg(env.action_space.shape[0], nb_sensors)
 
@@ -110,6 +117,7 @@ while sample_steps_counter < total_max_steps + testing_each * max_steps:
         sample_steps.append(sample_steps_counter)
     episode+=1
 
+#comptatibility with lhpo
 elapsed_time = (time.time() - start_time)/60.
 with open('time_elapsed', 'w') as f:
     f.write('%d\n' % elapsed_time)

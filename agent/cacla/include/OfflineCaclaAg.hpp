@@ -138,6 +138,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
     lambda                  = pt->get<double>("agent.lambda");
+    uint momentum           = pt->get<uint>("agent.momentum");
     corrected_update_ac     = false;
     gae                     = false;
     inverting_gradient      = false;
@@ -182,11 +183,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       exit(1);
     }
     
-    ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true);
+    ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true, momentum);
     if(std::is_same<NN, DODevMLP>::value)
       ann->exploit(pt, nullptr);
     
-    vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic);
+    vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, momentum);
     if(std::is_same<NN, DODevMLP>::value)
       vnn->exploit(pt, ann);
     

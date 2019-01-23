@@ -161,6 +161,7 @@ class MLP {
       solver_param.set_momentum(0.);
       solver_param.set_momentum2(0.999);
     } else if(momentum_ == 1){
+      // same as DDPG of OpenAI Baseline
       solver_param.set_momentum(0.9);
       solver_param.set_momentum2(0.999);
     } else if(momentum_ == 2){
@@ -256,7 +257,8 @@ class MLP {
     if(momentum_ == 0){
       solver_param.set_momentum(0.);
       solver_param.set_momentum2(0.999);
-    } else if(momentum_ == 1){
+    } else if(momentum_ == 1){      
+      // same as DDPG of OpenAI Baseline 
       solver_param.set_momentum(0.9);
       solver_param.set_momentum2(0.999);
     } else if(momentum_ == 2){
