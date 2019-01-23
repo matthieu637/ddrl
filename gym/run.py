@@ -49,6 +49,12 @@ def run_episode(env, ag, learning, episode):
     if episode % display_log_each == 0:
         ag.display(learning, episode, sample_steps, totalreward)
 
+    t=(time.time() - start_time)
+    if learning:
+        training_monitor.write(str(undiscounted_rewards)+','+str(sample_steps)+','+str(t)+'\n')
+    else:
+        testing_monitor.write(str(undiscounted_rewards)+','+str(sample_steps)+','+str(t)+'\n')
+
     return totalreward, transitions, undiscounted_rewards, sample_steps
 
 def train(env, ag, episode):
@@ -88,18 +94,18 @@ ag = NFACAg(env.action_space.shape[0], nb_sensors)
 
 start_time = time.time()
 
-sample_steps_counter=0
 results=[]
-testing_sample_steps=[]
-testing_action_sum=[]
 sample_steps=[]
 sample_steps_counter=0
-weights=[]
-weightsQ=[]
-weightsV=[]
-used_samples=[]
-local_training_info=[]
 episode=0
+
+#comptatibility with openai-baseline logging
+training_monitor = open('0.0.monitor.csv','w')
+testing_monitor = open('0.1.monitor.csv','w')
+training_monitor.write('# { "env_id": "'+env_name+'"} \n')
+testing_monitor.write('# { "env_id": "'+env_name+'"} \n')
+training_monitor.write('r,l,t\n')
+testing_monitor.write('r,l,t\n')
 
 max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
 
@@ -113,12 +119,21 @@ while sample_steps_counter < total_max_steps + testing_each * max_steps:
     if episode % testing_each == 0:
         reward, testing_sample_step = testing(env, ag, episode)
         results.append(reward)
-        testing_sample_steps.append(testing_sample_step)
         sample_steps.append(sample_steps_counter)
     episode+=1
+
+#write logs
+results=np.array(results)
+lastPerf = results[int(results.shape[0]*0.9):results.shape[0]-1]
+np.savetxt('y.testing.data', results)
+np.savetxt('x.learning.data', sample_steps)
+np.savetxt('perf.data',  [np.mean(lastPerf)-np.std(lastPerf)])
+training_monitor.close()
+testing_monitor.close()
 
 #comptatibility with lhpo
 elapsed_time = (time.time() - start_time)/60.
 with open('time_elapsed', 'w') as f:
     f.write('%d\n' % elapsed_time)
+
 
