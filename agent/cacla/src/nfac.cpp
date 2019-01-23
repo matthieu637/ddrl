@@ -46,7 +46,8 @@ extern "C" {
   }
 
   void OfflineCaclaAg_end_episode(OfflineCaclaAg<MLP>* ag, bool learning) {
-    return ag->end_episode(learning);
+    ag->end_episode(learning);
+    ag->end_instance(learning);
   }
 
   const double* OfflineCaclaAg_run(OfflineCaclaAg<MLP>* ag, double reward, const double* sensors,
