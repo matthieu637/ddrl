@@ -138,7 +138,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
     lambda                  = pt->get<double>("agent.lambda");
-    uint momentum           = pt->get<uint>("agent.momentum");
+    momentum                = pt->get<uint>("agent.momentum");
     corrected_update_ac     = false;
     gae                     = false;
     inverting_gradient      = false;
@@ -187,7 +187,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(std::is_same<NN, DODevMLP>::value)
       ann->exploit(pt, nullptr);
     
-    vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, momentum);
+    vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);
     if(std::is_same<NN, DODevMLP>::value)
       vnn->exploit(pt, ann);
     
@@ -280,7 +280,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         ASSERT((uint)li == trajectory.size(), "");
         if(vnn_from_scratch){
           delete vnn;
-          vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, trajectory.size(), -1, hidden_layer_type, batch_norm_critic);
+          vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, trajectory.size(), -1, hidden_layer_type, batch_norm_critic, false, momentum);
         }
         if(lambda < 0.f && batch_norm_critic == 0)
           vnn->learn_batch(all_states, empty_action, v_target, stoch_iter_critic);
@@ -660,7 +660,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         update_delta_neg, corrected_update_ac, gae;
   bool inverting_gradient;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
-  uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type;
+  uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, corrected_update_ac_factor;
 
   std::shared_ptr<std::vector<double>> last_action;
