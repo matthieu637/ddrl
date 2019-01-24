@@ -14,7 +14,7 @@ lib = cdll.LoadLibrary(config.get('simulation', 'library'))
 if "libddrl-nfac" in config.get('simulation', 'library') :
     lib.OfflineCaclaAg_new.restype = ctypes.c_int64
     lib.OfflineCaclaAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]
-    lib.OfflineCaclaAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
+    lib.OfflineCaclaAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
     lib.OfflineCaclaAg_dump.argtypes = [ ctypes.c_int64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
     lib.OfflineCaclaAg_display.argtypes = [ ctypes.c_int64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
     lib.OfflineCaclaAg_end_episode.argtypes = [ ctypes.c_int64, ctypes.c_bool ]

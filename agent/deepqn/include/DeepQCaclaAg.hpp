@@ -87,7 +87,7 @@ class DeepQCaclaAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   typedef MLP PolicyImpl;
    
   DeepQCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<MLP, arch::AgentGPUProgOptions>(_nb_motors), nb_sensors(_nb_sensors) {
+    : arch::AACAgent<MLP, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors) {
 
   }
 

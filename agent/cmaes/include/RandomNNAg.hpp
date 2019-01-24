@@ -14,7 +14,7 @@ template<typename NN = MLP>
 class RandomNNAg : public arch::ARLAgent<arch::AgentProgOptions> {
  public:
   RandomNNAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::ARLAgent<arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors) {
+    : arch::ARLAgent<arch::AgentProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors) {
 
   }
 

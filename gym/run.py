@@ -4,6 +4,8 @@ import configparser
 import time
 import numpy as np
 
+np.seterr(all='raise')
+
 config = configparser.ConfigParser()
 config.read('config.ini')
 
@@ -20,6 +22,19 @@ iter_by_episode=1
 def str2bool(v):
   return v.lower() in ("yes", "true", "1")
 
+def plot_exploratory_actions(observation, ag):
+    print(observation)
+    p=[np.array(ag.run(0, observation, True, False, False)) for _ in range(5000)]
+    p=np.concatenate(p)
+    
+    print(p)
+    import matplotlib.pyplot as plt
+    from pylab import figure
+    fig = figure()
+    ax=fig.add_subplot(111)
+    ax.hist(p, 50)
+    plt.show()
+
 def run_episode(env, ag, learning, episode):
     observation = env.reset()
     transitions = []
@@ -29,11 +44,15 @@ def run_episode(env, ag, learning, episode):
     sample_steps=0
     max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
     ag.start_ep(observation, learning)
+    #plot_exploratory_actions(observation, ag)
     reward=0 #not taken into account
     for step in range(max_steps):
         action = ag.run(reward, observation, learning, False, False)
+        #be carreful action is a pointer so it can be changed
+        #action = np.array(action)
         observation, reward, done, info = env.step(action)
-#        env.render()
+        #uncomment next line to display env
+        #env.render()
         totalreward += cur_gamma * reward
         cur_gamma = gamma * cur_gamma
         undiscounted_rewards += reward
@@ -90,6 +109,8 @@ print("Action space:", env.action_space)
 print("- low:", env.action_space.low)
 print("- high:", env.action_space.high)
 
+print("Create agent with (nb_motors, nb_sensors) : ", env.action_space.shape[0], nb_sensors)
+
 ag = NFACAg(env.action_space.shape[0], nb_sensors)
 
 start_time = time.time()
@@ -102,8 +123,8 @@ episode=0
 #comptatibility with openai-baseline logging
 training_monitor = open('0.0.monitor.csv','w')
 testing_monitor = open('0.1.monitor.csv','w')
-training_monitor.write('# { "env_id": "'+env_name+'"} \n')
-testing_monitor.write('# { "env_id": "'+env_name+'"} \n')
+training_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
+testing_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
 training_monitor.write('r,l,t\n')
 testing_monitor.write('r,l,t\n')
 

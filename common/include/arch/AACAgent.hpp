@@ -95,7 +95,7 @@ private:
 template <typename Pol_Impl, typename ProgOptions = AgentProgOptions >
 class AACAgent : public ARLAgent<ProgOptions> {
  public:
-  AACAgent(uint _nb_motors):ARLAgent<ProgOptions>(_nb_motors){
+  AACAgent(uint _nb_motors, uint _nb_sensors):ARLAgent<ProgOptions>(_nb_motors, _nb_sensors){
     
   }
 

@@ -56,7 +56,7 @@ class NFACVMemAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   typedef NN PolicyImpl;
 
   NFACVMemAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors), normst(_nb_sensors,
+    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), normst(_nb_sensors,
         0.f), empty_action(0) {
 
   }

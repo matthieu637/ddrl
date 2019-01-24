@@ -31,5 +31,7 @@ gen-data
 octave-workspace
 *.dylib
 *.data
+*.csv
+*.ini
 __pycache__
 time_elapsed

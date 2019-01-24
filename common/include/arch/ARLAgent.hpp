@@ -19,7 +19,7 @@ namespace arch {
 template <typename ProgOptions = AgentProgOptions>
 class ARLAgent : public AAgent<ProgOptions> {
  public:
-  ARLAgent(uint _nb_motors, uint _nb_sensors=0):
+  ARLAgent(uint _nb_motors, uint _nb_sensors):
   returned_ac(_nb_motors), nb_sensors(_nb_sensors), nb_motors(_nb_motors){
     
   }

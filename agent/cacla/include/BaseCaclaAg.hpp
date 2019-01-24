@@ -20,7 +20,7 @@
 class BaseCaclaAg : public arch::ARLAgent<> {
  public:
   BaseCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : ARLAgent<>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0) {
+    : ARLAgent<>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(0) {
 
   }
 

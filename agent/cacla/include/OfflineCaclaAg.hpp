@@ -57,7 +57,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   typedef NN PolicyImpl;
 
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors), nb_sensors(_nb_sensors), empty_action(0) {
+    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(0) {
 
   }
 
@@ -406,7 +406,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(ann->ewc_best_method() <= 3){
       ann->update_best_param_previous_task(this->sum_weighted_reward);
       vnn->update_best_param_previous_task(this->sum_weighted_reward);
-    }    
+    }
       
     if(episode % update_each_episode != 0)
       return;
@@ -633,7 +633,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << this->sum_weighted_reward/this->gamma << " " << this->sum_reward << 
         " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << nb_sample_update <<
-          " " << std::setprecision(3) << ratio_valid_advantage ;
+          " " << std::setprecision(3) << ratio_valid_advantage << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm();
   }
 
   void _dump(std::ostream& out) const override {
