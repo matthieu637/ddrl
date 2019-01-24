@@ -19,7 +19,7 @@ if "libddrl-nfac" in config.get('simulation', 'library') :
     lib.OfflineCaclaAg_display.argtypes = [ ctypes.c_int64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
     lib.OfflineCaclaAg_end_episode.argtypes = [ ctypes.c_int64, ctypes.c_bool ]
     
-    class NFACAg(object):
+    class DDRLAg(object):
         def __init__(self, nb_motors, nb_sensors, argv=[]):
             self.obj = lib.OfflineCaclaAg_new(nb_motors, nb_sensors)
             argv.append("")
@@ -54,3 +54,53 @@ if "libddrl-nfac" in config.get('simulation', 'library') :
     
         def load(self, episode):
             lib.OfflineCaclaAg_load(self.obj, episode)
+        
+        def name(self):
+            return "NFAC(lambda)-V"
+
+elif "libddrl-cacla" in config.get('simulation', 'library') :
+    lib.BaseCaclaAg_new.restype = ctypes.c_int64
+    lib.BaseCaclaAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]
+    lib.BaseCaclaAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
+    lib.BaseCaclaAg_dump.argtypes = [ ctypes.c_int64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
+    lib.BaseCaclaAg_display.argtypes = [ ctypes.c_int64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
+    lib.BaseCaclaAg_end_episode.argtypes = [ ctypes.c_int64, ctypes.c_bool ]
+    
+    class DDRLAg(object):
+        def __init__(self, nb_motors, nb_sensors, argv=[]):
+            self.obj = lib.BaseCaclaAg_new(nb_motors, nb_sensors)
+            argv.append("")
+            string_length = len(argv)
+
+            select_type = (ctypes.c_char_p * string_length)
+            select = select_type()
+            for key, item in enumerate(argv):
+                select[key] = item.encode('utf-8')
+            
+            lib.BaseCaclaAg_unique_invoke.argtypes = [ctypes.c_int64, ctypes.c_int, select_type]
+            lib.BaseCaclaAg_unique_invoke(self.obj, len(argv), select)
+            lib.BaseCaclaAg_run.restype = ndpointer(ctypes.c_double, shape=(nb_motors,))
+    
+        def run(self, reward, state, learning, goal, last):
+            return lib.BaseCaclaAg_run(self.obj, reward, np.ascontiguousarray(state, np.float64), learning, goal , last)
+    
+        def start_ep(self, state, learning):
+            lib.BaseCaclaAg_start_episode(self.obj, np.ascontiguousarray(state, np.float64), learning)
+    
+        def end_ep(self, learning):
+            lib.BaseCaclaAg_end_episode(self.obj, learning)
+    
+        def dump(self, learning, episode, step, treward):
+            lib.BaseCaclaAg_dump(self.obj, learning, episode, step, treward)
+            
+        def display(self, learning, episode, step, treward):
+            lib.BaseCaclaAg_display(self.obj, learning, episode, step, treward)
+            
+        def save(self, episode):
+            lib.BaseCaclaAg_save(self.obj, episode)
+    
+        def load(self, episode):
+            lib.BaseCaclaAg_load(self.obj, episode)
+            
+        def name(self):
+            return "CACLA"

@@ -4,6 +4,12 @@ import configparser
 import time
 import numpy as np
 
+#import custom ContinuousBandit env if founded
+try:
+    import CASCD
+except:
+    pass
+
 np.seterr(all='raise')
 
 config = configparser.ConfigParser()
@@ -49,8 +55,8 @@ def run_episode(env, ag, learning, episode):
     for step in range(max_steps):
         action = ag.run(reward, observation, learning, False, False)
         #be carreful action is a pointer so it can be changed
-        #action = np.array(action)
-        observation, reward, done, info = env.step(action)
+        action = np.array(action)
+        observation, reward, done, info = env.step(action * action_scale)
         #uncomment next line to display env
         #env.render()
         totalreward += cur_gamma * reward
@@ -109,20 +115,26 @@ print("Action space:", env.action_space)
 print("- low:", env.action_space.low)
 print("- high:", env.action_space.high)
 
+for i in range(env.action_space.shape[0]):
+    assert env.action_space.low[i] == - env.action_space.high[i]
+action_scale=env.action_space.high
+
 print("Create agent with (nb_motors, nb_sensors) : ", env.action_space.shape[0], nb_sensors)
 
-ag = NFACAg(env.action_space.shape[0], nb_sensors)
+ag = DDRLAg(env.action_space.shape[0], nb_sensors)
+
+print("main algo : " + ag.name())
 
 start_time = time.time()
 
 results=[]
-sample_steps=[]
 sample_steps_counter=0
 episode=0
 
 #comptatibility with openai-baseline logging
 training_monitor = open('0.0.monitor.csv','w')
 testing_monitor = open('0.1.monitor.csv','w')
+xlearning_monitor = open('x.learning.data','w')
 training_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
 testing_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
 training_monitor.write('r,l,t\n')
@@ -138,19 +150,19 @@ while sample_steps_counter < total_max_steps + testing_each * max_steps:
     sample_steps_counter += sample_step
 
     if episode % testing_each == 0:
+        xlearning_monitor.write(str(sample_steps_counter)+'\n');
         reward, testing_sample_step = testing(env, ag, episode)
         results.append(reward)
-        sample_steps.append(sample_steps_counter)
     episode+=1
 
 #write logs
 results=np.array(results)
 lastPerf = results[int(results.shape[0]*0.9):results.shape[0]-1]
 np.savetxt('y.testing.data', results)
-np.savetxt('x.learning.data', sample_steps)
 np.savetxt('perf.data',  [np.mean(lastPerf)-np.std(lastPerf)])
 training_monitor.close()
 testing_monitor.close()
+xlearning_monitor.close()
 
 #comptatibility with lhpo
 elapsed_time = (time.time() - start_time)/60.

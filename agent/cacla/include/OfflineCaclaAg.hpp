@@ -638,7 +638,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   void _dump(std::ostream& out) const override {
     out << std::setw(25) << std::fixed << std::setprecision(22) <<
-    this->sum_weighted_reward << " " << this->sum_reward << " " << std::setw(8) << std::fixed <<
+    this->sum_weighted_reward/this->gamma << " " << this->sum_reward << " " << std::setw(8) << std::fixed <<
         std::setprecision(5) << vnn->error() << " " << nb_sample_update <<
         " " << std::setprecision(3) << ratio_valid_advantage ;
   }

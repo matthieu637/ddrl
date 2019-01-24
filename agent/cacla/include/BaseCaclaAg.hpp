@@ -15,6 +15,7 @@
 #include <bib/MetropolisHasting.hpp>
 #include <bib/XMLEngine.hpp>
 #include <bib/Combinaison.hpp>
+#include <bib/IniParser.hpp>
 #include "nn/MLP.hpp"
 
 class BaseCaclaAg : public arch::ARLAgent<> {
@@ -153,13 +154,13 @@ class BaseCaclaAg : public arch::ARLAgent<> {
 
  protected:
   void _display(std::ostream& out) const override {
-    out << sum_weighted_reward << " " << std::setw(8) << std::fixed << std::setprecision(
+    out << sum_weighted_reward/this->gamma << " " " " << this->sum_reward << " " << std::setw(8) << std::fixed << std::setprecision(
           5) << vnn->error() << " " << noise ;
   }
 
   void _dump(std::ostream& out) const override {
     out <<" " << std::setw(25) << std::fixed << std::setprecision(22) <<
-        sum_weighted_reward << " " << std::setw(8) << std::fixed <<
+        sum_weighted_reward/this->gamma << " " " " << this->sum_reward << " " << std::setw(8) << std::fixed <<
         std::setprecision(5) << vnn->error() << " " << noise;
   }
 
