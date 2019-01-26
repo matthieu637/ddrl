@@ -317,19 +317,26 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 //           
 //        Simple computation for lambda return
 //           
+//          bib::Logger::PRINT_ELEMENTS(*all_V, "V0 ");
           li=0;
           for (auto it : trajectory){
             deltas[li] = v_target[li] - all_V->at(li);
             ++li;
           }
+//          bib::Logger::PRINT_ELEMENTS(deltas, "deltas ");
           
           std::vector<double> diff(trajectory.size());
-          li=0;
-          for (auto it : trajectory){
-            diff[li] = 0;
-            for (uint n=li;n<trajectory.size();n++)
-              diff[li] += std::pow(this->gamma * lambda, n-li) * deltas[n];
-            li++;
+          li=trajectory.size() - 1;
+          double prev_delta = 0.;
+          int index_ep = trajectory_end_points.size() - 1;
+          for (auto it : trajectory) {
+            if (index_ep >= 0 && trajectory_end_points[index_ep] - 1 == li){
+                prev_delta = 0.;
+                index_ep--;
+            }
+            diff[li] = deltas[li] + prev_delta;
+            prev_delta = this->gamma * lambda * diff[li];
+            --li;
           }
           ASSERT(diff[trajectory.size() -1] == deltas[trajectory.size() -1], "pb lambda");
           
@@ -340,6 +347,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             ++li;
           }
           
+//          bib::Logger::PRINT_ELEMENTS(diff, "target ");
           V_pi_s0 = diff[0];
           vnn->learn_batch(all_states, empty_action, diff, stoch_iter_critic);
 // // 
@@ -375,7 +383,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 //             diff2[li] = sum_n;
 //             ++li;
 //           }
-//           bib::Logger::PRINT_ELEMENTS(diff, "form1 ");
 //           bib::Logger::PRINT_ELEMENTS(diff2, "mech form ");
 //           
 //           if(trajectory[trajectory.size()-1].goal_reached)
@@ -403,12 +410,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       return;
     }
     
+    //learning phase
     if(ann->ewc_best_method() <= 3){
       ann->update_best_param_previous_task(this->sum_weighted_reward);
       vnn->update_best_param_previous_task(this->sum_weighted_reward);
     }
-      
-    if(episode % update_each_episode != 0)
+    
+    trajectory_end_points.push_back(trajectory.size());
+    if (episode % update_each_episode != 0)
       return;
 
     if(trajectory.size() > 0){
@@ -431,7 +440,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
       std::vector<double> all_states(trajectory.size() * nb_sensors);
       std::vector<double> all_next_states(trajectory.size() * nb_sensors);
-      uint li=0;
+      int li=0;
       for (auto it : trajectory) {
         std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * nb_sensors);
         std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * nb_sensors);
@@ -470,15 +479,20 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         //        Simple computation for lambda return
         //           
         std::vector<double> diff(trajectory.size());
-        li=0;
-        for (auto it : trajectory){
-          diff[li] = 0;
-          for (uint n=li;n<trajectory.size();n++)
-            diff[li] += std::pow(this->gamma * lambda, n-li) * deltas[n];
-          li++;
+        li=trajectory.size() - 1;
+        double prev_delta = 0.;
+        int index_ep = trajectory_end_points.size() - 1;
+        for (auto it : trajectory) {
+          if (index_ep >= 0 && trajectory_end_points[index_ep] - 1 == li){
+              prev_delta = 0.;
+              index_ep--;
+          }
+          diff[li] = deltas[li] + prev_delta;
+          prev_delta = this->gamma * lambda * diff[li];
+          --li;
         }
-        
         ASSERT(diff[trajectory.size() -1] == deltas[trajectory.size() -1], "pb lambda");
+
         li=0;
         for (auto it : trajectory){
 //           diff[li] = diff[li] + all_V->at(li);
@@ -577,6 +591,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     
     nb_sample_update= trajectory.size();
     trajectory.clear();
+    trajectory_end_points.clear();
     
     ann->ewc_decay_update();
     vnn->ewc_decay_update();
@@ -651,7 +666,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
  private:
   uint nb_sensors;
-  uint episode = 0;
+  uint episode = 1;
   uint step = 0;
 
   double noise, noise2, noise3;
@@ -669,6 +684,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   double alpha_v, alpha_a;
 
   std::deque<sample> trajectory;
+  std::deque<uint> trajectory_end_points;
 
   NN* ann;
   NN* vnn;

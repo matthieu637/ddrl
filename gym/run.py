@@ -10,6 +10,8 @@ try:
 except:
     pass
 
+#find . -type f -name 'perf.data' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'printf "%08.2f" $(find P_* -name "perf.data" | xargs -I G zcat G | jq -s add/length) ; echo -n "($(find P_* -name "perf.data" | wc -l))" ; echo : P ' |  sort -g -r
+
 np.seterr(all='raise')
 
 config = configparser.ConfigParser()
@@ -149,7 +151,7 @@ while sample_steps_counter < total_max_steps + testing_each * max_steps:
     sample_step = train(env, ag, episode)
     sample_steps_counter += sample_step
 
-    if episode % testing_each == 0:
+    if episode % testing_each == 0 and episode != 0:
         xlearning_monitor.write(str(sample_steps_counter)+'\n');
         reward, testing_sample_step = testing(env, ag, episode)
         results.append(reward)
