@@ -559,10 +559,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                     ac_diff[i] *= (ac_out->at(i) - min_) / (max_ - min_);
                 }
               } else {
-                if(bib::Utils::rand01() < 0.4)
-                  ac_diff[i] = -x ;//* (corrected_update_ac_factor + fabs(deltas_blob[i]));
-                else
-                  ac_diff[i] = 0.00000000f;
+                ac_diff[i] = -x * corrected_update_ac_factor;
               }
             }
           }
