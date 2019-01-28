@@ -11,6 +11,7 @@ except:
     pass
 
 #find . -type f -name 'perf.data' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'printf "%08.2f" $(find P_* -name "perf.data" | xargs -I G zcat G | jq -s add/length) ; echo -n "($(find P_* -name "perf.data" | wc -l))" ; echo : P ' |  sort -g -r
+#find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G tail -50 G | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
 
 np.seterr(all='raise')
 
@@ -79,8 +80,10 @@ def run_episode(env, ag, learning, episode):
     t=(time.time() - start_time)
     if learning:
         training_monitor.write(str(undiscounted_rewards)+','+str(sample_steps)+','+str(t)+'\n')
+        training_monitor.flush()
     else:
         testing_monitor.write(str(undiscounted_rewards)+','+str(sample_steps)+','+str(t)+'\n')
+        testing_monitor.flush()
 
     return totalreward, transitions, undiscounted_rewards, sample_steps
 
@@ -152,7 +155,8 @@ while sample_steps_counter < total_max_steps + testing_each * max_steps:
     sample_steps_counter += sample_step
 
     if episode % testing_each == 0 and episode != 0:
-        xlearning_monitor.write(str(sample_steps_counter)+'\n');
+        xlearning_monitor.write(str(sample_steps_counter)+'\n')
+        xlearning_monitor.flush()
         reward, testing_sample_step = testing(env, ag, episode)
         results.append(reward)
     episode+=1
