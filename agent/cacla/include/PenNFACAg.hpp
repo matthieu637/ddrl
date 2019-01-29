@@ -1,5 +1,5 @@
-#ifndef OFFLINECACLAAG_HPP
-#define OFFLINECACLAAG_HPP
+#ifndef PENNFAC_HPP
+#define PENNFAC_HPP
 
 #include <vector>
 #include <string>
@@ -125,7 +125,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
     gaussian_policy         = pt->get<uint>("agent.gaussian_policy");
-    update_delta_neg        = pt->get<bool>("agent.update_delta_neg");
     vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
     update_critic_first     = pt->get<bool>("agent.update_critic_first");
     number_fitted_iteration = pt->get<uint>("agent.number_fitted_iteration");
@@ -139,9 +138,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     alpha_v                 = pt->get<double>("agent.alpha_v");
     lambda                  = pt->get<double>("agent.lambda");
     momentum                = pt->get<uint>("agent.momentum");
-    corrected_update_ac     = false;
+    beta_target   = pt->get<double>("agent.beta_target");
+    ignore_poss_ac        = pt->get<bool>("agent.ignore_poss_ac");
     gae                     = false;
-    inverting_gradient      = false;
     update_each_episode = 1;
     
     if(gaussian_policy == 2){
@@ -158,21 +157,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     try {
       update_each_episode     = pt->get<uint>("agent.update_each_episode");
     } catch(boost::exception const& ) {
-    }
-    
-    try {
-      corrected_update_ac   = pt->get<bool>("agent.corrected_update_ac");
-    } catch(boost::exception const& ) {
-    }
-    try {
-      inverting_gradient   = pt->get<bool>("agent.inverting_gradient");
-    } catch(boost::exception const& ) {
-    }
-    if(corrected_update_ac){
-      try {
-        corrected_update_ac_factor   = pt->get<double>("agent.corrected_update_ac_factor");
-      } catch(boost::exception const& ) {
-      }
     }
     
     if(lambda >= 0.)
@@ -431,11 +415,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       V_pi_s0 = update_critic();
 
     if (trajectory.size() > 0) {
-      std::vector<double> sensors(trajectory.size() * nb_sensors);
-      std::vector<double> actions(trajectory.size() * this->nb_motors);
-      std::vector<bool> disable_back(trajectory.size() * this->nb_motors, false);
       const std::vector<bool> disable_back_ac(this->nb_motors, true);
-//       std::vector<double> deltas_blob(trajectory.size() * this->nb_motors);
       std::vector<double> deltas(trajectory.size());
 
       std::vector<double> all_states(trajectory.size() * nb_sensors);
@@ -502,30 +482,45 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       }
       
       uint n=0;
+      std::vector<double> sensors(2*trajectory.size() * nb_sensors);
+      std::vector<double> actions(2*trajectory.size() * this->nb_motors);
+      std::vector<bool> disable_back(2*trajectory.size() * this->nb_motors, false);
+
       li=0;
-//       double dmax = std::max((double)0.f, *std::max_element(deltas.begin(), deltas.end()));
+      //cacla cost
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
         sample sm = *it;
 
         std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
+        std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
         if(deltas[li] > 0.) {
-          std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
           n++;
-        } else if(update_delta_neg) {
-          std::copy(it->pure_a.begin(), it->pure_a.end(), actions.begin() + li * this->nb_motors);
         } else {
-          std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
         }
-//         std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
         li++;
+      }
+      //penalty cost
+      int li2=0;
+      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        sample sm = *it;
+
+        std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
+        std::copy(it->pure_a.begin(), it->pure_a.end(), actions.begin() + li * this->nb_motors);
+        if(ignore_poss_ac && deltas[li2] > 0.) {
+            std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
+        }
+        
+        li++;
+        li2++;
       }
 
       ratio_valid_advantage = ((float)n) / ((float) trajectory.size());
       
+      double beta=1.f;
       if(n > 0) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++){
-          ann->increase_batchsize(trajectory.size());
+          ann->increase_batchsize(2*trajectory.size());
           //learn BN
           auto ac_out = ann->computeOutBatch(sensors);
           if(batch_norm_actor != 0) {
@@ -535,32 +530,38 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             ann_testing->copyWeightsFrom(weights, false);
             delete[] weights;
             delete ac_out;
-            ann_testing->increase_batchsize(trajectory.size());
+            ann_testing->increase_batchsize(2*trajectory.size());
             ac_out = ann_testing->computeOutBatch(sensors);
           }
           ann->ZeroGradParameters();
           
+          //compute deter distance(pi, pi_old)
+          double l2distance = 0.;
+          int size_cost_cacla=trajectory.size()*this->nb_motors;
+          for(int i=size_cost_cacla;i<actions.size();i++) {
+              double x = actions[i] - ac_out->at(i);
+              l2distance += x*x;
+          }
+          l2distance = std::sqrt(l2distance)/((double) trajectory.size()*this->nb_motors);
+          if (std::fabs(l2distance - beta_target) < 1e-6) {
+              break;
+          } else if (l2distance < beta_target/1.5)
+              beta = beta/2.;
+          else if (l2distance > beta_target*1.5)
+              beta = beta*2.;
+          
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
-          for(int i=0; i<actor_actions_blob->count(); i++){
-            if(disable_back[i]){
-              ac_diff[i] = 0.00000000f;
+          
+          for(int i=0; i<actor_actions_blob->count(); i++) {
+            if(disable_back[i]) {
+            ac_diff[i] = 0.00000000f;
             } else {
-              double x = actions[i] - ac_out->at(i);
-              if(!corrected_update_ac){
-                ac_diff[i] = -x;
-                if(inverting_gradient){
-                  const double min_ = -1.0; 
-                  const double max_ = 1.0;
-                  
-                  if (ac_diff[i] < 0)
-                    ac_diff[i] *= (max_ - ac_out->at(i)) / (max_ - min_);
-                  else if (ac_diff[i] > 0)
-                    ac_diff[i] *= (ac_out->at(i) - min_) / (max_ - min_);
-                }
-              } else {
-                ac_diff[i] = -x * corrected_update_ac_factor;
-              }
+                double x = actions[i] - ac_out->at(i);
+                if(i < size_cost_cacla)
+                    ac_diff[i] = -x;
+                else
+                    ac_diff[i] = -x * beta;
             }
           }
           ann->actor_backward();
@@ -655,12 +656,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         " " << std::setprecision(3) << ratio_valid_advantage ;
   }
   
-  double sign(double x){
-    if(x>=0)
-      return 1.f;
-    return -1.f;
-  }
-
  private:
   uint nb_sensors;
   uint episode = 1;
@@ -668,12 +663,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   double noise, noise2, noise3;
   uint gaussian_policy;
-  bool vnn_from_scratch, update_critic_first,
-        update_delta_neg, corrected_update_ac, gae;
-  bool inverting_gradient;
+  bool vnn_from_scratch, update_critic_first, gae, ignore_poss_ac;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
-  double lambda, corrected_update_ac_factor;
+  double lambda, beta_target;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

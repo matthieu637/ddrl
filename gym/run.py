@@ -12,6 +12,7 @@ except:
 
 #find . -type f -name 'perf.data' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'printf "%08.2f" $(find P_* -name "perf.data" | xargs -I G zcat G | jq -s add/length) ; echo -n "($(find P_* -name "perf.data" | wc -l))" ; echo : P ' |  sort -g -r
 #find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G tail -50 G | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
+#find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G -n 1 bash -c "zcat G | tail -50" | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
 
 np.seterr(all='raise')
 

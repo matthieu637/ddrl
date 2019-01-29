@@ -1,5 +1,10 @@
 #include "arch/Simulator.hpp"
+
+#ifndef WANT_PENNFAC
 #include "OfflineCaclaAg.hpp"
+#else
+#include "PenNFACAg.hpp"
+#endif
 
 extern "C" {
   //NFAC
