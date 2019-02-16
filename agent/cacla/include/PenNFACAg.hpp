@@ -543,12 +543,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               l2distance += x*x;
           }
           l2distance = std::sqrt(l2distance)/((double) trajectory.size()*this->nb_motors);
-          if (std::fabs(l2distance - beta_target) < 1e-6) {
-              break;
-          } else if (l2distance < beta_target/1.5)
+          if (l2distance < beta_target/1.5)
               beta = beta/2.;
           else if (l2distance > beta_target*1.5)
               beta = beta*2.;
+          else if (sia > 0)
+              break;
           
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
