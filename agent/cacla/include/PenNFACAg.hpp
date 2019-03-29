@@ -485,6 +485,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       std::vector<double> sensors(2*trajectory.size() * nb_sensors);
       std::vector<double> actions(2*trajectory.size() * this->nb_motors);
       std::vector<bool> disable_back(2*trajectory.size() * this->nb_motors, false);
+      std::vector<double> deltas_blob(2*trajectory.size() * this->nb_motors);
 
       li=0;
       //cacla cost
@@ -498,6 +499,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
         }
+        std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
         li++;
       }
       //penalty cost
@@ -510,7 +512,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         if(ignore_poss_ac && deltas[li2] > 0.) {
             std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
         }
-        
+        std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li2]);
         li++;
         li2++;
       }
@@ -559,9 +561,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             } else {
                 double x = actions[i] - ac_out->at(i);
                 if(i < size_cost_cacla)
-                    ac_diff[i] = -x;
+                    ac_diff[i] = -x * deltas_blob[i];
                 else
-                    ac_diff[i] = -x * beta;
+                    ac_diff[i] = -x * beta * deltas_blob[i];
             }
           }
           ann->actor_backward();
@@ -594,7 +596,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     ann->ewc_decay_update();
     vnn->ewc_decay_update();
   }
-  
+
   void end_instance(bool learning) override {
     if(learning)
       episode++;
