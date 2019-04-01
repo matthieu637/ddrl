@@ -17,7 +17,8 @@ find_package(Humanoid)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${COMMON_DRL_INCLUDE_DIRS}
   ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS}
-  ${HALF_CHEETAH_INCLUDE_DIRS} ${HUMANOID_INCLUDE_DIRS})
+  ${HALF_CHEETAH_INCLUDE_DIRS} ${HUMANOID_INCLUDE_DIRS}
+  ${CMAKE_SOURCE_DIR}/../cacla/include/)
 
 file ( GLOB_RECURSE all_include include/*.hpp include/*.h)
 file ( GLOB all_sources src/*.cpp src/*.c)
@@ -74,6 +75,11 @@ set(LIBRARY_NAME "ddrl-ddpg")
 rename_buildtype(LIBRARY_NAME)
 add_library(${LIBRARY_NAME} SHARED ${all_include} src/pybinding/ddpg.cpp)
 target_link_libraries(${LIBRARY_NAME} ${COMMON_DRL_LIBRARY} )
+
+set(LIBRARY_NAME2 "ddrl-foo")
+rename_buildtype(LIBRARY_NAME2)
+add_library(${LIBRARY_NAME2} SHARED ${all_include} src/pybinding/foo.cpp)
+target_link_libraries(${LIBRARY_NAME2} ${COMMON_DRL_LIBRARY} )
 
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

@@ -16,6 +16,8 @@
 #include "nn/MLP.hpp"
 #include "nn/DODevMLP.hpp"
 
+#ifndef SAASRG_SAMPLE
+#define SAASRG_SAMPLE
 typedef struct _sample {
   std::vector<double> s;
   std::vector<double> pure_a;
@@ -50,11 +52,13 @@ typedef struct _sample {
   }
 
 } sample;
+#endif
 
 template<typename NN = MLP>
 class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
  public:
   typedef NN PolicyImpl;
+  friend class FusionOOAg;
 
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
     : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(0) {
