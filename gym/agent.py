@@ -150,3 +150,49 @@ elif "libddrl-ddpg" in config.get('simulation', 'library') :
             
         def name(self):
             return "DDPG"
+elif "libddrl-foo" in config.get('simulation', 'library') :
+    lib.FOOAg_new.restype = ctypes.c_int64
+    lib.FOOAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]
+    lib.FOOAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
+    lib.FOOAg_dump.argtypes = [ ctypes.c_int64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
+    lib.FOOAg_display.argtypes = [ ctypes.c_int64, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_double]
+    lib.FOOAg_end_episode.argtypes = [ ctypes.c_int64, ctypes.c_bool ]
+    
+    class DDRLAg(object):
+        def __init__(self, nb_motors, nb_sensors, argv=[]):
+            self.obj = lib.FOOAg_new(nb_motors, nb_sensors)
+            argv.append("")
+            string_length = len(argv)
+
+            select_type = (ctypes.c_char_p * string_length)
+            select = select_type()
+            for key, item in enumerate(argv):
+                select[key] = item.encode('utf-8')
+            
+            lib.FOOAg_unique_invoke.argtypes = [ctypes.c_int64, ctypes.c_int, select_type]
+            lib.FOOAg_unique_invoke(self.obj, len(argv), select)
+            lib.FOOAg_run.restype = ndpointer(ctypes.c_double, shape=(nb_motors,))
+    
+        def run(self, reward, state, learning, goal, last):
+            return lib.FOOAg_run(self.obj, reward, np.ascontiguousarray(state, np.float64), learning, goal , last)
+    
+        def start_ep(self, state, learning):
+            lib.FOOAg_start_episode(self.obj, np.ascontiguousarray(state, np.float64), learning)
+    
+        def end_ep(self, learning):
+            lib.FOOAg_end_episode(self.obj, learning)
+    
+        def dump(self, learning, episode, step, treward):
+            lib.FOOAg_dump(self.obj, learning, episode, step, treward)
+            
+        def display(self, learning, episode, step, treward):
+            lib.FOOAg_display(self.obj, learning, episode, step, treward)
+            
+        def save(self, episode):
+            lib.FOOAg_save(self.obj, episode)
+    
+        def load(self, episode):
+            lib.FOOAg_load(self.obj, episode)
+            
+        def name(self):
+            return "FOO"
