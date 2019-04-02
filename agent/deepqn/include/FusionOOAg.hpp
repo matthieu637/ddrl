@@ -39,13 +39,18 @@ class FusionOOAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* command_args) override {
     //hidden_unit_q           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_q"));
-    offpolicy_ag._unique_invoke(pt, command_args);
-    onpolicy_ag._unique_invoke(pt, command_args);
+    
+    boost::property_tree::ptree* properties = new boost::property_tree::ptree;
+        boost::property_tree::ini_parser::read_ini("config.off.ini", *properties);    
+    offpolicy_ag.unique_invoke(properties, command_args, false);
+    delete properties;
+    
+    onpolicy_ag.unique_invoke(pt, command_args, false);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool learning) override {
-    offpolicy_ag._start_episode(sensors, learning);
-    onpolicy_ag._start_episode(sensors, learning);
+    offpolicy_ag.start_episode(sensors, learning);
+    onpolicy_ag.start_episode(sensors, learning);
   }
 
   void end_instance(bool learning) override {

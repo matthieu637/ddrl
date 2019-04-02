@@ -104,7 +104,7 @@ elif "libddrl-cacla" in config.get('simulation', 'library') :
             
         def name(self):
             return "CACLA"
-elif "libddrl-ddpg" in config.get('simulation', 'library') :
+elif "libddrl-ddpg" in config.get('simulation', 'library') or "libddrl-td3" in config.get('simulation', 'library') :
     lib.DDPGAg_new.restype = ctypes.c_int64
     lib.DDPGAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]
     lib.DDPGAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
@@ -149,7 +149,7 @@ elif "libddrl-ddpg" in config.get('simulation', 'library') :
             lib.DDPGAg_load(self.obj, episode)
             
         def name(self):
-            return "DDPG"
+            return "DDPG" if "libddrl-ddpg" in config.get('simulation', 'library') else "TD3"
 elif "libddrl-foo" in config.get('simulation', 'library') :
     lib.FOOAg_new.restype = ctypes.c_int64
     lib.FOOAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]

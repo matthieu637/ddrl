@@ -10,9 +10,12 @@ try:
 except:
     pass
 
-#find . -type f -name 'perf.data' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'printf "%08.2f" $(find P_* -name "perf.data" | xargs -I G zcat G | jq -s add/length) ; echo -n "($(find P_* -name "perf.data" | wc -l))" ; echo : P ' |  sort -g -r
-#find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G tail -50 G | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
-#find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G -n 1 bash -c "zcat G | tail -50" | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
+#find . -type f -name 'perf.data' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "perf.data" | xargs -I G zcat G | jq -s add/length) ; echo -n "($(find P_* -name "perf.data" | wc -l))" ; echo : P ' |  sort -g -r
+#find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G tail -50 G | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
+#find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G -n 1 bash -c "zcat G | tail -50" | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
+##find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G -n 1 bash -c "if [ $(file G | grep gzip | wc -l) -eq 1 ] ; then zcat G | tail -50 ; else tail -50 G ; fi" | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
+#find . -name '0.1.monitor.csv' |  xargs -I % tail -50 % | cut -f1 -d',' | jq -s add/length
+#find . -name "0.1.monitor.csv" | xargs -I G bash -c "file G | grep gzip > /dev/null && echo mv 'G G.gz ; gunzip G.gz'"
 
 np.seterr(all='raise')
 

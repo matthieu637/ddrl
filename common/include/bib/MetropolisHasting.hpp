@@ -44,6 +44,15 @@ class Proba {
 
     return gauss;
   }
+  
+  static std::vector<Real>* multidimentionnalTruncatedGaussianZeroMean(int size, Real sigma, Real min_, Real max_) {
+    std::vector<Real>* gauss = new std::vector<Real>(size);
+
+    for (uint i = 0; i < size; i++)
+      gauss->at(i) = rtnorm(min_, max_, (Real) 0, sigma);
+
+    return gauss;
+  }
 
   static Real truncatedGaussianDensity(Real r, Real mu, const Real sigma, Real a=-1.f, Real b=1.f) {
     //68–95–99.7 rule

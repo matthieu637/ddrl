@@ -81,6 +81,12 @@ rename_buildtype(LIBRARY_NAME2)
 add_library(${LIBRARY_NAME2} SHARED ${all_include} src/pybinding/foo.cpp)
 target_link_libraries(${LIBRARY_NAME2} ${COMMON_DRL_LIBRARY} )
 
+set(LIBRARY_NAME3 "ddrl-td3")
+rename_buildtype(LIBRARY_NAME3)
+add_library(${LIBRARY_NAME3} SHARED ${all_include} src/pybinding/ddpg.cpp)
+target_compile_definitions(${LIBRARY_NAME3} PUBLIC WANT_TD3)
+target_link_libraries(${LIBRARY_NAME3} ${COMMON_DRL_LIBRARY} )
+
 file(COPY ${ROOT_DRL_PATH}/environment/advanced-acrobot/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY ${ROOT_DRL_PATH}/environment/cartpole/data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
 file(COPY data DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

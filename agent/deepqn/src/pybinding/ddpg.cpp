@@ -1,5 +1,10 @@
 #include "arch/Simulator.hpp"
+
+#ifdef WANT_TD3
+#include "TD3Ag.hpp"
+#else //DDPG
 #include "DeepQNAg.hpp"
+#endif
 
 extern "C" {
   DeepQNAg<MLP>* DDPGAg_new(uint a, uint b) {
