@@ -184,6 +184,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     bool test_net           = pt->get<bool>("agent.test_net");
     bn_adapt                = pt->get<bool>("agent.bn_adapt");
     uint momentum           = pt->get<uint>("agent.momentum");
+    nstep_return            = pt->get<int>("agent.nstep_return");
     
 #ifdef CAFFE_CPU_ONLY
     LOG_INFO("CPU mode");
@@ -277,6 +278,14 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
        traj[i] = from[r];
      }
   }
+  
+  void sample_transition(std::vector<sample>& traj, std::vector<int>& traj_index, const std::deque<sample>& from){
+     for(uint i=0;i<traj.size();i++){
+       int r = std::uniform_int_distribution<int>(0, from.size() - 1)(*bib::Seed::random_engine());
+       traj[i] = from[r];
+       traj_index[i] = r;
+     }
+  }
 
   void end_instance(bool learning) override {
     if(learning){
@@ -333,15 +342,35 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     {
     
       std::vector<sample> traj(kMinibatchSize);
-      sample_transition(traj, trajectory);
+      std::vector<int> traj_index(kMinibatchSize);
+      std::vector<int> valid_next_state(kMinibatchSize);
+      if(nstep_return <= 0)
+        sample_transition(traj, trajectory);
+      else
+        sample_transition(traj, traj_index, trajectory);
       
       //compute \pi(s_{t+1})
       std::vector<double> all_next_states(traj.size() * nb_sensors);
       std::vector<double> all_states(traj.size() * nb_sensors);
       std::vector<double> all_actions(traj.size() * nb_motors);
       uint i=0;
-      for (auto it : traj){
-        std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
+      for (auto it : traj) {
+          if(nstep_return <= 0)
+            std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
+          else {
+            //compute i+N next state
+            //j in the index in the full replay buffer
+            int index_next_step = traj_index[i];
+            for(int j=traj_index[i] +1; j < traj_index[i]+nstep_return && j < trajectory.size();j++) {
+                if(trajectory[j].goal_reached)
+                    break;
+                //valid horizon
+                index_next_step = j;
+            }
+            valid_next_state[i] = index_next_step - traj_index[i];
+            auto it2 = trajectory[index_next_step];
+            std::copy(it2.next_s.begin(), it2.next_s.end(), all_next_states.begin() + i * nb_sensors);
+          }
         std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
         std::copy(it.a.begin(), it.a.end(), all_actions.begin() + i * nb_motors);
         i++;
@@ -356,11 +385,22 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       //adjust q_targets
       i=0;
       for (auto it : traj){
-        if(it.goal_reached)
-          q_targets->at(i) = it.r;
-        else 
-          q_targets->at(i) = it.r + gamma * q_targets->at(i);
-        
+        if(it.goal_reached) {
+            q_targets->at(i) = it.r;
+        } else {
+            if(nstep_return <= 0){
+                q_targets->at(i) = it.r + gamma * q_targets->at(i);
+            } else {
+                double Qnext = q_targets->at(i);
+                q_targets->at(i) = 0;
+                double local_gamma = 1.f;
+                for(int j=0; j < valid_next_state[i];j++){
+                        q_targets->at(i) += trajectory[traj_index[i]+j].r * local_gamma;
+                        local_gamma *= gamma;
+                }
+                q_targets->at(i) += gamma * Qnext;
+            }
+        }
         i++;
       }
       
@@ -535,6 +575,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   uint actor_output_layer_type, hidden_layer_type;
   
   bool inverting_grad, bn_adapt;
+  int nstep_return;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
