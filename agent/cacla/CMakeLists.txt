@@ -108,6 +108,12 @@ add_library(${LIBRARY_NAME4} SHARED ${all_include} src/pybinding/nfac.cpp)
 target_compile_definitions(${LIBRARY_NAME4} PUBLIC WANT_PENNFAC)
 target_link_libraries(${LIBRARY_NAME4} ${BASE_LIBRARIES} )
 
+set(LIBRARY_NAME5 "ddrl-psepenfac")
+rename_buildtype(LIBRARY_NAME5)
+add_library(${LIBRARY_NAME5} SHARED ${all_include} src/pybinding/nfac.cpp)
+target_compile_definitions(${LIBRARY_NAME5} PUBLIC WANT_PSEPENFAC)
+target_link_libraries(${LIBRARY_NAME5} ${BASE_LIBRARIES} )
+
 # add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
 # target_link_libraries(ada-nfac ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
 

@@ -1,9 +1,13 @@
 #include "arch/Simulator.hpp"
 
 #ifndef WANT_PENNFAC
-#include "OfflineCaclaAg.hpp"
+    #ifndef WANT_PSEPENFAC
+        #include "OfflineCaclaAg.hpp"
+    #else
+        #include "PSEPeNFACAg.hpp"
+    #endif
 #else
-#include "PenNFACAg.hpp"
+    #include "PenNFACAg.hpp"
 #endif
 
 extern "C" {

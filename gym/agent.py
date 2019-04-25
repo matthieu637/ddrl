@@ -11,7 +11,7 @@ config.read('config.ini')
 #need either numpy 1.16 or numpy 1.14 : 1.15 broke ctypes
 
 lib = cdll.LoadLibrary(config.get('simulation', 'library'))
-if "libddrl-nfac" in config.get('simulation', 'library') or "libddrl-penfac" in config.get('simulation', 'library'):
+if "libddrl-nfac" in config.get('simulation', 'library') or "libddrl-penfac" in config.get('simulation', 'library') or "libddrl-psepenfac" in config.get('simulation', 'library'):
     lib.OfflineCaclaAg_new.restype = ctypes.c_int64
     lib.OfflineCaclaAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]
     lib.OfflineCaclaAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
