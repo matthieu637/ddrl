@@ -129,8 +129,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     momentum                = pt->get<uint>("agent.momentum");
     beta_target   = pt->get<double>("agent.beta_target");
     ignore_poss_ac        = pt->get<bool>("agent.ignore_poss_ac");
+    adaptive_noise        = pt->get<bool>("agent.adaptive_noise");
     gae                     = false;
     update_each_episode = 1;
+    effective_noise = noise;
     
     try {
       update_each_episode     = pt->get<uint>("agent.update_each_episode");
@@ -199,7 +201,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     ann_testing->copyWeightsFrom(weights, false);
     
     std::vector<double> embedded(weights, weights + ann->number_of_parameters(false));
-    std::vector<double>* noisy_weights = bib::Proba<double>::multidimentionnalGaussian(embedded, noise);
+    std::vector<double>* noisy_weights = bib::Proba<double>::multidimentionnalGaussian(embedded, effective_noise);
     ann_testing_noisy->copyWeightsFrom(noisy_weights->data(), false);
     
     delete[] weights;
@@ -535,6 +537,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           else if (sia > 0)
               break;
           
+          if (sia == 0 && adaptive_noise){
+              if (l2distance < effective_noise)
+                  effective_noise = 1.01f * effective_noise;
+              else
+                  effective_noise = (1.f/1.01f) * effective_noise;
+          }
+          
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
           
@@ -630,7 +639,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
  protected:
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << this->sum_weighted_reward/this->gamma << " " << this->sum_reward << 
-        " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << nb_sample_update <<
+        " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << effective_noise << " " << nb_sample_update <<
           " " << std::setprecision(3) << ratio_valid_advantage << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm();
   }
 
@@ -646,8 +655,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   uint episode = 1;
   uint step = 0;
 
-  double noise;
-  bool vnn_from_scratch, update_critic_first, gae, ignore_poss_ac;
+  double noise, effective_noise;
+  bool vnn_from_scratch, update_critic_first, gae, ignore_poss_ac, adaptive_noise;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
