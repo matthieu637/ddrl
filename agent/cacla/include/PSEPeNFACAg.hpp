@@ -543,7 +543,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               else
                   effective_noise = (1.f/1.01f) * effective_noise;
 
-              effective_noise = std::min(std::max(effective_noise, 0.001f), 10.f);
+              effective_noise = std::min(std::max(effective_noise, (double)0.001f), (double) 10.f);
           }
           
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
