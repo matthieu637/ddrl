@@ -529,7 +529,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               double x = actions[i] - ac_out->at(i);
               l2distance += x*x;
           }
-          l2distance = std::sqrt(l2distance)/((double) trajectory.size()*this->nb_motors);
+          l2distance = std::sqrt(l2distance)/((double) (trajectory.size()*this->nb_motors*2.f));
           if (l2distance < beta_target/1.5)
               beta = beta/2.;
           else if (l2distance > beta_target*1.5)
@@ -542,6 +542,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                   effective_noise = 1.01f * effective_noise;
               else
                   effective_noise = (1.f/1.01f) * effective_noise;
+
+              effective_noise = std::min(std::max(effective_noise, 0.001f), 10.f);
           }
           
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
