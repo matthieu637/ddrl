@@ -366,7 +366,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       auto all_next_actions = ann_target->computeOutBatch(all_next_states);
       
       // TD3 : learn Qpi instead of Qmu
-      std::vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussianZeroMean(all_next_actions->size(), noise, -noise_clip, noise_clip);
+      std::vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussianZeroMean(all_next_actions->size(), policy_noise, -noise_clip, noise_clip);
       for (int i=0;i < all_next_actions->size();i++)
           all_next_actions->at(i) = std::min(std::max(all_next_actions->at(i) + randomized_action->at(i), (double)-1.f), (double)1.f);
       delete randomized_action;
