@@ -537,8 +537,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           else if (sia > 0)
               break;
           
-          if (sia == 0 && adaptive_noise){
-              if (l2distance < effective_noise)
+          if (sia == 0 && adaptive_noise) {
+              if (l2distance < noise)
                   effective_noise = 1.01f * effective_noise;
               else
                   effective_noise = (1.f/1.01f) * effective_noise;
