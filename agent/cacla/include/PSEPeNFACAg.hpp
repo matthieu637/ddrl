@@ -200,7 +200,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     ann->copyWeightsTo(weights, false);
     ann_testing->copyWeightsFrom(weights, false);
     
-    if(learning && trajectory.size() == 0) {
+    if(learning) {
         std::vector<double> embedded(weights, weights + ann->number_of_parameters(false));
         std::vector<double>* noisy_weights = bib::Proba<double>::multidimentionnalGaussian(embedded, effective_noise);
         ann_testing_noisy->copyWeightsFrom(noisy_weights->data(), false);
@@ -526,33 +526,19 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           
           //compute deter distance(pi, pi_old)
           double l2distance = 0.;
-          double l2distance_noise = 0.;
           int size_cost_cacla=trajectory.size()*this->nb_motors;
           for(int i=size_cost_cacla;i<actions.size();i++) {
               double x = actions[i] - ac_out->at(i);
               l2distance += x*x;
-
-              double x2 = actions[i] - actions[i - size_cost_cacla];
-              l2distance_noise += x2*x2;
           }
           l2distance = std::sqrt(l2distance)/((double) (trajectory.size()*this->nb_motors));
-          l2distance_noise = std::sqrt(l2distance_noise)/((double) (trajectory.size()*this->nb_motors));
           if (l2distance < beta_target/1.5)
               beta = beta/2.;
           else if (l2distance > beta_target*1.5)
               beta = beta*2.;
           else if (sia > 0)
               break;
-          
-          if (sia == 0 && adaptive_noise) {
-              if (l2distance_noise < noise)
-                  effective_noise = 1.01f * effective_noise;
-              else
-                  effective_noise = (1.f/1.01f) * effective_noise;
-
-              effective_noise = std::min(std::max(effective_noise, (double)0.001f), (double) 20.f);
-          }
-          
+         
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
           
@@ -581,7 +567,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
       delete all_nextV;
       delete all_mine;
-      
+
       if(batch_norm_actor != 0)
         ann_testing->increase_batchsize(1);
     }
@@ -589,7 +575,52 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(!update_critic_first){
       update_critic();
     }
-    
+
+    if (adaptive_noise) {
+      double* weights = new double[ann->number_of_parameters(false)];
+      ann->copyWeightsTo(weights, false);
+      ann->increase_batchsize(trajectory.size());
+      ann_testing_noisy->increase_batchsize(trajectory.size());
+
+      std::vector<double> sensors(trajectory.size() * nb_sensors);
+      int li=0;
+      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
+        sample sm = *it;
+        std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
+        li++;
+      }
+      auto ac_out = ann->computeOutBatch(sensors);
+      
+      std::vector<double> embedded(weights, weights + ann->number_of_parameters(false));
+
+      for (int i=0;i<10;i++) {
+          std::vector<double>* noisy_weights = bib::Proba<double>::multidimentionnalGaussian(embedded, effective_noise);
+          ann_testing_noisy->copyWeightsFrom(noisy_weights->data(), false);
+          delete noisy_weights;
+      	  auto ac_out2 = ann->computeOutBatch(sensors);
+          
+          double l2distance_noise = 0.;
+          for(int j=0;j<sensors.size();j++) {
+              double x2 = ac_out2->at(i) - ac_out->at(i);
+              l2distance_noise += x2*x2;
+          }
+		  delete ac_out2;
+		  
+          l2distance_noise = std::sqrt(l2distance_noise)/((double) (trajectory.size()*this->nb_motors));
+		  if (l2distance_noise >= 0.9*noise && l2distance_noise <= 1.1*noise )
+   			  break;
+          else if (l2distance_noise < noise)
+              effective_noise = 1.01f * effective_noise;
+          else
+              effective_noise = (1.f/1.01f) * effective_noise;
+   
+          effective_noise = std::min(std::max(effective_noise, (double)0.0005f), (double) 20.f);
+      }
+      
+	  delete ac_out;
+      delete[] weights;
+    }
+
     nb_sample_update= trajectory.size();
     trajectory.clear();
     trajectory_end_points.clear();
