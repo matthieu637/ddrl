@@ -597,24 +597,24 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           std::vector<double>* noisy_weights = bib::Proba<double>::multidimentionnalGaussian(embedded, effective_noise);
           ann_testing_noisy->copyWeightsFrom(noisy_weights->data(), false);
           delete noisy_weights;
-      	  auto ac_out2 = ann->computeOutBatch(sensors);
+      	  auto ac_out2 = ann_testing_noisy->computeOutBatch(sensors);
           
           double l2distance_noise = 0.;
-          for(int j=0;j<sensors.size();j++) {
+          for(int j=0;j<trajectory.size()*this->nb_motors;j++) {
               double x2 = ac_out2->at(i) - ac_out->at(i);
               l2distance_noise += x2*x2;
           }
 		  delete ac_out2;
 		  
           l2distance_noise = std::sqrt(l2distance_noise)/((double) (trajectory.size()*this->nb_motors));
-		  if (l2distance_noise >= 0.9*noise && l2distance_noise <= 1.1*noise )
-   			  break;
-          else if (l2distance_noise < noise)
+          if (l2distance_noise < noise)
               effective_noise = 1.01f * effective_noise;
           else
               effective_noise = (1.f/1.01f) * effective_noise;
-   
           effective_noise = std::min(std::max(effective_noise, (double)0.0005f), (double) 20.f);
+          
+          if (l2distance_noise >= 0.9*noise && l2distance_noise <= 1.1*noise )
+   			  break;
       }
       
 	  delete ac_out;
