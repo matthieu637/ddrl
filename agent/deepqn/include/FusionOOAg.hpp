@@ -2,7 +2,7 @@
 #ifndef FUSIONONOFFAG_HPP
 #define FUSIONONOFFAG_HPP
 
-#include "DeepQNAg.hpp"
+#include "TD3Ag.hpp"
 #include "PenNFACAg.hpp"
 
 class FusionOOAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
