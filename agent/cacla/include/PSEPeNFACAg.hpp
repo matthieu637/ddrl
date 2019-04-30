@@ -86,6 +86,19 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     vector<double>* next_action_pure;
     vector<double>* next_action;
     if(learning){
+        double* weights = new double[ann->number_of_parameters(false)];
+        ann->copyWeightsTo(weights, false);
+        ann_testing->copyWeightsFrom(weights, false);
+        
+        if(learning) {
+            std::vector<double> embedded(weights, weights + ann->number_of_parameters(false));
+            std::vector<double>* noisy_weights = bib::Proba<double>::multidimentionnalGaussian(embedded, effective_noise);
+            ann_testing_noisy->copyWeightsFrom(noisy_weights->data(), false);
+            delete noisy_weights;
+        }
+        
+        delete[] weights;
+        
         next_action = ann_testing_noisy->computeOut(sensors);
         next_action_pure = ann_testing->computeOut(sensors);
     } else {
@@ -619,6 +632,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       
 	  delete ac_out;
       delete[] weights;
+      ann_testing_noisy->increase_batchsize(1);
     }
 
     nb_sample_update= trajectory.size();
