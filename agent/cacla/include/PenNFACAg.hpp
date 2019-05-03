@@ -208,8 +208,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(gaussian_policy == 2)
       oun->reset();
     
-    ratio_valid_advantage = -1;
-    
     if(std::is_same<NN, DODevMLP>::value && learning){
       DODevMLP * ann_cast = static_cast<DODevMLP *>(ann);
       bool changed_ann = std::get<1>(ann_cast->inform(episode, this->last_sum_weighted_reward));
@@ -548,7 +546,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               double x = actions[i] - ac_out->at(i);
               l2distance += x*x;
           }
-          l2distance = std::sqrt(l2distance)/((double) trajectory.size()*this->nb_motors);
+          l2distance = std::sqrt(l2distance/((double) trajectory.size()*this->nb_motors));
           if (l2distance < beta_target/1.5)
               beta = beta/2.;
           else if (l2distance > beta_target*1.5)

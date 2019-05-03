@@ -56,6 +56,8 @@ if "libddrl-nfac" in config.get('simulation', 'library') or "libddrl-penfac" in 
             lib.OfflineCaclaAg_load(self.obj, episode)
         
         def name(self):
+            if "libddrl-psepenfac" in config.get('simulation', 'library'):
+                return "PSEPeNFAC(lambda)-V"
             return "NFAC(lambda)-V" if "libddrl-nfac" in config.get('simulation', 'library') else "PeNFAC(lambda)-V"
 
 elif "libddrl-cacla" in config.get('simulation', 'library') :
