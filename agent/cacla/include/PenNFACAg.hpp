@@ -142,8 +142,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     alpha_v                 = pt->get<double>("agent.alpha_v");
     lambda                  = pt->get<double>("agent.lambda");
     momentum                = pt->get<uint>("agent.momentum");
-    beta_target   = pt->get<double>("agent.beta_target");
-    ignore_poss_ac        = pt->get<bool>("agent.ignore_poss_ac");
+    beta_target             = pt->get<double>("agent.beta_target");
+    ignore_poss_ac          = pt->get<bool>("agent.ignore_poss_ac");
+    conserve_beta           = pt->get<bool>("agent.conserve_beta");
     gae                     = false;
     update_each_episode = 1;
     
@@ -522,6 +523,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       ratio_valid_advantage = ((float)n) / ((float) trajectory.size());
       
       double beta=1.f;
+      if(conserve_beta)
+        beta=conserved_beta;
+
       if(n > 0) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++){
           ann->increase_batchsize(2*trajectory.size());
@@ -579,6 +583,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         ann->increase_batchsize(trajectory.size());
         delete ann->computeOutBatch(sensors);
       }
+      
+      conserved_beta = beta;
 
       delete all_nextV;
       delete all_mine;
@@ -667,10 +673,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   double noise, noise2, noise3;
   uint gaussian_policy;
-  bool vnn_from_scratch, update_critic_first, gae, ignore_poss_ac;
+  bool vnn_from_scratch, update_critic_first, gae, ignore_poss_ac, conserve_beta;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
+  double conserved_beta= 1.f;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
