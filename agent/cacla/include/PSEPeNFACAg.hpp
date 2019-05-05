@@ -693,7 +693,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   uint step = 0;
 
   double noise, effective_noise;
-  bool vnn_from_scratch, update_critic_first, gae, ignore_poss_ac, adaptive_noise;
+  bool vnn_from_scratch, update_critic_first, gae, ignore_poss_ac, adaptive_noise, conserve_beta;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
