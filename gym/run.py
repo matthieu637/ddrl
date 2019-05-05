@@ -12,18 +12,24 @@ except:
 
 #for ddrl with perf.data gziped
 #find . -type f -name 'perf.data' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "perf.data" | xargs -I G zcat G | jq -s add/length) ; echo -n "($(find P_* -name "perf.data" | wc -l))" ; echo : P ' |  sort -g -r
+#to display cpu time
+#find . -type f -name 'time_elapsed' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "time_elapsed" | xargs -I G cat G | jq -s add/length) ; echo -n "($(find P_* -name "time_elapsed" | wc -l))" ; echo : P ' |  sort -g -r
+#print number of trials generated
+#find . -name 'x.learning.data' |  xargs -I % tail -1 %
 
 #for baseline with uncompressed monitor
-#find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G tail -50 G | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
+#find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G tail -50 G | grep -v r | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
+#display problematic datas
+#find . -name "0.1.monitor.csv" | xargs -I G bash -c "tail -50 G | cut -f1 -d',' | jq -s add/length || echo G"
 
 #for baseline with compressed monitor
-#find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G -n 1 bash -c "zcat G | tail -50" | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
+#find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G -n 1 bash -c "zcat G | tail -50 | grep -v r" | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
 
 #uncompress monitor for baseline with mix of compress/uncompress monitor
 #paste result and rerun it
 #find . -name "0.1.monitor.csv" | xargs -I G bash -c "file G | grep gzip > /dev/null && echo mv 'G G.gz ; gunzip G.gz'"
-    
-#find . -name '0.1.monitor.csv' |  xargs -I % tail -50 % | cut -f1 -d',' | jq -s add/length
+#if ddrl:
+#find . -name "x.learning.data" | xargs -I G bash -c "file G | grep gzip > /dev/null && echo mv 'G G.gz ; gunzip G.gz'"
 
 np.seterr(all='raise')
 
