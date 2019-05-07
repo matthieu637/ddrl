@@ -396,6 +396,10 @@ class MLP {
 //
 //   }
   
+  int get_batchsize() {
+        return kMinibatchSize;
+  }
+  
   void increase_batchsize(uint new_batch_size) {
     kMinibatchSize = new_batch_size;
 

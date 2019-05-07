@@ -91,9 +91,9 @@ def run_episode(env, ag, learning, episode):
     ag.end_ep(learning)
 
     if episode % dump_log_each == 0:
-        ag.dump(learning, episode, sample_steps, totalreward)
+        ag.dump(learning, episode, sample_steps, undiscounted_rewards)
     if episode % display_log_each == 0:
-        ag.display(learning, episode, sample_steps, totalreward)
+        ag.display(learning, episode, sample_steps, undiscounted_rewards)
 
     t=(time.time() - start_time)
     if learning:
