@@ -642,7 +642,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     auto qsa = qnn1_->computeOutVFBatch(sensors, actions);
     auto vsa = qnn1_->computeOutVFBatch(sensors, pure_actions);
     if (idea_min_qnn) {
-        qnn1_->increase_batchsize(trajectory.size());
+        qnn2_->increase_batchsize(trajectory.size());
         auto qsa2 = qnn2_->computeOutVFBatch(sensors, actions);
         auto vsa2 = qnn2_->computeOutVFBatch(sensors, pure_actions);
         
