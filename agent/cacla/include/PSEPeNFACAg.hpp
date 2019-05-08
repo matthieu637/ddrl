@@ -99,17 +99,17 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         next_action = ann_testing_noisy->computeOut(sensors);
         next_action_pure = ann_testing->computeOut(sensors);
 
-        double l2distance_noise = 0.;
-        for(int j=0;j<this->nb_motors;j++) {
-            double x2 = next_action->at(j) - next_action_pure->at(j);
-            l2distance_noise += x2*x2;
-        }
-        l2distance_noise = std::sqrt(l2distance_noise/((double) (this->nb_motors)));
-        if (l2distance_noise > 0.1) {
-            for(int j=0;j<this->nb_motors;j++) {
-                next_action->at(j) += (0.1/l2distance_noise) *(next_action_pure->at(j) - next_action->at(j));
-            }
-        }
+//        double l2distance_noise = 0.;
+//        for(int j=0;j<this->nb_motors;j++) {
+//            double x2 = next_action->at(j) - next_action_pure->at(j);
+//            l2distance_noise += x2*x2;
+//        }
+//        l2distance_noise = std::sqrt(l2distance_noise/((double) (this->nb_motors)));
+//        if (l2distance_noise > 0.1) {
+//            for(int j=0;j<this->nb_motors;j++) {
+//                next_action->at(j) += (0.1/l2distance_noise) *(next_action_pure->at(j) - next_action->at(j));
+//            }
+//        }
         
 //         l2distance_noise = 0.;
 //         for(int j=0;j<this->nb_motors;j++) {

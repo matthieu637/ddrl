@@ -942,7 +942,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
         std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
         std::copy(it->pure_a.begin(), it->pure_a.end(), actions.begin() + li * this->nb_motors);
-        if(ignore_poss_ac && deltas[li2] > 0.) {
+        if(ignore_poss_ac && deltas[li2] > 0. && deltas_off[li2] > 0.) {
             std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
         }
         li++;
