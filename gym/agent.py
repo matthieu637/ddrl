@@ -10,8 +10,9 @@ config.read('config.ini')
 #works only on x86_64 system where pointer are stored into a int64
 #need either numpy 1.16 or numpy 1.14 : 1.15 broke ctypes
 
-lib = cdll.LoadLibrary(config.get('simulation', 'library'))
-if "libddrl-nfac" in config.get('simulation', 'library') or "libddrl-penfac" in config.get('simulation', 'library') or "libddrl-psepenfac" in config.get('simulation', 'library'):
+lib_path=config.get('simulation', 'library')
+lib = cdll.LoadLibrary(lib_path)
+if "libddrl-nfac" in lib_path or "libddrl-penfac" in lib_path or "libddrl-psepenfac" in lib_path or "libddrl-dpenfac" in lib_path:
     lib.OfflineCaclaAg_new.restype = ctypes.c_int64
     lib.OfflineCaclaAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]
     lib.OfflineCaclaAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
@@ -56,11 +57,13 @@ if "libddrl-nfac" in config.get('simulation', 'library') or "libddrl-penfac" in 
             lib.OfflineCaclaAg_load(self.obj, episode)
         
         def name(self):
-            if "libddrl-psepenfac" in config.get('simulation', 'library'):
+            if "libddrl-psepenfac" in lib_path:
                 return "PSEPeNFAC(lambda)-V"
-            return "NFAC(lambda)-V" if "libddrl-nfac" in config.get('simulation', 'library') else "PeNFAC(lambda)-V"
+            if "libddrl-dpenfac" in lib_path:
+                return "DPeNFAC(lambda)-V"
+            return "NFAC(lambda)-V" if "libddrl-nfac" in lib_path else "PeNFAC(lambda)-V"
 
-elif "libddrl-cacla" in config.get('simulation', 'library') :
+elif "libddrl-cacla" in lib_path :
     lib.BaseCaclaAg_new.restype = ctypes.c_int64
     lib.BaseCaclaAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]
     lib.BaseCaclaAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
@@ -106,7 +109,7 @@ elif "libddrl-cacla" in config.get('simulation', 'library') :
             
         def name(self):
             return "CACLA"
-elif "libddrl-ddpg" in config.get('simulation', 'library') or "libddrl-td3" in config.get('simulation', 'library') :
+elif "libddrl-ddpg" in lib_path or "libddrl-td3" in lib_path :
     lib.DDPGAg_new.restype = ctypes.c_int64
     lib.DDPGAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]
     lib.DDPGAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
@@ -151,8 +154,8 @@ elif "libddrl-ddpg" in config.get('simulation', 'library') or "libddrl-td3" in c
             lib.DDPGAg_load(self.obj, episode)
             
         def name(self):
-            return "DDPG" if "libddrl-ddpg" in config.get('simulation', 'library') else "TD3"
-elif "libddrl-foo" in config.get('simulation', 'library') :
+            return "DDPG" if "libddrl-ddpg" in lib_path else "TD3"
+elif "libddrl-foo" in lib_path :
     lib.FOOAg_new.restype = ctypes.c_int64
     lib.FOOAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]
     lib.FOOAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
