@@ -124,7 +124,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
                                  bool learning, bool goal_reached, bool) override {
 
     // protect batch norm from testing data and poor data
-    vector<double>* next_action = ann_testing->computeOut(sensors);
+    vector<double>* next_action = new std::vector<double>(nb_motors);
     
     if (last_action.get() != nullptr && learning){
       sample sa = {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached};
@@ -519,11 +519,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     return *next_action;
   }
 
-  void feed_qnn(MLP *qnn_, MLP *qnn_target_, MLP *qnn2_, MLP *qnn_target2_) {
+  void feed_qnn(MLP *qnn_, MLP *qnn_target_, MLP *qnn2_, MLP *qnn_target2_, MLP* ann_target_) {
       qnn = qnn_;
       qnn2 = qnn2_;
       qnn_target = qnn_target_ ;
       qnn_target2 = qnn_target2_;
+      ann_target = ann_target_;
   }
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
@@ -629,7 +630,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     delete[] weights;
   }
   
-  void critic_qnn(std::vector<double>& deltas_off, const std::vector<double>& sensors, const std::vector<double>& actions, const std::vector<double>& pure_actions){      
+  void critic_qnn(std::vector<double>& deltas_off, const std::vector<double>& sensors, const std::vector<double>& pure_actions, 
+                    const std::vector<double>& next_sensors) {
     auto qnn1_ = qnn;
     auto qnn2_ = qnn2;
     if (idea_target_qnn){
@@ -639,22 +641,30 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     
     int kmbs = qnn1_->get_batchsize();
     qnn1_->increase_batchsize(trajectory.size());
-    auto qsa = qnn1_->computeOutVFBatch(sensors, actions);
+    ann_target->increase_batchsize(trajectory.size());
+    auto next_actions = ann_target->computeOutBatch(next_sensors);
+    auto qsa = qnn1_->computeOutVFBatch(next_sensors, *next_actions);
     auto vsa = qnn1_->computeOutVFBatch(sensors, pure_actions);
     if (idea_min_qnn) {
         qnn2_->increase_batchsize(trajectory.size());
-        auto qsa2 = qnn2_->computeOutVFBatch(sensors, actions);
+        auto qsa2 = qnn2_->computeOutVFBatch(next_sensors, *next_actions);
         auto vsa2 = qnn2_->computeOutVFBatch(sensors, pure_actions);
         
         for(int i=0;i<trajectory.size();i++) {
-            deltas_off[i] = std::min(qsa->at(i), qsa2->at(i)) - std::max(vsa->at(i), vsa2->at(i));
+            deltas_off[i] = trajectory[i].r - std::max(vsa->at(i), vsa2->at(i));
+            if (! trajectory[i].goal_reached)
+                deltas_off[i] +=  this->gamma * std::min(qsa->at(i), qsa2->at(i));
         }
     } else {
         for(int i=0;i<trajectory.size();i++){
-            deltas_off[i] = qsa->at(i) - vsa->at(i);
+            deltas_off[i] = trajectory[i].r - vsa->at(i);
+            if (! trajectory[i].goal_reached)
+                deltas_off[i] += this->gamma * qsa->at(i);
         }
     }
+    delete next_actions;
     qnn1_->increase_batchsize(kmbs);
+    ann_target->increase_batchsize(kmbs);
     if (idea_min_qnn)
         qnn2_->increase_batchsize(kmbs);
   }
@@ -889,7 +899,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         li++;
       }
       if (!control_valid_fusion) {
-        critic_qnn(deltas_off, sensors, actions, pure_actions);
+        critic_qnn(deltas_off, all_states, pure_actions, all_next_states);
       } else {
         for(int i=0;i<deltas_off.size();i++)
             deltas_off[i] = 1.f;
@@ -1107,7 +1117,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   NN* ann_testing;
   NN* vnn_testing;
   
-  MLP *qnn, *qnn_target, *qnn2, *qnn_target2;
+  MLP *qnn, *qnn_target, *qnn2, *qnn_target2, *ann_target;
 
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
@@ -1159,7 +1169,7 @@ class FusionOOAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     offpolicy_ag.unique_invoke(properties, command_args, false);
     delete properties;
     
-    onpolicy_ag.feed_qnn(offpolicy_ag.qnn, offpolicy_ag.qnn2, offpolicy_ag.qnn_target, offpolicy_ag.qnn_target2);
+    onpolicy_ag.feed_qnn(offpolicy_ag.qnn, offpolicy_ag.qnn2, offpolicy_ag.qnn_target, offpolicy_ag.qnn_target2, offpolicy_ag.ann_target);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool learning) override {
