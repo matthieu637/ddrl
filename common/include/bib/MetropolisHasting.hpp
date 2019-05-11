@@ -45,6 +45,23 @@ class Proba {
     return gauss;
   }
   
+  static std::vector<Real>* multidimentionnalTruncatedGaussian(const std::vector<Real>& centers, Real sigma, const std::vector<Real>& min_, const std::vector<Real>& max_) {
+    std::vector<Real>* gauss = new std::vector<Real>(centers.size());
+
+    for (uint i = 0; i < centers.size(); i++){
+      double mu = centers[i];
+      //68–95–99.7 rule
+      if(mu > 1.0f + 3.f*sigma)
+        mu = 1.0f + 3.f*sigma;
+      else if(mu < -1.0f - 3.f*sigma)
+        mu = -1.0f - 3.f*sigma;
+      
+      gauss->at(i) = rtnorm(min_[i], max_[i], mu, sigma);
+    }
+
+    return gauss;
+  }
+ 
   static std::vector<Real>* multidimentionnalTruncatedGaussianZeroMean(int size, Real sigma, Real min_, Real max_) {
     std::vector<Real>* gauss = new std::vector<Real>(size);
 
