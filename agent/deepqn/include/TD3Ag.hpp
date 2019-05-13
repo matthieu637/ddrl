@@ -113,11 +113,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     delete hidden_unit_q;
     delete hidden_unit_a;
     
-    for (auto i: best_population){
-      delete i.ann;
-      delete i.qnn;
-    }
-    
     if(oun == nullptr)
       delete oun;
     
@@ -154,8 +149,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
-
-//     last_trajectory_a.push_back(*next_action);
     
     return *next_action;
   }
@@ -176,8 +169,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     gaussian_policy         = pt->get<uint>("agent.gaussian_policy");
     kMinibatchSize          = pt->get<uint>("agent.mini_batch_size");
     replay_memory           = pt->get<uint>("agent.replay_memory");
-    inverting_grad          = pt->get<bool>("agent.inverting_grad");
-    force_more_update       = pt->get<uint>("agent.force_more_update");
     tau_soft_update         = pt->get<double>("agent.tau_soft_update");
     alpha_a                 = pt->get<double>("agent.alpha_a");
     alpha_v                 = pt->get<double>("agent.alpha_v");
@@ -208,7 +199,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     }
 #endif
 
-    if(gaussian_policy == 2){
+    if(gaussian_policy == 2) {
       double oun_theta = pt->get<double>("agent.noise2");
       double oun_dt = pt->get<double>("agent.noise3");
       oun = new bib::OrnsteinUhlenbeckNoise<double>(this->nb_motors, noise, oun_theta, oun_dt);
@@ -216,10 +207,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     ann = new NN(nb_sensors, *hidden_unit_a, nb_motors, alpha_a, kMinibatchSize, 
                  hidden_layer_type, actor_output_layer_type, batch_norm_actor, false, momentum);
-    if(std::is_same<NN, DevMLP>::value)
-      ann->exploit(pt, static_cast<DeepQNAg *>(old_ag)->ann);
-    else if(std::is_same<NN, DODevMLP>::value)
-      ann->exploit(pt, nullptr);
     
     if(test_net)
       ann_target = new NN(*ann, false, ::caffe::Phase::TEST);
@@ -233,10 +220,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
                  decay_v, hidden_layer_type, batch_norm_critic, false, momentum);
     qnn2 = new NN(nb_sensors + nb_motors, nb_sensors, *hidden_unit_q, alpha_v, kMinibatchSize, 
                  decay_v, hidden_layer_type, batch_norm_critic, false, momentum);
-    if(std::is_same<NN, DevMLP>::value)
-      qnn->exploit(pt, static_cast<DeepQNAg *>(old_ag)->qnn);
-    else if(std::is_same<NN, DODevMLP>::value)
-      qnn->exploit(pt, ann);
     
     if(test_net) {
       qnn_target = new NN(*qnn, false, ::caffe::Phase::TEST);
@@ -257,8 +240,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     last_action = nullptr;
     last_pure_action = nullptr;
-    
-    last_trajectory_a.clear();
     
     current_step_counter = 0;
     
@@ -296,107 +277,64 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 
   void end_instance(bool learning) override {
     if(learning){
-      if(ann->ewc_best_method() <= 3){
-        ann->update_best_param_previous_task(this->sum_weighted_reward);
-        qnn->update_best_param_previous_task(this->sum_weighted_reward);
-      }
-      
-      ann->ewc_decay_update();
-      qnn->ewc_decay_update();
-//      MLP* cann = new MLP(*ann, false, ::caffe::Phase::TEST);
-//      MLP* cqnn = new MLP(*qnn, false, ::caffe::Phase::TEST);
-//      best_population.insert({cann, cqnn, sum_weighted_reward, last_trajectory_a});
-//      
-//      if(best_population.size() > 5){
-//        //remove smallest
-//        auto it = best_population.end();
-//        --it;
-//        delete it->ann;
-//        delete it->qnn;
-//        best_population.erase(it);
-//      }
-      
       episode++;
-    } else if(ann->ewc_best_method() >= 4) {
-      ann->update_best_param_previous_task(this->sum_weighted_reward);
-      qnn->update_best_param_previous_task(this->sum_weighted_reward);
     }
-  }
-  
-  void restoreBest() override {
-    if(best_population.size() == 0){
-      LOG_INFO("WARNING: pop empty (random NN given as best )" << best_population.size());
-      return;
-    }
-    
-    LOG_INFO("WARNING : hard to restoreBest because of online updates");
-    exit(1);
-    
-    delete ann;
-    delete qnn;
-    
-    auto it = best_population.begin();
-    ann = new MLP(*it->ann, false, ::caffe::Phase::TEST);
-    qnn = new MLP(*it->qnn, false, ::caffe::Phase::TEST);
   }
   
   void end_episode(bool learning) override {
     
     if(!learning || trajectory.size() < 250 || trajectory.size() < kMinibatchSize)
       return;
-    
-    for(uint fupd=0;fupd<1+force_more_update;fupd++)
-    {
-    
-      std::vector<sample> traj(kMinibatchSize);
-      sample_transition(traj, trajectory);
-      
-      //compute \pi(s_{t+1})
-      std::vector<double> all_next_states(traj.size() * nb_sensors);
-      std::vector<double> all_states(traj.size() * nb_sensors);
-      std::vector<double> all_actions(traj.size() * nb_motors);
-      uint i=0;
-      for (auto it : traj){
-        std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
-        std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
-        std::copy(it.a.begin(), it.a.end(), all_actions.begin() + i * nb_motors);
-        i++;
-      }
 
-      auto all_next_actions = ann_target->computeOutBatch(all_next_states);
-      
-      // TD3 : learn Qpi instead of Qmu
-      std::vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussianZeroMean(all_next_actions->size(), policy_noise, -noise_clip, noise_clip);
-      for (int i=0;i < all_next_actions->size();i++)
-          all_next_actions->at(i) = std::min(std::max(all_next_actions->at(i) + randomized_action->at(i), (double)-1.f), (double)1.f);
-      delete randomized_action;
-      
-      //compute next q
-      auto q_targets = qnn_target->computeOutVFBatch(all_next_states, *all_next_actions);
-      auto q_targets2 = qnn_target2->computeOutVFBatch(all_next_states, *all_next_actions);
-      delete all_next_actions;
-      
-      //adjust q_targets
-      i=0;
-      for (auto it : traj){
-        if(it.goal_reached)
-          q_targets->at(i) = it.r;
-        else 
-          q_targets->at(i) = it.r + gamma * std::min(q_targets->at(i), q_targets2->at(i));
-        
-        i++;
-      }
-      
-      //Update critic
-      qnn->learn_batch(all_states, all_actions, *q_targets, 1);
-      qnn2->learn_batch(all_states, all_actions, *q_targets, 1);
-      
-      //Update actor
-      qnn->ZeroGradParameters();
-      ann->ZeroGradParameters();
-      
-      //TD3 delayed update of the actor
-      if (current_step_counter % policy_freq == 0){
+    std::vector<sample> traj(kMinibatchSize);
+    sample_transition(traj, trajectory);
+    
+    //compute \pi(s_{t+1})
+    std::vector<double> all_next_states(traj.size() * nb_sensors);
+    std::vector<double> all_states(traj.size() * nb_sensors);
+    std::vector<double> all_actions(traj.size() * nb_motors);
+    uint i=0;
+    for (auto it : traj){
+    std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + i * nb_sensors);
+    std::copy(it.s.begin(), it.s.end(), all_states.begin() + i * nb_sensors);
+    std::copy(it.a.begin(), it.a.end(), all_actions.begin() + i * nb_motors);
+    i++;
+    }
+
+    auto all_next_actions = ann_target->computeOutBatch(all_next_states);
+    
+    // TD3 : learn Qpi instead of Qmu
+    std::vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussianZeroMean(all_next_actions->size(), policy_noise, -noise_clip, noise_clip);
+    for (int i=0;i < all_next_actions->size();i++)
+        all_next_actions->at(i) = std::min(std::max(all_next_actions->at(i) + randomized_action->at(i), (double)-1.f), (double)1.f);
+    delete randomized_action;
+    
+    //compute next q
+    auto q_targets = qnn_target->computeOutVFBatch(all_next_states, *all_next_actions);
+    auto q_targets2 = qnn_target2->computeOutVFBatch(all_next_states, *all_next_actions);
+    delete all_next_actions;
+    
+    //adjust q_targets
+    i=0;
+    for (auto it : traj){
+    if(it.goal_reached)
+        q_targets->at(i) = it.r;
+    else 
+        q_targets->at(i) = it.r + gamma * std::min(q_targets->at(i), q_targets2->at(i));
+    
+    i++;
+    }
+    
+    //Update critic
+    qnn->learn_batch(all_states, all_actions, *q_targets, 1);
+    qnn2->learn_batch(all_states, all_actions, *q_targets, 1);
+    
+    //TD3 delayed update of the actor
+    if (current_step_counter % policy_freq == 0) {
+        //Update actor
+        qnn->ZeroGradParameters();
+        ann->ZeroGradParameters();
+    
         auto all_actions_outputs = ann->computeOutBatch(all_states);
         if(batch_norm_actor != 0 && bn_adapt){
             delete all_actions_outputs;
@@ -415,26 +353,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         qnn->critic_backward();
         const auto critic_action_blob = qnn->getNN()->blob_by_name(MLP::actions_blob_name);
         
-        if(inverting_grad){
-            double* action_diff = critic_action_blob->mutable_cpu_diff();
-            
-            for (uint n = 0; n < traj.size(); ++n) {
-            for (uint h = 0; h < nb_motors; ++h) {
-                int offset = critic_action_blob->offset(n,h,0,0);
-                double diff = action_diff[offset];
-                double output = all_actions_outputs->at(offset);
-                double min = -1.0; 
-                double max = 1.0;
-                if (diff < 0) {
-                diff *= (max - output) / (max - min);
-                } else if (diff > 0) {
-                diff *= (output - min) / (max - min);
-                }
-                action_diff[offset] = diff;
-            }
-            }
-        }
-        
         // Transfer input-level diffs from Critic to Actor
         const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
         actor_actions_blob->ShareDiff(*critic_action_blob);
@@ -450,16 +368,15 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         qnn_target->soft_update(*qnn, tau_soft_update);
         qnn_target2->soft_update(*qnn2, tau_soft_update);
         ann_target->soft_update(*ann, tau_soft_update);
-      }
-      
-      delete q_targets;
-      delete q_targets2;
+        
+        double* weights = new double[ann->number_of_parameters(false)];
+        ann->copyWeightsTo(weights, false);
+        ann_testing->copyWeightsFrom(weights, false);
+        delete[] weights;
     }
     
-    double* weights = new double[ann->number_of_parameters(false)];
-    ann->copyWeightsTo(weights, false);
-    ann_testing->copyWeightsFrom(weights, false);
-    delete[] weights;
+    delete q_targets;
+    delete q_targets2;
   }
   
   double criticEval(const std::vector<double>& perceptions, const std::vector<double>& actions) override {
@@ -470,14 +387,10 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     return nullptr;
   }
 
-  void save(const std::string& path, bool save_best, bool) override {
-    if(save_best && best_population.size() > 0){
-      auto it = best_population.begin();
-      bib::XMLEngine::save(it->trajectory_a, "trajectory_a", "best_trajectory_a.data");
-    } else {
-      ann->save(path+".actor");
-      qnn->save(path+".critic");
-    }
+  void save(const std::string& path, bool, bool) override {
+    ann->save(path+".actor");
+    qnn->save(path+".critic");
+    qnn2->save(path+".critic2");
   }
 
   void load(const std::string& path) override {
@@ -489,41 +402,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
     
     qnn_target = new MLP(*qnn, false, ::caffe::Phase::TEST);
     ann_target = new MLP(*ann, false, ::caffe::Phase::TEST);
-  }
-  
-  void save_run() override {
-    ann->save("continue.actor");
-    qnn->save("continue.critic");
-    ann_target->save("continue.actor_target");
-    qnn_target->save("continue.critic_target");
-    bib::XMLEngine::save(trajectory, "trajectory", "continue.trajectory.data");
-    
-    double best_J = 0;
-    const std::deque<std::vector<double>>* best_trajectory_a_;
-    if(best_population.size() == 0){
-      best_J = best_population.begin()->J;
-      best_trajectory_a_ = &best_population.begin()->trajectory_a;
-    } else {
-      best_J = sum_weighted_reward;
-      best_trajectory_a_ = &last_trajectory_a;
-    }
-    
-    struct algo_state st = {episode, best_J, *best_trajectory_a_};
-    bib::XMLEngine::save(st, "algo_state", "continue.algo_state.data");
-  }
-  
-  void load_previous_run() override {
-    ann->load("continue.actor");
-    qnn->load("continue.critic");
-    ann_target->load("continue.actor_target");
-    qnn_target->load("continue.critic_target");
-    auto p1 = bib::XMLEngine::load<std::deque<sample>>("trajectory", "continue.trajectory.data");
-    trajectory = *p1;
-    delete p1;
-    auto p3 = bib::XMLEngine::load<struct algo_state>("algo_state", "continue.algo_state.data");
-    episode = p3->episode;
-    best_population.insert({nullptr, nullptr, p3->J, p3->best_trajectory_a});
-    delete p3;
   }
 
  protected:
@@ -560,7 +438,6 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::vector<uint>* hidden_unit_a;
   uint kMinibatchSize;
   uint replay_memory;
-  uint force_more_update;
   uint batch_norm_actor, batch_norm_critic;
   uint actor_output_layer_type, hidden_layer_type;
   
@@ -574,22 +451,9 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
   std::vector<double> last_state;
 
   std::deque<sample> trajectory;
-  std::deque<std::vector<double>> last_trajectory_a;
   
   uint episode = 0;
   bib::OrnsteinUhlenbeckNoise<double>* oun = nullptr;
-  
-  struct my_pol_dpmt{
-    MLP* ann;
-    MLP* qnn;
-    double J;
-    std::deque<std::vector<double>> trajectory_a;
-    
-    bool operator< (const my_pol_dpmt& b) const {
-      return J > b.J;
-    }
-  };
-  std::multiset<my_pol_dpmt> best_population;
   
   MLP *ann, *ann_target;
   MLP *qnn, *qnn_target, *qnn2, *qnn_target2;
