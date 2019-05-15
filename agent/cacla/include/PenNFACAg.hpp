@@ -556,6 +556,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               beta = beta*2.;
           else if (sia > 0)
               break;
+          conserved_l2dist = l2distance;
           
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
@@ -655,14 +656,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << this->sum_weighted_reward/this->gamma << " " << this->sum_reward << 
         " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << nb_sample_update <<
-          " " << std::setprecision(3) << ratio_valid_advantage << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm();
+          " " << std::setprecision(3) << ratio_valid_advantage << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm(true);
   }
 
   void _dump(std::ostream& out) const override {
-    out << std::setw(25) << std::fixed << std::setprecision(22) <<
-    this->sum_weighted_reward/this->gamma << " " << this->sum_reward << " " << std::setw(8) << std::fixed <<
-        std::setprecision(5) << vnn->error() << " " << nb_sample_update <<
-        " " << std::setprecision(3) << ratio_valid_advantage ;
+    out << std::setw(25) << std::fixed << std::setprecision(22) << this->sum_weighted_reward/this->gamma << " " << 
+    this->sum_reward << " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << 
+    nb_sample_update << " " << std::setprecision(3) << ratio_valid_advantage << " " << std::setprecision(6) << 
+    conserved_beta << " " << conserved_l2dist << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm(true);
   }
   
  private:
@@ -677,6 +678,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
   double conserved_beta= 1.f;
+  double conserved_l2dist= 0.f;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;

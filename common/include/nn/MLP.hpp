@@ -578,7 +578,7 @@ class MLP {
     return outputs;
   }
 
-  double weight_l1_norm() {
+  double weight_l1_norm(bool ignore_bn_weight=false) {
     double sum = 0.f;
 
     caffe::Net<double>& net = *neural_net;
@@ -599,7 +599,8 @@ class MLP {
       }
 #endif
       for(int n=0; n < blob->count(); n++) {
-        sum += fabs(weights[n]);
+          if(!ignore_bn_weight || fabs(weights[n]) < 500)
+            sum += fabs(weights[n]);
       }
     }
 
