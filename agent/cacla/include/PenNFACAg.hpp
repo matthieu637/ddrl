@@ -485,6 +485,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       }
       
       uint n=0;
+      double posdelta_mean=0.f;
       std::vector<double> sensors(2*trajectory.size() * nb_sensors);
       std::vector<double> actions(2*trajectory.size() * this->nb_motors);
       std::vector<bool> disable_back(2*trajectory.size() * this->nb_motors, false);
@@ -498,6 +499,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
         std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
         if(deltas[li] > 0.) {
+          posdelta_mean += deltas[li];
           n++;
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
@@ -520,6 +522,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       }
 
       ratio_valid_advantage = ((float)n) / ((float) trajectory.size());
+      posdelta_mean = posdelta_mean / ((float) trajectory.size());
       
       double beta=1.f;
       if(conserve_beta)
@@ -556,6 +559,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               beta = beta*2.;
           else if (sia > 0)
               break;
+//           beta=std::max(std::min((double)50.f, beta), (double) 0.0001f );
           conserved_l2dist = l2distance;
           
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
@@ -665,7 +669,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     this->sum_reward << " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << 
     nb_sample_update << " " << std::setprecision(3) << ratio_valid_advantage << " " << std::setprecision(10) << 
     conserved_beta << " " << conserved_l2dist << " " << std::setprecision(3) << vnn->weight_l1_norm() << " " << 
-    ann->weight_l1_norm(true);
+    ann->weight_l1_norm(true) << " " << posdelta_mean;
   }
   
  private:
