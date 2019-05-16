@@ -16,6 +16,13 @@
 #include "nn/MLP.hpp"
 #include "nn/DODevMLP.hpp"
 
+// 
+// fundamental issues : 
+// - all good actions could not be represented within parameter space
+// - difficult to learn V without gaussian noise
+// - problem with batch norm
+// 
+
 #ifndef SAASRG_SAMPLE
 #define SAASRG_SAMPLE
 typedef struct _sample {
@@ -99,28 +106,20 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         next_action = ann_testing_noisy->computeOut(sensors);
         next_action_pure = ann_testing->computeOut(sensors);
 
+//         clipping
 //        double l2distance_noise = 0.;
 //        for(int j=0;j<this->nb_motors;j++) {
 //            double x2 = next_action->at(j) - next_action_pure->at(j);
 //            l2distance_noise += x2*x2;
 //        }
 //        l2distance_noise = std::sqrt(l2distance_noise/((double) (this->nb_motors)));
-//        if (l2distance_noise > 0.1) {
+//        if (l2distance_noise > 0.2) {
 //            for(int j=0;j<this->nb_motors;j++) {
-//                next_action->at(j) += (0.1/l2distance_noise) *(next_action_pure->at(j) - next_action->at(j));
+//                next_action->at(j) += (0.2/l2distance_noise) *(next_action_pure->at(j) - next_action->at(j));
 //            }
 //        }
         
-//         l2distance_noise = 0.;
-//         for(int j=0;j<this->nb_motors;j++) {
-//             double x2 = next_action->at(j) - next_action_pure->at(j);
-//             l2distance_noise += x2*x2;
-//         }
-//         if(l2distance_noise >= 0.2){
-//             LOG_DEBUG(l2distance_noise);
-//             bib::Logger::PRINT_ELEMENTS(*next_action);
-//             bib::Logger::PRINT_ELEMENTS(*next_action_pure);
-//         }
+//        gaussian noise
 //        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action_pure, noise);
 //        delete next_action;
 //        next_action = randomized_action;
@@ -708,7 +707,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           " " << l2distance_explo << " " << distance_explo;
   }
 
-//clear all; close all; wndw = 10; X=load('0.learning.data'); X=filter(ones(wndw,1)/wndw, 1, X); startx=0; starty=0; width=260; height=300; figure('position',[startx,starty,width,height]); plot(X(:,5), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('sum rewards', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,8), "linewidth", 2); ylim([0 1]); xlabel('learning episode', "fontsize", 16); ylabel('ratio good actions', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,9), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\pi(s)-\mu(s)||_2', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,10), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\pi(s)-\mu(s)', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,11), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\sigma', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,12), "linewidth", 2); hold on; plot(X(:,13), "linewidth", 2, "color", "red"); legend("critic", "actor"); xlabel('learning episode', "fontsize", 16); ylabel('||\theta||_1', "fontsize", 16);startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,14), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\beta', "fontsize", 16);startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,15), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\mu_{old}-\mu||_2', "fontsize", 16);startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,16), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\delta pos', "fontsize", 16);
+//clear all; close all; wndw = 10; X=load('0.learning.data'); X=filter(ones(wndw,1)/wndw, 1, X); startx=0; starty=0; width=260; height=300; figure('position',[startx,starty,width,height]); plot(cumsum(X(:,2)),X(:,5), "linewidth", 2); xlabel('learning steps', "fontsize", 16); ylabel('sum rewards', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,8), "linewidth", 2); ylim([0 1]); xlabel('learning episode', "fontsize", 16); ylabel('ratio good actions', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,9), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\pi(s)-\mu(s)||_2', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,10), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\pi(s)-\mu(s)', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,11), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\sigma', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,12), "linewidth", 2); hold on; plot(X(:,13), "linewidth", 2, "color", "red"); legend("critic", "actor"); xlabel('learning episode', "fontsize", 16); ylabel('||\theta||_1', "fontsize", 16);startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,14), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\beta', "fontsize", 16);startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,15), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\mu_{old}-\mu||_2', "fontsize", 16);startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,16), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\delta pos', "fontsize", 16);
   void _dump(std::ostream& out) const override {
     out << std::setw(25) << std::fixed << std::setprecision(22) <<
     this->sum_weighted_reward/this->gamma << " " << this->sum_reward << " " << std::setw(8) << std::fixed <<
