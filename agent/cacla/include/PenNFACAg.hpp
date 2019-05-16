@@ -707,6 +707,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   bib::OrnsteinUhlenbeckNoise<double>* oun = nullptr;
   float ratio_valid_advantage=0;
   int nb_sample_update = 0;
+  double posdelta_mean = 0;
   
   struct algo_state {
     uint episode;
