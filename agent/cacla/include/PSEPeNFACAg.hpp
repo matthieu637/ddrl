@@ -531,6 +531,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       }
       
       uint n=0;
+      posdelta_mean=0.f;
       std::vector<double> sensors(2*trajectory.size() * nb_sensors);
       std::vector<double> actions(2*trajectory.size() * this->nb_motors);
       std::vector<bool> disable_back(2*trajectory.size() * this->nb_motors, false);
@@ -544,6 +545,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
         std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
         if(deltas[li] > 0.) {
+          posdelta_mean += deltas[li];
           n++;
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
@@ -566,6 +568,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       }
 
       ratio_valid_advantage = ((float)n) / ((float) trajectory.size());
+      posdelta_mean = posdelta_mean / ((float) trajectory.size());
       
       double beta=1.f;
       if(conserve_beta)
@@ -602,7 +605,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               beta = beta*2.;
           else if (sia > 0)
               break;
-         
+//           beta=std::max(std::min((double)50.f, beta), (double) 0.0001f );
+          conserved_l2dist = l2distance;
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
           
@@ -704,13 +708,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           " " << l2distance_explo << " " << distance_explo;
   }
 
-//clear all; close all; wndw = 10; X=load('0.learning.data'); X=filter(ones(wndw,1)/wndw, 1, X); startx=0; starty=0; width=400; height=350; figure('position',[startx,starty,width,height]); plot(X(:,5), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('sum rewards', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,8), "linewidth", 2); ylim([0 1]); xlabel('learning episode', "fontsize", 16); ylabel('ratio good actions', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,9), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\pi(s)-\mu(s)||_2', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,10), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\pi(s)-\mu(s)', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,11), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\sigma', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,12), "linewidth", 2); hold on; plot(X(:,13), "linewidth", 2, "color", "red"); legend("critic", "actor"); xlabel('learning episode', "fontsize", 16); ylabel('||\theta||_1', "fontsize", 16);
+//clear all; close all; wndw = 10; X=load('0.learning.data'); X=filter(ones(wndw,1)/wndw, 1, X); startx=0; starty=0; width=260; height=300; figure('position',[startx,starty,width,height]); plot(X(:,5), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('sum rewards', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,8), "linewidth", 2); ylim([0 1]); xlabel('learning episode', "fontsize", 16); ylabel('ratio good actions', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,9), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\pi(s)-\mu(s)||_2', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,10), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\pi(s)-\mu(s)', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,11), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\sigma', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,12), "linewidth", 2); hold on; plot(X(:,13), "linewidth", 2, "color", "red"); legend("critic", "actor"); xlabel('learning episode', "fontsize", 16); ylabel('||\theta||_1', "fontsize", 16);startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,14), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\beta', "fontsize", 16);startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,15), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\mu_{old}-\mu||_2', "fontsize", 16);startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,16), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('\delta pos', "fontsize", 16);
   void _dump(std::ostream& out) const override {
     out << std::setw(25) << std::fixed << std::setprecision(22) <<
     this->sum_weighted_reward/this->gamma << " " << this->sum_reward << " " << std::setw(8) << std::fixed <<
         std::setprecision(5) << vnn->error() << " " << nb_sample_update << " " << std::setprecision(3) << 
-        ratio_valid_advantage << " " << std::setprecision(5) << l2distance_explo << " " << distance_explo << 
-        " " << effective_noise << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm();
+        ratio_valid_advantage << " " << std::setprecision(7) << l2distance_explo << " " << distance_explo << 
+        " " << effective_noise << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm() << " " << 
+        conserved_beta << " " <<  conserved_l2dist << " " << posdelta_mean;
   }
   
  private:
@@ -724,6 +729,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
   double conserved_beta= 1.f;
+  double conserved_l2dist= 0.f;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
@@ -749,6 +755,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   float distance_explo = 0;
   int nb_sample_update = 0;
   int update_param_noise;
+  double posdelta_mean = 0;
   
   struct algo_state {
     uint episode;
