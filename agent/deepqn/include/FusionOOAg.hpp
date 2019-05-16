@@ -320,11 +320,11 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
 //       qnn2->learn_batch(all_states, all_actions, *q_targets, 1);
       
       //Update actor
-      qnn->ZeroGradParameters();
+//       qnn->ZeroGradParameters();
 //       ann->ZeroGradParameters();
       
       //TD3 delayed update of the actor
-      if (current_step_counter % policy_freq == 0) {
+//       if (current_step_counter % policy_freq == 0) {
 //         auto all_actions_outputs = ann->computeOutBatch(all_states);
 //         if(batch_norm_actor != 0 && bn_adapt){
 //             delete all_actions_outputs;
@@ -358,7 +358,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
         qnn_target->soft_update(*qnn, tau_soft_update);
 //         qnn_target2->soft_update(*qnn2, tau_soft_update);
         ann_target->soft_update(*ann, tau_soft_update);
-      }
+//       }
       
       delete q_targets;
 //       delete q_targets2;
@@ -631,7 +631,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   }
   
   void critic_qnn(std::vector<double>& deltas_off, const std::vector<double>& sensors, const std::vector<double>& pure_actions, 
-                    const std::vector<double>& next_sensors, const std::vector<double>& actions) {
+                    const std::vector<double>& next_sensors, const std::vector<double>& actions, const std::vector<double>& vvalues) {
     auto qnn1_ = qnn;
     auto qnn2_ = qnn2;
     if (idea_target_qnn){
@@ -677,6 +677,17 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 //     ann_target->increase_batchsize(kmbs);
     if (idea_min_qnn)
         qnn2_->increase_batchsize(kmbs);
+    
+    qnn_error = 0.f;
+//     bib::Logger::PRINT_ELEMENTS(vvalues, "vnn ");
+//     bib::Logger::PRINT_ELEMENTS(*qsa, "qnn ");
+    for(int i=0;i<trajectory.size();i++)
+        qnn_error += std::fabs(qsa->at(i)/10.f - vvalues[i]);//reward_scale
+    
+    qnn_error /= (double) trajectory.size();
+    
+    delete qsa;
+    delete vsa;
   }
 
   double update_critic() {
@@ -911,7 +922,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         li++;
       }
       if (!control_valid_fusion) {
-        critic_qnn(deltas_off, all_states, pure_actions, all_next_states, actions_one);
+        critic_qnn(deltas_off, all_states, pure_actions, all_next_states, actions_one, *all_mine);
       } else {
         for(int i=0;i<deltas_off.size();i++)
             deltas_off[i] = 1.f;
@@ -940,6 +951,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
                     deltas[i] = -1.f;
         }
       }
+      
+//         for(int i=0;i<deltas.size();i++)
+//               deltas[i]= 0.5f*deltas[i] + 0.5f*deltas_off[i];
+      
       //cacla cost
       li=0;
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
@@ -949,9 +964,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             n2++;
         if(deltas_off[li] > 0.)
             n3++;
-            //sortir ça
-//         for(int i=0;i<deltas.size();i++)
-//               deltas[i]= 0.5f*deltas[i] + 0.5f*deltas_off[i];
+            
 //         if(deltas[li] > 0. && deltas_off[li] > 0.) {
 //         if(deltas[li] > 0. || deltas_off[li] > 0.) {
        if(deltas[li] > 0.) {
@@ -1115,7 +1128,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   void _dump(std::ostream& out) const override {
     out << std::setprecision(5) << vnn->error() << " " << nb_sample_update << " " << std::setprecision(3) << ratio_valid_advantage 
         << " " << ratio_valid_advantage2 << " "  << ratio_valid_advantage3  << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm(true)
-        << " " << std::setprecision(7) << conserved_beta << " " << conserved_l2dist;
+        << " " << std::setprecision(7) << conserved_beta << " " << conserved_l2dist << " " << qnn_error;
   }
   
  private:
@@ -1156,7 +1169,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   bib::OrnsteinUhlenbeckNoise<double>* oun = nullptr;
   float ratio_valid_advantage=0, ratio_valid_advantage2 = 0, ratio_valid_advantage3 = 0;
   int nb_sample_update = 0;
-  
+  double qnn_error = 0.f;
 };
 
 
@@ -1249,7 +1262,7 @@ class FusionOOAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
      offpolicy_ag._display(out);
   }
 
-//clear all; close all; wndw = 10; X=load('0.learning.data'); X=filter(ones(wndw,1)/wndw, 1, X); startx=0; starty=800; width=350; height=350; figure('position',[startx,starty,width,height]); plot(cumsum(X(:,2)), X(:,3), "linewidth", 2); xlabel('learning steps', "fontsize", 16); ylabel('sum rewards', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,11), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('beta', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,6), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('valid adv both', "fontsize", 16); ylim([0, 1]);  startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,7), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('valid adv on', "fontsize", 16); ylim([0, 1]); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,8), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('valid adv off', "fontsize", 16);ylim([0, 1]); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,9), "linewidth", 2); hold on; plot(X(:,10), "linewidth", 2, "color", "red"); legend("critic", "actor"); xlabel('learning episode', "fontsize", 16); ylabel('||\theta||_1', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,12), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\mu_{old}-\mu||_2', "fontsize", 16); 
+//clear all; close all; wndw = 10; X=load('0.learning.data'); X=filter(ones(wndw,1)/wndw, 1, X); startx=0; starty=800; width=320; height=350; figure('position',[startx,starty,width,height]); plot(cumsum(X(:,2)), X(:,3), "linewidth", 2); xlabel('learning steps', "fontsize", 16); ylabel('sum rewards', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,11), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('beta', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,6), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('valid adv both', "fontsize", 16); ylim([0, 1]);  startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,7), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('valid adv on', "fontsize", 16); ylim([0, 1]); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,8), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('valid adv off', "fontsize", 16);ylim([0, 1]); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,9), "linewidth", 2); hold on; plot(X(:,10), "linewidth", 2, "color", "red"); legend("critic", "actor"); xlabel('learning episode', "fontsize", 16); ylabel('||\theta||_1', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,12), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\mu_{old}-\mu||_2', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,13), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||qnn-vnn||_2', "fontsize", 16);
   void _dump(std::ostream& out) const override {
      onpolicy_ag._dump(out);
      out << " ";
