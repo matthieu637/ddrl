@@ -11,10 +11,10 @@
 #include "bib/Seed.hpp"
 #include "bib/Utils.hpp"
 #include "bib/OrnsteinUhlenbeckNoise.hpp"
-#include <bib/MetropolisHasting.hpp>
-#include <bib/XMLEngine.hpp>
+#include "bib/MetropolisHasting.hpp"
+#include "bib/XMLEngine.hpp"
+#include "bib/IniParser.hpp"
 #include "nn/MLP.hpp"
-#include "nn/DODevMLP.hpp"
 
 #ifndef SAASRG_SAMPLE
 #define SAASRG_SAMPLE
@@ -25,31 +25,6 @@ typedef struct _sample {
   std::vector<double> next_s;
   double r;
   bool goal_reached;
-
-  friend class boost::serialization::access;
-  template <typename Archive>
-  void serialize(Archive& ar, const unsigned int) {
-    ar& BOOST_SERIALIZATION_NVP(s);
-    ar& BOOST_SERIALIZATION_NVP(pure_a);
-    ar& BOOST_SERIALIZATION_NVP(a);
-    ar& BOOST_SERIALIZATION_NVP(next_s);
-    ar& BOOST_SERIALIZATION_NVP(r);
-    ar& BOOST_SERIALIZATION_NVP(goal_reached);
-  }
-
-  bool operator< (const _sample& b) const {
-    for (uint i = 0; i < s.size(); i++) {
-      if(s[i] != b.s[i])
-        return s[i] < b.s[i];
-    }
-
-    for (uint i = 0; i < a.size(); i++) {
-      if(a[i] != b.a[i])
-        return a[i] < b.a[i];
-    }
-
-    return false;
-  }
 
 } sample;
 #endif
@@ -111,8 +86,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     }
     last_action.reset(next_action);
 
-    ann_testing->neutral_action(sensors, next_action);
-
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -129,7 +102,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
     gaussian_policy         = pt->get<uint>("agent.gaussian_policy");
-    vnn_from_scratch        = pt->get<bool>("agent.vnn_from_scratch");
     update_critic_first     = pt->get<bool>("agent.update_critic_first");
     number_fitted_iteration = pt->get<uint>("agent.number_fitted_iteration");
     stoch_iter_actor        = pt->get<uint>("agent.stoch_iter_actor");
@@ -145,6 +117,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     beta_target             = pt->get<double>("agent.beta_target");
     ignore_poss_ac          = pt->get<bool>("agent.ignore_poss_ac");
     conserve_beta           = pt->get<bool>("agent.conserve_beta");
+    disable_trust_region = pt->get<bool>("agent.disable_trust_region");
+    disable_cac                 = pt->get<bool>("agent.disable_cac");
     gae                     = false;
     update_each_episode = 1;
     
@@ -173,31 +147,17 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     }
     
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true, momentum);
-    if(std::is_same<NN, DODevMLP>::value)
-      ann->exploit(pt, nullptr);
     
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);
-    if(std::is_same<NN, DODevMLP>::value)
-      vnn->exploit(pt, ann);
     
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
     if(batch_norm_critic != 0)
       vnn_testing = new NN(*vnn, false, ::caffe::Phase::TEST);
     
-    if(std::is_same<NN, DODevMLP>::value){
-      try {
-        if(pt->get<bool>("devnn.reset_learning_algo")){
-          LOG_ERROR("NFAC cannot reset anything with DODevMLP");
-          exit(1);
-        }
-      } catch(boost::exception const& ) {
-      }
-    }
-    
     bestever_score = std::numeric_limits<double>::lowest();
   }
 
-  void _start_episode(const std::vector<double>& sensors, bool learning) override {
+  void _start_episode(const std::vector<double>& sensors, bool) override {
     last_state.clear();
     for (uint i = 0; i < sensors.size(); i++)
       last_state.push_back(sensors[i]);
@@ -209,25 +169,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if(gaussian_policy == 2)
       oun->reset();
     
-    if(std::is_same<NN, DODevMLP>::value && learning){
-      DODevMLP * ann_cast = static_cast<DODevMLP *>(ann);
-      bool changed_ann = std::get<1>(ann_cast->inform(episode, this->last_sum_weighted_reward));
-//       don't need to inform vnn because they share parameters
-//       static_cast<DODevMLP *>(vnn)->inform(episode, this->last_sum_weighted_reward);
-      if(changed_ann && ann_cast->ewc_enabled() && ann_cast->ewc_force_constraint()){
-        static_cast<DODevMLP *>(vnn)->ewc_setup();
-//         else if(changed_vnn && !changed_ann) //impossible cause of ann structure
-      }
-    }
-    
     double* weights = new double[ann->number_of_parameters(false)];
     ann->copyWeightsTo(weights, false);
     ann_testing->copyWeightsFrom(weights, false);
     delete[] weights;
   }
 
-  double update_critic() {
-    double V_pi_s0 = 0.f;
+  void update_critic() {
+    
     if (trajectory.size() > 0) {
       //remove trace of old policy
       auto iter = [&]() {
@@ -265,10 +214,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         }
 
         ASSERT((uint)li == trajectory.size(), "");
-        if(vnn_from_scratch){
-          delete vnn;
-          vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, trajectory.size(), -1, hidden_layer_type, batch_norm_critic, false, momentum);
-        }
         if(lambda < 0.f && batch_norm_critic == 0)
           vnn->learn_batch(all_states, empty_action, v_target, stoch_iter_critic);
         else if(lambda < 0.f){
@@ -335,45 +280,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           }
           
 //          bib::Logger::PRINT_ELEMENTS(diff, "target ");
-          V_pi_s0 = diff[0];
           vnn->learn_batch(all_states, empty_action, diff, stoch_iter_critic);
-// // 
-// //        The mechanic formula
-// //        
-//           std::vector<double> diff2(trajectory.size());
-//           li=0;
-//           for (auto it : trajectory){
-//             diff2[li] = 0;
-//             double sum_n = 0.f;
-//             for(int n=1;n<=((int)trajectory.size()) - li - 1;n++){
-//               double sum_i = 0.f;
-//               for(int i=li;i<=li+n-1;i++)
-//                 sum_i += std::pow(this->gamma, i-li) * trajectory[i].r;
-//               sum_i += std::pow(this->gamma, n) * all_nextV->at(li+n-1);
-//               sum_i *= pow(lambda, n-1);
-//               sum_n += sum_i;
-//             }
-//             sum_n *= (1.f-lambda);
-//             
-//             double sum_L = 0.f;
-//             for(int i=li;i<(int)trajectory.size();i++)
-//               sum_L += std::pow(this->gamma, i-li) * trajectory[i].r;
-//             if(trajectory[trajectory.size()-1].goal_reached)
-//               sum_n += std::pow(lambda, trajectory.size() - li - 1) * sum_L;
-//             else {
-//               sum_L += std::pow(this->gamma, ((int)trajectory.size()) - li) * all_nextV->at(trajectory.size()-1);
-//               sum_n += std::pow(lambda, trajectory.size() - li - 1) * sum_L;
-//             }
-//             
-//             sum_n -= all_V->at(li);
-//             
-//             diff2[li] = sum_n;
-//             ++li;
-//           }
-//           bib::Logger::PRINT_ELEMENTS(diff2, "mech form ");
-//           
-//           if(trajectory[trajectory.size()-1].goal_reached)
-//             exit(1);
+
           delete all_V;
         }
         
@@ -383,26 +291,15 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       for(uint i=0; i<number_fitted_iteration; i++)
         iter();
     }
-    
-    return V_pi_s0;
   }
 
   void end_episode(bool learning) override {
 //     LOG_FILE("policy_exploration", ann->hash());
     if(!learning){
-      if(ann->ewc_best_method() >= 4){
-        ann->update_best_param_previous_task(this->sum_weighted_reward);
-        vnn->update_best_param_previous_task(this->sum_weighted_reward);
-      }
       return;
     }
     
     //learning phase
-    if(ann->ewc_best_method() <= 3){
-      ann->update_best_param_previous_task(this->sum_weighted_reward);
-      vnn->update_best_param_previous_task(this->sum_weighted_reward);
-    }
-    
     trajectory_end_points.push_back(trajectory.size());
     if (episode % update_each_episode != 0)
       return;
@@ -413,9 +310,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         vnn_testing->increase_batchsize(trajectory.size());
     }
     
-    double V_pi_s0 = 0;
     if(update_critic_first)
-      V_pi_s0 = update_critic();
+      update_critic();
 
     if (trajectory.size() > 0) {
       const std::vector<bool> disable_back_ac(this->nb_motors, true);
@@ -489,7 +385,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       std::vector<double> sensors(2*trajectory.size() * nb_sensors);
       std::vector<double> actions(2*trajectory.size() * this->nb_motors);
       std::vector<bool> disable_back(2*trajectory.size() * this->nb_motors, false);
-      std::vector<double> deltas_blob(trajectory.size() * this->nb_motors);
+      std::vector<double> deltas_blob(trajectory.size() * this->nb_motors, 1.f);
 
       li=0;
       //cacla cost
@@ -504,7 +400,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
         }
-        std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
+        if(!disable_cac)
+            std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
         li++;
       }
       //penalty cost
@@ -553,13 +450,18 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
               l2distance += x*x;
           }
           l2distance = std::sqrt(l2distance/((double) trajectory.size()*this->nb_motors));
-          if (l2distance < beta_target/1.5)
-              beta = beta/2.;
-          else if (l2distance > beta_target*1.5)
-              beta = beta*2.;
-          else if (sia > 0)
-              break;
-//           beta=std::max(std::min((double)50.f, beta), (double) 0.0001f );
+          
+          if(disable_trust_region)
+              beta=0.f;
+          else {
+            if (l2distance < beta_target/1.5)
+                beta = beta/2.;
+            else if (l2distance > beta_target*1.5)
+                beta = beta*2.;
+            else if (sia > 0)
+                break;
+            beta=std::max(std::min((double)50.f, beta), (double) 0.0001f );
+          }
           conserved_l2dist = l2distance;
           
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
@@ -679,7 +581,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   double noise, noise2, noise3;
   uint gaussian_policy;
-  bool vnn_from_scratch, update_critic_first, gae, ignore_poss_ac, conserve_beta;
+  bool update_critic_first, gae, ignore_poss_ac, conserve_beta, disable_trust_region, disable_cac;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;

@@ -18,7 +18,7 @@ find_package(Threads REQUIRED)
 include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${GTEST_INCLUDE_DIRS})
 
 file ( GLOB_RECURSE all_include include/*.hpp )
-file ( GLOB all_sources src/*.cpp )
+file ( GLOB all_sources src/*.cpp src/zoo/*.cpp)
 
 #-------------------
 # Library Build

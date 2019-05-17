@@ -16,6 +16,8 @@ except:
 #find . -type f -name 'time_elapsed' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "time_elapsed" | xargs -I G cat G | jq -s add/length) ; echo -n "($(find P_* -name "time_elapsed" | wc -l))" ; echo : P ' |  sort -g -r
 #print number of trials generated
 #find . -name 'x.learning.data' |  xargs -I % tail -1 %
+#specific column
+#find . -type f -name '0.learning.data' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "0.learning.data" | xargs -I G zcat G | cut -f13 -d" " | jq -s add/length) ; echo -n "($(find P_* -name "0.learning.data" | wc -l))" ; echo : P ' |  sort -g -r
 
 #for baseline with uncompressed monitor
 #find . -type f -name '0.1.monitor.csv' | sed -r 's|/[^/]+$||' | sort | uniq | sed -e 's/_[0-9]*$//' | sort | uniq | xargs -I P -n 1 bash -c 'LANG=en_US.UTF-8 printf "%08.2f" $(find P_* -name "0.1.monitor.csv" | xargs -I G tail -50 G | grep -v r | cut -f1 -d',' | jq -s add/length) ; echo -n "($(find P_* -name "0.1.monitor.csv" | wc -l))" ; echo : P ' |  sort -g -r
