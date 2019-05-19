@@ -462,7 +462,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             else if (l2distance > beta_target*1.5)
                 beta = beta*2.;
 
-            beta=std::max(std::min((double)20.f, beta), (double) 0.0001f);
+            beta=std::max(std::min((double)20.f, beta), (double) 0.01f);
             mean_beta += beta;
             conserved_l2dist = l2distance;
             //LOG_DEBUG(std::setprecision(7) << l2distance << " " << beta << " " << beta_target << " " << sia);
