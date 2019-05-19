@@ -420,10 +420,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
       ratio_valid_advantage = ((float)n) / ((float) trajectory.size());
       posdelta_mean = posdelta_mean / ((float) trajectory.size());
+      int size_cost_cacla=trajectory.size()*this->nb_motors;
       
-      double beta=1.f;
+      double beta=0.0001f;
+      mean_beta=0.f;
       if(conserve_beta)
         beta=conserved_beta;
+      mean_beta += beta;
 
       if(n > 0) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++){
@@ -442,27 +445,28 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           }
           ann->ZeroGradParameters();
           
-          //compute deter distance(pi, pi_old)
-          double l2distance = 0.;
-          int size_cost_cacla=trajectory.size()*this->nb_motors;
-          for(int i=size_cost_cacla;i<actions.size();i++) {
-              double x = actions[i] - ac_out->at(i);
-              l2distance += x*x;
-          }
-          l2distance = std::sqrt(l2distance/((double) trajectory.size()*this->nb_motors));
-          
+          number_effective_actor_update = sia;
           if(disable_trust_region)
               beta=0.f;
-          else {
+          else if (sia > 0) {
+            //compute deter distance(pi, pi_old)
+            double l2distance = 0.;
+            for(int i=size_cost_cacla;i<actions.size();i++) {
+                double x = actions[i] - ac_out->at(i);
+                l2distance += x*x;
+            }
+            l2distance = std::sqrt(l2distance/((double) trajectory.size()*this->nb_motors));
+
             if (l2distance < beta_target/1.5)
                 beta = beta/2.;
             else if (l2distance > beta_target*1.5)
                 beta = beta*2.;
-            else if (sia > 0)
-                break;
-            beta=std::max(std::min((double)50.f, beta), (double) 0.0001f );
+
+            beta=std::max(std::min((double)20.f, beta), (double) 0.0001f);
+            mean_beta += beta;
+            conserved_l2dist = l2distance;
+            //LOG_DEBUG(std::setprecision(7) << l2distance << " " << beta << " " << beta_target << " " << sia);
           }
-          conserved_l2dist = l2distance;
           
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
@@ -491,6 +495,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       }
       
       conserved_beta = beta;
+      mean_beta /= (double) number_effective_actor_update;
 
       delete all_nextV;
       delete all_mine;
@@ -565,13 +570,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           " " << std::setprecision(3) << ratio_valid_advantage << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm(true);
   }
 
-//clear all; close all; wndw = 10; X=load('0.learning.data'); X=filter(ones(wndw,1)/wndw, 1, X); startx=0; starty=800; width=350; height=350; figure('position',[startx,starty,width,height]); plot(X(:,3), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('sum rewards', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]); plot(X(:,9), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('beta', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,8), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('valid adv', "fontsize", 16); ylim([0, 1]); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,11), "linewidth", 2); hold on; plot(X(:,12), "linewidth", 2, "color", "red"); legend("critic", "actor"); xlabel('learning episode', "fontsize", 16); ylabel('||\theta||_1', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,10), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\mu_{old}-\mu||_2', "fontsize", 16);
+//clear all; close all; wndw = 10; X=load('0.learning.data'); X=filter(ones(wndw,1)/wndw, 1, X); startx=0; starty=800; width=350; height=350; figure('position',[startx,starty,width,height]); plot(X(:,3), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('sum rewards', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]); plot(X(:,9), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('beta', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,8), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('valid adv', "fontsize", 16); ylim([0, 1]); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,11), "linewidth", 2); hold on; plot(X(:,12), "linewidth", 2, "color", "red"); legend("critic", "actor"); xlabel('learning episode', "fontsize", 16); ylabel('||\theta||_1', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,10), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\mu_{old}-\mu||_2', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,14), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('effective actor. upd.', "fontsize", 16); 
   void _dump(std::ostream& out) const override {
     out << std::setw(25) << std::fixed << std::setprecision(22) << this->sum_weighted_reward/this->gamma << " " << 
     this->sum_reward << " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << 
     nb_sample_update << " " << std::setprecision(3) << ratio_valid_advantage << " " << std::setprecision(10) << 
-    conserved_beta << " " << conserved_l2dist << " " << std::setprecision(3) << vnn->weight_l1_norm() << " " << 
-    ann->weight_l1_norm(true) << " " << std::setprecision(6)  << posdelta_mean;
+    mean_beta << " " << conserved_l2dist << " " << std::setprecision(3) << vnn->weight_l1_norm() << " " << 
+    ann->weight_l1_norm(true) << " " << std::setprecision(6)  << posdelta_mean << " " << number_effective_actor_update;
   }
   
  private:
@@ -585,8 +590,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
-  double conserved_beta= 1.f;
+  double conserved_beta= 0.0001f;
+  double mean_beta= 0.f;
   double conserved_l2dist= 0.f;
+  int number_effective_actor_update = 0;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
