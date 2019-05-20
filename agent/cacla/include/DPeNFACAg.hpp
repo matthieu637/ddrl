@@ -91,28 +91,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
-      if(gaussian_policy == 1 && episode < 3) {
+      if(gaussian_policy == 1) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
         delete next_action;
         next_action = randomized_action;
-      } else if(gaussian_policy == 1) {
-        vector<double>* old_next_action = ann_old->computeOut(sensors);
-        std::vector<double> min_(this->nb_motors, -1.f);
-        std::vector<double> max_(this->nb_motors, 1.f);
-        for(int i=0;i<this->nb_motors;i++) {
-            if(next_action->at(i) < 0.99 && next_action->at(i) > -0.99) {
-                if (next_action->at(i) - old_next_action->at(i) < 0.00001) {
-                    max_[i] = next_action->at(i);
-                } else if (next_action->at(i) - old_next_action->at(i) > 0.00001) {
-                    min_[i] = next_action->at(i);
-                }
-            }
-        }
-
-        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise, min_, max_);
-        delete next_action;
-        next_action = randomized_action;
-        delete old_next_action;
       } else if(gaussian_policy == 2) {
         oun->step(*next_action);
       } else if(gaussian_policy == 3 && bib::Utils::rand01() < noise2) {
@@ -427,11 +409,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     if (episode % update_each_episode != 0)
       return;
 
-    double* weights = new double[ann->number_of_parameters(false)];
-    ann->copyWeightsTo(weights, false);
-    ann_old->copyWeightsFrom(weights, false);
-    delete[] weights;
- 
+
     if(trajectory.size() > 0){
       vnn->increase_batchsize(trajectory.size());
       if(batch_norm_critic != 0)
@@ -522,7 +500,22 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
         std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
         std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
-        if(deltas[li] > 0.) {
+    
+        bool valid_action=true;
+        if(episode > 10){
+        vector<double>* old_next_action = ann_old->computeOut(sm.s);
+        for(int i=0;i<this->nb_motors && valid_action;i++) {
+            if(sm.pure_a[i] < 0.99 && old_next_action->at(i) > -0.99) {
+                if (sm.pure_a[i] - old_next_action->at(i) < -0.00001) {
+                    valid_action = valid_action && sm.a[i] <= sm.pure_a[i];
+                } else if (sm.pure_a[i] - old_next_action->at(i) > 0.00001) {
+                    valid_action = valid_action && sm.a[i] >= sm.pure_a[i];
+                }
+            }
+        }
+        delete old_next_action;
+        }
+        if(deltas[li] > 0. && valid_action) {
           n++;
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
@@ -549,7 +542,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       double beta=1.f;
       if(conserve_beta)
         beta=conserved_beta;
-
+    double* weights = new double[ann->number_of_parameters(false)];
+    ann->copyWeightsTo(weights, false);
+    ann_old->copyWeightsFrom(weights, false);
+    delete[] weights;
+ 
       if(n > 0) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++){
           ann->increase_batchsize(2*trajectory.size());
