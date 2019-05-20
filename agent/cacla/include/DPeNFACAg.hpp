@@ -502,18 +502,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         std::copy(it->a.begin(), it->a.end(), actions.begin() + li * this->nb_motors);
     
         bool valid_action=true;
-        if(episode > 10){
-        vector<double>* old_next_action = ann_old->computeOut(sm.s);
-        for(int i=0;i<this->nb_motors && valid_action;i++) {
-            if(sm.pure_a[i] < 0.99 && old_next_action->at(i) > -0.99) {
-                if (sm.pure_a[i] - old_next_action->at(i) < -0.00001) {
-                    valid_action = valid_action && sm.a[i] <= sm.pure_a[i];
-                } else if (sm.pure_a[i] - old_next_action->at(i) > 0.00001) {
-                    valid_action = valid_action && sm.a[i] >= sm.pure_a[i];
-                }
+        if(episode > 10) {
+            std::vector<double>* old_next_action = ann_old->computeOut(sm.s);
+            std::vector<double> newdirection (this->nb_motors);
+            for(int i=0;i<this->nb_motors;++i) {
+                old_next_action->at(i) = sm.pure_a[i] - old_next_action->at(i);
+                newdirection[i] = sm.a[i] - sm.pure_a[i];
             }
-        }
-        delete old_next_action;
+            
+            valid_action = std::inner_product(std::begin(*old_next_action), std::end(*old_next_action), std::begin(newdirection), 0.0) >= 0.0;
+            delete old_next_action;
         }
         if(deltas[li] > 0. && valid_action) {
           n++;
