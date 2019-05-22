@@ -508,6 +508,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             for(int i=0;i<this->nb_motors;++i) {
                 old_next_action->at(i) = sm.pure_a[i] - old_next_action->at(i);
                 newdirection[i] = sm.a[i] - sm.pure_a[i];
+
+                //if too close from the boundary disable constraint
+                if (sm.pure_a[i] > 0.95 || sm.pure_a[i] < -0.95)
+                    old_next_action->at(i) = 0.00f;
             }
             
             valid_action = std::inner_product(std::begin(*old_next_action), std::end(*old_next_action), std::begin(newdirection), 0.0) >= 0.0;
