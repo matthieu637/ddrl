@@ -103,8 +103,20 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             delete[] weights;
         }
         
-        next_action = ann_testing_noisy->computeOut(sensors);
-        next_action_pure = ann_testing->computeOut(sensors);
+        if(control_explo_gauss) {
+//             gaussian noise
+            std::vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action_pure, noise);
+            delete next_action;
+            next_action = randomized_action;
+        } else {
+            if (bib::Utils::rand01() < proba_pse) {
+                next_action = ann_testing_noisy->computeOut(sensors);
+                next_action_pure = ann_testing->computeOut(sensors);
+            } else {
+                next_action_pure = ann_testing->computeOut(sensors);
+                next_action = next_action_pure;
+            }
+        }
 
 //         clipping
 //        double l2distance_noise = 0.;
@@ -118,11 +130,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 //                next_action->at(j) += (0.2/l2distance_noise) *(next_action_pure->at(j) - next_action->at(j));
 //            }
 //        }
-        
-//        gaussian noise
-//        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action_pure, noise);
-//        delete next_action;
-//        next_action = randomized_action;
 
     } else {
         next_action = ann_testing->computeOut(sensors);
@@ -168,6 +175,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     conserve_beta           = pt->get<bool>("agent.conserve_beta");
     adaptive_noise          = pt->get<bool>("agent.adaptive_noise");
     update_param_noise      = pt->get<uint>("agent.update_param_noise");
+    proba_pse               = pt->get<double>("agent.proba_pse");
+    control_explo_gauss = pt->get<bool>("agent.control_explo_gauss");
     gae                     = false;
     update_each_episode = 1;
     effective_noise = noise;
@@ -722,13 +731,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   uint episode = 1;
   uint step = 0;
 
-  double noise, effective_noise;
+  double noise, effective_noise, proba_pse;
   bool vnn_from_scratch, update_critic_first, gae, ignore_poss_ac, adaptive_noise, conserve_beta;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
   double conserved_beta= 1.f;
   double conserved_l2dist= 0.f;
+  bool control_explo_gauss;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
