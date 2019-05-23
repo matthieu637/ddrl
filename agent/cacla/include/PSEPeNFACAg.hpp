@@ -112,7 +112,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             if (bib::Utils::rand01() < proba_pse) {
                 next_action = ann_testing_noisy->computeOut(sensors);
             } else {
-                next_action = next_action_pure;
+                next_action = new std::vector<double>(*next_action_pure);
             }
         }
 
