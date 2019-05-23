@@ -103,17 +103,15 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             delete[] weights;
         }
         
+        next_action_pure = ann_testing->computeOut(sensors);
         if(control_explo_gauss) {
 //             gaussian noise
             std::vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action_pure, noise);
-            delete next_action;
             next_action = randomized_action;
         } else {
             if (bib::Utils::rand01() < proba_pse) {
                 next_action = ann_testing_noisy->computeOut(sensors);
-                next_action_pure = ann_testing->computeOut(sensors);
             } else {
-                next_action_pure = ann_testing->computeOut(sensors);
                 next_action = next_action_pure;
             }
         }
