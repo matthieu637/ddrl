@@ -90,7 +90,7 @@ class MLP {
     kMinibatchSize(_kMinibatchSize), weighted_sample(_weighted_sample), hiddens_size(hiddens.size()) {
 
     ASSERT(alpha > 0, "alpha <= 0");
-    ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
+    ASSERT(hiddens.size() >= 0, "hiddens.size() < 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
     ASSERT(hidden_layer_type >= 1 && hidden_layer_type <= 3, "hidden_layer_type not in (1,2,3)");
     batch_norm_type bna = convertBN(batch_norm, hiddens.size());
@@ -196,7 +196,7 @@ class MLP {
       add_loss_layer(loss_layer), hiddens_size(hiddens.size()) {
 
     ASSERT(alpha > 0, "alpha <= 0");
-    ASSERT(hiddens.size() > 0, "hiddens.size() <= 0");
+    ASSERT(hiddens.size() >= 0, "hiddens.size() < 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
     ASSERT(hidden_layer_type >= 1 && hidden_layer_type <= 3, "hidden_layer_type not in (1,2,3)");
     if(last_layer_type == 1 || last_layer_type == 3)
@@ -647,6 +647,34 @@ class MLP {
       }
     }
   }
+  
+  void copyDiffTo(double* startx, bool ignore_null_lr) const {
+    uint index = 0;
+    
+    caffe::Net<double>& net = *neural_net;
+    const double* weights;
+    for (uint i = 0; i < net.learnable_params().size(); ++i) {
+      if(!ignore_null_lr || net.params_lr()[i] != 0.0f) {
+        auto blob = net.learnable_params()[i];
+#ifdef CAFFE_CPU_ONLY
+        weights = blob->cpu_data();
+#else
+        switch (caffe::Caffe::mode()) {
+          case caffe::Caffe::CPU:
+            weights = blob->cpu_diff();
+            break;
+          case caffe::Caffe::GPU:
+            weights = blob->gpu_diff();
+            break;
+        }
+#endif
+        for(int n=0; n < blob->count(); n++) {
+          startx[index] = weights[n];
+          index++;
+        }
+      }
+    }
+  }
 
   virtual void copyWeightsFrom(const double* startx, bool ignore_null_lr) {
     uint index = 0;
@@ -665,6 +693,33 @@ class MLP {
           break;
         case caffe::Caffe::GPU:
           weights = blob->mutable_gpu_data();
+          break;
+        }
+#endif
+        for(int n=0; n < blob->count(); n++) {
+          weights[n] = startx[index];
+          index++;
+        }
+      }
+  }
+  
+  virtual void copyDiffFrom(const double* startx, bool ignore_null_lr) {
+    uint index = 0;
+
+    caffe::Net<double>& net = *neural_net;
+    double* weights;
+    for (uint i = 0; i < net.learnable_params().size(); ++i) 
+      if(!ignore_null_lr || net.params_lr()[i] != 0.0f) {
+        auto blob = net.learnable_params()[i];
+#ifdef CAFFE_CPU_ONLY
+        weights = blob->mutable_cpu_diff();
+#else
+        switch (caffe::Caffe::mode()) {
+        case caffe::Caffe::CPU:
+          weights = blob->mutable_cpu_diff();
+          break;
+        case caffe::Caffe::GPU:
+          weights = blob->mutable_gpu_diff();
           break;
         }
 #endif
@@ -1058,7 +1113,7 @@ protected:
         ASSERT((uint)copy_q_values->size() == target_input_layer->batch_size() * size_motors, 
                "size pb " << copy_q_values->size() << " " << target_input_layer->batch_size() * size_motors);
       else
-        ASSERT((int)copy_q_values->size() == target_input_layer->batch_size(), "size pb");
+        ASSERT((int)copy_q_values->size() == target_input_layer->batch_size(), "size pb " << copy_q_values->size() << " " << target_input_layer->batch_size());
 #endif
       target_input_layer->Reset(copy_q_values->data(), copy_q_values->data(), target_input_layer->batch_size());
     }
