@@ -90,7 +90,6 @@ class MLP {
     kMinibatchSize(_kMinibatchSize), weighted_sample(_weighted_sample), hiddens_size(hiddens.size()) {
 
     ASSERT(alpha > 0, "alpha <= 0");
-    ASSERT(hiddens.size() >= 0, "hiddens.size() < 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
     ASSERT(hidden_layer_type >= 1 && hidden_layer_type <= 3, "hidden_layer_type not in (1,2,3)");
     batch_norm_type bna = convertBN(batch_norm, hiddens.size());
@@ -196,7 +195,6 @@ class MLP {
       add_loss_layer(loss_layer), hiddens_size(hiddens.size()) {
 
     ASSERT(alpha > 0, "alpha <= 0");
-    ASSERT(hiddens.size() >= 0, "hiddens.size() < 0");
     ASSERT(_kMinibatchSize > 0, "_kMinibatchSize <= 0");
     ASSERT(hidden_layer_type >= 1 && hidden_layer_type <= 3, "hidden_layer_type not in (1,2,3)");
     if(last_layer_type == 1 || last_layer_type == 3)

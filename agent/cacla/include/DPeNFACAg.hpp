@@ -188,8 +188,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           li++;
       }
       li=0;
-      ann->increase_batchsize(trajectory_offpol.size());
-      auto current_pol = ann->computeOutBatch(all_states);
+      std::vector<double>* current_pol;
+      if(batch_norm_actor != 0 ) {
+        ann_testing->increase_batchsize(trajectory_offpol.size());
+        current_pol = ann_testing->computeOutBatch(all_states);
+      } else {
+        ann->increase_batchsize(trajectory_offpol.size());
+        current_pol = ann->computeOutBatch(all_states);
+      }
       for (auto it : trajectory_offpol) {
         all_is[li] = bib::Proba<double>::truncatedGaussianDensity(it.a, current_pol->data(), noise, li * this->nb_motors) / it.prob;
         li++;

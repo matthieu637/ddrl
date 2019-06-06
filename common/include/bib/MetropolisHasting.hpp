@@ -105,14 +105,14 @@ class Proba {
   
   static Real truncatedGaussianDensity(const std::vector<Real>& r, const std::vector<Real>& mu, Real sigma, Real a=-1.f, Real b=1.f){
       double prob = 1.f;
-      for (int i=0;i< r.size();++i)
+      for (uint i=0;i< r.size();++i)
           prob *= truncatedGaussianDensity(r[i], mu[i], sigma, a, b);
       return prob;
   }
   
   static Real truncatedGaussianDensity(const std::vector<Real>& r, const Real* mu, Real sigma, int start, Real a=-1.f, Real b=1.f){
       double prob = 1.f;
-      for (int i=0;i<r.size(); ++i)
+      for (uint i=0;i<r.size(); ++i)
           prob *= truncatedGaussianDensity(r[i], mu[start+i], sigma, a, b);
       return prob;
   }
