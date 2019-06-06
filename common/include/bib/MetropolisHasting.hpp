@@ -102,6 +102,20 @@ class Proba {
     //std::cout<< "num = " << num << "  denom = " << denom  << std::endl;
     return  num/denom;
   }
+  
+  static Real truncatedGaussianDensity(const std::vector<Real>& r, const std::vector<Real>& mu, Real sigma, Real a=-1.f, Real b=1.f){
+      double prob = 1.f;
+      for (int i=0;i< r.size();++i)
+          prob *= truncatedGaussianDensity(r[i], mu[i], sigma, a, b);
+      return prob;
+  }
+  
+  static Real truncatedGaussianDensity(const std::vector<Real>& r, const Real* mu, Real sigma, int start, Real a=-1.f, Real b=1.f){
+      double prob = 1.f;
+      for (int i=0;i<r.size(); ++i)
+          prob *= truncatedGaussianDensity(r[i], mu[start+i], sigma, a, b);
+      return prob;
+  }
 
   static std::vector<Real>* multidimentionnalGaussianWReject(const std::vector<Real>& centers, Real sigma) {
     std::vector<Real>* gauss = new std::vector<Real>(centers.size());

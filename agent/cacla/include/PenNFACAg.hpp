@@ -102,7 +102,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
     gaussian_policy         = pt->get<uint>("agent.gaussian_policy");
-    update_critic_first     = pt->get<bool>("agent.update_critic_first");
     number_fitted_iteration = pt->get<uint>("agent.number_fitted_iteration");
     stoch_iter_actor        = pt->get<uint>("agent.stoch_iter_actor");
     stoch_iter_critic       = pt->get<uint>("agent.stoch_iter_critic");
@@ -310,8 +309,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         vnn_testing->increase_batchsize(trajectory.size());
     }
     
-    if(update_critic_first)
-      update_critic();
+    update_critic();
 
     if (trajectory.size() > 0) {
       const std::vector<bool> disable_back_ac(this->nb_motors, true);
@@ -503,17 +501,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       if(batch_norm_actor != 0)
         ann_testing->increase_batchsize(1);
     }
-
-    if(!update_critic_first){
-      update_critic();
-    }
     
     nb_sample_update= trajectory.size();
     trajectory.clear();
     trajectory_end_points.clear();
-    
-    ann->ewc_decay_update();
-    vnn->ewc_decay_update();
   }
 
   void end_instance(bool learning) override {
@@ -586,7 +577,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
   double noise, noise2, noise3;
   uint gaussian_policy;
-  bool update_critic_first, gae, ignore_poss_ac, conserve_beta, disable_trust_region, disable_cac;
+  bool gae, ignore_poss_ac, conserve_beta, disable_trust_region, disable_cac;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
