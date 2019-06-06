@@ -322,6 +322,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       trajectory_end_points_offpol.pop_front();
       for (int i=0;i<first_traj_size;i++)
         trajectory_offpol.pop_front();
+      for (uint i=0;i< trajectory_end_points_offpol.size(); i++)
+        trajectory_end_points_offpol[i] -= first_traj_size;
     }
 
     if(trajectory_offpol.size() > 0){
@@ -472,7 +474,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           else if (sia > 0) {
             //compute deter distance(pi, pi_old)
             double l2distance = 0.;
-            for(int i=size_cost_cacla;i<actions.size();i++) {
+            for(uint i=size_cost_cacla;i<actions.size();i++) {
                 double x = actions[i] - ac_out->at(i);
                 l2distance += x*x;
             }
@@ -636,7 +638,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   double posdelta_mean = 0;
   double pbar = 1;
   double cbar = 1;
-  int nb_offpolicy_trajectories;
+  uint nb_offpolicy_trajectories;
   
   struct algo_state {
     uint episode;

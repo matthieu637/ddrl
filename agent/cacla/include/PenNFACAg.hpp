@@ -449,7 +449,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           else if (sia > 0) {
             //compute deter distance(pi, pi_old)
             double l2distance = 0.;
-            for(int i=size_cost_cacla;i<actions.size();i++) {
+            for(uint i=size_cost_cacla;i<actions.size();i++) {
                 double x = actions[i] - ac_out->at(i);
                 l2distance += x*x;
             }
