@@ -9,6 +9,10 @@ my PhD thesis to develop several deep reinforcement learning agent in continuous
 It contains : 
 - 4 open-source and free environments using ODE (open dynamic engine) based on OpenAI/mujuco : acrobot, cartpole, half-cheetah and humanoid. We propose those environments because the free licence of Mujoco is not enough to perform hyperparameter meta-optimization on a cluster. However a lot of deep RL algorithms relies on a large number of hyperparameters.
 
+- an implementation of PeNFAC with Caffe
+```
+Matthieu Zimmer and Paul Weng. Exploiting the sign of the advantage function to learn deterministic policies in continuous domains. In International Joint Conferences on Artificial Intelligence, August 2019.
+```
 - an implementation of DDPG with Caffe
 ```
 Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., … Wierstra, D. (2015). Continuous control with deep reinforcement learning. arXiv Preprint arXiv:1509.02971.
@@ -163,7 +167,67 @@ cd ddrl
 if you don't have access to sudo, you can adapt the script under scripts/nosudo-install
 
 
-## Usage
+## Usage with OpenAI Gym
+Example to train PeNFAC on RoboschoolHalfCheetah-v1:
+
+goto gym directoy and create a config.ini file with
+```
+[simulation]
+total_max_steps=20000000
+testing_each=20
+#number of trajectories for testing
+testing_trials=1
+
+
+dump_log_each=50
+display_log_each=100
+save_agent_each=100000
+
+library=ADAPT_PATH_TO_DDRL/agent/cacla/lib/libddrl-penfac.so
+env_name=RoboschoolHalfCheetah-v1
+
+[agent]
+gamma=0.99
+decision_each=1
+
+#exploration
+gaussian_policy=1
+noise=0.2
+
+#ADAM hyperparameters
+momentum=0
+
+#Neural network hyperparameters
+hidden_unit_v=64:64
+hidden_unit_a=64:64
+#0 is linear, 1 is Leaky ReLU, 2 TanH, 3 ReLU
+actor_output_layer_type=2
+hidden_layer_type=1
+
+batch_norm_actor=7
+batch_norm_critic=0
+
+#RL hyperparameters
+alpha_a=0.0001
+alpha_v=0.001
+number_fitted_iteration=10
+stoch_iter_critic=1
+lambda=0.9
+update_each_episode=5
+stoch_iter_actor=30
+beta_target=0.03
+
+#fixed advanced setup
+disable_cac=false
+disable_trust_region=false
+ignore_poss_ac=false
+conserve_beta=true
+gae=true
+```
+python run.py
+
+
+## Usage (C++)
 
 A .ini file is needed to describe the experience you want to run (neural network architecture, episodes, etc.).
 ```
