@@ -87,7 +87,7 @@ extern "C" {
   
   void OfflineCaclaAg_save(OfflineCaclaAg<MLP>* ag, int episode) {
     std::string path = "agent" + std::to_string(episode);
-    ag->save(path, true, true);
+    ag->save(path, false, false);
   }
   
   void OfflineCaclaAg_load(OfflineCaclaAg<MLP>* ag, int episode) {
