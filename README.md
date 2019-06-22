@@ -243,7 +243,9 @@ Then you can run this script within the virtual environment:
 ```
 python run.py
 ```
-
+In the current PeNFAC implementation:
+- the learning process (all the forward/backward propagations on the neural networks) can be parallelized according to the value of the environment variable OMP_NUM_THREADS
+- the process of collecting rollout on the environment is done in a synchronized way (i.e. with a single thread)
 
 ## Usage with C++ ODE environments
 
