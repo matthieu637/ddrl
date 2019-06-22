@@ -85,6 +85,7 @@ cd ../ddrl/
 
 ### Ubuntu >= 14.04
 
+Do not enable anaconda during compilation.
 ```
 sudo apt-get update
 #base
@@ -168,9 +169,23 @@ if you don't have access to sudo, you can adapt the script under scripts/nosudo-
 
 
 ## Usage with OpenAI Gym
-Example to train PeNFAC on RoboschoolHalfCheetah-v1:
+Example to train PeNFAC on RoboschoolHalfCheetah-v1.
 
-goto gym directoy and create a config.ini file with
+With a python virtual env
+```
+#create a python virtual environment with openai gym, roboschool
+sudo apt-get install virtualenv
+virtualenv ddrlvenv --python=python3
+. ddrlvenv/bin/activate
+pip install gym roboschool
+```
+or with anaconda:
+```
+. anaconda3/bin/activate
+pip install gym roboschool
+```
+
+Goto gym directoy of ddrl and create a config.ini file with
 ```
 [simulation]
 total_max_steps=20000000
@@ -224,11 +239,15 @@ ignore_poss_ac=false
 conserve_beta=true
 gae=true
 ```
+Then you can run this script within the virtual environment:
+```
 python run.py
+```
 
 
-## Usage (C++)
+## Usage with C++ ODE environments
 
+Do not enable anaconda in this case.
 A .ini file is needed to describe the experience you want to run (neural network architecture, episodes, etc.).
 ```
 #run the humanoid envionment with CMA-ES (debug version)
