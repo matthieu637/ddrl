@@ -1,10 +1,16 @@
 from ctypes import cdll
 import ctypes
 import numpy as np
+import platform
 from numpy.ctypeslib import ndpointer
 
-#works only on x86_64 system where pointer are stored into a int64
-#need either numpy 1.16 or numpy 1.14 : 1.15 broke ctypes
+if not platform.architecture()[0] == '64bit':
+    print("works only on x86_64 system where pointer are stored into a int64")
+    exit()
+
+if np.version.version.split(".")[0] == "1" and np.version.version.split(".")[1] == "15":
+    print("need either numpy 1.16 or numpy 1.14 because 1.15 broke ctypes")
+    exit()
 
 def load_so_libray(config):
     lib_path=config.get('simulation', 'library')

@@ -4,6 +4,8 @@ import argparse
 import time
 import numpy as np
 import sys
+import os
+from agent import load_so_libray
 
 #import custom ContinuousBandit env if founded
 try:
@@ -54,6 +56,9 @@ if clparams['capture'] and askrender:
     exit()
 
 config = configparser.ConfigParser()
+if not os.path.isfile(clparams['config']) :
+    print("cannot find the config.ini file at ", clparams['config'])
+    exit()
 config.read(clparams['config'])
 
 total_max_steps=int(config['simulation']['total_max_steps'])
@@ -169,6 +174,12 @@ def testing(env, ag, episode):
 
 
 env = gym.make(env_name)
+
+#for goal-oriented environment (https://openai.com/blog/ingredients-for-robotics-research/)
+if isinstance(env.observation_space, gym.spaces.Dict):
+    keys = env.observation_space.spaces.keys()
+    env = gym.wrappers.FlattenDictWrapper(env, dict_keys=list(keys))
+
 observation = env.reset()
 nb_sensors = env.observation_space.shape[0]
 
@@ -186,7 +197,8 @@ action_scale=env.action_space.high
 
 print("Create agent with (nb_motors, nb_sensors) : ", env.action_space.shape[0], nb_sensors)
 
-from agent import load_so_libray
+if isinstance(nb_sensors, np.generic):
+    nb_sensors=np.asscalar(nb_sensors)
 DDRLAg=load_so_libray(config)
 ag = DDRLAg(env.action_space.shape[0], nb_sensors, sys.argv)
 
