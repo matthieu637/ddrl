@@ -1,27 +1,40 @@
 #include "arch/Simulator.hpp"
 
-#ifndef WANT_DPENFAC
-    #ifndef WANT_PENNFAC
-        #ifndef WANT_PSEPENFAC
-            #include "OfflineCaclaAg.hpp"
-        #else
-            #include "PSEPeNFACAg.hpp"
-        #endif
-    #else
-        #include "PenNFACAg.hpp"
-    #endif
+#ifndef WANT_HINDSIGHT_PENFAC
+  #ifndef WANT_DPENFAC
+      #ifndef WANT_PENNFAC
+          #ifndef WANT_PSEPENFAC
+              #include "OfflineCaclaAg.hpp"
+          #else
+              #include "PSEPeNFACAg.hpp"
+          #endif
+      #else
+          #include "PenNFACAg.hpp"
+      #endif
+  #else
+  #include "DPeNFACAg.hpp"
+  #endif
 #else
-#include "DPeNFACAg.hpp"
+#include "HPeNFACAg.hpp"
 #endif
 
 extern "C" {
-  //NFAC
+
+#ifndef WANT_HINDSIGHT_PENFAC
   OfflineCaclaAg<MLP>* OfflineCaclaAg_new(uint a, uint b) {
     FLAGS_minloglevel = 2;
     google::InitGoogleLogging("");
     google::InstallFailureSignalHandler();
     return new OfflineCaclaAg<MLP>(a,b);
   }
+#else
+  OfflineCaclaAg<MLP>* OfflineCaclaAg_new(uint a, uint b, uint goal_size, uint goal_start, uint goal_achieved_start) {
+    FLAGS_minloglevel = 2;
+    google::InitGoogleLogging("");
+    google::InstallFailureSignalHandler();
+    return new OfflineCaclaAg<MLP>(a,b, goal_size, goal_start, goal_achieved_start);
+  }
+#endif
 
   void OfflineCaclaAg_unique_invoke(OfflineCaclaAg<MLP>* ag, int argc, char** argv) {
     namespace po = boost::program_options;

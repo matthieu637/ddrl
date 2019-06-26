@@ -35,8 +35,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   typedef NN PolicyImpl;
   friend class FusionOOAg;
 
-  OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(0) {
+  OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors, uint _goal_size, 
+                 uint _goal_start, uint _goal_achieved_start)
+    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(0), 
+        goal_size(_goal_size), goal_start(_goal_start), goal_achieved_start(_goal_achieved_start) {
 
   }
 
@@ -118,6 +120,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     conserve_beta           = pt->get<bool>("agent.conserve_beta");
     disable_trust_region = pt->get<bool>("agent.disable_trust_region");
     disable_cac                 = pt->get<bool>("agent.disable_cac");
+    hindsight_nb_destination = pt->get<uint>("agent.hindsight_nb_destination");
     gae                     = false;
     update_each_episode = 1;
     
@@ -302,6 +305,40 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     trajectory_end_points.push_back(trajectory.size());
     if (episode % update_each_episode != 0)
       return;
+    
+//     hindsight part to relabel goals
+//     suppose that a reward of 0 means a success
+//     implements a kind of "future/random HER"
+    int saved_tepsize=trajectory_end_points.size();
+    for(int i=0;i < saved_tepsize; i++){
+        if(trajectory[trajectory_end_points[i]-1].r < -10e-6) {
+          int min_index=0;
+          if(i>0)
+            min_index=trajectory_end_points[i-1];
+
+          for(int j=0;j<hindsight_nb_destination;j++) {
+              uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
+
+              for(int k=min_index;k<destination;k++) {
+                sample sa = trajectory[k];
+                trajectory.push_back(sa);
+                std::copy(trajectory[destination].s.begin() + goal_achieved_start, 
+                      trajectory[destination].s.begin() + goal_achieved_start + goal_size, 
+                      trajectory.back().s.begin() + goal_start);
+                std::copy(trajectory[destination].s.begin() + goal_achieved_start, 
+                      trajectory[destination].s.begin() + goal_achieved_start + goal_size, 
+                      trajectory.back().next_s.begin() + goal_start);
+              }
+              trajectory.back().goal_reached = true;
+              trajectory.back().r = 0.f;
+              trajectory_end_points.push_back(trajectory.size());
+          }
+        }
+    }
+//     LOG_DEBUG("#############");
+//     for (int i=0;i<trajectory.size(); i++)
+//       bib::Logger::PRINT_ELEMENTS(trajectory[i].s);
+//     exit(1);
 
     if(trajectory.size() > 0){
       vnn->increase_batchsize(trajectory.size());
@@ -488,7 +525,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           delete ac_out;
         }
       } else if(batch_norm_actor != 0){
-        ann->increase_batchsize(2*trajectory.size());
+        ann->increase_batchsize(trajectory.size());
         delete ann->computeOutBatch(sensors);
       }
       
@@ -608,6 +645,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   float ratio_valid_advantage=0;
   int nb_sample_update = 0;
   double posdelta_mean = 0;
+  
+  //hindsight
+  uint goal_size;
+  uint goal_start;
+  uint goal_achieved_start;
+  uint hindsight_nb_destination;
   
   struct algo_state {
     uint episode;

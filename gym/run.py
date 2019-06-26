@@ -44,6 +44,7 @@ parser.add_argument('--render', action='store_true', default=False)
 parser.add_argument('--view', action='store_true', default=False)
 parser.add_argument('--test-only', action='store_true', default=False)
 parser.add_argument('--capture', action='store_true', default=False)
+parser.add_argument('--goal-based', action='store_true', default=False)
 parser.add_argument('--load', type=str, default=None)
 parser.add_argument('--config', type=str, default='config.ini')
 clargs = parser.parse_args()
@@ -175,8 +176,16 @@ def testing(env, ag, episode):
 
 env = gym.make(env_name)
 
+if (clparams['goal_based']) and not isinstance(env.observation_space, gym.spaces.Dict):
+    print("goal_based algorithms only works with goal based goal-oriented environment")
+    exit(1)
+
 #for goal-oriented environment (https://openai.com/blog/ingredients-for-robotics-research/)
 if isinstance(env.observation_space, gym.spaces.Dict):
+    goal_size=env.observation_space.spaces.get('desired_goal').shape[0]
+    #the following might be false for some env
+    goal_achieved_start=0
+    goal_start=goal_achieved_start+goal_size
     keys = env.observation_space.spaces.keys()
     env = gym.wrappers.FlattenDictWrapper(env, dict_keys=list(keys))
 
@@ -200,8 +209,11 @@ print("Create agent with (nb_motors, nb_sensors) : ", env.action_space.shape[0],
 if isinstance(nb_sensors, np.generic):
     nb_sensors=np.asscalar(nb_sensors)
 DDRLAg=load_so_libray(config)
-ag = DDRLAg(env.action_space.shape[0], nb_sensors, sys.argv)
 
+if not (clparams['goal_based']):
+    ag = DDRLAg(env.action_space.shape[0], nb_sensors, sys.argv)
+else:
+    ag = DDRLAg(env.action_space.shape[0], nb_sensors, goal_size, goal_start, goal_achieved_start, sys.argv)
 print("main algo : " + ag.name())
 
 if clparams['load'] is not None:
