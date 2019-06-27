@@ -120,11 +120,14 @@ def run_episode(env, ag, learning, episode):
         ag.display(learning, episode, sample_steps, undiscounted_rewards)
 
     t=(time.time() - start_time)
+    datalogged=str(undiscounted_rewards)+','+str(sample_steps)+','+str(t)
+    if clparams['goal_based']:
+        datalogged+=','+str(info['is_success'])
     if learning:
-        training_monitor.write(str(undiscounted_rewards)+','+str(sample_steps)+','+str(t)+'\n')
+        training_monitor.write(datalogged+'\n')
         training_monitor.flush()
     else:
-        testing_monitor.write(str(undiscounted_rewards)+','+str(sample_steps)+','+str(t)+'\n')
+        testing_monitor.write(datalogged+'\n')
         testing_monitor.flush()
 
     return totalreward, transitions, undiscounted_rewards, sample_steps
@@ -210,7 +213,7 @@ if isinstance(nb_sensors, np.generic):
     nb_sensors=np.asscalar(nb_sensors)
 DDRLAg=load_so_libray(config)
 
-if not (clparams['goal_based']):
+if not (clparams['goal_based']) or "libddrl-hpenfac" not in config.get('simulation', 'library'):
     ag = DDRLAg(env.action_space.shape[0], nb_sensors, sys.argv)
 else:
     ag = DDRLAg(env.action_space.shape[0], nb_sensors, goal_size, goal_start, goal_achieved_start, sys.argv)
@@ -233,8 +236,12 @@ if not clparams['test_only']:
     xlearning_monitor = open('x.learning.data','w')
     training_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
     testing_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
-    training_monitor.write('r,l,t\n')
-    testing_monitor.write('r,l,t\n')
+    if not clparams['goal_based']:
+        training_monitor.write('r,l,t\n')
+        testing_monitor.write('r,l,t\n')
+    else:
+        training_monitor.write('r,l,t,g\n')
+        testing_monitor.write('r,l,t,g\n')
     
     max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
     bestTestingScore=float("-inf")
