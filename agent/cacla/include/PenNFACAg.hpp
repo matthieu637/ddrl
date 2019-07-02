@@ -380,7 +380,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       
       uint n=0;
       posdelta_mean=0.f;
-      std::vector<double> sensors(2*trajectory.size() * nb_sensors);
+      std::vector<double> sensors(trajectory.size() * nb_sensors);
       std::vector<double> actions(2*trajectory.size() * this->nb_motors);
       std::vector<bool> disable_back(2*trajectory.size() * this->nb_motors, false);
       std::vector<double> deltas_blob(trajectory.size() * this->nb_motors, 1.f);
@@ -407,7 +407,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
         sample sm = *it;
 
-        std::copy(it->s.begin(), it->s.end(), sensors.begin() + li * nb_sensors);
         std::copy(it->pure_a.begin(), it->pure_a.end(), actions.begin() + li * this->nb_motors);
         if(ignore_poss_ac && deltas[li2] > 0.) {
             std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back.begin() + li * this->nb_motors);
@@ -428,7 +427,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 
       if(n > 0) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++){
-          ann->increase_batchsize(2*trajectory.size());
+          ann->increase_batchsize(trajectory.size());
           //learn BN
           auto ac_out = ann->computeOutBatch(sensors);
           if(batch_norm_actor != 0) {
@@ -438,7 +437,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
             ann_testing->copyWeightsFrom(weights, false);
             delete[] weights;
             delete ac_out;
-            ann_testing->increase_batchsize(2*trajectory.size());
+            ann_testing->increase_batchsize(trajectory.size());
             ac_out = ann_testing->computeOutBatch(sensors);
           }
           ann->ZeroGradParameters();
@@ -449,8 +448,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           else if (sia > 0) {
             //compute deter distance(pi, pi_old)
             double l2distance = 0.;
-            for(uint i=size_cost_cacla;i<actions.size();i++) {
-                double x = actions[i] - ac_out->at(i);
+            for(uint i=0;i<size_cost_cacla;i++) {
+                double x = actions[size_cost_cacla+i] - ac_out->at(i);
                 l2distance += x*x;
             }
             l2distance = std::sqrt(l2distance/((double) trajectory.size()*this->nb_motors));
@@ -470,15 +469,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           auto ac_diff = actor_actions_blob->mutable_cpu_diff();
           
           for(int i=0; i<actor_actions_blob->count(); i++) {
-            if(disable_back[i]) {
-            ac_diff[i] = 0.00000000f;
-            } else {
-                double x = actions[i] - ac_out->at(i);
-                if(i < size_cost_cacla)
-                    ac_diff[i] = -x * deltas_blob[i];
-                else
-                    ac_diff[i] = -x * beta;
-            }
+            double x = actions[i] - ac_out->at(i);
+            double x2 = actions[size_cost_cacla+i] - ac_out->at(i);
+            
+            //cacla grad
+            ac_diff[i] = disable_back[i] ? 0.00000000f : -x * deltas_blob[i];
+            //trust reg grad
+            ac_diff[i] += disable_back[size_cost_cacla+i] ? 0.00000000f : -x2 * beta;
           }
           ann->actor_backward();
           ann->updateFisher(n);
@@ -488,7 +485,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
           delete ac_out;
         }
       } else if(batch_norm_actor != 0){
-        ann->increase_batchsize(2*trajectory.size());
+        ann->increase_batchsize(trajectory.size());
         delete ann->computeOutBatch(sensors);
       }
       
