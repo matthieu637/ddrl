@@ -186,6 +186,7 @@ if (clparams['goal_based']) and not isinstance(env.observation_space, gym.spaces
 #for goal-oriented environment (https://openai.com/blog/ingredients-for-robotics-research/)
 if isinstance(env.observation_space, gym.spaces.Dict):
     goal_size=env.observation_space.spaces.get('desired_goal').shape[0]
+    print("Goal space:", env.observation_space.spaces.get('desired_goal'))
     #the following might be false for some env
     goal_achieved_start=0
     goal_start=goal_achieved_start+goal_size

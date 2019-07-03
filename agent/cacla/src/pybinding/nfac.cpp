@@ -1,21 +1,25 @@
 #include "arch/Simulator.hpp"
 
-#ifndef WANT_HINDSIGHT_PENFAC
-  #ifndef WANT_DPENFAC
-      #ifndef WANT_PENNFAC
-          #ifndef WANT_PSEPENFAC
-              #include "OfflineCaclaAg.hpp"
-          #else
-              #include "PSEPeNFACAg.hpp"
-          #endif
-      #else
-          #include "PenNFACAg.hpp"
-      #endif
+#ifndef WANT_CORRELATION
+  #ifndef WANT_HINDSIGHT_PENFAC
+    #ifndef WANT_DPENFAC
+        #ifndef WANT_PENNFAC
+            #ifndef WANT_PSEPENFAC
+                #include "OfflineCaclaAg.hpp"
+            #else
+                #include "PSEPeNFACAg.hpp"
+            #endif
+        #else
+            #include "PenNFACAg.hpp"
+        #endif
+    #else
+    #include "DPeNFACAg.hpp"
+    #endif
   #else
-  #include "DPeNFACAg.hpp"
+  #include "HPeNFACAg.hpp"
   #endif
 #else
-#include "HPeNFACAg.hpp"
+#include "CorPeNFACAg.hpp"
 #endif
 
 extern "C" {

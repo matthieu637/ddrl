@@ -15,7 +15,8 @@ if np.version.version.split(".")[0] == "1" and np.version.version.split(".")[1] 
 def load_so_libray(config):
     lib_path=config.get('simulation', 'library')
     lib = cdll.LoadLibrary(lib_path)
-    if "libddrl-nfac" in lib_path or "libddrl-penfac" in lib_path or "libddrl-psepenfac" in lib_path or "libddrl-dpenfac" in lib_path:
+    if "libddrl-nfac" in lib_path or "libddrl-penfac" in lib_path or "libddrl-psepenfac" in lib_path or "libddrl-dpenfac" in lib_path or \
+        "libddrl-corpenfac" in lib_path:
         lib.OfflineCaclaAg_new.restype = ctypes.c_int64
         lib.OfflineCaclaAg_start_episode.argtypes = [ ctypes.c_int64, ndpointer(ctypes.c_double), ctypes.c_bool]
         lib.OfflineCaclaAg_run.argtypes = [ ctypes.c_int64, ctypes.c_double, ndpointer(ctypes.c_double, flags="C_CONTIGUOUS"), ctypes.c_bool, ctypes.c_bool, ctypes.c_bool]
@@ -62,6 +63,8 @@ def load_so_libray(config):
                 lib.OfflineCaclaAg_load(self.obj, episode)
             
             def name(self):
+                if "libddrl-corpenfac" in lib_path:
+                    return "PeNFAC(lambda)-V with correlations"
                 if "libddrl-psepenfac" in lib_path:
                     return "PSEPeNFAC(lambda)-V"
                 if "libddrl-dpenfac" in lib_path:
