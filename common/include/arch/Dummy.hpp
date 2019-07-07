@@ -137,7 +137,7 @@ class AgentGPUProgOptions {
     boost::program_options::options_description desc("Allowed Agent options");
     desc.add_options()("load", boost::program_options::value<std::string>(), "set the agent to load");
     desc.add_options()("cpu", "use cpu [default]");
-    desc.add_options()("gpu", "use gpu");
+    desc.add_options()("gpu", boost::program_options::value<uint>(), "use gpu");
     return desc;
   }
 };

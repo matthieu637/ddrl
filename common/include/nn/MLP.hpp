@@ -577,6 +577,7 @@ class MLP {
   }
 
   double weight_l1_norm(bool ignore_bn_weight=false) {
+    (void) ignore_bn_weight;
     double sum = 0.f;
 
     caffe::Net<double>& net = *neural_net;
@@ -586,20 +587,21 @@ class MLP {
       auto blob = net.learnable_params()[i];
 #ifdef CAFFE_CPU_ONLY
       weights = blob->cpu_data();
+      sum += caffe::caffe_cpu_asum(blob->count(), weights);
 #else
       switch (caffe::Caffe::mode()) {
       case caffe::Caffe::CPU:
         weights = blob->cpu_data();
+        sum += caffe::caffe_cpu_asum(blob->count(), weights);
         break;
       case caffe::Caffe::GPU:
         weights = blob->gpu_data();
+        double c=0;
+        caffe::caffe_gpu_asum(blob->count(), weights, &c);
+        sum += c;
         break;
       }
 #endif
-      for(int n=0; n < blob->count(); n++) {
-          if(!ignore_bn_weight || fabs(weights[n]) < 500)
-            sum += fabs(weights[n]);
-      }
     }
 
     return sum;
@@ -626,18 +628,7 @@ class MLP {
     for (uint i = 0; i < net.learnable_params().size(); ++i) {
       if(!ignore_null_lr || net.params_lr()[i] != 0.0f) {
         auto blob = net.learnable_params()[i];
-#ifdef CAFFE_CPU_ONLY
         weights = blob->cpu_data();
-#else
-        switch (caffe::Caffe::mode()) {
-          case caffe::Caffe::CPU:
-            weights = blob->cpu_data();
-            break;
-          case caffe::Caffe::GPU:
-            weights = blob->gpu_data();
-            break;
-        }
-#endif
         for(int n=0; n < blob->count(); n++) {
           startx[index] = weights[n];
           index++;
@@ -654,18 +645,7 @@ class MLP {
     for (uint i = 0; i < net.learnable_params().size(); ++i) {
       if(!ignore_null_lr || net.params_lr()[i] != 0.0f) {
         auto blob = net.learnable_params()[i];
-#ifdef CAFFE_CPU_ONLY
         weights = blob->cpu_data();
-#else
-        switch (caffe::Caffe::mode()) {
-          case caffe::Caffe::CPU:
-            weights = blob->cpu_diff();
-            break;
-          case caffe::Caffe::GPU:
-            weights = blob->gpu_diff();
-            break;
-        }
-#endif
         for(int n=0; n < blob->count(); n++) {
           startx[index] = weights[n];
           index++;
@@ -682,18 +662,7 @@ class MLP {
     for (uint i = 0; i < net.learnable_params().size(); ++i) 
       if(!ignore_null_lr || net.params_lr()[i] != 0.0f) {
         auto blob = net.learnable_params()[i];
-#ifdef CAFFE_CPU_ONLY
         weights = blob->mutable_cpu_data();
-#else
-        switch (caffe::Caffe::mode()) {
-        case caffe::Caffe::CPU:
-          weights = blob->mutable_cpu_data();
-          break;
-        case caffe::Caffe::GPU:
-          weights = blob->mutable_gpu_data();
-          break;
-        }
-#endif
         for(int n=0; n < blob->count(); n++) {
           weights[n] = startx[index];
           index++;
@@ -709,18 +678,8 @@ class MLP {
     for (uint i = 0; i < net.learnable_params().size(); ++i) 
       if(!ignore_null_lr || net.params_lr()[i] != 0.0f) {
         auto blob = net.learnable_params()[i];
-#ifdef CAFFE_CPU_ONLY
         weights = blob->mutable_cpu_diff();
-#else
-        switch (caffe::Caffe::mode()) {
-        case caffe::Caffe::CPU:
-          weights = blob->mutable_cpu_diff();
-          break;
-        case caffe::Caffe::GPU:
-          weights = blob->mutable_gpu_diff();
-          break;
-        }
-#endif
+
         for(int n=0; n < blob->count(); n++) {
           weights[n] = startx[index];
           index++;
@@ -734,13 +693,19 @@ class MLP {
     const double* errors;
 #ifdef CAFFE_CPU_ONLY
     errors = blob->cpu_data();
+    sum = caffe::caffe_cpu_asum(blob->count(), errors);
 #else
-    errors = caffe::Caffe::mode() == caffe::Caffe::CPU ? blob->cpu_data() : blob->gpu_data();
-#endif
-    for(int n=0; n < blob->count(); n++) {
-//       LOG_DEBUG(errors[n] << " " << n);
-      sum += fabs(errors[n]);
+    switch (caffe::Caffe::mode()) {
+        case caffe::Caffe::CPU:
+          errors = blob->cpu_data();
+          sum = caffe::caffe_cpu_asum(blob->count(), errors);
+          break;
+        case caffe::Caffe::GPU:
+          errors = blob->gpu_data();
+          caffe::caffe_gpu_asum(blob->count(), errors, &sum);
+          break;
     }
+#endif
 
     return sum;
   }

@@ -195,7 +195,7 @@ class DeepQNAg : public arch::AACAgent<MLP, arch::AgentGPUProgOptions> {
       LOG_INFO("CPU mode");
     } else {
       caffe::Caffe::set_mode(caffe::Caffe::Brew::GPU);
-      caffe::Caffe::SetDevice(0);
+      caffe::Caffe::SetDevice((*command_args)["gpu"].as<uint>());
       LOG_INFO("GPU mode");
     }
 #endif

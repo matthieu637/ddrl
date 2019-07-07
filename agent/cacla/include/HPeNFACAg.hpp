@@ -30,14 +30,13 @@ typedef struct _sample {
 #endif
 
 template<typename NN = MLP>
-class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
+class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
  public:
   typedef NN PolicyImpl;
-  friend class FusionOOAg;
 
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors, uint _goal_size, 
                  uint _goal_start, uint _goal_achieved_start)
-    : arch::AACAgent<NN, arch::AgentProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(0), 
+    : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(0), 
         goal_size(_goal_size), goal_start(_goal_start), goal_achieved_start(_goal_achieved_start) {
 
   }
@@ -98,7 +97,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   }
 
 
-  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map*) override {
+  void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* command_args) override {
 //     bib::Seed::setFixedSeedUTest();
     hidden_unit_v           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
@@ -147,7 +146,21 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
       LOG_DEBUG("to be done!");
       exit(1);
     }
-    
+
+#ifdef CAFFE_CPU_ONLY
+    LOG_INFO("CPU mode");
+    (void) command_args;
+#else
+    if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){ 
+      caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
+      LOG_INFO("CPU mode");
+    } else {
+      caffe::Caffe::set_mode(caffe::Caffe::Brew::GPU);
+      caffe::Caffe::SetDevice((*command_args)["gpu"].as<uint>());
+      LOG_INFO("GPU mode");
+    }   
+#endif
+
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true, momentum);
     
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);

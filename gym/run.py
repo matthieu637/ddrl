@@ -45,6 +45,7 @@ parser.add_argument('--view', action='store_true', default=False)
 parser.add_argument('--test-only', action='store_true', default=False)
 parser.add_argument('--capture', action='store_true', default=False)
 parser.add_argument('--goal-based', action='store_true', default=False)
+parser.add_argument('--gpu', type=int, default=None) #used in cpp
 parser.add_argument('--load', type=str, default=None)
 parser.add_argument('--config', type=str, default='config.ini')
 clargs = parser.parse_args()
@@ -89,6 +90,7 @@ def plot_exploratory_actions(observation, ag):
     plt.show()
 
 def run_episode(env, ag, learning, episode):
+#    env.seed(0)
     observation = env.reset()
     transitions = []
     totalreward = 0
