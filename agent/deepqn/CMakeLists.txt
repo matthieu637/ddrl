@@ -23,54 +23,57 @@ include_directories(${CMAKE_SOURCE_DIR}/include ${COMMON_DRL_INCLUDE_DIRS}
 file ( GLOB_RECURSE all_include include/*.hpp include/*.h)
 file ( GLOB all_sources src/*.cpp src/*.c)
 
-add_executable(adacrobot src/test/Adacrobot.cpp ${all_include} ${all_sources} )
-target_link_libraries(adacrobot 
-  ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY})
-  
-# add_executable(ada-nfac src/test/NFACAda.cpp ${all_include} ${all_sources} )
-# target_link_libraries(ada-nfac 
-#   ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY})
 
-add_executable(cartpole src/test/Cartpole.cpp ${all_include} ${all_sources} )
-target_link_libraries(cartpole 
-  ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
+if(NOT PYTHON_ONLY)
+  add_executable(adacrobot src/test/Adacrobot.cpp ${all_include} ${all_sources} )
+  target_link_libraries(adacrobot 
+    ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY})
+    
+  # add_executable(ada-nfac src/test/NFACAda.cpp ${all_include} ${all_sources} )
+  # target_link_libraries(ada-nfac 
+  #   ${ADVANCED_ACROBOT_LIBRARY} ${COMMON_DRL_LIBRARY})
   
-add_executable(half-cheetah-dpmt src/test/DpmtHalfCheetah.cpp ${all_include} ${all_sources} )
-target_link_libraries(half-cheetah-dpmt 
-  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  add_executable(cartpole src/test/Cartpole.cpp ${all_include} ${all_sources} )
+  target_link_libraries(cartpole 
+    ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
+    
+  add_executable(half-cheetah-dpmt src/test/DpmtHalfCheetah.cpp ${all_include} ${all_sources} )
+  target_link_libraries(half-cheetah-dpmt 
+    ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  
+  add_executable(half-cheetah-dodev src/test/DodevHalfCheetah.cpp ${all_include} ${all_sources} )
+  target_link_libraries(half-cheetah-dodev 
+    ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+    
+  # add_executable(cp-nfac src/test/NFACCp.cpp ${all_include} ${all_sources} )
+  # target_link_libraries(cp-nfac
+  #   ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
+    
+  add_executable(half-cheetah src/test/HalfCheetah.cpp ${all_include} ${all_sources} )
+  target_link_libraries(half-cheetah 
+    ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+    
+  add_executable(half-cheetah-dqc src/test/HalfCheetahDQC.cpp ${all_include} ${all_sources} )
+  target_link_libraries(half-cheetah-dqc 
+    ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+  
+  # add_executable(half-cheetah-nfac src/test/NFACHalfCheetah.cpp ${all_include} ${all_sources} )
+  # target_link_libraries(half-cheetah-nfac
+  #   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+    
+  # add_executable(half-cheetah-nfmac src/test/NFMACHalfCheetah.cpp ${all_include} ${all_sources} )
+  # target_link_libraries(half-cheetah-nfmac
+  #   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
+    
+  add_executable(humanoid src/test/Humanoid.cpp ${all_include} ${all_sources} )
+  target_link_libraries(humanoid 
+    ${HUMANOID_LIBRARY} ${COMMON_DRL_LIBRARY} )
+    
+  add_executable(humanoid-dodev src/test/DodevHumanoid.cpp ${all_include} ${all_sources} )
+  target_link_libraries(humanoid-dodev 
+    ${HUMANOID_LIBRARY} ${COMMON_DRL_LIBRARY} )
+endif()
 
-add_executable(half-cheetah-dodev src/test/DodevHalfCheetah.cpp ${all_include} ${all_sources} )
-target_link_libraries(half-cheetah-dodev 
-  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
-  
-# add_executable(cp-nfac src/test/NFACCp.cpp ${all_include} ${all_sources} )
-# target_link_libraries(cp-nfac
-#   ${CARTPOLE_LIBRARY} ${COMMON_DRL_LIBRARY} )
-  
-add_executable(half-cheetah src/test/HalfCheetah.cpp ${all_include} ${all_sources} )
-target_link_libraries(half-cheetah 
-  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
-  
-add_executable(half-cheetah-dqc src/test/HalfCheetahDQC.cpp ${all_include} ${all_sources} )
-target_link_libraries(half-cheetah-dqc 
-  ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
-
-# add_executable(half-cheetah-nfac src/test/NFACHalfCheetah.cpp ${all_include} ${all_sources} )
-# target_link_libraries(half-cheetah-nfac
-#   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
-  
-# add_executable(half-cheetah-nfmac src/test/NFMACHalfCheetah.cpp ${all_include} ${all_sources} )
-# target_link_libraries(half-cheetah-nfmac
-#   ${HALF_CHEETAH_LIBRARY} ${COMMON_DRL_LIBRARY} )
-  
-add_executable(humanoid src/test/Humanoid.cpp ${all_include} ${all_sources} )
-target_link_libraries(humanoid 
-  ${HUMANOID_LIBRARY} ${COMMON_DRL_LIBRARY} )
-  
-add_executable(humanoid-dodev src/test/DodevHumanoid.cpp ${all_include} ${all_sources} )
-target_link_libraries(humanoid-dodev 
-  ${HUMANOID_LIBRARY} ${COMMON_DRL_LIBRARY} )
-  
 set(LIBRARY_NAME "ddrl-ddpg")
 rename_buildtype(LIBRARY_NAME)
 add_library(${LIBRARY_NAME} SHARED ${all_include} src/pybinding/ddpg.cpp)

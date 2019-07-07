@@ -83,3 +83,6 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
 else()
   set(build_dir_type "release" CACHE STRING "")
 endif()
+
+option(PYTHON_ONLY "Build only c++ libraries for python binding" ON)
+

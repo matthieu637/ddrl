@@ -1,7 +1,5 @@
 #!/bin/bash
 
-OUTSIDE_PATH="eclipse"
-
 LIB=$(dirname "${BASH_SOURCE[0]}")
 cd $LIB
 
@@ -108,6 +106,10 @@ function buildDir(){
 		
                 cd $here/$subdir
 
+            if [[ $PYTHON_ONLY -eq 1 && $subdir == "agent/cmaes" ]] ; then
+                continue
+            fi
+
 		if [ $CLEAR -eq 1 ] ; then
 			rm -rf build
 			rm -rf lib
@@ -175,80 +177,8 @@ function buildDir(){
 	cd $here
 }
 
-#found all the CMakeLists.txt and create 3 targets to build (release, debug, release with debug info)
-function buildDirOutside(){
-        dir="../$1"
-        if [ ! -e $dir ] ; then
-                echo "Please cd into the root directory of DRL"
-                exit 1
-        fi
-
-        here=`pwd`
-        for subdir in $($FIND $dir/ -name 'CMakeLists.txt' -printf '%h\n') ; do
-		#echo "init subdir $subdir"
-		linkdepth=`echo "$subdir" | sed -e 's/^\(\([.][.]\/\)*\).*$/\1/'`
-		rsubdir="$subdir"
-		subdir=`echo "$subdir" | sed 's/[.][.]\///g'`
-		cd $here
-
-		if [ $CLEAR -eq 1 ] ; then
-			rm -rf project.$subdir/pfiles/lib
-			rm -rf project.$subdir
-			echo "INFO : $subdir cleared."
-			continue
-		fi
-
-		if [ $FORCE_REMOVE -eq 0 ]; then
-			if [ -e project.$subdir ] ; then
-				echo "INFO : $subdir already contains a build directory. Just recall..."
-				cd project.$subdir
-				cmakeBuildRecall debug pfiles/
-				continue
-			fi
-		else
-			echo "INFO : $subdir already contains a build directory. Removing it..."
-			rm -rf project.$subdir
-		fi
-
-		mkdir -p project.$subdir
-                cd project.$subdir
-		if [ ! -e pfiles ] ; then
-	                nb_dir=`echo $rsubdir | grep -o '/' | wc -l`
-	                path='.'
-	                for i in $(seq 1 1 $nb_dir) ; do
-		               path="$path/.."
-		        done
-			
-			#ln -s $path/${linkdepth}${subdir} pfiles
-			fp=$(dirname $here)
-			ln -s $fp/$subdir pfiles
-		fi
-
-                if [[ -e pfiles/lib && $FORCE_REMOVE -eq 1 ]]; then
-                        rm -rf pfiles/lib/
-                fi
-
-                #building
-
-		export CMAKE_ARGS="-DROOT_DRL_PATH=$(dirname $here)  $CMAKE_ARGS"
-                cmakeBuild debug Debug pfiles/
-
-                echo "INFO : $subdir well builed. Congratz."
-                hr
-        done
-	cd $here
-}
-
-
-
 function merge_report(){
 	$FIND . -name 'build.log' -type f | xargs cat > build_report.log
-}
-
-function outside_prepare(){
-	mkdir project.$1
-	cd project.$1
-	ln -s ../../$1 $1
 }
 
 function echo_usage(){
@@ -258,8 +188,9 @@ function echo_usage(){
 	echo "eclipse | EC : generates Eclipse projects"
 	echo "xcode | XC : generates Xcode projects"
 	echo "--force : always remove old build without asking"
-	echo "--clear : remove old build (without build)"
+	echo "--clear : remove old build (without starting a new build)"
 	echo "--debug : build only debug"
+	echo "--with-cpp : build every c++ binaries"
 	echo "--report : merge all report into one (build_report.log) usefull for continuous integration"
 	echo "-j n : limit the build with n cpu (use all by default)"
 	echo "-with-relwithdeb : build also relwithdeb"
@@ -272,8 +203,8 @@ export CLEAR=0
 export XCODE=0
 export BUILD_DEBUG=0
 export BUILD_RELWITHDEB=0
+export PYTHON_ONLY=1
 REPORT=0
-BUILD_OUTSIDE=0
 
 for ARG in $*
 do
@@ -289,13 +220,18 @@ do
 		"eclipse" | "EC")
 			echo "Will generate Eclipse projects"
 			export CMAKE_ARGS='-G "Eclipse CDT4 - Unix Makefiles"'
-			BUILD_OUTSIDE=1
 			;;
 		"xcode" | "XC")
 			echo "Will generate Xcode projects"
 			export CMAKE_ARGS='-G "Xcode"'
 			XCODE=1
 			;;
+        "--with-cpp")
+            echo "build every c++ binaries"
+            export PYTHON_ONLY=0
+			export CMAKE_ARGS='-DPYTHON_ONLY=OFF"'
+			XCODE=1
+            ;;
 		"--force")
 			export FORCE_REMOVE='1'
 			;;
@@ -338,26 +274,11 @@ if [[ "$FORCE_REMOVE" == '' && $CLEAR -eq 0 ]]  ; then
 	fi
 fi
 
-if [ $BUILD_OUTSIDE -eq 1 ] ; then
-	if [ ! -e $OUTSIDE_PATH ] ; then
-		mkdir $OUTSIDE_PATH
-	fi
-
-	here_r=$(pwd)
-	cd $OUTSIDE_PATH
-	buildDirOutside common
-	buildDirOutside environment
-	buildDirOutside agent
-
-	cd $here_r
-	if [ $CLEAR -eq 1 ]; then
-		rm -rf $OUTSIDE_PATH
-	fi
-else
-	buildDir common
-	buildDir environment
-	buildDir agent
+buildDir common
+if [ $PYTHON_ONLY -eq 0 ] ; then
+    buildDir environment
 fi
+buildDir agent
 
 if [ $REPORT -eq 1 ] ; then
 	merge_report

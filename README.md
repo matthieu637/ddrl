@@ -114,7 +114,7 @@ make -j4
 sudo make install
 cd ../..
 
-# ode compilation needed if official packages is under 0.14
+# ode compilation is needed if official packages are under 0.14 (only required if fullbuild is called with --with-cpp)
 mkdir ode
 cd ode
 wget https://bitbucket.org/odedevs/ode/downloads/ode-0.14.tar.gz
@@ -129,8 +129,11 @@ cd ../..
 # then you can finnaly compile ddrl
 git clone https://github.com/matthieu637/ddrl
 cd ddrl
+# to use DDRL with python (openai gym) the following build is enough
 ./fullBuild.bash
 
+# if want to use ODE environments with c++ binaries
+./fullBuild.bash --with-cpp
 ```
 
 ### Mac
