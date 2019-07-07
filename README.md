@@ -69,7 +69,7 @@ Main dependencies : boost (>=1.54), caffe, ode(>=0.14).
 However, it needs a modified version of Caffe : https://github.com/matthieu637/caffe.git
 RAM+SWAP > 750 MB
 
-### Archlinux
+### Archlinux 
 ```
 yaourt -Sy boost ode openblas-lapack hdf5 protobuf google-glog gflags leveldb snappy lmdb cuda xz cmake gtest freeimage
 cd any_directory_you_want
@@ -83,7 +83,7 @@ cd ../ddrl/
 ./fullBuild.bash
 ```
 
-### Ubuntu >= 14.04
+### Ubuntu >= 14.04 (CPU Only)
 
 Do not enable anaconda during compilation.
 ```
@@ -136,7 +136,61 @@ cd ddrl
 ./fullBuild.bash --with-cpp
 ```
 
-### Mac
+### Ubuntu LTS 18.04 with GPU (CUDA 10.0)
+Install CUDA 10.0 (same as tensorflow)
+```
+#remove nvidia driver and default cuda
+sudo apt-get -y remove nvidia-cuda-dev nvidia-cuda-toolkit nvidia-cuda-doc nvidia-cuda-gdb nvidia-utils-390 nvidia-driver-390 nvidia-utils-410 nvidia-driver-410
+sudo apt-get autoremove
+#optionally unload nvidia driver if you don't want to reboot (only for server without GUI)
+sudo rmmod nvidia nvidia_uvm nvidia_modeset nvidia_drm
+
+# Add NVIDIA package repositories
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-repo-ubuntu1804_10.0.130-1_amd64.deb
+sudo apt-key adv --fetch-keys http://202.121.180.31/cache/7fa2af80.pub
+sudo dpkg -i cuda-repo-ubuntu1804_10.0.130-1_amd64.deb
+sudo apt-get update
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/nvidia-machine-learning-repo-ubuntu1804_1.0.0-1_amd64.deb
+sudo apt install ./nvidia-machine-learning-repo-ubuntu1804_1.0.0-1_amd64.deb
+sudo apt-get update
+ 
+# Install NVIDIA driver
+sudo apt-get install --no-install-recommends nvidia-driver-418
+# Reboot. Check that GPUs are visible using the command: nvidia-smi
+ 
+# Install development and runtime libraries (~4GB)
+#cuda-10-0 needs nvidia-driver-418 and not nvidia-driver-410 ... (tensorflow.org seems outdated)
+sudo apt-get install cuda-10-0 libcudnn7=7.5.1.10-1+cuda10.0 libcudnn7-dev=7.5.1.10-1+cuda10.0
+sudo apt-get install nvinfer-runtime-trt-repo-ubuntu1804-5.0.2-ga-cuda10.0
+sudo apt-get install libnvinfer-dev=5.1.5-1+cuda10.0 libnvinfer5=5.1.5-1+cuda10.0
+ 
+#Protect those packages from being upgraded
+sudo apt-mark hold libcudnn7 libcudnn7-dev libnvinfer-dev libnvinfer5
+```
+
+Needs a higher version of cmake than the one present in ubuntu 18.04
+```
+wget https://github.com/Kitware/CMake/releases/download/v3.13.5/cmake-3.13.5.tar.gz
+tar xf cmake-3.13.5.tar.gz
+cd cmake-3.13.5
+./configure --prefix=$HOME/.root/cmake
+make -j 4
+make install
+```
+
+Follow the same installation as CPU only, except for caffe:
+```
+# caffe compilation
+git clone https://github.com/matthieu637/caffe.git
+mkdir caffe/build
+cd caffe/build
+~/.root/cmake/bin/cmake ../ -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCPU_ONLY=Off -DCMAKE_INSTALL_PREFIX:PATH=/usr/local/
+make -j4
+sudo make install
+cd ../..
+```
+
+### Mac (CPU Only)
 ```
 #if you run a version lower than sierra (example on mavericks)
 #you need to install an up-to-date llvm version for c++11 features with :
