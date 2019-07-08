@@ -9,22 +9,26 @@ url="https://github.com/BVLC/caffe"
 license=('BSD')
 groups=('base-devel')
 depends=('openblas-lapack' 'hdf5' 'boost' 'protobuf' 'google-glog'
-		 'gflags' 'leveldb' 'snappy' 'lmdb' 'xz>=5' 'gcc5' 'cuda')
+		 'gflags' 'leveldb' 'snappy' 'lmdb' 'xz>=5' 'cuda>=10.0' 'gcc7')
 makedepends=('git' 'cmake')
 source=("git+https://github.com/matthieu637/caffe.git")
 sha256sums=('SKIP')
 
 build() {
-    cd "$srcdir/$pkgname"
+    cd "$srcdir/caffe"
     mkdir build
     cd build
-    cmake ../ -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCMAKE_C_COMPILER=gcc-5 \
-                -DCMAKE_INSTALL_PREFIX=$pkgdir/usr/ -DCUDA_ARCH_NAME=All
+    export CC=/usr/bin/gcc-7
+    export CXX=/usr/bin/g++-7
+    cmake ../ -DBLAS=Open -DBUILD_python=OFF -DUSE_OPENCV=OFF -DCPU_ONLY=OFF\
+                -DCMAKE_INSTALL_PREFIX=$pkgdir/usr/ 
 
     make all -j4
 }
 
 package() {
-        cd "$srcdir/$pkgname/build"
+        cd "$srcdir/caffe/build"
         make install
+        cd "$pkgdir/usr/"
+        mv lib64 lib
 }
