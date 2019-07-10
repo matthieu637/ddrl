@@ -176,6 +176,7 @@ class MLP {
 
     solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
     neural_net = solver->net();
+    computeMemoryDataSkip();
     writeNN_struct(*net_param);
     
 //       LOG_DEBUG("param critic : " <<  neural_net->params().size());
@@ -241,7 +242,7 @@ class MLP {
                       boost::none, {kMinibatchSize, size_motors, kFixedDim, kFixedDim});
       SilenceLayer(net_param_init, "silence", {"dummy1", "dummy2"}, {}, boost::none);
       EuclideanLossLayer(net_param_init, "loss", {actions_blob_name, targets_blob_name},
-      {loss_blob_name}, boost::none);
+        {loss_blob_name}, boost::none);
     }
 
 //     net_param_init.PrintDebugString();
@@ -272,7 +273,7 @@ class MLP {
     solver = caffe::SolverRegistry<double>::CreateSolver(solver_param);
     neural_net = solver->net();
     writeNN_struct(*net_param);
-
+    computeMemoryDataSkip();
 //       LOG_DEBUG("actor critic : " <<  neural_net->params().size());
   }
 
@@ -344,6 +345,8 @@ class MLP {
       ASSERT(number_of_parameters() == m.number_of_parameters(), "gettrace");
       exit(1);
     }
+    
+    computeMemoryDataSkip();
   }
 
  private:
@@ -481,6 +484,21 @@ class MLP {
       }
     }
   }
+  
+    void learn_blob(const caffe::Blob<double>& sensors, const caffe::Blob<double>& motors, const caffe::Blob<double>& q, uint iter) {
+      if(size_motors > 0 && !add_loss_layer)
+        InputBlobIntoLayers(&sensors, &motors, &q);
+      else
+        InputBlobIntoLayers(&sensors, nullptr, &q);
+      
+      for(uint i=0;i<iter;i++){
+        neural_net->ClearParamDiffs();
+        forwardSkipMemoryDataLayer();
+        neural_net->Backward();
+        solver->ApplyUpdate();
+        solver->set_iter(solver->iter() + 1);
+      }
+  }
 
   void learn_batch_lw(const std::vector<double>& sensors, const std::vector<double>& motors, const std::vector<double>& q,
                       const std::vector<double>& lw, uint iter) {
@@ -545,6 +563,23 @@ class MLP {
 
     return outputs;
   }
+  
+  virtual caffe::Blob<double>* computeOutVFBlob(const caffe::Blob<double>& sensors, const caffe::Blob<double>& motors) {
+    if(size_motors > 0)
+      InputBlobIntoLayers(&sensors, &motors, nullptr);
+    else 
+      InputBlobIntoLayers(&sensors, nullptr, nullptr);
+    
+    if(weighted_sample)
+      setWeightedSampleVector(nullptr, true);
+    forwardSkipMemoryDataAndLossLayer();
+
+    const auto q_values_blob = neural_net->blob_by_name(q_values_blob_name);
+    auto outputs = new caffe::Blob<double>(q_values_blob->shape());
+    outputs->CopyFrom(*q_values_blob);
+    
+    return outputs;
+  }
 
   virtual std::vector<double>* computeOut(const std::vector<double>& states_batch) {
     std::vector<double> states_input(size_input_state * kMinibatchSize, 0.0f);
@@ -572,6 +607,17 @@ class MLP {
     for (uint n = 0; n < kMinibatchSize; ++n)
       for(uint j=0; j < size_motors; j++)
         outputs->at(i++) = actions_blob->data_at(n, j, 0, 0);
+
+    return outputs;
+  }
+  
+  caffe::Blob<double>* computeOutBlob(const caffe::Blob<double>& in) {
+    InputBlobIntoLayers(&in, NULL, NULL);
+    forwardSkipMemoryDataAndLossLayer();
+
+    const auto actions_blob = neural_net->blob_by_name(actions_blob_name);
+    auto outputs = new caffe::Blob<double>(actions_blob->shape());
+    outputs->CopyFrom(*actions_blob);
 
     return outputs;
   }
@@ -1082,6 +1128,29 @@ protected:
     }
   }
   
+  void InputBlobIntoLayers(const caffe::Blob<double>* states_input, 
+                           const caffe::Blob<double>* actions_input, 
+                           const caffe::Blob<double>* target_input) {
+    if (states_input != nullptr) {
+      auto blob = neural_net->blob_by_name(states_blob_name);
+      CHECK(blob);
+      ASSERT(states_input->shape() == blob->shape(), "pb size " << states_input->shape()[0] << " " << 
+                    states_input->shape()[1] << " " << blob->shape()[0] << " " << blob->shape()[1] );
+      blob->CopyFrom(*states_input);
+    }
+    if (actions_input != nullptr) {
+      LOG_ERROR("not implemented");
+      exit(1);
+    }
+    if (target_input != nullptr ) {
+      auto blob = neural_net->blob_by_name(targets_blob_name);
+      CHECK(blob);
+      ASSERT(target_input->shape() == blob->shape(), "pb size " << target_input->shape()[0] << " " << 
+              target_input->shape()[1] << " " << blob->shape()[0] << " " << blob->shape()[1] );
+      blob->CopyFrom(*target_input);
+    }
+  }
+  
   bool MyNetNeedsUpgrade(const caffe::NetParameter& net_param) {
     return NetNeedsV0ToV1Upgrade(net_param) || NetNeedsV1ToV2Upgrade(net_param)
     || NetNeedsDataUpgrade(net_param) || NetNeedsInputUpgrade(net_param);
@@ -1167,6 +1236,63 @@ public:
     ofs.close();
   }
 
+  void forwardSkipMemoryDataLayer(){
+    for(uint i=0;i<memory_data_skip_begin.size();i++)
+        neural_net->ForwardFromTo(memory_data_skip_begin[i], memory_data_skip_end[i]);
+  }
+  
+  void forwardSkipMemoryDataAndLossLayer(){
+    for(uint i=0;i<memory_data_loss_skip_begin.size();i++)
+        neural_net->ForwardFromTo(memory_data_loss_skip_begin[i], memory_data_loss_skip_end[i]);
+  }
+  
+  void computeMemoryDataSkip(){
+      std::string md("MemoryData");
+      std::string si("Silence");
+      std::string loss("EuclideanLoss");
+      auto isinvalid = [&](const char * f) {
+          return md.compare(f) == 0 || si.compare(f) == 0;
+      };
+      auto isinvalid2 = [&](const char * f) {
+          return md.compare(f) == 0 || si.compare(f) == 0 || loss.compare(f) == 0;
+      };
+      bool started=false;
+      for(int i=0;i<neural_net->layers().size();i++){
+        if (!isinvalid(neural_net->layers()[i]->type()) && !started){
+          memory_data_skip_begin.push_back(i);
+          started=true;
+        } 
+        else if (isinvalid(neural_net->layers()[i]->type()) && started){
+          memory_data_skip_end.push_back(i-1);
+          started=false;
+        }
+      }
+
+      if(started)
+        memory_data_skip_end.push_back(neural_net->layers().size()-1);
+      
+      started=false;
+      for(int i=0;i<neural_net->layers().size();i++){
+        if (!isinvalid2(neural_net->layers()[i]->type()) && !started){
+          memory_data_loss_skip_begin.push_back(i);
+          started=true;
+        } 
+        else if (isinvalid2(neural_net->layers()[i]->type()) && started){
+          memory_data_loss_skip_end.push_back(i-1);
+          started=false;
+        }
+      }
+
+      if(started)
+        memory_data_loss_skip_end.push_back(neural_net->layers().size()-1);
+      
+//       bib::Logger::PRINT_ELEMENTS(memory_data_skip_begin);
+//       bib::Logger::PRINT_ELEMENTS(memory_data_skip_end);
+//       bib::Logger::PRINT_ELEMENTS(memory_data_loss_skip_begin);
+//       bib::Logger::PRINT_ELEMENTS(memory_data_loss_skip_end);
+//       LOG_DEBUG("end");
+  }
+
  protected:
   caffe::Solver<double>* solver;
   boost::shared_ptr<caffe::Net<double>> neural_net;
@@ -1177,6 +1303,10 @@ public:
   bool add_loss_layer=false;
   bool weighted_sample=false;
   uint hiddens_size;
+  std::deque<uint> memory_data_skip_begin;
+  std::deque<uint> memory_data_skip_end;
+  std::deque<uint> memory_data_loss_skip_begin;
+  std::deque<uint> memory_data_loss_skip_end;
 //   internal copy of inputs/outputs
   boost::shared_ptr<std::vector<double>> copy_states;
   boost::shared_ptr<std::vector<double>> copy_actions;

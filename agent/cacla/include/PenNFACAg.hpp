@@ -6,6 +6,7 @@
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
+#include <caffe/util/math_functions.hpp>
 
 #include "arch/AACAgent.hpp"
 #include "bib/Seed.hpp"
@@ -36,7 +37,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   friend class FusionOOAg;
 
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(0), last_state(_nb_sensors, 0.f) {
+    : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(), last_state(_nb_sensors, 0.f) {
 
   }
 
@@ -45,6 +46,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     delete ann;
     
     delete ann_testing;
+    if(batch_norm_actor != 0)
+      delete ann_testing_blob;
     if(batch_norm_critic != 0)
       delete vnn_testing;
 
@@ -94,7 +97,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
 
   void _unique_invoke(boost::property_tree::ptree* pt, boost::program_options::variables_map* command_args) override {
-//    bib::Seed::setFixedSeedUTest();
+//     bib::Seed::setFixedSeedUTest();
     hidden_unit_v           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_v"));
     hidden_unit_a           = bib::to_array<uint>(pt->get<std::string>("agent.hidden_unit_a"));
     noise                   = pt->get<double>("agent.noise");
@@ -161,6 +164,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);
     
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
+    
+    if(batch_norm_actor != 0)
+      ann_testing_blob = new NN(*ann, false, ::caffe::Phase::TEST);
     if(batch_norm_critic != 0)
       vnn_testing = new NN(*vnn, false, ::caffe::Phase::TEST);
     
@@ -183,91 +189,80 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     delete[] weights;
   }
 
-  void update_critic(const std::vector<double>& all_states, const std::vector<double>& all_next_states,
-    const std::vector<double>& gamma_coef, const std::vector<double>& r_all) {
+  void update_critic(const caffe::Blob<double>& all_states, const caffe::Blob<double>& all_next_states,
+    const caffe::Blob<double>& gamma_coef, const caffe::Blob<double>& r_all) {
     
     if (trajectory.size() > 0) {
-      std::vector<double> v_target(trajectory.size());
+      caffe::Blob<double> v_target(trajectory.size(), 1, 1, 1);
 
       //remove trace of old policy
       auto iter = [&]() {
-        decltype(vnn_testing->computeOutVFBatch(all_next_states, empty_action)) all_nextV;
+        decltype(vnn_testing->computeOutVFBlob(all_next_states, empty_action)) all_nextV;
         if(batch_norm_critic != 0)
         {
           double* weights = new double[vnn->number_of_parameters(false)];
           vnn->copyWeightsTo(weights, false);
           vnn_testing->copyWeightsFrom(weights, false);
           delete[] weights;
-          all_nextV = vnn_testing->computeOutVFBatch(all_next_states, empty_action);
+          all_nextV = vnn_testing->computeOutVFBlob(all_next_states, empty_action);
         } else 
-          all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
+          all_nextV = vnn->computeOutVFBlob(all_next_states, empty_action);
+        auto all_V = vnn->computeOutVFBlob(all_states, empty_action);
 
-//#ifdef CAFFE_CPU_ONLY
-        caffe::caffe_mul(trajectory.size(), gamma_coef.data(), all_nextV->data(), v_target.data());
-        caffe::caffe_add(trajectory.size(), r_all.data(), v_target.data(), v_target.data());
-//#else
-//        caffe::caffe_gpu_mul(trajectory.size(), gamma_coef.data(), all_nextV->data(), v_target.data());
-//        caffe::caffe_gpu_add(trajectory.size(), r_all.data(), v_target.data(), v_target.data());
-//#endif
-
-        if(lambda < 0.f && batch_norm_critic == 0)
-          vnn->learn_batch(all_states, empty_action, v_target, stoch_iter_critic);
-        else if(lambda < 0.f){
-          for(uint sia = 0; sia < stoch_iter_critic; sia++){
-            delete vnn->computeOutVFBatch(all_states, empty_action);
-            {
-              double* weights = new double[vnn->number_of_parameters(false)];
-              vnn->copyWeightsTo(weights, false);
-              vnn_testing->copyWeightsFrom(weights, false);
-              delete[] weights;
-            }
-            auto all_V = vnn_testing->computeOutVFBatch(all_states, empty_action);
-            
-            const auto q_values_blob = vnn->getNN()->blob_by_name(MLP::q_values_blob_name);
-            double* q_values_diff = q_values_blob->mutable_cpu_diff();
-            uint i=0;
-            double s = trajectory.size();
-            for (auto it : trajectory){
-              q_values_diff[i] = (all_V->at(i)-v_target[i])/s;
-              i++;
-            }
-            vnn->critic_backward();
-            vnn->updateFisher(trajectory.size());
-            vnn->regularize();
-            vnn->getSolver()->ApplyUpdate();
-            vnn->getSolver()->set_iter(vnn->getSolver()->iter() + 1);
-            delete all_V;
-          }
-        }
-        else {
-//        Simple computation for lambda return
-          auto all_V = vnn->computeOutVFBatch(all_states, empty_action);
-          std::vector<double> deltas(trajectory.size());
-
-          caffe::caffe_sub(trajectory.size(), v_target.data(), all_V->data(), deltas.data());
-          
-          std::vector<double> diff(trajectory.size());
-          int li=trajectory.size() - 1;
-          double prev_delta = 0.;
-          int index_ep = trajectory_end_points.size() - 1;
-          for (auto it : trajectory) {
-            if (index_ep >= 0 && trajectory_end_points[index_ep] - 1 == li){
-                prev_delta = 0.;
-                index_ep--;
-            }
-            diff[li] = deltas[li] + prev_delta;
-            prev_delta = this->gamma * lambda * diff[li];
-            --li;
-          }
-          ASSERT(diff[trajectory.size() -1] == deltas[trajectory.size() -1], "pb lambda");
-          
-          caffe::caffe_add(trajectory.size(), diff.data(), all_V->data(), diff.data());
-          
-          vnn->learn_batch(all_states, empty_action, diff, stoch_iter_critic);
-
-          delete all_V;
-        }
+#ifdef CAFFE_CPU_ONLY
+        caffe::caffe_mul(trajectory.size(), gamma_coef.cpu_data(), all_nextV->cpu_data(), v_target.mutable_cpu_data());
+        caffe::caffe_add(trajectory.size(), r_all.cpu_data(), v_target.cpu_data(), v_target.mutable_cpu_data());
+        caffe::caffe_sub(trajectory.size(), v_target.cpu_data(), all_V->cpu_data(), v_target.mutable_cpu_data());
+#else
+      switch (caffe::Caffe::mode()) {
+      case caffe::Caffe::CPU:
+        caffe::caffe_mul(trajectory.size(), gamma_coef.cpu_data(), all_nextV->cpu_data(), v_target.mutable_cpu_data());
+        caffe::caffe_add(trajectory.size(), r_all.cpu_data(), v_target.cpu_data(), v_target.mutable_cpu_data());
+        caffe::caffe_sub(trajectory.size(), v_target.cpu_data(), all_V->cpu_data(), v_target.mutable_cpu_data());
+        break;
+      case caffe::Caffe::GPU:
+        caffe::caffe_gpu_mul(trajectory.size(), gamma_coef.gpu_data(), all_nextV->gpu_data(), v_target.mutable_gpu_data());
+        caffe::caffe_gpu_add(trajectory.size(), r_all.gpu_data(), v_target.gpu_data(), v_target.mutable_gpu_data());
+        caffe::caffe_gpu_sub(trajectory.size(), v_target.gpu_data(), all_V->gpu_data(), v_target.mutable_gpu_data());
+        break;
+      }
+#endif
         
+//     Simple computation for lambda return
+//    move v_target from GPU to CPU
+        caffe::Blob<double> diff(trajectory.size(), 1, 1, 1);
+        double* pdiff = diff.mutable_cpu_data();
+        const double* pvtarget = v_target.cpu_data();
+        int li=trajectory.size() - 1;
+        double prev_delta = 0.;
+        int index_ep = trajectory_end_points.size() - 1;
+        for (auto it : trajectory) {
+          if (index_ep >= 0 && trajectory_end_points[index_ep] - 1 == li){
+              prev_delta = 0.;
+              index_ep--;
+          }
+          pdiff[li] = pvtarget[li] + prev_delta;
+          prev_delta = this->gamma * lambda * pdiff[li];
+          --li;
+        }
+        ASSERT(pdiff[trajectory.size() -1] == pvtarget[trajectory.size() -1], "pb lambda");
+        
+//         move diff to GPU
+#ifdef CAFFE_CPU_ONLY
+        caffe::caffe_add(trajectory.size(), diff.cpu_data(), all_V->cpu_data(), diff.mutable_cpu_data());
+#else
+      switch (caffe::Caffe::mode()) {
+      case caffe::Caffe::CPU:
+        caffe::caffe_add(trajectory.size(), diff.cpu_data(), all_V->cpu_data(), diff.mutable_cpu_data());
+        break;
+      case caffe::Caffe::GPU:
+        caffe::caffe_gpu_add(trajectory.size(), diff.gpu_data(), all_V->gpu_data(), diff.mutable_gpu_data());
+        break;
+      }
+#endif
+        vnn->learn_blob(all_states, empty_action, diff, stoch_iter_critic);
+
+        delete all_V;
         delete all_nextV;
       };
 
@@ -293,17 +288,22 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         vnn_testing->increase_batchsize(trajectory.size());
     }
     
-    std::vector<double> all_states(trajectory.size() * nb_sensors);
-    std::vector<double> all_next_states(trajectory.size() * nb_sensors);
-    std::vector<double> gamma_coef(trajectory.size());
-    std::vector<double> r_all(trajectory.size());
+    caffe::Blob<double> all_states(trajectory.size(), nb_sensors, 1, 1);
+    caffe::Blob<double> all_next_states(trajectory.size(), nb_sensors, 1, 1);
+    caffe::Blob<double> gamma_coef(trajectory.size(), 1, 1, 1);
+    caffe::Blob<double> r_all(trajectory.size(), 1, 1, 1);
+    
+    double* pall_states = all_states.mutable_cpu_data();
+    double* pall_states_next = all_next_states.mutable_cpu_data();
+    double* pgamma_coef = gamma_coef.mutable_cpu_data();
+    double* pr_all = r_all.mutable_cpu_data();
 
     int li=0;
     for (auto it : trajectory) {
-      std::copy(it.s.begin(), it.s.end(), all_states.begin() + li * nb_sensors);
-      std::copy(it.next_s.begin(), it.next_s.end(), all_next_states.begin() + li * nb_sensors);
-      r_all[li]=it.r;
-      gamma_coef[li]= it.goal_reached ? 0.000f : this->gamma;
+      std::copy(it.s.begin(), it.s.end(), pall_states + li * nb_sensors);
+      std::copy(it.next_s.begin(), it.next_s.end(), pall_states_next + li * nb_sensors);
+      pr_all[li]=it.r;
+      pgamma_coef[li]= it.goal_reached ? 0.000f : this->gamma;
       li++;
     }
 
@@ -311,31 +311,47 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
     if (trajectory.size() > 0) {
       const std::vector<double> disable_back_ac(this->nb_motors, 0.00f);
-      std::vector<double> deltas(trajectory.size());
+      caffe::Blob<double> deltas(trajectory.size(), 1, 1, 1);
 
-      decltype(vnn->computeOutVFBatch(all_next_states, empty_action)) all_nextV, all_mine;
+      decltype(vnn->computeOutVFBlob(all_next_states, empty_action)) all_nextV, all_mine;
       if(batch_norm_critic != 0)
       {
         double* weights = new double[vnn->number_of_parameters(false)];
         vnn->copyWeightsTo(weights, false);
         vnn_testing->copyWeightsFrom(weights, false);
         delete[] weights;
-        all_nextV = vnn_testing->computeOutVFBatch(all_next_states, empty_action);
-        all_mine = vnn_testing->computeOutVFBatch(all_states, empty_action);
+        all_nextV = vnn_testing->computeOutVFBlob(all_next_states, empty_action);
+        all_mine = vnn_testing->computeOutVFBlob(all_states, empty_action);
       } else {
-        all_nextV = vnn->computeOutVFBatch(all_next_states, empty_action);
-        all_mine = vnn->computeOutVFBatch(all_states, empty_action);
+        all_nextV = vnn->computeOutVFBlob(all_next_states, empty_action);
+        all_mine = vnn->computeOutVFBlob(all_states, empty_action);
       }
-      
-      caffe::caffe_mul(trajectory.size(), gamma_coef.data(), all_nextV->data(), deltas.data());
-      caffe::caffe_add(trajectory.size(), r_all.data(), deltas.data(), deltas.data());
-      caffe::caffe_sub(trajectory.size(), deltas.data(), all_mine->data(), deltas.data());
+
+     
+#ifdef CAFFE_CPU_ONLY
+        caffe::caffe_mul(trajectory.size(), gamma_coef.cpu_data(), all_nextV->cpu_data(), deltas.mutable_cpu_data());
+        caffe::caffe_add(trajectory.size(), r_all.cpu_data(), cpu_data.data(), deltas.mutable_cpu_data());
+        caffe::caffe_sub(trajectory.size(), deltas.cpu_data(), all_mine->cpu_data(), deltas.mutable_cpu_data());
+#else
+      switch (caffe::Caffe::mode()) {
+      case caffe::Caffe::CPU:
+        caffe::caffe_mul(trajectory.size(), gamma_coef.cpu_data(), all_nextV->cpu_data(), deltas.mutable_cpu_data());
+        caffe::caffe_add(trajectory.size(), r_all.cpu_data(), deltas.cpu_data(), deltas.mutable_cpu_data());
+        caffe::caffe_sub(trajectory.size(), deltas.cpu_data(), all_mine->cpu_data(), deltas.mutable_cpu_data());
+        break;
+      case caffe::Caffe::GPU:
+        caffe::caffe_gpu_mul(trajectory.size(), gamma_coef.gpu_data(), all_nextV->gpu_data(), deltas.mutable_gpu_data());
+        caffe::caffe_gpu_add(trajectory.size(), r_all.gpu_data(), deltas.gpu_data(), deltas.mutable_gpu_data());
+        caffe::caffe_gpu_sub(trajectory.size(), deltas.gpu_data(), all_mine->gpu_data(), deltas.mutable_gpu_data());
+        break;
+      }
+#endif
  
       if(gae){
-        //           
         //        Simple computation for lambda return
-        //           
+        //        move deltas from GPU to CPU
         std::vector<double> diff(trajectory.size());
+        const double* pdeltas = deltas.cpu_data();
         int li=trajectory.size() - 1;
         double prev_delta = 0.;
         int index_ep = trajectory_end_points.size() - 1;
@@ -344,47 +360,52 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               prev_delta = 0.;
               index_ep--;
           }
-          diff[li] = deltas[li] + prev_delta;
+          diff[li] = pdeltas[li] + prev_delta;
           prev_delta = this->gamma * lambda * diff[li];
           --li;
         }
-        ASSERT(diff[trajectory.size() -1] == deltas[trajectory.size() -1], "pb lambda");
+        ASSERT(diff[trajectory.size() -1] == pdeltas[trajectory.size() -1], "pb lambda");
 
-        caffe::caffe_copy(trajectory.size(), diff.data(), deltas.data());
+        caffe::caffe_copy(trajectory.size(), diff.data(), deltas.mutable_cpu_data());
       }
       
       uint n=0;
       posdelta_mean=0.f;
-      std::vector<double> target_cac(trajectory.size() * this->nb_motors);
-      std::vector<double> target_treg(trajectory.size() * this->nb_motors);
-      std::vector<double> disable_back_cac(trajectory.size() * this->nb_motors, 1.f);
-      std::vector<double> disable_back_treg(trajectory.size() * this->nb_motors, 1.f);
-      std::vector<double> deltas_blob(trajectory.size() * this->nb_motors, 1.f);
+      caffe::Blob<double> target_cac(trajectory.size(), this->nb_motors, 1, 1);
+      caffe::Blob<double> target_treg(trajectory.size(), this->nb_motors, 1, 1);
+      caffe::Blob<double> disable_back_cac(trajectory.size(), this->nb_motors, 1, 1);
+      caffe::caffe_set(disable_back_cac.count(), static_cast<double>(1.f), disable_back_cac.mutable_cpu_data());
+      caffe::Blob<double> disable_back_treg(trajectory.size(), this->nb_motors, 1, 1);
+      caffe::caffe_set(disable_back_treg.count(), static_cast<double>(1.f), disable_back_treg.mutable_cpu_data());
+      caffe::Blob<double> deltas_blob(trajectory.size(), this->nb_motors, 1, 1);
+      caffe::caffe_set(deltas_blob.count(), static_cast<double>(1.f), deltas_blob.mutable_cpu_data());
 
+      double* pdisable_back_cac = disable_back_cac.mutable_cpu_data();
+      double* pdisable_back_treg = disable_back_treg.mutable_cpu_data();
+      double* pdeltas_blob = deltas_blob.mutable_cpu_data();
+      double* ptarget_cac = target_cac.mutable_cpu_data();
+      double* ptarget_treg = target_treg.mutable_cpu_data();
+      const double* pdeltas = deltas.cpu_data();
       li=0;
       //cacla cost
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-        sample sm = *it;
-
-        std::copy(it->a.begin(), it->a.end(), target_cac.begin() + li * this->nb_motors);
-        if(deltas[li] > 0.) {
-          posdelta_mean += deltas[li];
+        std::copy(it->a.begin(), it->a.end(), ptarget_cac + li * this->nb_motors);
+        if(pdeltas[li] > 0.) {
+          posdelta_mean += pdeltas[li];
           n++;
         } else {
-          std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back_cac.begin() + li * this->nb_motors);
+          std::copy(disable_back_ac.begin(), disable_back_ac.end(), pdisable_back_cac + li * this->nb_motors);
         }
         if(!disable_cac)
-            std::fill(deltas_blob.begin() + li * this->nb_motors, deltas_blob.begin() + (li+1) * this->nb_motors, deltas[li]);
+            std::fill(pdeltas_blob + li * this->nb_motors, pdeltas_blob + (li+1) * this->nb_motors, pdeltas[li]);
         li++;
       }
       //penalty cost
       li=0;
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-        sample sm = *it;
-
-        std::copy(it->pure_a.begin(), it->pure_a.end(), target_treg.begin() + li * this->nb_motors);
-        if(ignore_poss_ac && deltas[li] > 0.) {
-            std::copy(disable_back_ac.begin(), disable_back_ac.end(), disable_back_treg.begin() + li * this->nb_motors);
+        std::copy(it->pure_a.begin(), it->pure_a.end(), ptarget_treg + li * this->nb_motors);
+        if(ignore_poss_ac && pdeltas[li] > 0.) {
+            std::copy(disable_back_ac.begin(), disable_back_ac.end(), pdisable_back_treg + li * this->nb_motors);
         }
         li++;
       }
@@ -398,21 +419,21 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       if(conserve_beta)
         beta=conserved_beta;
       mean_beta += beta;
-
+      
       if(n > 0) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++){
           ann->increase_batchsize(trajectory.size());
           //learn BN
-          auto ac_out = ann->computeOutBatch(all_states);
+          auto ac_out = ann->computeOutBlob(all_states);
           if(batch_norm_actor != 0) {
             //re-compute ac_out with BN as testing
             double* weights = new double[ann->number_of_parameters(false)];
             ann->copyWeightsTo(weights, false);
-            ann_testing->copyWeightsFrom(weights, false);
+            ann_testing_blob->copyWeightsFrom(weights, false);
             delete[] weights;
             delete ac_out;
-            ann_testing->increase_batchsize(trajectory.size());
-            ac_out = ann_testing->computeOutBatch(all_states);
+            ann_testing_blob->increase_batchsize(trajectory.size());
+            ac_out = ann_testing_blob->computeOutBlob(all_states);
           }
           ann->ZeroGradParameters();
           
@@ -421,10 +442,26 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               beta=0.f;
           else if (sia > 0) {
             //compute deter distance(pi, pi_old)
-            std::vector<double> diff_treg(size_cost_cacla);
-            caffe::caffe_sub(size_cost_cacla, target_treg.data(), ac_out->data(), diff_treg.data());
-            caffe::caffe_mul(size_cost_cacla, diff_treg.data(), diff_treg.data(), diff_treg.data());
-            double l2distance = caffe::caffe_cpu_asum(size_cost_cacla, diff_treg.data());
+            caffe::Blob<double> diff_treg(trajectory.size(), this->nb_motors, 1, 1);
+            double l2distance = 0.f;
+#ifdef CAFFE_CPU_ONLY
+            caffe::caffe_sub(size_cost_cacla, target_treg.cpu_data(), ac_out->cpu_data(), diff_treg.mutable_cpu_data());
+            caffe::caffe_mul(size_cost_cacla, diff_treg.cpu_data(), diff_treg.cpu_data(), diff_treg.mutable_cpu_data());
+            l2distance = caffe::caffe_cpu_asum(size_cost_cacla, diff_treg.cpu_data());
+#else
+          switch (caffe::Caffe::mode()) {
+          case caffe::Caffe::CPU:
+            caffe::caffe_sub(size_cost_cacla, target_treg.cpu_data(), ac_out->cpu_data(), diff_treg.mutable_cpu_data());
+            caffe::caffe_mul(size_cost_cacla, diff_treg.cpu_data(), diff_treg.cpu_data(), diff_treg.mutable_cpu_data());
+            l2distance = caffe::caffe_cpu_asum(size_cost_cacla, diff_treg.cpu_data());
+            break;
+          case caffe::Caffe::GPU:
+            caffe::caffe_gpu_sub(size_cost_cacla, target_treg.gpu_data(), ac_out->gpu_data(), diff_treg.mutable_gpu_data());
+            caffe::caffe_gpu_mul(size_cost_cacla, diff_treg.gpu_data(), diff_treg.gpu_data(), diff_treg.mutable_gpu_data());
+            caffe::caffe_gpu_asum(size_cost_cacla, diff_treg.gpu_data(), &l2distance);
+            break;
+          }
+#endif
             l2distance = std::sqrt(l2distance/((double) trajectory.size()*this->nb_motors));
 
             if (l2distance < beta_target/1.5)
@@ -439,16 +476,52 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           }
           
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
-          auto ac_diff = actor_actions_blob->mutable_cpu_diff();
           
-          std::vector<double> diff_cac(size_cost_cacla);
-          std::vector<double> diff_treg(size_cost_cacla);
-          caffe::caffe_sub(size_cost_cacla, target_cac.data(), ac_out->data(), diff_cac.data());
-          caffe::caffe_sub(size_cost_cacla, target_treg.data(), ac_out->data(), diff_treg.data());
-          caffe::caffe_mul(size_cost_cacla, disable_back_cac.data(), diff_cac.data(), diff_cac.data());
-          caffe::caffe_mul(size_cost_cacla, disable_back_treg.data(), diff_treg.data(), diff_treg.data());
-          caffe::caffe_add(size_cost_cacla, diff_cac.data(), diff_treg.data(), ac_diff);
+          caffe::Blob<double> diff_cac(trajectory.size(), this->nb_motors, 1, 1);
+          caffe::Blob<double> diff_treg(trajectory.size(), this->nb_motors, 1, 1);
+          double * ac_diff = nullptr;
+#ifdef CAFFE_CPU_ONLY
+          ac_diff = actor_actions_blob->mutable_cpu_diff();
+          caffe::caffe_sub(size_cost_cacla, target_cac.cpu_data(), ac_out->cpu_data(), diff_cac.mutable_cpu_data());
+          caffe::caffe_mul(size_cost_cacla, diff_cac.cpu_data(), deltas_blob.cpu_data(), diff_cac.mutable_cpu_data());
+          caffe::caffe_mul(size_cost_cacla, disable_back_cac.cpu_data(), diff_cac.cpu_data(), diff_cac.mutable_cpu_data());
+          
+          caffe::caffe_sub(size_cost_cacla, target_treg.cpu_data(), ac_out->cpu_data(), diff_treg.mutable_cpu_data());
+          caffe::caffe_scal(size_cost_cacla, beta, diff_treg.mutable_cpu_data());
+          caffe::caffe_mul(size_cost_cacla, disable_back_treg.cpu_data(), diff_treg.cpu_data(), diff_treg.mutable_cpu_data());
+          
+          caffe::caffe_add(size_cost_cacla, diff_cac.cpu_data(), diff_treg.cpu_data(), ac_diff);
           caffe::caffe_scal(size_cost_cacla, (double) -1.f, ac_diff);
+#else
+          switch (caffe::Caffe::mode()) {
+          case caffe::Caffe::CPU:
+            ac_diff = actor_actions_blob->mutable_cpu_diff();
+            caffe::caffe_sub(size_cost_cacla, target_cac.cpu_data(), ac_out->cpu_data(), diff_cac.mutable_cpu_data());
+            caffe::caffe_mul(size_cost_cacla, diff_cac.cpu_data(), deltas_blob.cpu_data(), diff_cac.mutable_cpu_data());
+            caffe::caffe_mul(size_cost_cacla, disable_back_cac.cpu_data(), diff_cac.cpu_data(), diff_cac.mutable_cpu_data());
+            
+            caffe::caffe_sub(size_cost_cacla, target_treg.cpu_data(), ac_out->cpu_data(), diff_treg.mutable_cpu_data());
+            caffe::caffe_scal(size_cost_cacla, beta, diff_treg.mutable_cpu_data());
+            caffe::caffe_mul(size_cost_cacla, disable_back_treg.cpu_data(), diff_treg.cpu_data(), diff_treg.mutable_cpu_data());
+            
+            caffe::caffe_add(size_cost_cacla, diff_cac.cpu_data(), diff_treg.cpu_data(), ac_diff);
+            caffe::caffe_scal(size_cost_cacla, (double) -1.f, ac_diff);
+            break;
+          case caffe::Caffe::GPU:
+            ac_diff = actor_actions_blob->mutable_gpu_diff();
+            caffe::caffe_gpu_sub(size_cost_cacla, target_cac.gpu_data(), ac_out->gpu_data(), diff_cac.mutable_gpu_data());
+            caffe::caffe_gpu_mul(size_cost_cacla, diff_cac.gpu_data(), deltas_blob.gpu_data(), diff_cac.mutable_gpu_data());
+            caffe::caffe_gpu_mul(size_cost_cacla, disable_back_cac.gpu_data(), diff_cac.gpu_data(), diff_cac.mutable_gpu_data());
+            
+            caffe::caffe_gpu_sub(size_cost_cacla, target_treg.gpu_data(), ac_out->gpu_data(), diff_treg.mutable_gpu_data());
+            caffe::caffe_gpu_scal(size_cost_cacla, beta, diff_treg.mutable_gpu_data());
+            caffe::caffe_gpu_mul(size_cost_cacla, disable_back_treg.gpu_data(), diff_treg.gpu_data(), diff_treg.mutable_gpu_data());
+            
+            caffe::caffe_gpu_add(size_cost_cacla, diff_cac.gpu_data(), diff_treg.gpu_data(), ac_diff);
+            caffe::caffe_gpu_scal(size_cost_cacla, (double) -1.f, ac_diff);
+            break;
+          }
+#endif
 
           ann->actor_backward();
           ann->updateFisher(n);
@@ -458,8 +531,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           delete ac_out;
         }
       } else if(batch_norm_actor != 0){
+        //learn BN even if every action were bad
         ann->increase_batchsize(trajectory.size());
-        delete ann->computeOutBatch(all_states);
+        delete ann->computeOutBlob(all_states);
       }
       
       conserved_beta = beta;
@@ -567,11 +641,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   NN* ann;
   NN* vnn;
   NN* ann_testing;
+  NN* ann_testing_blob;
   NN* vnn_testing;
 
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
-  std::vector<double> empty_action; //dummy action cause c++ cannot accept null reference
+  caffe::Blob<double> empty_action; //dummy action cause c++ cannot accept null reference
   double bestever_score;
   int update_each_episode;
   bib::OrnsteinUhlenbeckNoise<double>* oun = nullptr;
