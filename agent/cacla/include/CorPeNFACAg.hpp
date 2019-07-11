@@ -7,6 +7,9 @@
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
 #include <caffe/util/math_functions.hpp>
+
+#define lapack_complex_float std::complex<float>
+#define lapack_complex_double std::complex<double>
 #include "lapacke.h"
 
 #include "arch/AACAgent.hpp"
