@@ -288,29 +288,27 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //     
     int saved_tepsize=trajectory_end_points.size();
     for(int i=0;i < saved_tepsize; i++) {
-        if(trajectory[trajectory_end_points[i]-1].r < -10e-6) {
-          int min_index=0;
-          if(i>0)
-            min_index=trajectory_end_points[i-1];
+        int min_index=0;
+        if(i>0)
+          min_index=trajectory_end_points[i-1];
 
-          for(int j=0;j<hindsight_nb_destination;j++) {
-              uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
+        for(int j=0;j<hindsight_nb_destination;j++) {
+            uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
 
-              for(int k=min_index;k<destination;k++) {
-                sample sa = trajectory[k];
-                trajectory.push_back(sa);
-                trajectory.back().artificial = true;
-                std::copy(trajectory[destination].s.begin() + goal_achieved_start, 
-                      trajectory[destination].s.begin() + goal_achieved_start + goal_size, 
-                      trajectory.back().s.begin() + goal_start);
-                std::copy(trajectory[destination].s.begin() + goal_achieved_start, 
-                      trajectory[destination].s.begin() + goal_achieved_start + goal_size, 
-                      trajectory.back().next_s.begin() + goal_start);
-              }
-              trajectory.back().goal_reached = true;
-              trajectory.back().r = 0.f;
-              trajectory_end_points.push_back(trajectory.size());
-          }
+            for(int k=min_index;k<destination;k++) {
+              sample sa = trajectory[k];
+              trajectory.push_back(sa);
+              trajectory.back().artificial = true;
+              std::copy(trajectory[destination].s.begin() + goal_achieved_start, 
+                    trajectory[destination].s.begin() + goal_achieved_start + goal_size, 
+                    trajectory.back().s.begin() + goal_start);
+              std::copy(trajectory[destination].s.begin() + goal_achieved_start, 
+                    trajectory[destination].s.begin() + goal_achieved_start + goal_size, 
+                    trajectory.back().next_s.begin() + goal_start);
+            }
+            trajectory.back().goal_reached = true;
+            trajectory.back().r = 0.f;
+            trajectory_end_points.push_back(trajectory.size());
         }
     }
 //     LOG_DEBUG("#############");
