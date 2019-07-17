@@ -90,7 +90,7 @@ def plot_exploratory_actions(observation, ag):
     plt.show()
 
 def run_episode(env, ag, learning, episode):
-#    env.seed(0)
+    env.seed(0)
     observation = env.reset()
     transitions = []
     totalreward = 0
@@ -189,6 +189,8 @@ if (clparams['goal_based']) and not isinstance(env.observation_space, gym.spaces
 if isinstance(env.observation_space, gym.spaces.Dict):
     goal_size=env.observation_space.spaces.get('desired_goal').shape[0]
     print("Goal space:", env.observation_space.spaces.get('desired_goal'))
+    print("Goal observed space:", env.observation_space.spaces.get('achieved_goal'))
+    print("Observation space:", env.observation_space.spaces.get('observation'))
     #the following might be false for some env
     goal_achieved_start=0
     goal_start=goal_achieved_start+goal_size
