@@ -90,7 +90,7 @@ def plot_exploratory_actions(observation, ag):
     plt.show()
 
 def run_episode(env, ag, learning, episode):
-    env.seed(0)
+#    env.seed(0)
     observation = env.reset()
     transitions = []
     totalreward = 0
