@@ -21,6 +21,7 @@
 #define SAASRG_SAMPLE
 typedef struct _sample {
   std::vector<double> s;
+  std::vector<double> goal_achieved;
   std::vector<double> pure_a;
   std::vector<double> a;
   std::vector<double> next_s;
@@ -37,8 +38,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors, uint _goal_size,
                                 uint _goal_start, uint _goal_achieved_start)
-      : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(), last_state(_nb_sensors, 0.f),
-      goal_size(_goal_size), goal_start(_goal_start), goal_achieved_start(_goal_achieved_start) {
+      : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors-_goal_size), nb_sensors(_nb_sensors-_goal_size), empty_action(), 
+      last_state(_nb_sensors-_goal_size, 0.f), last_goal_achieved(_goal_size, 0.f), goal_size(_goal_size), goal_start(_goal_start-_goal_size), goal_achieved_start(_goal_achieved_start) {
 
   }
 
@@ -60,12 +61,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   }
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                  bool learning, bool goal_reached, bool) override {
+                                  const std::vector<double>& goal_achieved, bool learning, bool goal_reached, bool) {
 
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(sensors);
     if (last_action.get() != nullptr && learning)
-      trajectory.push_back( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached, false});
+      trajectory.push_back( {last_state, last_goal_achieved, *last_pure_action, *last_action, sensors, reward, goal_reached, false});
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
@@ -91,6 +92,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     last_action.reset(next_action);
 
     std::copy(sensors.begin(), sensors.end(), last_state.begin());
+    std::copy(goal_achieved.begin(), goal_achieved.end(), last_goal_achieved.begin());
     step++;
     
     return *next_action;
@@ -285,7 +287,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
 // 
 // data augmentation part
-//     
+//
+    auto comparator = [](double left, double right) {
+      return std::fabs(left - right) <= 1e-6;
+    };
     int saved_tepsize=trajectory_end_points.size();
     for(int i=0;i < saved_tepsize; i++) {
         int min_index=0;
@@ -299,16 +304,21 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               sample sa = trajectory[k];
               trajectory.push_back(sa);
               trajectory.back().artificial = true;
-              std::copy(trajectory[destination].s.begin() + goal_achieved_start, 
-                    trajectory[destination].s.begin() + goal_achieved_start + goal_size, 
+              std::copy(trajectory[destination].goal_achieved.begin(), 
+                    trajectory[destination].goal_achieved.end(), 
                     trajectory.back().s.begin() + goal_start);
-              std::copy(trajectory[destination].s.begin() + goal_achieved_start, 
-                    trajectory[destination].s.begin() + goal_achieved_start + goal_size, 
+              std::copy(trajectory[destination].goal_achieved.begin(), 
+                    trajectory[destination].goal_achieved.end(), 
                     trajectory.back().next_s.begin() + goal_start);
+              
+               if (std::equal(sa.goal_achieved.begin(), sa.goal_achieved.end(),
+                   trajectory[destination].goal_achieved.begin(), comparator)) {
+//               if (sa.goal_achieved == trajectory[destination].goal_achieved){
+                trajectory.back().goal_reached = true;
+                trajectory.back().r = 0.f;
+                trajectory_end_points.push_back(trajectory.size());
+              }
             }
-            trajectory.back().goal_reached = true;
-            trajectory.back().r = 0.f;
-            trajectory_end_points.push_back(trajectory.size());
         }
     }
 //     LOG_DEBUG("#############");
@@ -635,6 +645,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //         return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
     return nullptr;
   }
+  
+  uint getGoalSize(){
+    return goal_size;
+  }
 
  protected:
   void _display(std::ostream& out) const override {
@@ -671,6 +685,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
   std::vector<double> last_state;
+  std::vector<double> last_goal_achieved;
   double alpha_v, alpha_a;
 
   std::deque<sample> trajectory;

@@ -82,8 +82,15 @@ extern "C" {
 
   const double* OfflineCaclaAg_run(OfflineCaclaAg<MLP>* ag, double reward, const double* sensors,
                               bool learning, bool goal_reached, bool last) {
+#ifndef WANT_HINDSIGHT_PENFAC
     std::vector<double> state(sensors, sensors+ag->get_number_sensors());
     const std::vector<double>& ac = ag->runf(reward, state, learning, goal_reached, last);
+#else
+    //assume goal goal_achieved is at the begenning of the vector
+    std::vector<double> goal_achieved(sensors, sensors+ag->getGoalSize());
+    std::vector<double> state(sensors + ag->getGoalSize(), sensors+ag->getGoalSize()+ag->get_number_sensors());
+    const std::vector<double>& ac = ag->_run(reward, state, goal_achieved, learning, goal_reached, last);
+#endif
     return ac.data();
   }
 

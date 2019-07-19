@@ -194,7 +194,7 @@ protected:
    * @return const std::vector< double, std::allocator< void > >&
    */
   virtual const std::vector<double>& _run(double reward, const std::vector<double>& perceptions,
-                                        bool learning, bool goal_reached, bool finished) = 0;
+                                        bool learning, bool goal_reached, bool finished) {};
                                         
   virtual void _start_episode(const std::vector<double>& perceptions, bool learning){
     (void) perceptions;
