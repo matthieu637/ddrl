@@ -15,6 +15,7 @@
 #include "bib/MetropolisHasting.hpp"
 #include "bib/XMLEngine.hpp"
 #include "bib/IniParser.hpp"
+#include "bib/OnlineNormalizer.hpp"
 #include "nn/MLP.hpp"
 
 #ifndef SAASRG_SAMPLE
@@ -58,13 +59,24 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       delete oun;
   }
 
-  const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
+  const std::vector<double>& _run(double reward, const std::vector<double>& sensors_,
                                   bool learning, bool goal_reached, bool) override {
+    
+    std::vector<double>* sensors;
+    if(normalizer_type == 0) {
+      sensors = const_cast<std::vector<double>*>(&sensors_);
+    } else {
+      sensors = new std::vector<double>(nb_sensors);
+      if (normalizer_type == 1)
+        normalizer->transform(*sensors, sensors_);
+      else
+        normalizer->transform_with_clip(*sensors, sensors_);
+    }
 
     // protect batch norm from testing data and poor data
-    vector<double>* next_action = ann_testing->computeOut(sensors);
+    vector<double>* next_action = ann_testing->computeOut(*sensors);
     if (last_action.get() != nullptr && learning)
-      trajectory.push_back( {last_state, *last_pure_action, *last_action, sensors, reward, goal_reached});
+      trajectory.push_back( {last_state, *last_pure_action, *last_action, *sensors, reward, goal_reached});
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
@@ -89,7 +101,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     }
     last_action.reset(next_action);
 
-    std::copy(sensors.begin(), sensors.end(), last_state.begin());
+    std::copy(sensors->begin(), sensors->end(), last_state.begin());
     step++;
     
     return *next_action;
@@ -137,10 +149,18 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     } catch(boost::exception const& ) {
     }
     
+    normalizer_type = 0;
+    try {
+      normalizer_type     = pt->get<uint>("agent.normalizer_type");
+    } catch(boost::exception const& ) {
+    }
+    if(normalizer_type > 0)
+      normalizer = new bib::OnlineNormalizer(this->nb_sensors);
+    
     if(lambda >= 0.)
       gae = pt->get<bool>("agent.gae");
     
-    if(lambda >=0. && batch_norm_critic != 0){
+    if(lambda >=0. && batch_norm_critic != 0 && stoch_iter_critic > 1){
       LOG_DEBUG("to be done!");
       exit(1);
     }
@@ -197,17 +217,22 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
       //remove trace of old policy
       auto iter = [&]() {
-        decltype(vnn_testing->computeOutVFBlob(all_next_states, empty_action)) all_nextV;
-        if(batch_norm_critic != 0)
-        {
+        decltype(vnn->computeOutVFBlob(all_states, empty_action)) all_nextV, all_V;
+        if(batch_norm_critic != 0) {
+          //learn BN
+          all_V = vnn->computeOutVFBlob(all_states, empty_action);
           double* weights = new double[vnn->number_of_parameters(false)];
           vnn->copyWeightsTo(weights, false);
           vnn_testing->copyWeightsFrom(weights, false);
           delete[] weights;
           all_nextV = vnn_testing->computeOutVFBlob(all_next_states, empty_action);
-        } else 
+          delete all_V;
+          all_V = vnn_testing->computeOutVFBlob(all_states, empty_action);
+        } else {
           all_nextV = vnn->computeOutVFBlob(all_next_states, empty_action);
-        auto all_V = vnn->computeOutVFBlob(all_states, empty_action);
+          all_V = vnn->computeOutVFBlob(all_states, empty_action);
+          //all_V must be computed after all_nextV to use learn_blob_no_full_forward
+        }
 
 #ifdef CAFFE_CPU_ONLY
         caffe::caffe_mul(trajectory.size(), r_gamma_coef.cpu_diff(), all_nextV->cpu_data(), v_target.mutable_cpu_data());
@@ -259,7 +284,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         break;
       }
 #endif
-        vnn->learn_blob(all_states, empty_action, v_target, stoch_iter_critic);
+        if (stoch_iter_critic == 1)
+          vnn->learn_blob_no_full_forward(all_states, empty_action, v_target);
+        else
+          vnn->learn_blob(all_states, empty_action, v_target, stoch_iter_critic);
 
         delete all_V;
         delete all_nextV;
@@ -652,6 +680,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   int nb_sample_update = 0;
   double posdelta_mean = 0;
   
+  uint normalizer_type;
+  bib::OnlineNormalizer* normalizer = nullptr;
+  
   struct algo_state {
     uint episode;
     
@@ -664,4 +695,5 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 };
 
 #endif
+
 

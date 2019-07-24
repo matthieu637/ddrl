@@ -485,7 +485,7 @@ class MLP {
     }
   }
   
-    void learn_blob(const caffe::Blob<double>& sensors, const caffe::Blob<double>& motors, const caffe::Blob<double>& q, uint iter) {
+  void learn_blob(const caffe::Blob<double>& sensors, const caffe::Blob<double>& motors, const caffe::Blob<double>& q, uint iter) {
       if(size_motors > 0 && !add_loss_layer)
         InputBlobIntoLayers(&sensors, &motors, &q);
       else
@@ -498,6 +498,20 @@ class MLP {
         solver->ApplyUpdate();
         solver->set_iter(solver->iter() + 1);
       }
+  }
+
+  void learn_blob_no_full_forward(const caffe::Blob<double>& sensors, const caffe::Blob<double>& motors, const caffe::Blob<double>& q) {
+      if(size_motors > 0 && !add_loss_layer)
+        InputBlobIntoLayers(&sensors, &motors, &q);
+      else
+        InputBlobIntoLayers(&sensors, nullptr, &q);
+      
+        neural_net->ClearParamDiffs();
+        int lossind = get_layer_index("loss");
+        neural_net->ForwardFromTo(lossind, lossind);
+        neural_net->Backward();
+        solver->ApplyUpdate();
+        solver->set_iter(solver->iter() + 1);
   }
 
   void learn_batch_lw(const std::vector<double>& sensors, const std::vector<double>& motors, const std::vector<double>& q,
