@@ -36,6 +36,30 @@ public:
     }
   }
   
+    void transform_with_double_clip(std::vector<double>& output, const std::vector<double>& x, double clip1=200, double clip2=5) {
+    for(uint i=0; i < x.size(); i++) {
+      output[i] = x[i];
+      
+      if(output[i] > clip1)
+        output[i]=clip1;
+      else if (output[i] < -clip1)
+        output[i]=-clip1;
+    }
+    update_mean_var(output);
+  
+    for(uint i=0; i < x.size(); i++){
+        output[i] = (x[i] - mean[i]);
+
+        if(std::abs(var[i]) >= 1e-6)
+          output[i] /= sqrt(var[i]);
+        
+        if(output[i] > clip2)
+          output[i]=clip2;
+        else if (output[i] < -clip2)
+          output[i]=-clip2;
+    }
+  }
+  
   void update_mean_var(const std::vector<double>& x){
     double dndata_number = data_number + 1;
     double ddata_number = data_number;

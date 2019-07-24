@@ -15,6 +15,7 @@
 #include "bib/MetropolisHasting.hpp"
 #include "bib/XMLEngine.hpp"
 #include "bib/IniParser.hpp"
+#include "bib/OnlineNormalizer.hpp"
 #include "nn/MLP.hpp"
 
 #ifndef SAASRG_SAMPLE
@@ -39,7 +40,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors, uint _goal_size,
                                 uint _goal_start, uint _goal_achieved_start)
       : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors-_goal_size), nb_sensors(_nb_sensors-_goal_size), empty_action(), 
-      last_state(_nb_sensors-_goal_size, 0.f), last_goal_achieved(_goal_size, 0.f), goal_size(_goal_size), goal_start(_goal_start-_goal_size), goal_achieved_start(_goal_achieved_start) {
+      last_state(_nb_sensors-_goal_size, 0.f), last_goal_achieved(_goal_size, 0.f), goal_size(_goal_size), goal_start(_goal_start-_goal_size), goal_achieved_start(_goal_achieved_start),
+      normalizer(nb_sensors), goal_normalizer(_goal_size){
 
   }
 
@@ -48,10 +50,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     delete ann;
     
     delete ann_testing;
-    if(batch_norm_actor != 0)
-      delete ann_testing_blob;
-    if(batch_norm_critic != 0)
-      delete vnn_testing;
 
     delete hidden_unit_v;
     delete hidden_unit_a;
@@ -60,15 +58,21 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       delete oun;
   }
 
-  const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
-                                  const std::vector<double>& goal_achieved, bool learning, bool goal_reached, bool) {
+  const std::vector<double>& _run(double reward, const std::vector<double>& sensors_,
+                                  const std::vector<double>& goal_achieved_, bool learning, bool, bool) {
 
+    std::vector<double> sensors(nb_sensors);
+    std::vector<double> goal_achieved(goal_size);
+    normalizer.transform_with_double_clip(sensors, sensors_);
+    goal_normalizer.transform_with_double_clip(goal_achieved, goal_achieved_);
+    
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(sensors);
-    if (last_action.get() != nullptr && learning)
-      trajectory.push_back( {last_state, last_goal_achieved, *last_pure_action, *last_action, sensors, reward, goal_reached, false});
+    if (last_action.get() != nullptr && learning) {
+      trajectory.push_back( {last_state, last_goal_achieved, *last_pure_action, *last_action, sensors, reward, false, false});
+    }
 
-    last_pure_action.reset(new vector<double>(*next_action));
+    last_pure_action.reset(new std::vector<double>(*next_action));
     if(learning) {
       if(gaussian_policy == 1) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
@@ -84,6 +88,15 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise * pow(noise2, noise3 - ((double) step)));
         delete next_action;
         next_action = randomized_action;
+      } else if(gaussian_policy == 5) {
+        if (bib::Utils::rand01() < noise2){
+          for (uint i = 0; i < next_action->size(); i++)
+            next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
+        } else {
+          vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+          delete next_action;
+          next_action = randomized_action;
+        }
       } else if(bib::Utils::rand01() < noise) { //e-greedy
         for (uint i = 0; i < next_action->size(); i++)
           next_action->at(i) = bib::Utils::randin(-1.f, 1.f);
@@ -108,8 +121,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     number_fitted_iteration = pt->get<uint>("agent.number_fitted_iteration");
     stoch_iter_actor        = pt->get<uint>("agent.stoch_iter_actor");
     stoch_iter_critic       = pt->get<uint>("agent.stoch_iter_critic");
-    batch_norm_actor        = pt->get<uint>("agent.batch_norm_actor");
-    batch_norm_critic       = pt->get<uint>("agent.batch_norm_critic");
     actor_output_layer_type = pt->get<uint>("agent.actor_output_layer_type");
     hidden_layer_type       = pt->get<uint>("agent.hidden_layer_type");
     alpha_a                 = pt->get<double>("agent.alpha_a");
@@ -129,7 +140,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       double oun_theta = pt->get<double>("agent.noise2");
       double oun_dt = pt->get<double>("agent.noise3");
       oun = new bib::OrnsteinUhlenbeckNoise<double>(this->nb_motors, noise, oun_theta, oun_dt);
-    } else if (gaussian_policy == 3){
+    } else if (gaussian_policy == 3 || gaussian_policy == 5){
       noise2 = pt->get<double>("agent.noise2");
     } else if (gaussian_policy == 4){
       noise2 = pt->get<double>("agent.noise2");
@@ -143,11 +154,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
     if(lambda >= 0.)
       gae = pt->get<bool>("agent.gae");
-    
-    if(lambda >=0. && batch_norm_critic != 0){
-      LOG_DEBUG("to be done!");
-      exit(1);
-    }
 
 #ifdef CAFFE_CPU_ONLY
     LOG_INFO("CPU mode");
@@ -163,16 +169,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     }   
 #endif
   
-    ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true, momentum);
+    ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, 0, true, momentum);
     
-    vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);
+    vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, 0, false, momentum);
     
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
-    
-    if(batch_norm_actor != 0)
-      ann_testing_blob = new NN(*ann, false, ::caffe::Phase::TEST);
-    if(batch_norm_critic != 0)
-      vnn_testing = new NN(*vnn, false, ::caffe::Phase::TEST);
     
     bestever_score = std::numeric_limits<double>::lowest();
   }
@@ -201,17 +202,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
       //remove trace of old policy
       auto iter = [&]() {
-        decltype(vnn_testing->computeOutVFBlob(all_next_states, empty_action)) all_nextV;
-        if(batch_norm_critic != 0)
-        {
-          double* weights = new double[vnn->number_of_parameters(false)];
-          vnn->copyWeightsTo(weights, false);
-          vnn_testing->copyWeightsFrom(weights, false);
-          delete[] weights;
-          all_nextV = vnn_testing->computeOutVFBlob(all_next_states, empty_action);
-        } else 
-          all_nextV = vnn->computeOutVFBlob(all_next_states, empty_action);
+        auto all_nextV = vnn->computeOutVFBlob(all_next_states, empty_action);
         auto all_V = vnn->computeOutVFBlob(all_states, empty_action);
+        //all_V must be computed after all_nextV to use learn_blob_no_full_forward
 
 #ifdef CAFFE_CPU_ONLY
         caffe::caffe_mul(trajectory.size(), r_gamma_coef.cpu_diff(), all_nextV->cpu_data(), v_target.mutable_cpu_data());
@@ -263,7 +256,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         break;
       }
 #endif
-        vnn->learn_blob(all_states, empty_action, v_target, stoch_iter_critic);
+        if (stoch_iter_critic == 1)
+          vnn->learn_blob_no_full_forward(all_states, empty_action, v_target);
+        else
+          vnn->learn_blob(all_states, empty_action, v_target, stoch_iter_critic);
 
         delete all_V;
         delete all_nextV;
@@ -313,23 +309,18 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               
                if (std::equal(sa.goal_achieved.begin(), sa.goal_achieved.end(),
                    trajectory[destination].goal_achieved.begin(), comparator)) {
-//               if (sa.goal_achieved == trajectory[destination].goal_achieved){
-                trajectory.back().goal_reached = true;
                 trajectory.back().r = 0.f;
-                trajectory_end_points.push_back(trajectory.size());
               }
             }
+            trajectory_end_points.push_back(trajectory.size());
         }
     }
 //     LOG_DEBUG("#############");
 //     for (int i=0;i<trajectory.size(); i++)
 //       bib::Logger::PRINT_ELEMENTS(trajectory[i].s);
 //     exit(1);
-    if(trajectory.size() > 0){
+    if(trajectory.size() > 0)
       vnn->increase_batchsize(trajectory.size());
-      if(batch_norm_critic != 0)
-        vnn_testing->increase_batchsize(trajectory.size());
-    }
     
     caffe::Blob<double> all_states(trajectory.size(), nb_sensors, 1, 1);
     caffe::Blob<double> all_next_states(trajectory.size(), nb_sensors, 1, 1);
@@ -356,20 +347,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       const std::vector<double> disable_back_ac(this->nb_motors, 0.00f);
       caffe::Blob<double> deltas(trajectory.size(), 1, 1, 1);
 
-      decltype(vnn->computeOutVFBlob(all_next_states, empty_action)) all_nextV, all_mine;
-      if(batch_norm_critic != 0)
-      {
-        double* weights = new double[vnn->number_of_parameters(false)];
-        vnn->copyWeightsTo(weights, false);
-        vnn_testing->copyWeightsFrom(weights, false);
-        delete[] weights;
-        all_nextV = vnn_testing->computeOutVFBlob(all_next_states, empty_action);
-        all_mine = vnn_testing->computeOutVFBlob(all_states, empty_action);
-      } else {
-        all_nextV = vnn->computeOutVFBlob(all_next_states, empty_action);
-        all_mine = vnn->computeOutVFBlob(all_states, empty_action);
-      }
-
+      auto all_nextV = vnn->computeOutVFBlob(all_next_states, empty_action);
+      auto all_mine = vnn->computeOutVFBlob(all_states, empty_action);
      
 #ifdef CAFFE_CPU_ONLY
       caffe::caffe_mul(trajectory.size(), r_gamma_coef.cpu_diff(), all_nextV->cpu_data(), deltas.mutable_cpu_data());
@@ -470,16 +449,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           ann->increase_batchsize(trajectory.size());
           //learn BN
           auto ac_out = ann->computeOutBlob(all_states);
-          if(batch_norm_actor != 0) {
-            //re-compute ac_out with BN as testing
-            double* weights = new double[ann->number_of_parameters(false)];
-            ann->copyWeightsTo(weights, false);
-            ann_testing_blob->copyWeightsFrom(weights, false);
-            delete[] weights;
-            delete ac_out;
-            ann_testing_blob->increase_batchsize(trajectory.size());
-            ac_out = ann_testing_blob->computeOutBlob(all_states);
-          }
           ann->ZeroGradParameters();
           
           number_effective_actor_update = sia;
@@ -578,10 +547,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           ann->getSolver()->set_iter(ann->getSolver()->iter() + 1);
           delete ac_out;
         }
-      } else if(batch_norm_actor != 0){
-        //learn BN even if every action were bad
-        ann->increase_batchsize(trajectory.size());
-        delete ann->computeOutBlob(all_states);
       }
       
       conserved_beta = beta;
@@ -589,9 +554,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
       delete all_nextV;
       delete all_mine;
-      
-      if(batch_norm_actor != 0)
-        ann_testing->increase_batchsize(1);
     }
     
     nb_sample_update= trajectory.size();
@@ -675,7 +637,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   uint gaussian_policy;
   bool gae, ignore_poss_ac, conserve_beta, disable_trust_region, disable_cac;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
-  uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
+  uint actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
   double conserved_beta= 0.0001f;
   double mean_beta= 0.f;
@@ -712,6 +674,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   uint goal_start;
   uint goal_achieved_start;
   uint hindsight_nb_destination;
+  
+  bib::OnlineNormalizer normalizer;
+  bib::OnlineNormalizer goal_normalizer;
  
   struct algo_state {
     uint episode;
