@@ -48,6 +48,7 @@ parser.add_argument('--goal-based', action='store_true', default=False)
 parser.add_argument('--gpu', type=int, default=None) #used in cpp
 parser.add_argument('--load', type=str, default=None)
 parser.add_argument('--config', type=str, default='config.ini')
+parser.add_argument('--racing', type=int, nargs=2, action='append')
 clargs = parser.parse_args()
 clparams = vars(clargs)
 print(clparams)
@@ -78,10 +79,11 @@ def str2bool(v):
 
 def plot_exploratory_actions(observation, ag):
     print(observation)
-    p=[np.array(ag.run(0, observation, True, False, False)) for _ in range(5000)]
-    p=np.concatenate(p)
-    
-    print(p)
+    p=[np.array(ag.run(0, observation, True, False, False))[0] for _ in range(5000)]
+    #p=np.concatenate(p)
+    p=np.array(p)
+
+    print(np.mean(p), np.std(p))
     import matplotlib.pyplot as plt
     from pylab import figure
     fig = figure()
@@ -265,6 +267,22 @@ if not clparams['test_only']:
             if clparams['save_best'] and reward >= bestTestingScore:
                 bestTestingScore=reward
                 ag.save(episode)
+                
+            if clparams['racing'] and len(results) > 10:
+                #compute current average score
+                lresults = np.array(results)
+                lastPerf = lresults[int(lresults.shape[0]*0.9):lresults.shape[0]-1]
+                lastPerf = np.mean(lastPerf)-np.std(lastPerf)
+                
+                shouldStopRun = False
+                for (xlearning_steps, ytesting_score) in clparams['racing']:
+                    if sample_steps_counter > xlearning_steps and ytesting_score > lastPerf:
+                        shouldStopRun = True
+                        break
+                if shouldStopRun:
+                    print("Racing condition triggered")
+                    open('raced', 'a').close()
+                    break
         episode+=1
         
     #write logs
