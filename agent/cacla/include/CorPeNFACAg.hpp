@@ -60,6 +60,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
     delete correlation_matrix;
     
+    if( correlation_history > 0) {
+      delete ttmg_mu;
+      delete ttmg_beta;
+    }
+    
     if(oun == nullptr)
       delete oun;
   }
@@ -88,9 +93,26 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise * pow(noise2, noise3 - ((double) step)));
         delete next_action;
         next_action = randomized_action;
-      } else if(gaussian_policy == 5) {
+      } else if(gaussian_policy == 5 && correlation_history == 0) {
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussianZeroMean(this->nb_motors, noise, -1.f, 1.f);
         caffe::caffe_cpu_gemv(CblasTrans, this->nb_motors, this->nb_motors, (double)1.f, correlation_matrix->data(), randomized_action->data(), (double)1.f, next_action->data());
+        delete randomized_action;
+      } else if(gaussian_policy == 5) {
+        std::vector<double> tmpcopy(this->nb_motors*correlation_history);
+        std::vector<double> tmpout(this->nb_motors*(correlation_history+1));
+        std::copy(ttmg_mu->begin(), ttmg_mu->begin()  + (this->nb_motors*correlation_history),  tmpcopy.begin());
+        std::copy(tmpcopy.begin(), tmpcopy.end(),  ttmg_mu->begin() + this->nb_motors);
+        std::copy(ttmg_beta->begin(), ttmg_beta->begin()  + (this->nb_motors*correlation_history),  tmpcopy.begin());
+        std::copy(tmpcopy.begin(), tmpcopy.end(),  ttmg_beta->begin() + this->nb_motors);
+        std::copy(ttmg_mu->begin(), ttmg_mu->end(),  tmpout.begin());
+        
+        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussianZeroMean(this->nb_motors, noise, -1.f, 1.f);
+        std::copy(next_action->begin(), next_action->end(),  ttmg_mu->begin());
+        std::copy(randomized_action->begin(), randomized_action->end(),  ttmg_beta->begin());
+        caffe::caffe_cpu_gemv(CblasTrans, this->nb_motors * (correlation_history+1), this->nb_motors * (correlation_history+1), (double)1.f, 
+                              correlation_matrix->data(), ttmg_beta->data(), (double)1.f, tmpout.data());
+        
+        std::copy(tmpout.begin(), tmpout.begin()  + this->nb_motors,  next_action->begin());
         delete randomized_action;
       } else if(bib::Utils::rand01() < noise) { //e-greedy
         for (uint i = 0; i < next_action->size(); i++)
@@ -129,6 +151,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     disable_trust_region = pt->get<bool>("agent.disable_trust_region");
     disable_cac                 = pt->get<bool>("agent.disable_cac");
     correlation_importance = pt->get<double>("agent.correlation_importance");
+    correlation_history = pt->get<uint>("agent.correlation_history");
     gae                     = false;
     update_each_episode = 1;
     
@@ -176,19 +199,24 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
     
-    std::vector<double> correlation_matrix_hf = {
-        1.374865,  0.237821,  0.014352,  0.292353, -0.314855, -0.435762,
-        0.,  0.786414, -0.260977, -0.172376, -0.175636, -0.066117,
-        0., 0.,  0.713604, 0.099008,  0.049184, -0.030153,
-        0., 0.,  0.,  0.780265, -0.007977, -0.261878,
-        0., 0.,  0., 0.,  0.592841,  0.148877,
-        0., 0., 0., 0.,  0.,  0.664371
-    };
-    correlation_matrix = new std::vector<double>(this->nb_motors*this->nb_motors);
-    ASSERT(correlation_matrix_hf.size() == correlation_matrix->size(), "pb size");
+    std::vector<double> correlation_matrix_hf = {1.174186,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.203411,0.862825,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.012921,-0.308543,0.787097,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.248043,-0.258294,0.023074,0.805355,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,-0.269374,-0.141422,0.011796,0.024498,0.706358,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,-0.373182,0.01231,-0.026008,-0.209719,0.077181,0.688788,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.894234,-0.014487,0.116819,0.022091,0.046136,-0.050369,0.747981,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,
+0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.348071,0.298075,-0.133945,-0.103472,-0.030253,0.042815,-0.062047,0.736018,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,-0.067611,-0.153373,0.228321,0.125554,-0.032914,0.001872,0.060067,-0.201222,0.75698,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.133598,-0.200086,0.04935,0.075655,0.168428,-0.163852,0.193919,-0.163734,0.025712,0.768631,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,-0.29758,-0.161934,0.025144,0.168967,0.035216,0.133731,-0.073748,-0.019424,-0.029083,0.013201,0.649448,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,-0.365179,-0.050311,-0.017432,-0.072349,0.007171,0.0633,-0.140295,0.075468,-0.031264,-0.221236,0.045834,0.663382,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.775182,-0.077546,0.214212,0.050156,0.12418,0.038175,0.433647,-0.020466,0.086893,0.009508,0.035615,-0.032742,0.71082,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.403143,0.174713,-0.054297,-0.077483,-0.002795,0.040947,0.082398,0.169955,
+-0.115206,-0.084501,0.003673,0.072824,-0.091297,0.717874,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,-0.136758,-0.026055,0.091971,0.11688,0.025727,-0.072474,0.032948,-0.081086,0.211502,0.114235,-0.047159,-0.003892,0.082399,-0.185123,0.747281,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.017601,-0.130643,0.067139,0.092764,0.130035,0.009248,0.165232,-0.108818,0.037854,0.047754,0.130328,-0.189299,0.200436,-0.139865,0.020588,0.757448,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,-0.306586,-0.148351,-0.000265,0.044356,-0.004394,0.0371,-0.102082,-0.070216,0.011129,0.165789,-0.011238,0.117536,-0.071692,-0.005669,-0.023748,0.012995,0.640743,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,-0.295184,-0.087492,-0.038273,-0.014,-0.090284,0.056172,-0.205091,-0.01723,-0.025306,-0.063401,-0.014062,0.053642,-0.143935,0.080678,-0.019636,-0.220248,0.031013,0.653691,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.581817,-0.124128,0.270156,0.128849,0.17148,0.110763,0.468155,0.005013,0.161316,0.034241,0.053801,0.028538,0.390972,-0.011342,0.082789,-0.004157,0.018944,-0.043131,0.690514,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.442755,0.080847,-0.054468,-0.048129,0.0394,0.11317,0.119369,0.062066,-0.032804,-0.059976,0.014307,0.074365,0.043817,0.132179,-0.100819,-0.07528,0.006056,0.079486,-0.092532,0.69819,0.,0.,0.,0.,0.,0.,0.,
+0.,0.,0.,-0.186385,0.048199,-0.041571,0.107671,0.000364,-0.043674,0.008794,0.010972,0.09342,0.114048,0.007983,-0.076868,0.081302,-0.05556,0.188818,0.104539,-0.049858,0.002795,0.090219,-0.17725,0.731947,0.,0.,0.,0.,0.,0.,0.,0.,0.,-0.104796,-0.074657,0.085952,-0.025845,0.109068,0.025352,0.133976,-0.041333,0.060346,0.081631,0.107205,-0.031642,0.183362,-0.081849,0.033594,0.025724,0.134187,-0.18807,0.194674,-0.127134,0.01627,0.740252,0.,0.,0.,0.,0.,0.,0.,0.,-0.304684,-0.131846,0.000596,0.014776,-0.023804,-0.020408,-0.118527,-0.067607,-0.009783,0.032224,-0.029978,0.012208,-0.094461,-0.051993,0.015735,0.16347,-0.020826,0.103634,-0.078139,0.004568,-0.015804,0.016798,0.63498,0.,0.,0.,0.,0.,0.,0.,-0.21666,-0.078991,-0.067899,-0.01872,-0.11271,-0.043703,-0.191927,-0.083996,-0.033927,-0.012151,-0.080625,0.065469,-0.206023,-0.025436,-0.012124,-0.047375,-0.022436,0.043586,-0.135825,0.079731,-0.009605,-0.206935,0.022641,0.64572,0.,0.,0.,0.,0.,0.,0.384656,-0.207148,0.206938,0.168651,0.229727,0.124344,0.405633,0.015907,0.224226,0.09119,0.069029,0.081109,0.437813,0.032972,0.156783,0.005405,0.031765,0.01121,0.355695,-0.012243,0.07842,-0.011594,0.01269,-0.040565,0.674863,0.,0.,0.,0.,0.,0.462858,-0.037545,0.010235,-0.032637,0.067599,0.057232,0.140276,0.021382,-0.048221,-0.055699,0.05095,0.136662,0.067162,0.025057,-0.012164,-0.047587,0.019721,0.073378,0.048624,0.102221,-0.082754,-0.062375,0.010374,0.076378,-0.088506,0.682811,0.,0.,0.,0.,-0.237002,0.136553,-0.169479,0.054602,0.039725,-0.000541,0.013912,0.039553,-0.007985,0.11256,-0.014411,-0.051135,0.07541,0.037134,0.064579,0.091219,
+0.004572,-0.062211,0.08929,-0.050738,0.140801,0.084812,-0.036232,0.019248,0.078228,-0.158604,0.703178,0.,0.,0.,-0.219181,-0.042467,0.095322,-0.050323,0.087276,0.119602,0.087783,0.022283,0.073163,-0.019529,0.060844,-0.032084,0.151047,-0.001998,0.057408,0.052449,0.101227,-0.036924,0.158619,-0.067171,0.027547,-0.017061,0.136677,-0.174956,0.182292,-0.111008,0.003227,0.717137,0.,0.,-0.299025,-0.070184,-0.02856,-0.034873,-0.067343,-0.040609,-0.113449,-0.087225,0.007211,0.017586,-0.017228,-0.039386,-0.094625,-0.052454,-0.005103,0.032305,-0.029874,0.004891,-0.089115,-0.039931,0.018108,0.160549,-0.028036,0.097298,-0.079042,0.008609,-0.012886,0.016111,0.632252,0.,-0.144615,-0.045874,-0.094776,-0.015527,-0.144924,-0.138616,-0.152975,-0.09402,-0.051977,-0.021469,-0.074796,-0.028442,-0.175167,-0.086675,-0.024261,0.009441,-0.073673,0.063455,-0.179161,-0.020451,-0.007802,-0.024904,-0.027003,0.025263,-0.122494,0.075669,-0.003496,-0.184827,0.020559,0.640879};
+
+//     correlation_matrix = new std::vector<double>(this->nb_motors*this->nb_motors);
+    correlation_matrix = new std::vector<double>((this->nb_motors*(correlation_history+1))*(this->nb_motors*(correlation_history+1)));
+    ASSERT(correlation_matrix_hf.size() == correlation_matrix->size(), "pb size " << correlation_matrix_hf.size() << " " <<  correlation_matrix->size());
     std::copy(correlation_matrix_hf.begin(), correlation_matrix_hf.end(), correlation_matrix->begin());
-    LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'U', this->nb_motors, correlation_matrix->data(), this->nb_motors);
-    bib::Logger::PRINT_ELEMENTS(*correlation_matrix);
+//     if cholesky needed:
+//     LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'U', this->nb_motors, correlation_matrix->data(), this->nb_motors);
+//     bib::Logger::PRINT_ELEMENTS(*correlation_matrix);
+    
+    if( correlation_history > 0) {
+      ttmg_mu = new std::vector<double>(this->nb_motors * (correlation_history+1), 0.f);
+      ttmg_beta = new std::vector<double>(this->nb_motors * (correlation_history+1), 0.f);
+    }
     
     if(batch_norm_actor != 0)
       ann_testing_blob = new NN(*ann, false, ::caffe::Phase::TEST);
@@ -203,6 +231,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
     last_action = nullptr;
     last_pure_action = nullptr;
+    
+    if(correlation_history > 1) {
+      std::fill(ttmg_mu->begin(), ttmg_mu->end(), 0.);
+      std::fill(ttmg_beta->begin(), ttmg_beta->end(), 0.);
+    }
     
     step = 0;
     if(gaussian_policy == 2)
@@ -516,11 +549,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           caffe::caffe_scal(size_cost_cacla, beta, diff_treg.mutable_cpu_data());
           caffe::caffe_mul(size_cost_cacla, target_treg.cpu_diff(), diff_treg.cpu_data(), diff_treg.mutable_cpu_data());
           
-          caffe::caffe_cpu_gemm(CblasNoTrans, CblasTrans, trajectory.size(), this->nb_motors, this->nb_motors, (double)1.f, ac_out->cpu_data(), correlation_matrix->data(), (double)0., target_corr.mutable_cpu_data());
-          caffe::caffe_sub(size_cost_cacla, target_corr.cpu_data(), ac_out->cpu_data(), target_corr.mutable_cpu_diff());
-          caffe::caffe_scal(size_cost_cacla, correlation_importance, target_corr.mutable_cpu_diff());
-          
-          caffe::caffe_add(size_cost_cacla, target_corr.cpu_diff(), diff_cac.cpu_data(), diff_cac.mutable_cpu_data());
+//           caffe::caffe_cpu_gemm(CblasNoTrans, CblasTrans, trajectory.size(), this->nb_motors, this->nb_motors, (double)1.f, ac_out->cpu_data(), correlation_matrix->data(), (double)0., target_corr.mutable_cpu_data());
+//           caffe::caffe_sub(size_cost_cacla, target_corr.cpu_data(), ac_out->cpu_data(), target_corr.mutable_cpu_diff());
+//           caffe::caffe_scal(size_cost_cacla, correlation_importance, target_corr.mutable_cpu_diff());
+//           
+//           caffe::caffe_add(size_cost_cacla, target_corr.cpu_diff(), diff_cac.cpu_data(), diff_cac.mutable_cpu_data());
           caffe::caffe_add(size_cost_cacla, diff_cac.cpu_data(), diff_treg.cpu_data(), ac_diff);
           caffe::caffe_scal(size_cost_cacla, (double) -1.f, ac_diff);
 #else
@@ -535,11 +568,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
             caffe::caffe_scal(size_cost_cacla, beta, diff_treg.mutable_cpu_data());
             caffe::caffe_mul(size_cost_cacla, target_treg.cpu_diff(), diff_treg.cpu_data(), diff_treg.mutable_cpu_data());
             
-            caffe::caffe_cpu_gemm(CblasNoTrans, CblasTrans, trajectory.size(), this->nb_motors, this->nb_motors, (double)1.f, ac_out->cpu_data(), correlation_matrix->data(), (double)0., target_corr.mutable_cpu_data());
-            caffe::caffe_sub(size_cost_cacla, target_corr.cpu_data(), ac_out->cpu_data(), target_corr.mutable_cpu_diff());
-            caffe::caffe_scal(size_cost_cacla, correlation_importance, target_corr.mutable_cpu_diff());
-            
-            caffe::caffe_add(size_cost_cacla, target_corr.cpu_diff(), diff_cac.cpu_data(), diff_cac.mutable_cpu_data());
+//             caffe::caffe_cpu_gemm(CblasNoTrans, CblasTrans, trajectory.size(), this->nb_motors, this->nb_motors, (double)1.f, ac_out->cpu_data(), correlation_matrix->data(), (double)0., target_corr.mutable_cpu_data());
+//             caffe::caffe_sub(size_cost_cacla, target_corr.cpu_data(), ac_out->cpu_data(), target_corr.mutable_cpu_diff());
+//             caffe::caffe_scal(size_cost_cacla, correlation_importance, target_corr.mutable_cpu_diff());
+//             
+//             caffe::caffe_add(size_cost_cacla, target_corr.cpu_diff(), diff_cac.cpu_data(), diff_cac.mutable_cpu_data());
             caffe::caffe_add(size_cost_cacla, diff_cac.cpu_data(), diff_treg.cpu_data(), ac_diff);
             caffe::caffe_scal(size_cost_cacla, (double) -1.f, ac_diff);
             break;
@@ -553,11 +586,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
             caffe::caffe_gpu_scal(size_cost_cacla, beta, diff_treg.mutable_gpu_data());
             caffe::caffe_gpu_mul(size_cost_cacla, target_treg.gpu_diff(), diff_treg.gpu_data(), diff_treg.mutable_gpu_data());
             
-            caffe::caffe_gpu_gemm(CblasNoTrans, CblasTrans, trajectory.size(), this->nb_motors, this->nb_motors, (double)1.f, ac_out->gpu_data(), correlation_matrix->data(), (double)0., target_corr.mutable_gpu_data());
-            caffe::caffe_gpu_sub(size_cost_cacla, target_corr.gpu_data(), ac_out->gpu_data(), target_corr.mutable_gpu_diff());
-            caffe::caffe_gpu_scal(size_cost_cacla, correlation_importance, target_corr.mutable_gpu_diff());
-            
-            caffe::caffe_gpu_add(size_cost_cacla, target_corr.gpu_diff(), diff_cac.gpu_data(), diff_cac.mutable_gpu_data());
+//             caffe::caffe_gpu_gemm(CblasNoTrans, CblasTrans, trajectory.size(), this->nb_motors, this->nb_motors, (double)1.f, ac_out->gpu_data(), correlation_matrix->data(), (double)0., target_corr.mutable_gpu_data());
+//             caffe::caffe_gpu_sub(size_cost_cacla, target_corr.gpu_data(), ac_out->gpu_data(), target_corr.mutable_gpu_diff());
+//             caffe::caffe_gpu_scal(size_cost_cacla, correlation_importance, target_corr.mutable_gpu_diff());
+//             
+//             caffe::caffe_gpu_add(size_cost_cacla, target_corr.gpu_diff(), diff_cac.gpu_data(), diff_cac.mutable_gpu_data());
             caffe::caffe_gpu_add(size_cost_cacla, diff_cac.gpu_data(), diff_treg.gpu_data(), ac_diff);
             caffe::caffe_gpu_scal(size_cost_cacla, (double) -1.f, ac_diff);
             break;
@@ -696,6 +729,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   int nb_sample_update = 0;
   double posdelta_mean = 0;
   double correlation_importance;
+  uint correlation_history;
+  
+  //temporal truncated multivariate gaussian
+  std::vector<double> *ttmg_mu, *ttmg_beta;
   
   struct algo_state {
     uint episode;
