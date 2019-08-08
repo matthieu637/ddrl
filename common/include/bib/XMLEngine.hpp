@@ -58,6 +58,16 @@ class XMLEngine {
     inputFile.close();
     return object;
   }
+  
+  template <class T>
+  static void load(T &object, const char *name, const string &file_name) {
+    ifstream inputFile(file_name);
+    assert(inputFile.good());
+    xml_iarchive xml(inputFile);
+    xml >> make_nvp(name, object);
+    inputFile.close();
+  }
+  
 };
 }  // namespace bib
 

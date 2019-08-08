@@ -63,8 +63,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
     std::vector<double> sensors(nb_sensors);
     std::vector<double> goal_achieved(goal_size);
-    normalizer.transform_with_double_clip(sensors, sensors_);
-    goal_normalizer.transform_with_double_clip(goal_achieved, goal_achieved_);
+    normalizer.transform_with_double_clip(sensors, sensors_, learning);
+    goal_normalizer.transform_with_double_clip(goal_achieved, goal_achieved_, learning);
     
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(sensors);
@@ -575,6 +575,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     } else {
       ann->save(path+".actor");
       vnn->save(path+".critic");
+      bib::XMLEngine::save<>(normalizer, "normalizer", path+".normalizer.data");
+      bib::XMLEngine::save<>(goal_normalizer, "goal_normalizer", path+".gnormalizer.data");
     } 
   }
   
@@ -588,6 +590,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   void load(const std::string& path) override {
     ann->load(path+".actor");
     vnn->load(path+".critic");
+    bib::XMLEngine::load<>(normalizer, "normalizer", path+".normalizer.data");
+    bib::XMLEngine::load<>(goal_normalizer, "goal_normalizer", path+".gnormalizer.data");
   }
   
   void load_previous_run() override {

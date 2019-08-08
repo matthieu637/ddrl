@@ -55,6 +55,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     delete hidden_unit_v;
     delete hidden_unit_a;
     
+    if(normalizer_type > 0)
+      delete normalizer;
+    
     if(oun == nullptr)
       delete oun;
   }
@@ -68,9 +71,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     } else {
       sensors = new std::vector<double>(nb_sensors);
       if (normalizer_type == 1)
-        normalizer->transform(*sensors, sensors_);
+        normalizer->transform(*sensors, sensors_, learning);
       else
-        normalizer->transform_with_clip(*sensors, sensors_);
+        normalizer->transform_with_clip(*sensors, sensors_, learning);
     }
 
     // protect batch norm from testing data and poor data
@@ -591,6 +594,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     } else {
       ann->save(path+".actor");
       vnn->save(path+".critic");
+      if (normalizer_type > 0)
+          bib::XMLEngine::save<>(*normalizer, "normalizer", path+".normalizer.data");
     } 
   }
   
@@ -604,6 +609,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   void load(const std::string& path) override {
     ann->load(path+".actor");
     vnn->load(path+".critic");
+    if (normalizer_type > 0){
+        delete normalizer;
+        normalizer = bib::XMLEngine::load<bib::OnlineNormalizer>("normalizer", path+".normalizer.data");
+    }
   }
   
   void load_previous_run() override {

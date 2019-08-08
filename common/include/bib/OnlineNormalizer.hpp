@@ -2,6 +2,7 @@
 #define ONLINENORMALIZER_HPP
 
 #include <vector>
+#include "bib/XMLEngine.hpp"
 
 namespace bib {
 
@@ -9,8 +10,9 @@ class OnlineNormalizer{
 public:
   OnlineNormalizer(uint _size) : data_number(0), mean(_size, 0), var(_size, 0), subvar(_size, 0){}
   
-  void transform(std::vector<double>& output, const std::vector<double>& x){
-    update_mean_var(x);
+  void transform(std::vector<double>& output, const std::vector<double>& x, bool learn){
+    if(learn)
+      update_mean_var(x);
   
     for(uint i=0; i < x.size(); i++){
         output[i] = (x[i] - mean[i]);
@@ -20,8 +22,9 @@ public:
     }
   }
   
-  void transform_with_clip(std::vector<double>& output, const std::vector<double>& x, double clip=5) {
-    update_mean_var(x);
+  void transform_with_clip(std::vector<double>& output, const std::vector<double>& x, bool learn, double clip=5) {
+    if(learn)
+      update_mean_var(x);
   
     for(uint i=0; i < x.size(); i++){
         output[i] = (x[i] - mean[i]);
@@ -36,7 +39,7 @@ public:
     }
   }
   
-    void transform_with_double_clip(std::vector<double>& output, const std::vector<double>& x, double clip1=200, double clip2=5) {
+    void transform_with_double_clip(std::vector<double>& output, const std::vector<double>& x, bool learn, double clip1=200, double clip2=5) {
     for(uint i=0; i < x.size(); i++) {
       output[i] = x[i];
       
@@ -45,7 +48,8 @@ public:
       else if (output[i] < -clip1)
         output[i]=-clip1;
     }
-    update_mean_var(output);
+    if(learn)
+      update_mean_var(output);
   
     for(uint i=0; i < x.size(); i++){
         output[i] = (x[i] - mean[i]);
@@ -60,6 +64,10 @@ public:
     }
   }
   
+private:
+  friend class bib::XMLEngine;
+  OnlineNormalizer(){}
+  
   void update_mean_var(const std::vector<double>& x){
     double dndata_number = data_number + 1;
     double ddata_number = data_number;
@@ -71,6 +79,15 @@ public:
     }
     
     data_number ++;
+  }
+  
+  friend class boost::serialization::access;
+  template <typename Archive>
+  void serialize(Archive& ar, const unsigned int) {
+    ar& BOOST_SERIALIZATION_NVP(data_number);
+    ar& BOOST_SERIALIZATION_NVP(mean);
+    ar& BOOST_SERIALIZATION_NVP(var);
+    ar& BOOST_SERIALIZATION_NVP(subvar);
   }
   
   ulong data_number;
