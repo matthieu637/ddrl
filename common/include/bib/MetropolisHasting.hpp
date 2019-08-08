@@ -28,6 +28,16 @@ class Proba {
     return gauss;
   }
 
+  static std::vector<Real>* multidimentionnalGaussianZeroMean(int size, Real sigma) {
+    std::vector<Real>* gauss = new std::vector<Real>(size);
+
+    std::normal_distribution<Real> dist(0, sigma);
+    for (uint i = 0; i < size; i++)
+      gauss->at(i) = dist(*bib::Seed::random_engine());
+
+    return gauss;
+  }
+
   static std::vector<Real>* multidimentionnalTruncatedGaussian(const std::vector<Real>& centers, Real sigma) {
     std::vector<Real>* gauss = new std::vector<Real>(centers.size());
 
