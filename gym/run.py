@@ -230,26 +230,28 @@ print("main algo : " + ag.name())
 if clparams['load'] is not None:
     ag.load(int(clparams['load']))
 
+start_time = time.time()
+episode=0
+testing_monitor = open('0.1.monitor.csv','w')
+testing_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
+if not clparams['goal_based']:
+    testing_monitor.write('r,l,t\n')
+else:
+    testing_monitor.write('r,l,t,g\n')
+
 if not clparams['test_only']:
     #classic learning run
-    start_time = time.time()
-
     results=[]
     sample_steps_counter=0
-    episode=0
     
     #comptatibility with openai-baseline logging
     training_monitor = open('0.0.monitor.csv','w')
-    testing_monitor = open('0.1.monitor.csv','w')
     xlearning_monitor = open('x.learning.data','w')
     training_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
-    testing_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
     if not clparams['goal_based']:
         training_monitor.write('r,l,t\n')
-        testing_monitor.write('r,l,t\n')
     else:
         training_monitor.write('r,l,t,g\n')
-        testing_monitor.write('r,l,t,g\n')
     
     max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
     bestTestingScore=float("-inf")
@@ -292,7 +294,6 @@ if not clparams['test_only']:
     np.savetxt('y.testing.data', results)
     np.savetxt('perf.data',  [np.mean(lastPerf)-np.std(lastPerf)])
     training_monitor.close()
-    testing_monitor.close()
     xlearning_monitor.close()
     
     #comptatibility with lhpo
@@ -308,4 +309,4 @@ else:
     #testing with display
     run_episode_displ(env, ag)
 
-
+testing_monitor.close()
