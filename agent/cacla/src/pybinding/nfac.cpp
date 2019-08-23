@@ -32,11 +32,11 @@ extern "C" {
     return new OfflineCaclaAg<MLP>(a,b);
   }
 #else
-  OfflineCaclaAg<MLP>* OfflineCaclaAg_new(uint a, uint b, uint goal_size, uint goal_start, uint goal_achieved_start) {
+  OfflineCaclaAg<MLP>* OfflineCaclaAg_new(uint a, uint b, uint goal_size, uint goal_start) {
     FLAGS_minloglevel = 2;
     google::InitGoogleLogging("");
     google::InstallFailureSignalHandler();
-    return new OfflineCaclaAg<MLP>(a,b, goal_size, goal_start, goal_achieved_start);
+    return new OfflineCaclaAg<MLP>(a,b, goal_size, goal_start);
   }
 #endif
 

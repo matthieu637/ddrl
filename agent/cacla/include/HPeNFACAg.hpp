@@ -23,6 +23,7 @@
 typedef struct _sample {
   std::vector<double> s;
   std::vector<double> goal_achieved;
+  std::vector<double> goal_achieved_unnormed;
   std::vector<double> pure_a;
   std::vector<double> a;
   std::vector<double> next_s;
@@ -37,12 +38,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
  public:
   typedef NN PolicyImpl;
 
-  OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors, uint _goal_size,
-                                uint _goal_start, uint _goal_achieved_start)
+  OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors, uint _goal_size, uint _goal_start)
       : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors-_goal_size), nb_sensors(_nb_sensors-_goal_size), empty_action(), 
-      last_state(_nb_sensors-_goal_size, 0.f), last_goal_achieved(_goal_size, 0.f), goal_size(_goal_size), goal_start(_goal_start-_goal_size), goal_achieved_start(_goal_achieved_start),
-      normalizer(nb_sensors), goal_normalizer(_goal_size){
+      last_state(_nb_sensors-_goal_size, 0.f), last_goal_achieved(_goal_size, 0.f), goal_size(_goal_size), goal_start(_goal_start-_goal_size),
+      normalizer(nb_sensors) {
 
+        LOG_DEBUG("goal size " << goal_size);
+        LOG_DEBUG("goal start " << goal_start);
   }
 
   virtual ~OfflineCaclaAg() {
@@ -58,18 +60,15 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       delete oun;
   }
 
-  const std::vector<double>& _run(double reward, const std::vector<double>& sensors_,
-                                  const std::vector<double>& goal_achieved_, bool learning, bool, bool) {
-
-    std::vector<double> sensors(nb_sensors);
-    std::vector<double> goal_achieved(goal_size);
-    normalizer.transform_with_double_clip(sensors, sensors_, learning);
-    goal_normalizer.transform_with_double_clip(goal_achieved, goal_achieved_, learning);
+  const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
+                                  const std::vector<double>& goal_achieved, bool learning, bool, bool) {
+    std::vector<double> normed_sensors(nb_sensors);
+    normalizer.transform_with_double_clip(normed_sensors, sensors, false);
     
     // protect batch norm from testing data and poor data
-    vector<double>* next_action = ann_testing->computeOut(sensors);
+    vector<double>* next_action = ann_testing->computeOut(normed_sensors);
     if (last_action.get() != nullptr && learning) {
-      trajectory.push_back( {last_state, last_goal_achieved, *last_pure_action, *last_action, sensors, reward, false, false});
+      trajectory.push_back( {last_state, last_goal_achieved, last_goal_achieved, *last_pure_action, *last_action, sensors, reward, false, false});
     }
 
     last_pure_action.reset(new std::vector<double>(*next_action));
@@ -169,6 +168,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     }   
 #endif
   
+    LOG_INFO("dimensionality of NN " << nb_sensors << " (in) " << this->nb_motors << " (out).");
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, 0, true, momentum);
     
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, 0, false, momentum);
@@ -281,12 +281,53 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     if (episode % update_each_episode != 0)
       return;
     
+//     LOG_DEBUG("#############");
+//     for (int i=0;i<trajectory.size(); i++) {
+//       bib::Logger::PRINT_ELEMENTS(trajectory[i].s);
+//       bib::Logger::PRINT_ELEMENTS(trajectory[i].goal_achieved);
+//       LOG_DEBUG(trajectory[i].r << " " <<i);
+//     }
+    
+    // perform norm on batch
+    for (int i=0;i<trajectory.size(); i++) {
+      normalizer.update_batch_clip_before(trajectory[i].s, goal_size);//ignore fixed goal in update
+      normalizer.update_batch_clip_before(trajectory[i].goal_achieved);
+    }
+    
+    for (int i=0;i<trajectory.size(); i++) {
+      std::vector<double> normed_sensors(nb_sensors);
+      std::vector<double> normed_goal_size(goal_size);
+      std::vector<double> normed_next_s(nb_sensors);
+      normalizer.transform_with_double_clip(normed_sensors, trajectory[i].s, false);
+      normalizer.transform_with_double_clip(normed_goal_size, trajectory[i].goal_achieved, false);
+      normalizer.transform_with_double_clip(normed_next_s, trajectory[i].next_s, false);
+      
+      std::copy(normed_sensors.begin(), normed_sensors.end(), trajectory[i].s.begin());
+      std::copy(normed_goal_size.begin(), normed_goal_size.end(), trajectory[i].goal_achieved.begin());
+      std::copy(normed_next_s.begin(), normed_next_s.end(), trajectory[i].next_s.begin());
+    }
+    
+//     LOG_DEBUG("#############");
+//     for (int i=0;i<trajectory.size(); i++) {
+//       bib::Logger::PRINT_ELEMENTS(trajectory[i].s);
+//       bib::Logger::PRINT_ELEMENTS(trajectory[i].goal_achieved);
+//       LOG_DEBUG(trajectory[i].r << " " <<i);
+//     }
+//     exit(1);
+    
 // 
 // data augmentation part
 //
-    auto comparator = [](double left, double right) {
-      return std::fabs(left - right) <= 1e-6;
+    auto goal_achieved_reward = [](const std::vector<double>&  a, const std::vector<double>&  b) {
+      double sum = 0.f;
+      for (int i=0;i<a.size();i++){
+        double diff = a[i] - b[i];
+        sum += diff*diff;
+      }
+      sum = std::sqrt(sum);
+      return sum < 0.05f;
     };
+    
     int saved_tepsize=trajectory_end_points.size();
     for(int i=0;i < saved_tepsize; i++) {
         int min_index=0;
@@ -296,7 +337,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         for(int j=0;j<hindsight_nb_destination;j++) {
             uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
 
-            for(int k=min_index;k<destination;k++) {
+            for(int k=min_index;k<=destination;k++) {
               sample sa = trajectory[k];
               trajectory.push_back(sa);
               trajectory.back().artificial = true;
@@ -307,18 +348,23 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
                     trajectory[destination].goal_achieved.end(), 
                     trajectory.back().next_s.begin() + goal_start);
               
-               if (std::equal(sa.goal_achieved.begin(), sa.goal_achieved.end(),
-                   trajectory[destination].goal_achieved.begin(), comparator)) {
+              if ( goal_achieved_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed))
                 trajectory.back().r = 0.f;
-              }
             }
             trajectory_end_points.push_back(trajectory.size());
         }
     }
 //     LOG_DEBUG("#############");
-//     for (int i=0;i<trajectory.size(); i++)
+//     for (int i=0;i<trajectory.size(); i++){
 //       bib::Logger::PRINT_ELEMENTS(trajectory[i].s);
+//       bib::Logger::PRINT_ELEMENTS(trajectory[i].goal_achieved);
+//       LOG_DEBUG(trajectory[i].r << " " <<i);
+//     }
+//     LOG_DEBUG("#############");
+//     LOG_DEBUG("#############");
+//     LOG_DEBUG("#############");
 //     exit(1);
+        
     if(trajectory.size() > 0)
       vnn->increase_batchsize(trajectory.size());
     
@@ -576,7 +622,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       ann->save(path+".actor");
       vnn->save(path+".critic");
       bib::XMLEngine::save<>(normalizer, "normalizer", path+".normalizer.data");
-      bib::XMLEngine::save<>(goal_normalizer, "goal_normalizer", path+".gnormalizer.data");
     } 
   }
   
@@ -591,7 +636,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     ann->load(path+".actor");
     vnn->load(path+".critic");
     bib::XMLEngine::load<>(normalizer, "normalizer", path+".normalizer.data");
-    bib::XMLEngine::load<>(goal_normalizer, "goal_normalizer", path+".gnormalizer.data");
   }
   
   void load_previous_run() override {
@@ -676,11 +720,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   //hindsight
   uint goal_size;
   uint goal_start;
-  uint goal_achieved_start;
   uint hindsight_nb_destination;
   
   bib::OnlineNormalizer normalizer;
-  bib::OnlineNormalizer goal_normalizer;
  
   struct algo_state {
     uint episode;

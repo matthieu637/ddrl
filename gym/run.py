@@ -37,6 +37,7 @@ except:
 #find . -name "x.learning.data" | xargs -I G bash -c "file G | grep gzip > /dev/null && echo mv 'G G.gz ; gunzip G.gz'"
 
 np.seterr(all='raise')
+np.set_printoptions(linewidth=2000,precision=2)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--save-best', action='store_true', default=False)
@@ -79,16 +80,16 @@ def str2bool(v):
 
 def plot_exploratory_actions(observation, ag):
     print(observation)
-    p=[np.array(ag.run(0, observation, True, False, False))[0] for _ in range(5000)]
-    #p=np.concatenate(p)
-    p=np.array(p)
+    all_ac=[np.array(ag.run(0, observation, True, False, False)) for _ in range(5000)]
+    all_ac=np.array(all_ac)
 
-    print(np.mean(p), np.std(p))
+#    import ipdb; ipdb.set_trace()
+    print('mean', np.mean(all_ac, 0), 'std', np.std(all_ac, 0))
     import matplotlib.pyplot as plt
     from pylab import figure
     fig = figure()
     ax=fig.add_subplot(111)
-    ax.hist(p, 50)
+    ax.hist(all_ac[:,0], 50)
     plt.show()
 
 def run_episode(env, ag, learning, episode):
@@ -101,7 +102,7 @@ def run_episode(env, ag, learning, episode):
     sample_steps=0
     max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
     ag.start_ep(observation, learning)
-    #plot_exploratory_actions(observation, ag)
+#    plot_exploratory_actions(observation, ag)
     reward=0 #not taken into account
     for step in range(max_steps):
         action = ag.run(reward, observation, learning, False, False)
@@ -194,9 +195,9 @@ if isinstance(env.observation_space, gym.spaces.Dict):
     print("Goal observed space:", env.observation_space.spaces.get('achieved_goal'))
     print("Observation space:", env.observation_space.spaces.get('observation'))
     #the following might be false for some env
-    goal_achieved_start=0
-    goal_start=goal_achieved_start+goal_size
+    goal_start=goal_size
     keys = env.observation_space.spaces.keys()
+    print("Keys order: ", list(keys))
     env = gym.wrappers.FlattenDictWrapper(env, dict_keys=list(keys))
 
 observation = env.reset()
@@ -223,7 +224,7 @@ DDRLAg=load_so_libray(config)
 if not (clparams['goal_based']) or "libddrl-hpenfac" not in config.get('simulation', 'library'):
     ag = DDRLAg(env.action_space.shape[0], nb_sensors, sys.argv)
 else:
-    ag = DDRLAg(env.action_space.shape[0], nb_sensors, goal_size, goal_start, goal_achieved_start, sys.argv)
+    ag = DDRLAg(env.action_space.shape[0], nb_sensors, goal_size, goal_start, sys.argv)
 print("main algo : " + ag.name())
 
 if clparams['load'] is not None:

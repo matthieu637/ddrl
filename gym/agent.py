@@ -81,8 +81,8 @@ def load_so_libray(config):
         lib.OfflineCaclaAg_load.argtypes = [ ctypes.c_int64 ]
         
         class DDRLAg(object):
-            def __init__(self, nb_motors, nb_sensors, goal_size, goal_start, goal_achieved_start, argv=[]):
-                self.obj = lib.OfflineCaclaAg_new(nb_motors, nb_sensors, goal_size, goal_start, goal_achieved_start)
+            def __init__(self, nb_motors, nb_sensors, goal_size, goal_start, argv=[]):
+                self.obj = lib.OfflineCaclaAg_new(nb_motors, nb_sensors, goal_size, goal_start)
                 argv.append("")
                 string_length = len(argv)
     
