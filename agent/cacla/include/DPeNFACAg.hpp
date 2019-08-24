@@ -125,6 +125,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
     update_each_episode         = pt->get<uint>("agent.update_each_episode");
     nb_offpolicy_trajectories   = pt->get<uint>("agent.nb_offpolicy_trajectories");
     offpol_actor                = pt->get<bool>("agent.offpol_actor");
+    nstep                           = pt->get<int>("agent.nstep");
     
     if(gaussian_policy == 2){
       double oun_theta = pt->get<double>("agent.noise2");
@@ -273,17 +274,36 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 //          bib::Logger::PRINT_ELEMENTS(deltas, "deltas ");
           
           std::vector<double> diff(trajectory_offpol.size());
-          li=trajectory_offpol.size() - 1;
-          double prev_delta = 0.;
-          int index_ep = trajectory_end_points_offpol.size() - 1;
+//           li=trajectory_offpol.size() - 1;
+//           double prev_delta = 0.;
+//           int index_ep = trajectory_end_points_offpol.size() - 1;
+//           for (auto it : trajectory_offpol) {
+//             if (index_ep >= 0 && trajectory_end_points_offpol[index_ep] - 1 == li){
+//                 prev_delta = 0.;
+//                 index_ep--;
+//             }
+//             diff[li] = deltas[li] + prev_delta * std::min(cbar, all_is[li]);
+//             prev_delta = this->gamma * lambda * diff[li];
+//             --li;
+//           }
+          li=0;
+          int index_ep = 0;
           for (auto it : trajectory_offpol) {
-            if (index_ep >= 0 && trajectory_end_points_offpol[index_ep] - 1 == li){
-                prev_delta = 0.;
-                index_ep--;
+            double future = 0.f;
+            double prodci =  std::min(cbar, all_is[li]);
+            for (int i=1;i < nstep && li + i < trajectory_end_points_offpol[index_ep] ; i++){
+              future += this->gamma * prodci * deltas[li+i]; 
+              prodci *= std::min(cbar, all_is[li+i]);
             }
-            diff[li] = deltas[li] + prev_delta * std::min(cbar, all_is[li]);
-            prev_delta = this->gamma * lambda * diff[li];
-            --li;
+            diff[li] = deltas[li] + future;
+            
+            li++;
+            if (li >= trajectory_end_points_offpol[index_ep]) {
+              index_ep++;
+              
+              if (index_ep >= trajectory_end_points_offpol.size())
+                break;
+            }
           }
           ASSERT(diff[trajectory_offpol.size() -1] == deltas[trajectory_offpol.size() -1], "pb lambda");
           
@@ -416,17 +436,36 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
         //        Simple computation for lambda return
         //           
         std::vector<double> diff(traj->size());
-        li=traj->size() - 1;
-        double prev_delta = 0.;
-        int index_ep = traj_end_points->size() - 1;
+//         li=traj->size() - 1;
+//         double prev_delta = 0.;
+//         int index_ep = traj_end_points->size() - 1;
+//         for (auto it : *traj) {
+//           if (index_ep >= 0 && traj_end_points->at(index_ep) - 1 == li) {
+//               prev_delta = 0.;
+//               index_ep--;
+//           }
+//           diff[li] = deltas[li] + prev_delta * std::min(cbar, all_is[li]);
+//           prev_delta = this->gamma * lambda * diff[li];
+//           --li;
+//         }
+        li=0;
+        int index_ep = 0;
         for (auto it : *traj) {
-          if (index_ep >= 0 && traj_end_points->at(index_ep) - 1 == li){
-              prev_delta = 0.;
-              index_ep--;
+          double future = 0.f;
+          double prodci =  std::min(cbar, all_is[li]);
+          for (int i=1;i < nstep && li + i < traj_end_points->at(index_ep) ; i++){
+            future += this->gamma * prodci * deltas[li+i]; 
+            prodci *= std::min(cbar, all_is[li+i]);
           }
-          diff[li] = deltas[li] + prev_delta * std::min(cbar, all_is[li]);
-          prev_delta = this->gamma * lambda * diff[li];
-          --li;
+          diff[li] = deltas[li] + future;
+          
+          li++;
+          if (li >= traj_end_points->at(index_ep)) {
+            index_ep++;
+            
+            if (index_ep >= traj_end_points->size())
+              break;
+          }
         }
         ASSERT(diff[traj->size() -1] == deltas[traj->size() -1], "pb lambda");
 
@@ -668,6 +707,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
   double pbar = 1;
   double cbar = 1;
   uint nb_offpolicy_trajectories;
+  int nstep;
   
   struct algo_state {
     uint episode;
@@ -681,4 +721,5 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentProgOptions> {
 };
 
 #endif
+
 
