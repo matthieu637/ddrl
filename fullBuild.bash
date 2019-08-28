@@ -10,6 +10,7 @@ cd $LIB
 check_all
 
 export CPU=$(nbcpu)
+export CPU=$((CPU>4 ? 4 : CPU))
 
 function hr(){
 	echo "---------------------------------------------------------------------------------"

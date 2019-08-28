@@ -1,5 +1,5 @@
-#ifndef PENNFAC_HPP
-#define PENNFAC_HPP
+#ifndef HPENFACAG_HPP_INCLUDED
+#define HPENFACAG_HPP_INCLUDED
 
 #include <vector>
 #include <string>
@@ -29,6 +29,7 @@ typedef struct _sample {
   std::vector<double> next_s;
   double r;
   bool goal_reached;
+  double prob;
   bool artificial;
 } sample;
 #endif
@@ -68,7 +69,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     // protect batch norm from testing data and poor data
     vector<double>* next_action = ann_testing->computeOut(normed_sensors);
     if (last_action.get() != nullptr && learning) {
-      trajectory.push_back( {last_state, last_goal_achieved, last_goal_achieved, *last_pure_action, *last_action, sensors, reward, false, false});
+      double prob = bib::Proba<double>::truncatedGaussianDensity(*last_action, *last_pure_action, noise);
+      trajectory.push_back( {last_state, last_goal_achieved, last_goal_achieved, *last_pure_action, *last_action, sensors, reward, false, prob, false});
     }
 
     last_pure_action.reset(new std::vector<double>(*next_action));
@@ -135,7 +137,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     gae                     = false;
     update_each_episode = 1;
     
-    if(gaussian_policy == 2){
+    if(gaussian_policy == 2) {
       double oun_theta = pt->get<double>("agent.noise2");
       double oun_dt = pt->get<double>("agent.noise3");
       oun = new bib::OrnsteinUhlenbeckNoise<double>(this->nb_motors, noise, oun_theta, oun_dt);
@@ -237,8 +239,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               prev_delta = 0.;
               index_ep--;
           }
-          pdiff[li] = pvtarget[li] + prev_delta;
-          prev_delta = this->gamma * lambda * pdiff[li];
+          if(it.artificial) {
+            pdiff[li] = pvtarget[li] * std::min(it.prob, pbar) + prev_delta * std::min(it.prob, cbar);
+            prev_delta = this->gamma * lambda * pdiff[li];
+          } else {
+            pdiff[li] = pvtarget[li] + prev_delta;
+            prev_delta = this->gamma * lambda * pdiff[li];
+          }
           --li;
         }
         ASSERT(pdiff[trajectory.size() -1] == pvtarget[trajectory.size() -1], "pb lambda");
@@ -288,7 +295,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //       LOG_DEBUG(trajectory[i].r << " " <<i);
 //     }
     
-    // perform norm on batch
+//     
+//    perform norm on batch
+//     
     for (int i=0;i<trajectory.size(); i++) {
       normalizer.update_batch_clip_before(trajectory[i].s, goal_size);//ignore fixed goal in update
       normalizer.update_batch_clip_before(trajectory[i].goal_achieved);
@@ -328,6 +337,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       return sum < 0.05f;
     };
     
+    int saved_trajsize=trajectory.size();
     int saved_tepsize=trajectory_end_points.size();
     for(int i=0;i < saved_tepsize; i++) {
         int min_index=0;
@@ -354,6 +364,29 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
             trajectory_end_points.push_back(trajectory.size());
         }
     }
+//     
+//  compute importance sampling ratio on artificial data
+// 
+    {
+      int artificial_data_size = trajectory.size() - saved_trajsize;
+      ann->increase_batchsize(artificial_data_size);
+      caffe::Blob<double> all_states(artificial_data_size, nb_sensors, 1, 1);
+      double* pall_states = all_states.mutable_cpu_data();
+      
+      int li=0;
+      for (int i = saved_trajsize; i < trajectory.size(); i++) {
+        std::copy(trajectory[i].s.begin(), trajectory[i].s.end(), pall_states + li * nb_sensors);
+        li++;
+      }
+      
+      auto ac_out = ann->computeOutBlob(all_states);
+      li=0;
+      for (int i = saved_trajsize; i < trajectory.size(); i++) {
+        trajectory[i].prob = bib::Proba<double>::truncatedGaussianDensity(trajectory[i].a, ac_out->cpu_data(), noise, li * this->nb_motors) / trajectory[i].prob;
+        li++;
+      }
+    }
+    
 //     LOG_DEBUG("#############");
 //     for (int i=0;i<trajectory.size(); i++){
 //       bib::Logger::PRINT_ELEMENTS(trajectory[i].s);
@@ -428,8 +461,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               prev_delta = 0.;
               index_ep--;
           }
-          diff[li] = pdeltas[li] + prev_delta;
-          prev_delta = this->gamma * lambda * diff[li];
+          
+          if(it.artificial) {
+            diff[li] = pdeltas[li] * std::min(it.prob, pbar) + prev_delta * std::min(it.prob, cbar);
+            prev_delta = this->gamma * lambda * diff[li];
+          } else {
+            diff[li] = pdeltas[li] + prev_delta;
+            prev_delta = this->gamma * lambda * diff[li];
+          }
           --li;
         }
         ASSERT(diff[trajectory.size() -1] == pdeltas[trajectory.size() -1], "pb lambda");
@@ -721,6 +760,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   uint goal_size;
   uint goal_start;
   uint hindsight_nb_destination;
+  
+  //v trace
+  double pbar = 1;
+  double cbar = 1;
   
   bib::OnlineNormalizer normalizer;
  
