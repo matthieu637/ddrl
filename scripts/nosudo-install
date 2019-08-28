@@ -132,3 +132,8 @@ fi
 
 
 cd /home/mzimmer
+
+#git clone https://github.com/xianyi/OpenBLAS
+#make FC=gfortran
+#make PREFIX=/home/mzimmer/home_ftalc/root/usr install
+
