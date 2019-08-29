@@ -234,13 +234,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         int li=trajectory.size() - 1;
         double prev_delta = 0.;
         int index_ep = trajectory_end_points.size() - 1;
-        for (auto it : trajectory) {
+        for (auto it = trajectory.rbegin(); it != trajectory.rend(); it++) {
           if (index_ep >= 0 && trajectory_end_points[index_ep] - 1 == li){
               prev_delta = 0.;
               index_ep--;
           }
-          if(it.artificial) {
-            pdiff[li] = pvtarget[li] * std::min(it.prob, pbar) + prev_delta * std::min(it.prob, cbar);
+          if(it->artificial) {
+            pdiff[li] = pvtarget[li] * std::min(it->prob, pbar) + prev_delta * std::min(it->prob, cbar);
             prev_delta = this->gamma * lambda * pdiff[li];
           } else {
             pdiff[li] = pvtarget[li] + prev_delta;
@@ -248,7 +248,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           }
           --li;
         }
-        ASSERT(pdiff[trajectory.size() -1] == pvtarget[trajectory.size() -1], "pb lambda");
+        ASSERT(pdiff[trajectory.size() -1] == pvtarget[trajectory.size() -1] * std::min(trajectory[trajectory.size() - 1].prob, pbar), "pb lambda");
         
 //         move diff to GPU
 #ifdef CAFFE_CPU_ONLY
@@ -337,6 +337,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       return sum < 0.05f;
     };
     
+    auto goal_reward_dense = [](const std::vector<double>&  a, const std::vector<double>&  b) {
+      double sum = 0.f;
+      for (int i=0;i<a.size();i++){
+        double diff = a[i] - b[i];
+        sum += diff*diff;
+      }
+      sum = std::sqrt(sum);
+      return -sum;
+    };
+    
     int saved_trajsize=trajectory.size();
     int saved_tepsize=trajectory_end_points.size();
     for(int i=0;i < saved_tepsize; i++) {
@@ -360,16 +370,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               
               if ( goal_achieved_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed))
                 trajectory.back().r = 0.f;
+//                 trajectory.back().r = goal_reward_dense(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed);
             }
             trajectory_end_points.push_back(trajectory.size());
         }
     }
-//     
+// 
 //  compute importance sampling ratio on artificial data
 // 
     {
       int artificial_data_size = trajectory.size() - saved_trajsize;
-      ann->increase_batchsize(artificial_data_size);
       caffe::Blob<double> all_states(artificial_data_size, nb_sensors, 1, 1);
       double* pall_states = all_states.mutable_cpu_data();
       
@@ -379,6 +389,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         li++;
       }
       
+      ann->increase_batchsize(artificial_data_size);
       auto ac_out = ann->computeOutBlob(all_states);
       li=0;
       for (int i = saved_trajsize; i < trajectory.size(); i++) {
@@ -456,14 +467,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         int li=trajectory.size() - 1;
         double prev_delta = 0.;
         int index_ep = trajectory_end_points.size() - 1;
-        for (auto it : trajectory) {
+        for (auto it = trajectory.rbegin(); it != trajectory.rend(); it++) {
           if (index_ep >= 0 && trajectory_end_points[index_ep] - 1 == li){
               prev_delta = 0.;
               index_ep--;
           }
           
-          if(it.artificial) {
-            diff[li] = pdeltas[li] * std::min(it.prob, pbar) + prev_delta * std::min(it.prob, cbar);
+          if(it->artificial) {
+            diff[li] = pdeltas[li] * std::min(it->prob, pbar) + prev_delta * std::min(it->prob, cbar);
             prev_delta = this->gamma * lambda * diff[li];
           } else {
             diff[li] = pdeltas[li] + prev_delta;
@@ -471,7 +482,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           }
           --li;
         }
-        ASSERT(diff[trajectory.size() -1] == pdeltas[trajectory.size() -1], "pb lambda");
+        ASSERT(diff[trajectory.size() -1] == pdeltas[trajectory.size() -1] * std::min(trajectory[trajectory.size() - 1].prob, pbar), "pb lambda");
 
         caffe::caffe_copy(trajectory.size(), deltas.cpu_diff(), deltas.mutable_cpu_data());
       }
