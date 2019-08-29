@@ -62,7 +62,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
     if( correlation_history > 0) {
       delete ttmg_mu;
-      delete ttmg_beta;
+      delete ttmg_a;
     }
     
     if(oun == nullptr)
@@ -104,21 +104,25 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         }
         delete randomized_action;
       } else if(gaussian_policy == 5) {
-        std::vector<double> tmpcopy(this->nb_motors*correlation_history);
-        std::vector<double> tmpout(this->nb_motors*(correlation_history+1));
-        std::copy(ttmg_mu->begin(), ttmg_mu->begin()  + (this->nb_motors*correlation_history),  tmpcopy.begin());
-        std::copy(tmpcopy.begin(), tmpcopy.end(),  ttmg_mu->begin() + this->nb_motors);
-        std::copy(ttmg_beta->begin(), ttmg_beta->begin()  + (this->nb_motors*correlation_history),  tmpcopy.begin());
-        std::copy(tmpcopy.begin(), tmpcopy.end(),  ttmg_beta->begin() + this->nb_motors);
-        std::copy(ttmg_mu->begin(), ttmg_mu->end(),  tmpout.begin());
+        if (correlation_history > 1) {
+          std::vector<double> tmpcopy(this->nb_motors*correlation_history);
+          std::copy(ttmg_mu->begin(), ttmg_mu->end(),  tmpcopy.begin());
+          std::copy(tmpcopy.begin(), tmpcopy.end(),  ttmg_mu->begin() + this->nb_motors);
+          std::copy(ttmg_a->begin(), ttmg_a->end(),  tmpcopy.begin());
+          std::copy(tmpcopy.begin(), tmpcopy.end(),  ttmg_a->begin() + this->nb_motors);
+        }
         
         vector<double>* randomized_action = bib::Proba<double>::multidimentionnalGaussianZeroMean(this->nb_motors, noise);
-        std::copy(next_action->begin(), next_action->end(),  ttmg_mu->begin());
-        std::copy(randomized_action->begin(), randomized_action->end(),  ttmg_beta->begin());
-        caffe::caffe_cpu_gemv(CblasTrans, this->nb_motors * (correlation_history+1), this->nb_motors * (correlation_history+1), (double)1.f, 
-                              correlation_matrix->data(), ttmg_beta->data(), (double)1.f, tmpout.data());
+        std::vector<double> saved_mu(next_action->begin(), next_action->end());
+        //adapt mu
+        std::vector<double> diff(this->nb_motors*correlation_history);
+        caffe::caffe_sub(this->nb_motors * correlation_history, ttmg_a->data(), ttmg_mu->data(), diff.data());
+        caffe::caffe_cpu_gemv(CblasTrans, this->nb_motors * correlation_history, this->nb_motors, (double) 1.f, sub_mu_matrix->data(), diff.data(), (double) 1.f, next_action->data());
+        caffe::caffe_cpu_gemv(CblasTrans, this->nb_motors, this->nb_motors, (double)1.f, sub_cov_matrix->data(), randomized_action->data(), (double)1.f, next_action->data());
         
-        std::copy(tmpout.begin(), tmpout.begin()  + this->nb_motors,  next_action->begin());
+        std::copy(next_action->begin(), next_action->end(),  ttmg_a->begin());
+        std::copy(saved_mu.begin(), saved_mu.end(),  ttmg_mu->begin());
+        
         for(int i=0;i<this->nb_motors;i++){
           if(next_action->at(i) > 1.f)
             next_action->at(i) = 1.f;
@@ -212,19 +216,55 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
     
     //must be upper triangular matrix
-    std::vector<double> correlation_matrix_hf = {1.17271 ,  0.203429,  0.012947,  0.247747, -0.269369, -0.372903,  0.892845,  0.348156, -0.067203,  0.133273, -0.296776, -0.364607,  0.      ,  0.863368, -0.306191, -0.256704, -0.139599,  0.012051, -0.015096,  0.298496, -0.151919, -0.19836 , -0.159198, -0.050492,  0.      ,  0.      ,  0.787103,  0.024518,  0.013595, -0.026101,  0.1162  , -0.133647,  0.228778,  0.051036,  0.02733 , -0.017488,  0.      ,  0.      ,  0.      ,  0.804971,  0.025752, -0.209738,  0.02229 , -0.103272,  0.124996,  0.0782  ,  0.170731, -0.071249,  0.      ,  0.      ,  0.      ,  0.      ,  0.706968,  0.077754,  0.046403, -0.031308, -0.033845,  0.170422,  0.03576 ,  0.006982,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.68809 , -0.050595,  0.042384,  0.002074, -0.164677,  0.132639,  0.062154,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.747796, -0.063111,  0.058302,  0.195479, -0.073965, -0.138678,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.735794, -0.199462, -0.163615, -0.017888,  0.075383,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.757345,  0.023782, -0.028556, -0.032997,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.770103,  0.01642 , -0.216797,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.650738,  0.049027,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.665461};
+    std::vector<double> correlation_matrix_hf = {1.375249,  0.238563,  0.015183,  0.290535, -0.315891, -0.437307,  1.047048,  0.408286, -0.078809,  0.156291, -0.348032, -0.427579,  0.238563,  0.786787, -0.261722, -0.171231, -0.175322, -0.065455,  0.168597,  0.328537, -0.144833, -0.144146, -0.197819, -0.117765,  0.015183, -0.261722,  0.713452,  0.101106,  0.049957, -0.029062,  0.107643, -0.192083,  0.225718,  0.102632,  0.066414, -0.003025,  0.290535, -0.171231,  0.101106,  0.775855, -0.009837, -0.264952,  0.245867, -0.076778,  0.128576,  0.148137,  0.105445, -0.135151, -0.315891, -0.175322,  0.049957, -0.009837,  0.592699,  0.14798 , -0.203438, -0.162062,  0.021712,  0.114982,  0.132216,  0.108126, -0.437307, -0.065455, -0.029062, -0.264952,  0.14798 ,  0.663387, -0.37204 , -0.074353, -0.010163, -0.169884,  0.166276,  0.194065,  1.047048,  0.168597,  0.107643,  0.245867, -0.203438, -0.37204 ,  1.375311,  0.23772 ,  0.013584,  0.292078, -0.315952, -0.434919,  0.408286,  0.328537, -0.192083, -0.076778, -0.162062, -0.074353,  0.23772 ,  0.786991, -0.261524, -0.172745, -0.17612 , -0.065683, -0.078809, -0.144833,  0.225718,  0.128576,  0.021712, -0.010163,  0.013584, -0.261524,  0.713465,  0.098562,  0.048416, -0.028952,  0.156291, -0.144146,  0.102632,  0.148137,  0.114982, -0.169884,  0.292078, -0.172745,  0.098562,  0.780596, -0.008542, -0.261269, -0.348032, -0.197819,  0.066414,  0.105445,  0.132216,  0.166276, -0.315952, -0.17612 ,  0.048416, -0.008542,  0.592523,  0.150291, -0.427579, -0.117765, -0.003025, -0.135151,  0.108126,  0.194065, -0.434919, -0.065683, -0.028952, -0.261269,  0.150291,  0.663028};
+    
+    std::vector<double> upper_left_hf = {1.375249,  0.238563,  0.015183,  0.290535, -0.315891, -0.437307,  0.238563,  0.786787, -0.261722, -0.171231, -0.175322, -0.065455,  0.015183, -0.261722,  0.713452,  0.101106,  0.049957, -0.029062,  0.290535, -0.171231,  0.101106,  0.775855, -0.009837, -0.264952, -0.315891, -0.175322,  0.049957, -0.009837,  0.592699,  0.14798 , -0.437307, -0.065455, -0.029062, -0.264952,  0.14798 ,  0.663387};
+    std::vector<double> upper_right_hf = {1.047048,  0.408286, -0.078809,  0.156291, -0.348032, -0.427579,  0.168597,  0.328537, -0.144833, -0.144146, -0.197819, -0.117765,  0.107643, -0.192083,  0.225718,  0.102632,  0.066414, -0.003025,  0.245867, -0.076778,  0.128576,  0.148137,  0.105445, -0.135151, -0.203438, -0.162062,  0.021712,  0.114982,  0.132216,  0.108126, -0.37204 , -0.074353, -0.010163, -0.169884,  0.166276,  0.194065};
+    std::vector<double> bottom_left_hf = {1.047048,  0.168597,  0.107643,  0.245867, -0.203438, -0.37204 ,  0.408286,  0.328537, -0.192083, -0.076778, -0.162062, -0.074353, -0.078809, -0.144833,  0.225718,  0.128576,  0.021712, -0.010163,  0.156291, -0.144146,  0.102632,  0.148137,  0.114982, -0.169884, -0.348032, -0.197819,  0.066414,  0.105445,  0.132216,  0.166276, -0.427579, -0.117765, -0.003025, -0.135151,  0.108126,  0.194065};
+    std::vector<double> inv_bottom_right_hf = {1.076633, -0.299715, -0.095462, -0.29491 ,  0.368688,  0.472586, -0.299715,  1.721995,  0.558192,  0.465147,  0.283334,  0.117431, -0.095462,  0.558192,  1.616162, -0.024783, -0.03286 ,  0.060932, -0.29491 ,  0.465147, -0.024783,  1.677507, -0.130292,  0.542112,  0.368688,  0.283334, -0.03286 , -0.130292,  2.031015, -0.243243,  0.472586,  0.117431,  0.060932,  0.542112, -0.243243,  2.101282};
+    
+    // cholesky(UL - UR @ IBR @ BL)
+    std::vector<double> sub_cov_matrix_hf = {0.693829, -0.016779,  0.020195,  0.216119, -0.146121, -0.188821,  0.      ,  0.771047, -0.208573, -0.150151, -0.08068 , -0.0099  ,  0.      ,  0.      ,  0.745927, -0.026867,  0.009598, -0.012033,  0.      ,  0.      ,  0.      ,  0.762361,  0.011613, -0.222311,  0.      ,  0.      ,  0.      ,  0.      ,  0.687421,  0.096491,  0.      ,  0.      ,  0.      ,  0.      ,  0.      ,  0.660971};
+    
+    // UR @ IBR
+    std::vector<double> sub_mu_matrix_hf = {0.635967,  0.269137, -0.017911, -0.04119 , -0.118911, -0.191117,  0.010798,  0.297436, -0.063885, -0.173187, -0.194343, -0.168051,  0.144704, -0.170834,  0.242392,  0.035187,  0.100098,  0.075194,  0.206764, -0.051221,  0.1261  ,  0.050088,  0.292403, -0.11432 , -0.106592, -0.102335, -0.036557,  0.218347,  0.105614,  0.143525, -0.174179, -0.031323, -0.011841, -0.126056,  0.154739,  0.090072};
 
 //     correlation_matrix = new std::vector<double>(this->nb_motors*this->nb_motors);
     correlation_matrix = new std::vector<double>((this->nb_motors*(correlation_history+1))*(this->nb_motors*(correlation_history+1)));
     ASSERT(correlation_matrix_hf.size() == correlation_matrix->size(), "pb size " << correlation_matrix_hf.size() << " " <<  correlation_matrix->size());
     std::copy(correlation_matrix_hf.begin(), correlation_matrix_hf.end(), correlation_matrix->begin());
+    
+//     upper_left = new std::vector<double>(this->nb_motors*this->nb_motors);
+//     ASSERT(upper_left_hf.size() == upper_left->size(), "pb size ");
+//     std::copy(upper_left_hf.begin(), upper_left_hf.end(), upper_left->begin());
+//     
+//     upper_right = new std::vector<double>((this->nb_motors*(correlation_history))*(this->nb_motors*(correlation_history)));
+//     ASSERT(upper_right_hf.size() == upper_right->size(), "pb size ");
+//     std::copy(upper_right_hf.begin(), upper_right_hf.end(), upper_right->begin());
+//     
+//     bottom_left = new std::vector<double>((this->nb_motors*(correlation_history))*(this->nb_motors*(correlation_history)));
+//     ASSERT(bottom_left_hf.size() == bottom_left->size(), "pb size ");
+//     std::copy(bottom_left_hf.begin(), bottom_left.end(), bottom_left->begin());
+//     
+//     inv_bottom_right = new std::vector<double>((this->nb_motors*(correlation_history))*(this->nb_motors*(correlation_history)));
+//     ASSERT(inv_bottom_right_hf.size() == inv_bottom_right->size(), "pb size ");
+//     std::copy(inv_bottom_right_hf.begin(), inv_bottom_right_hf.end(), inv_bottom_right->begin());
+    
+    sub_cov_matrix = new std::vector<double>(this->nb_motors*this->nb_motors);
+    ASSERT(sub_cov_matrix_hf.size() == sub_cov_matrix->size(), "pb size ");
+    std::copy(sub_cov_matrix_hf.begin(), sub_cov_matrix_hf.end(), sub_cov_matrix->begin());
+
+    sub_mu_matrix = new std::vector<double>(this->nb_motors*this->nb_motors);
+    ASSERT(sub_mu_matrix_hf.size() == sub_mu_matrix->size(), "pb size ");
+    std::copy(sub_mu_matrix_hf.begin(), sub_mu_matrix_hf.end(), sub_mu_matrix->begin());
+    
 //     if cholesky needed:
 //     LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'U', this->nb_motors, correlation_matrix->data(), this->nb_motors);
 //     bib::Logger::PRINT_ELEMENTS(*correlation_matrix);
     
     if( correlation_history > 0) {
-      ttmg_mu = new std::vector<double>(this->nb_motors * (correlation_history+1), 0.f);
-      ttmg_beta = new std::vector<double>(this->nb_motors * (correlation_history+1), 0.f);
+      ttmg_mu = new std::vector<double>(this->nb_motors * correlation_history, 0.f);
+      ttmg_a = new std::vector<double>(this->nb_motors * correlation_history, 0.f);
     }
     
     if(batch_norm_actor != 0)
@@ -243,7 +283,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
     if(correlation_history > 1) {
       std::fill(ttmg_mu->begin(), ttmg_mu->end(), 0.);
-      std::fill(ttmg_beta->begin(), ttmg_beta->end(), 0.);
+      std::fill(ttmg_a->begin(), ttmg_a->end(), 0.);
     }
     
     step = 0;
@@ -727,6 +767,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   NN* ann_testing_blob;
   NN* vnn_testing;
   std::vector<double>* correlation_matrix;
+  std::vector<double> *upper_left, *upper_right, *bottom_left, *inv_bottom_right, *sub_cov_matrix, *sub_mu_matrix;
 
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
@@ -741,7 +782,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   uint correlation_history;
   
   //temporal truncated multivariate gaussian
-  std::vector<double> *ttmg_mu, *ttmg_beta;
+  std::vector<double> *ttmg_mu, *ttmg_a;
   
   struct algo_state {
     uint episode;
