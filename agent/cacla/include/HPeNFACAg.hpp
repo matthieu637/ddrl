@@ -27,6 +27,7 @@ typedef struct _sample {
   std::vector<double> pure_a;
   std::vector<double> a;
   std::vector<double> next_s;
+  std::vector<double> next_goal_achieved_unnormed;
   double r;
   bool goal_reached;
   double prob;
@@ -70,7 +71,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     vector<double>* next_action = ann_testing->computeOut(normed_sensors);
     if (last_action.get() != nullptr && learning) {
       double prob = bib::Proba<double>::truncatedGaussianDensity(*last_action, *last_pure_action, noise);
-      trajectory.push_back( {last_state, last_goal_achieved, last_goal_achieved, *last_pure_action, *last_action, sensors, reward, false, prob, false});
+      trajectory.push_back( {last_state, last_goal_achieved, last_goal_achieved, *last_pure_action, *last_action, sensors, goal_achieved, reward, false, prob, false});
     }
 
     last_pure_action.reset(new std::vector<double>(*next_action));
@@ -239,7 +240,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               prev_delta = 0.;
               index_ep--;
           }
-          if(it->artificial) {
+          if (it->artificial) {
             pdiff[li] = pvtarget[li] * std::min(it->prob, pbar) + prev_delta * std::min(it->prob, cbar);
             prev_delta = this->gamma * lambda * pdiff[li];
           } else {
@@ -290,19 +291,72 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
 //     LOG_DEBUG("#############");
 //     for (int i=0;i<trajectory.size(); i++) {
-//       bib::Logger::PRINT_ELEMENTS(trajectory[i].s);
 //       bib::Logger::PRINT_ELEMENTS(trajectory[i].goal_achieved);
 //       LOG_DEBUG(trajectory[i].r << " " <<i);
 //     }
+//     bib::Logger::PRINT_ELEMENTS(trajectory_end_points);
+//     LOG_DEBUG("#############");
+//     LOG_DEBUG("#############");
     
 //     
-//    perform norm on batch
+//    update norm on batch
 //     
     for (int i=0;i<trajectory.size(); i++) {
       normalizer.update_batch_clip_before(trajectory[i].s, goal_size);//ignore fixed goal in update
       normalizer.update_batch_clip_before(trajectory[i].goal_achieved);
     }
     
+//     
+// Remove junk data
+// 
+    for (int traj = 0 ; traj < trajectory_end_points.size() ; traj++) {
+      double varsum = 0;
+      int beg = traj == 0 ? 0 : trajectory_end_points[traj-1];
+      int end = trajectory_end_points[traj];
+      for (int goal_dim=0; goal_dim < goal_size; goal_dim++) {
+        std::function<double(const sample&)> get = [goal_dim](const sample&  s) {
+          return s.goal_achieved_unnormed[goal_dim];
+        };
+        varsum += bib::Utils::variance<>(trajectory.cbegin() + beg, trajectory.cbegin() + end, get);
+      }
+      
+      //goal_achieved hasn't change at all during the trajectory
+      if (varsum <= 1e-8) {
+        trajectory.erase(trajectory.begin() + beg, trajectory.begin() + end);
+        for (uint i=traj+1;i< trajectory_end_points.size(); i++)
+          trajectory_end_points[i] -= (end - beg);
+        trajectory_end_points.erase(trajectory_end_points.begin() + traj);
+        traj--;
+      } else {
+//         entropy bonus
+        for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++){
+          if(it->r < 0.)
+            it->r += std::min(100.*bib::Utils::euclidien_dist(it->goal_achieved_unnormed, it->next_goal_achieved_unnormed, 1.f), (double) 0.7f);
+//           LOG_DEBUG(it->r);
+        }
+      }
+    }
+    
+    if (trajectory.size() == 0){
+      nb_sample_update = 0;
+      ASSERT(trajectory_end_points.size() == 0, "");
+      return;
+    }
+    
+//     LOG_DEBUG("#############");
+//     for (int i=0;i<trajectory.size(); i++) {
+//       bib::Logger::PRINT_ELEMENTS(trajectory[i].goal_achieved);
+//       LOG_DEBUG(trajectory[i].r << " " <<i);
+//       if(trajectory[i].r >= 0 ){
+//         bib::Logger::PRINT_ELEMENTS(trajectory[i].goal_achieved, ("HERE "+std::to_string(i)+" ").c_str());
+//       }
+//     }
+//     bib::Logger::PRINT_ELEMENTS(trajectory_end_points);
+//     exit(1);
+    
+//     
+//  perform norm on batch
+// 
     for (int i=0;i<trajectory.size(); i++) {
       std::vector<double> normed_sensors(nb_sensors);
       std::vector<double> normed_goal_size(goal_size);
@@ -400,7 +454,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
 //     LOG_DEBUG("#############");
 //     for (int i=0;i<trajectory.size(); i++){
-//       bib::Logger::PRINT_ELEMENTS(trajectory[i].s);
+//       bib::Logger::PRINT_ELEMENTS(trajectory[i].s, trajectory[i].artificial ? "arti " : "real ");
 //       bib::Logger::PRINT_ELEMENTS(trajectory[i].goal_achieved);
 //       LOG_DEBUG(trajectory[i].r << " " <<i);
 //     }
