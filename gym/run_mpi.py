@@ -280,9 +280,11 @@ if not clparams['test_only']:
             xlearning_monitor.write(str(sample_steps_counter)+'\n')
             xlearning_monitor.flush()
             reward, testing_sample_step = testing(env, ag, episode)
+
+            reward_all = comm.gather(reward, root=0)
             results.append(reward)
-            if clparams['save_best'] and reward >= bestTestingScore:
-                bestTestingScore=reward
+            if rank == 0 and clparams['save_best'] and np.mean(reward_all) >= bestTestingScore:
+                bestTestingScore=np.mean(reward_all)
                 ag.save(episode)
                 
             if clparams['racing'] and len(results) > 10:
