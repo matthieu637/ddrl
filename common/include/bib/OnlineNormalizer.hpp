@@ -79,10 +79,6 @@ public:
     update_mean_var(output, start_col);
   }
   
-private:
-  friend class bib::XMLEngine;
-  OnlineNormalizer(){}
-  
   void update_mean_var(const std::vector<double>& x, uint start_col=0) {
     for(uint i=start_col; i < x.size(); i++) {
       double dndata_number = data_number[i] + 1;
@@ -95,6 +91,19 @@ private:
       data_number[i] ++;
     }
   }
+  
+  void copyFrom(const OnlineNormalizer& on) {
+    ASSERT(on.data_number.size() == data_number.size(), "size pb");
+    
+     std::copy(on.data_number.begin(), on.data_number.end(), data_number.begin());
+     std::copy(on.mean.begin(), on.mean.end(), mean.begin());
+     std::copy(on.var.begin(), on.var.end(), var.begin());
+     std::copy(on.subvar.begin(), on.subvar.end(), subvar.begin());
+  }
+  
+private:
+  friend class bib::XMLEngine;
+  OnlineNormalizer(){}
   
   friend class boost::serialization::access;
   template <typename Archive>

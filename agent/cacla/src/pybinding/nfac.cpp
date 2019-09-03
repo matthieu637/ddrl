@@ -96,7 +96,11 @@ extern "C" {
 
   void OfflineCaclaAg_dump(OfflineCaclaAg<MLP>* ag, bool learning, int episode, int step, double treward) {
     bib::Dumper<OfflineCaclaAg<MLP>, bool, bool> agent_dump(ag, false, true);
-    LOG_FILE(std::to_string(0) + (learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE),
+    int rank = 0;
+#ifdef PARALLEL_INTERACTION
+    rank = ag->getMPIrank();
+#endif
+    LOG_FILE(std::to_string(rank) + (learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE),
              episode << " " << step << " " << treward << " " << agent_dump);
   }
 

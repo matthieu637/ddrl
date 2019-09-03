@@ -6,6 +6,7 @@
 #include <boost/serialization/list.hpp>
 #include <boost/serialization/set.hpp>
 #include <boost/serialization/vector.hpp>
+#include <boost/serialization/deque.hpp>
 #include <caffe/util/math_functions.hpp>
 
 #include "arch/AACAgent.hpp"
@@ -18,6 +19,11 @@
 #include "bib/OnlineNormalizer.hpp"
 #include "nn/MLP.hpp"
 
+#ifdef PARALLEL_INTERACTION
+#include <mpi.h>
+#include <boost/mpi.hpp>
+#endif
+
 #ifndef SAASRG_SAMPLE
 #define SAASRG_SAMPLE
 typedef struct _sample {
@@ -27,6 +33,17 @@ typedef struct _sample {
   std::vector<double> next_s;
   double r;
   bool goal_reached;
+
+  friend class boost::serialization::access;
+  template <typename Archive>
+  void serialize(Archive& ar, const unsigned int) {
+    ar& BOOST_SERIALIZATION_NVP(s);
+    ar& BOOST_SERIALIZATION_NVP(pure_a);
+    ar& BOOST_SERIALIZATION_NVP(a);
+    ar& BOOST_SERIALIZATION_NVP(next_s);
+    ar& BOOST_SERIALIZATION_NVP(r);
+    ar& BOOST_SERIALIZATION_NVP(goal_reached);
+  }
 
 } sample;
 #endif
@@ -39,7 +56,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
     : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(), last_state(_nb_sensors, 0.f) {
-
+      
   }
 
   virtual ~OfflineCaclaAg() {
@@ -64,22 +81,24 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors_,
                                   bool learning, bool goal_reached, bool) override {
-    
-    std::vector<double>* sensors;
-    if(normalizer_type == 0) {
-      sensors = const_cast<std::vector<double>*>(&sensors_);
-    } else {
-      sensors = new std::vector<double>(nb_sensors);
-      if (normalizer_type == 1)
-        normalizer->transform(*sensors, sensors_, learning);
-      else
-        normalizer->transform_with_clip(*sensors, sensors_, learning);
-    }
 
     // protect batch norm from testing data and poor data
-    vector<double>* next_action = ann_testing->computeOut(*sensors);
+    vector<double>* next_action = nullptr;
+    if(normalizer_type == 0) {
+      next_action = ann_testing->computeOut(sensors_);
+    } else {
+      std::vector<double> sensors(nb_sensors);
+      if (normalizer_type == 1)
+        normalizer->transform(sensors, sensors_, false);
+      else if (normalizer_type == 2)
+        normalizer->transform_with_clip(sensors, sensors_, false);
+      else
+        normalizer->transform_with_double_clip(sensors, sensors_, false);
+      next_action = ann_testing->computeOut(sensors);
+    }
+    
     if (last_action.get() != nullptr && learning)
-      trajectory.push_back( {last_state, *last_pure_action, *last_action, *sensors, reward, goal_reached});
+      trajectory.push_back( {last_state, *last_pure_action, *last_action, sensors_, reward, goal_reached});
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
@@ -104,7 +123,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     }
     last_action.reset(next_action);
 
-    std::copy(sensors->begin(), sensors->end(), last_state.begin());
+    std::copy(sensors_.begin(), sensors_.end(), last_state.begin());
     step++;
     
     return *next_action;
@@ -149,6 +168,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
     try {
       update_each_episode     = pt->get<uint>("agent.update_each_episode");
+#ifdef PARALLEL_INTERACTION
+      if (update_each_episode % (world.size() - 1) != 0) {
+        LOG_ERROR("update_each_episode must be a multiple of (number of worker - 1)");
+        exit(1);
+      }
+      update_each_episode = update_each_episode / (world.size() - 1);
+#endif
     } catch(boost::exception const& ) {
     }
     
@@ -172,20 +198,38 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     LOG_INFO("CPU mode");
     (void) command_args;
 #else
-    if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0){ 
+    if(command_args->count("gpu") == 0 || command_args->count("cpu") > 0
+#ifdef PARALLEL_INTERACTION
+      || world.rank() != 0
+#endif
+     ) 
+    {
       caffe::Caffe::set_mode(caffe::Caffe::Brew::CPU);
       LOG_INFO("CPU mode");
     } else {
       caffe::Caffe::set_mode(caffe::Caffe::Brew::GPU);
       caffe::Caffe::SetDevice((*command_args)["gpu"].as<uint>());
       LOG_INFO("GPU mode");
-    }   
+    }
 #endif
   
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true, momentum);
-    
+
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);
-    
+
+#ifdef PARALLEL_INTERACTION
+    for(auto it : {ann, vnn})
+    {
+        std::vector<double> weights(it->number_of_parameters(false), 0.f);
+        if (world.rank() == 0)
+            it->copyWeightsTo(weights.data(), false);
+
+        broadcast(world, weights, 0);
+        if (world.rank() != 0)
+            it->copyWeightsFrom(weights.data(), false);
+    }
+#endif
+
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
     
     if(batch_norm_actor != 0)
@@ -311,6 +355,77 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     trajectory_end_points.push_back(trajectory.size());
     if (episode % update_each_episode != 0)
       return;
+
+#ifdef PARALLEL_INTERACTION
+    if (world.rank() == 0) {
+      trajectory_end_points.clear();
+      
+      std::vector<std::deque<sample>> all_traj;
+      std::vector<std::deque<int>> all_traj_ep;
+      gather(world, trajectory, all_traj, 0);
+      gather(world, trajectory_end_points, all_traj_ep, 0);
+
+      ASSERT(all_traj.size() == all_traj_ep.size(), "pb");
+      for (int i=0; i < all_traj.size() ; i++) {
+        for (auto d2 : all_traj_ep[i])
+          trajectory_end_points.push_back(trajectory.size() + d2);
+        
+        trajectory.insert(trajectory.end(), all_traj[i].begin(), all_traj[i].end());
+      }
+    } else {
+      gather(world, trajectory, 0);
+      gather(world, trajectory_end_points, 0);
+    }
+    
+    if (world.rank() == 0) {
+#endif
+      
+//     
+//    update norm on batch
+//
+    if (normalizer_type > 0) {
+      for (int i=0;i<trajectory.size(); i++) {
+        if(normalizer_type == 3)
+          normalizer->update_batch_clip_before(trajectory[i].s);
+        else
+          normalizer->update_mean_var(trajectory[i].s);
+      }
+      
+      for (int i=0;i<trajectory.size(); i++) {
+        std::vector<double> normed_sensors(nb_sensors);
+        std::vector<double> normed_next_s(nb_sensors);
+        if (normalizer_type == 1) {
+          normalizer->transform(normed_sensors, trajectory[i].s, false);
+          normalizer->transform(normed_next_s, trajectory[i].next_s, false);
+        } else if (normalizer_type == 2) {
+          normalizer->transform_with_clip(normed_sensors, trajectory[i].s, false);
+          normalizer->transform_with_clip(normed_next_s, trajectory[i].next_s, false);
+        } else {
+          normalizer->transform_with_double_clip(normed_sensors, trajectory[i].s, false);
+          normalizer->transform_with_double_clip(normed_next_s, trajectory[i].next_s, false);
+        }
+        
+        std::copy(normed_sensors.begin(), normed_sensors.end(), trajectory[i].s.begin());
+        std::copy(normed_next_s.begin(), normed_next_s.end(), trajectory[i].next_s.begin());
+      }
+    }
+#ifdef PARALLEL_INTERACTION
+    }
+    
+//     synchronize normalizer
+    if  (normalizer_type > 0) {
+      bib::OnlineNormalizer on(this->nb_sensors);
+      if (world.rank() == 0)
+        on.copyFrom(*normalizer);
+      
+      broadcast(world, on, 0);
+      
+      if (world.rank() != 0)
+        normalizer->copyFrom(on);
+    }
+    
+    if (world.rank() == 0) {
+#endif
 
     if(trajectory.size() > 0){
       vnn->increase_batchsize(trajectory.size());
@@ -574,8 +689,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       if(batch_norm_actor != 0)
         ann_testing->increase_batchsize(1);
     }
-    
-    nb_sample_update= trajectory.size();
+#ifdef PARALLEL_INTERACTION
+    }
+#endif
+    nb_sample_update = trajectory.size();
     trajectory.clear();
     trajectory_end_points.clear();
   }
@@ -592,10 +709,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         ann->save(path+".actor");
       }
     } else {
-      ann->save(path+".actor");
-      vnn->save(path+".critic");
-      if (normalizer_type > 0)
-          bib::XMLEngine::save<>(*normalizer, "normalizer", path+".normalizer.data");
+#ifdef PARALLEL_INTERACTION
+      if(world.rank() == 0 ) {
+#endif
+        ann->save(path+".actor");
+        vnn->save(path+".critic");
+        if (normalizer_type > 0)
+            bib::XMLEngine::save<>(*normalizer, "normalizer", path+".normalizer.data");
+#ifdef PARALLEL_INTERACTION
+      }
+#endif
     } 
   }
   
@@ -632,6 +755,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //         return new arch::Policy<MLP>(new MLP(*ann) , gaussian_policy ? arch::policy_type::GAUSSIAN : arch::policy_type::GREEDY, noise, decision_each);
     return nullptr;
   }
+
+#ifdef PARALLEL_INTERACTION
+  int getMPIrank() {
+    return world.rank();
+  }
+#endif
 
  protected:
   void _display(std::ostream& out) const override {
@@ -691,6 +820,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   
   uint normalizer_type;
   bib::OnlineNormalizer* normalizer = nullptr;
+
+#ifdef PARALLEL_INTERACTION
+  boost::mpi::communicator world;
+#endif
   
   struct algo_state {
     uint episode;
