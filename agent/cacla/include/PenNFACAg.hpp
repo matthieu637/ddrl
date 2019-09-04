@@ -218,16 +218,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);
 
 #ifdef PARALLEL_INTERACTION
-    for(auto it : {ann, vnn})
-    {
-        std::vector<double> weights(it->number_of_parameters(false), 0.f);
-        if (world.rank() == 0)
-            it->copyWeightsTo(weights.data(), false);
+      std::vector<double> weights(ann->number_of_parameters(false), 0.f);
+      if (world.rank() == 0)
+          ann->copyWeightsTo(weights.data(), false);
 
-        broadcast(world, weights, 0);
-        if (world.rank() != 0)
-            it->copyWeightsFrom(weights.data(), false);
-    }
+      broadcast(world, weights, 0);
+      if (world.rank() != 0)
+          ann->copyWeightsFrom(weights.data(), false);
 #endif
 
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
@@ -691,6 +688,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     }
 #ifdef PARALLEL_INTERACTION
     }
+    std::vector<double> weights(ann->number_of_parameters(false), 0.f);
+    if (world.rank() == 0)
+        ann->copyWeightsTo(weights.data(), false);
+
+    broadcast(world, weights, 0);
+    if (world.rank() != 0)
+        ann->copyWeightsFrom(weights.data(), false);
 #endif
     nb_sample_update = trajectory.size();
     trajectory.clear();
