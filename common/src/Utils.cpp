@@ -82,6 +82,14 @@ double Utils::euclidien_dist(const std::vector<double>& v1, const std::vector<do
   return sqrt(sum) / (v1.size() * dmax);
 }
 
+double Utils::L1_dist(const std::vector<double>& v1, const std::vector<double>& v2, double dmax) {
+  double sum = 0;
+  for(uint i=0; i < v1.size(); i++)
+    sum += std::fabs(v1[i] - v2[i]);
+
+  return sum / (v1.size() * dmax);
+}
+
 double Utils::euclidien_dist_ref(const std::vector<double>& v1, double refp) {
   double sum = 0;
   for(uint i=0; i < v1.size(); i++)

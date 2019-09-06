@@ -276,7 +276,9 @@ hidden_unit_a=64:64
 actor_output_layer_type=2
 hidden_layer_type=1
 
-batch_norm_actor=7
+#use online normalizer instead of batch norm
+normalizer_type=2
+batch_norm_actor=0
 batch_norm_critic=0
 
 #RL hyperparameters

@@ -34,8 +34,13 @@ class ARLAgent : public AAgent<ProgOptions> {
    * @param finished is it the last step of this episode
    * @return const std::vector< double, std::allocator< void > >&
    */
-  const std::vector<double>& runf(double r, const std::vector<double>& perceptions,
+#ifdef WANT_HINDSIGHT_PENFAC
+  const std::vector<double>& runf(double r, const std::vector<double>& perceptions, const std::vector<double>& goal_achieved,
+                                         bool learning, bool absorbing_state, bool finished)  {
+#else
+  const std::vector<double>& runf(double r, const std::vector<double>& perceptions, 
                                          bool learning, bool absorbing_state, bool finished) override {
+#endif
     const std::vector<double> *state_to_send = &perceptions;
     if(history_size > 1){
       for (uint h = history_size - 1 ; h >= 1; h--)
@@ -58,7 +63,11 @@ class ARLAgent : public AAgent<ProgOptions> {
       }
  
       _last_receive_reward = reward;
+#ifdef WANT_HINDSIGHT_PENFAC
+      const std::vector<double>& next_action = _run(reward*reward_scale, *state_to_send, goal_achieved, learning, absorbing_state, finished);
+#else
       const std::vector<double>& next_action = _run(reward*reward_scale, *state_to_send, learning, absorbing_state, finished);
+#endif
       time_for_ac = decision_each;
 
       for (uint i = 0; i < nb_motors; i++)
@@ -193,8 +202,13 @@ protected:
    * @param goal_reached did the agent reached a global goal during his last action
    * @return const std::vector< double, std::allocator< void > >&
    */
+#ifdef WANT_HINDSIGHT_PENFAC
+  virtual const std::vector<double>& _run(double reward, const std::vector<double>& perceptions,
+                                        const std::vector<double>& goal_achieved, bool learning, bool goal_reached, bool finished) {};
+#else
   virtual const std::vector<double>& _run(double reward, const std::vector<double>& perceptions,
                                         bool learning, bool goal_reached, bool finished) {};
+#endif
                                         
   virtual void _start_episode(const std::vector<double>& perceptions, bool learning){
     (void) perceptions;

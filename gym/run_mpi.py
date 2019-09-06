@@ -6,6 +6,10 @@ import numpy as np
 import sys
 import os
 from agent import load_so_libray
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 #import custom ContinuousBandit env if founded
 try:
@@ -95,52 +99,53 @@ def plot_exploratory_actions(observation, ag):
     plt.show()
 
 def run_episode(env, ag, learning, episode):
-#    env.seed(0)
-    observation = env.reset()
-    transitions = []
+#    plot_exploratory_actions(observation, ag)
+    sample_steps=0
     totalreward = 0
     undiscounted_rewards = 0
-    cur_gamma = 1.0
-    sample_steps=0
-    max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
-    ag.start_ep(observation, learning)
-#    plot_exploratory_actions(observation, ag)
-    reward=0 #not taken into account
-    for step in range(max_steps):
-        action = ag.run(reward, observation, learning, False, False)
-        #be carreful action is a pointer so it can be changed
-        action = np.array(action)
-        observation, reward, done, info = env.step(action * action_scale)
-        totalreward += cur_gamma * reward
-        cur_gamma = gamma * cur_gamma
-        undiscounted_rewards += reward
-        sample_steps+=1
-        if done:
-            break
-
-    ag.run(reward, observation, learning, done, True)
+    transitions = []
+    if rank != 0:
+#        env.seed(0)
+        observation = env.reset()
+        cur_gamma = 1.0
+        max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
+        ag.start_ep(observation, learning)
+        reward=0 #not taken into account
+        for step in range(max_steps):
+            action = ag.run(reward, observation, learning, False, False)
+            #be carreful action is a pointer so it can be changed
+            action = np.array(action)
+            observation, reward, done, info = env.step(action * action_scale)
+            totalreward += cur_gamma * reward
+            cur_gamma = gamma * cur_gamma
+            undiscounted_rewards += reward
+            sample_steps+=1
+            if done:
+                break
+    
+        ag.run(reward, observation, learning, done, True)
     ag.end_ep(learning)
 
-    if episode % dump_log_each == 0:
-        ag.dump(learning, episode, sample_steps, undiscounted_rewards)
-    if episode % display_log_each == 0:
-        ag.display(learning, episode, sample_steps, undiscounted_rewards)
-
-    t=(time.time() - start_time)
-    datalogged=str(undiscounted_rewards)+','+str(sample_steps)+','+str(t)
-    if clparams['goal_based']:
-        datalogged+=','+str(info['is_success'])
-    if learning:
-        training_monitor.write(datalogged+'\n')
-        training_monitor.flush()
-    else:
-        testing_monitor.write(datalogged+'\n')
-        testing_monitor.flush()
+    if rank != 0:
+        if episode % dump_log_each == 0:
+            ag.dump(learning, episode, sample_steps, undiscounted_rewards)
+        if episode % display_log_each == 0:
+            ag.display(learning, episode, sample_steps, undiscounted_rewards)
+    
+        t=(time.time() - start_time)
+        datalogged=str(undiscounted_rewards)+','+str(sample_steps)+','+str(t)
+        if clparams['goal_based']:
+            datalogged+=','+str(info['is_success'])
+        if learning:
+            training_monitor.write(datalogged+'\n')
+            training_monitor.flush()
+        else:
+            testing_monitor.write(datalogged+'\n')
+            testing_monitor.flush()
 
     return totalreward, transitions, undiscounted_rewards, sample_steps
 
 def run_episode_displ(env, ag):
-#    env.seed(0)
     observation = env.reset()
     if clparams['capture']: 
         envm = gym.wrappers.Monitor(env, 'test_monit', video_callable=lambda x: True, force=True)
@@ -233,9 +238,16 @@ print("main algo : " + ag.name())
 if clparams['load'] is not None:
     ag.load(int(clparams['load']))
 
+
+max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
+if rank == 0:
+    env = None
+    import gc
+    gc.collect()
+
 start_time = time.time()
 episode=0
-testing_monitor = open('0.1.monitor.csv','w')
+testing_monitor = open(str(rank) + '.1.monitor.csv','w')
 testing_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
 if not clparams['goal_based']:
     testing_monitor.write('r,l,t\n')
@@ -248,30 +260,37 @@ if not clparams['test_only']:
     sample_steps_counter=0
     
     #comptatibility with openai-baseline logging
-    training_monitor = open('0.0.monitor.csv','w')
-    xlearning_monitor = open('x.learning.data','w')
+    training_monitor = open(str(rank)+'.0.monitor.csv','w')
+    xlearning_monitor = open(str(rank)+'.x.learning.data','w')
     training_monitor.write('# { "t_start": '+str(start_time)+', "env_id": "'+env_name+'"} \n')
     if not clparams['goal_based']:
         training_monitor.write('r,l,t\n')
     else:
         training_monitor.write('r,l,t,g\n')
     
-    max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
     bestTestingScore=float("-inf")
     while sample_steps_counter < total_max_steps + testing_each * max_steps:
-        if episode % display_log_each == 0:
+        if rank == 0 and episode % display_log_each == 0:
             print('episode', episode, 'total steps', sample_steps_counter, 'last perf', results[-1] if len(results) > 0 else 0)
         
         sample_step = train(env, ag, episode)
-        sample_steps_counter += sample_step
-    
+        sample_step = comm.gather(sample_step, root=0)
+        if rank == 0:
+            sample_steps_counter += np.sum(np.array(sample_step))
+
+        ssc=[sample_steps_counter] if rank == 0 else None
+        ssc = comm.bcast(ssc, root=0)
+        sample_steps_counter = ssc[0]
+
         if episode % testing_each == 0 and episode != 0:
             xlearning_monitor.write(str(sample_steps_counter)+'\n')
             xlearning_monitor.flush()
             reward, testing_sample_step = testing(env, ag, episode)
+
+            reward_all = comm.gather(reward, root=0)
             results.append(reward)
-            if clparams['save_best'] and reward >= bestTestingScore:
-                bestTestingScore=reward
+            if rank == 0 and clparams['save_best'] and np.mean(reward_all) >= bestTestingScore:
+                bestTestingScore=np.mean(reward_all)
                 ag.save(episode)
                 
             if clparams['racing'] and len(results) > 10:
@@ -291,18 +310,23 @@ if not clparams['test_only']:
                     break
         episode+=1
         
-    #write logs
-    results=np.array(results)
-    lastPerf = results[int(results.shape[0]*0.9):results.shape[0]-1]
-    np.savetxt('y.testing.data', results)
-    np.savetxt('perf.data',  [np.mean(lastPerf)-np.std(lastPerf)])
     training_monitor.close()
     xlearning_monitor.close()
-    
-    #comptatibility with lhpo
-    elapsed_time = (time.time() - start_time)/60.
-    with open('time_elapsed', 'w') as f:
-        f.write('%d\n' % elapsed_time)
+
+    #write logs
+    results=np.array(results)
+    results=comm.gather(results, root=0)
+
+    if rank == 0:
+        results = np.mean(np.array(results), axis=0)
+        lastPerf = results[int(results.shape[0]*0.9):results.shape[0]-1]
+        np.savetxt('y.testing.data', results)
+        np.savetxt('perf.data',  [np.mean(lastPerf)-np.std(lastPerf)])
+        
+        #comptatibility with lhpo
+        elapsed_time = (time.time() - start_time)/60.
+        with open('time_elapsed', 'w') as f:
+            f.write('%d\n' % elapsed_time)
 
 elif not clparams['capture'] and not askrender:
     #testing without log
@@ -310,7 +334,7 @@ elif not clparams['capture'] and not askrender:
     print(reward)
 else:
     #testing with display
-    while True:
-        run_episode_displ(env, ag)
+    run_episode_displ(env, ag)
 
 testing_monitor.close()
+

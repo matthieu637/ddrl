@@ -10,19 +10,20 @@ endif()
 include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
 
 #Boost library
-find_package(Boost COMPONENTS serialization filesystem system program_options thread REQUIRED)
+find_package(Boost COMPONENTS serialization filesystem system program_options thread mpi REQUIRED)
 find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(Cartpole)
 find_package(HalfCheetah)
 find_package(Humanoid)
+find_package(MPI)
 # find_package(TBB)
 # find_package(OPTPP)
 find_package(Threads REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} 
   ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${HALF_CHEETAH_INCLUDE_DIRS}
-  ${HUMANOID_INCLUDE_DIRS})
+  ${HUMANOID_INCLUDE_DIRS} ${MPI_INCLUDE_PATH})
 
 set(BASE_LIBRARIES ${COMMON_DRL_LIBRARY} ${Boost_LIBRARIES} )
 file ( GLOB_RECURSE all_include include/*.hpp)
@@ -105,6 +106,14 @@ add_library(${LIBRARY_NAME4} SHARED ${all_include} src/pybinding/nfac.cpp)
 target_compile_definitions(${LIBRARY_NAME4} PUBLIC WANT_PENNFAC)
 target_link_libraries(${LIBRARY_NAME4} ${BASE_LIBRARIES} )
 
+if(${MPI_FOUND})
+    set(LIBRARY_NAME44 "ddrl-penfac-para")
+    rename_buildtype(LIBRARY_NAME44)
+    add_library(${LIBRARY_NAME44} SHARED ${all_include} src/pybinding/nfac.cpp)
+    target_compile_definitions(${LIBRARY_NAME44} PUBLIC WANT_PENNFAC PARALLEL_INTERACTION)
+    target_link_libraries(${LIBRARY_NAME44} ${BASE_LIBRARIES} ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES} boost_mpi)
+endif()
+
 set(LIBRARY_NAME5 "ddrl-psepenfac")
 rename_buildtype(LIBRARY_NAME5)
 add_library(${LIBRARY_NAME5} SHARED ${all_include} src/pybinding/nfac.cpp)
@@ -122,6 +131,14 @@ rename_buildtype(LIBRARY_NAME7)
 add_library(${LIBRARY_NAME7} SHARED ${all_include} src/pybinding/nfac.cpp)
 target_compile_definitions(${LIBRARY_NAME7} PUBLIC WANT_HINDSIGHT_PENFAC)
 target_link_libraries(${LIBRARY_NAME7} ${BASE_LIBRARIES} )
+
+if(${MPI_FOUND})
+    set(LIBRARY_NAME77 "ddrl-hpenfac-para")
+    rename_buildtype(LIBRARY_NAME77)
+    add_library(${LIBRARY_NAME77} SHARED ${all_include} src/pybinding/nfac.cpp)
+    target_compile_definitions(${LIBRARY_NAME77} PUBLIC WANT_HINDSIGHT_PENFAC PARALLEL_INTERACTION)
+    target_link_libraries(${LIBRARY_NAME77} ${BASE_LIBRARIES} ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES} boost_mpi)
+endif()
 
 set(LIBRARY_NAME8 "ddrl-corpenfac")
 rename_buildtype(LIBRARY_NAME8)

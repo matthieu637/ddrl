@@ -32,11 +32,11 @@ extern "C" {
     return new OfflineCaclaAg<MLP>(a,b);
   }
 #else
-  OfflineCaclaAg<MLP>* OfflineCaclaAg_new(uint a, uint b, uint goal_size, uint goal_start, uint goal_achieved_start) {
+  OfflineCaclaAg<MLP>* OfflineCaclaAg_new(uint a, uint b, uint goal_size, uint goal_start) {
     FLAGS_minloglevel = 2;
     google::InitGoogleLogging("");
     google::InstallFailureSignalHandler();
-    return new OfflineCaclaAg<MLP>(a,b, goal_size, goal_start, goal_achieved_start);
+    return new OfflineCaclaAg<MLP>(a,b, goal_size, goal_start);
   }
 #endif
 
@@ -64,7 +64,7 @@ extern "C" {
 
     properties = new boost::property_tree::ptree;
     boost::property_tree::ini_parser::read_ini(config_file, *properties);
-    ag->unique_invoke(properties, command_args, false);
+    ag->unique_invoke(properties, command_args, true);
 
     delete properties;
     delete command_args;
@@ -89,14 +89,18 @@ extern "C" {
     //assume goal goal_achieved is at the begenning of the vector
     std::vector<double> goal_achieved(sensors, sensors+ag->getGoalSize());
     std::vector<double> state(sensors + ag->getGoalSize(), sensors+ag->getGoalSize()+ag->get_number_sensors());
-    const std::vector<double>& ac = ag->_run(reward, state, goal_achieved, learning, goal_reached, last);
+    const std::vector<double>& ac = ag->runf(reward, state, goal_achieved, learning, goal_reached, last);
 #endif
     return ac.data();
   }
 
   void OfflineCaclaAg_dump(OfflineCaclaAg<MLP>* ag, bool learning, int episode, int step, double treward) {
     bib::Dumper<OfflineCaclaAg<MLP>, bool, bool> agent_dump(ag, false, true);
-    LOG_FILE(std::to_string(0) + (learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE),
+    int rank = 0;
+#ifdef PARALLEL_INTERACTION
+    rank = ag->getMPIrank();
+#endif
+    LOG_FILE(std::to_string(rank) + (learning ? DEFAULT_DUMP_LEARNING_FILE : DEFAULT_DUMP_TESTING_FILE),
              episode << " " << step << " " << treward << " " << agent_dump);
   }
 

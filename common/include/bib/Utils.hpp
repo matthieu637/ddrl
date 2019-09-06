@@ -9,6 +9,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <functional>
 
 #include "bib/Logger.hpp"
 
@@ -72,6 +73,26 @@ class Utils {
 
     return {variance, mean, max, min};
   }
+  
+  template <typename T, typename S>
+  static double variance(const T &begin,  const T &end, std::function<double(const S&)> func) {
+    double mean = 0.f;
+    for (auto it = begin; it != end; ++it) {
+      double p = func(*it);
+      mean += p;
+    }
+    mean = (mean / static_cast<double>(end - begin));
+
+    double variance = 0.f;
+    for (auto it = begin; it != end; ++it) {
+      double p = func(*it) - mean;
+      variance += p * p;
+    }
+    double n = static_cast<double>(end - begin);
+    variance = variance * (n/(n-1));
+
+    return variance;
+  }
 
   static double euclidien_dist1D(double x1, double x2);
 
@@ -81,6 +102,8 @@ class Utils {
                                 double z1, double z2);
 
   static double euclidien_dist(const std::vector<double>& v1, const std::vector<double>& v2, double dmax);
+  
+  static double L1_dist(const std::vector<double>& v1, const std::vector<double>& v2, double dmax);
 
   static double euclidien_dist_ref(const std::vector<double>& v1, double refp);
 };
