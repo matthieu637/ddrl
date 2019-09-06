@@ -411,43 +411,42 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //     
 // Remove junk data
 // 
-//     for (int traj = 0 ; traj < trajectory_end_points.size() ; traj++) {
-//       double varsum = 0;
-//       int beg = traj == 0 ? 0 : trajectory_end_points[traj-1];
-//       int end = trajectory_end_points[traj];
-//       if (end - beg > 1) {
-//         for (int goal_dim=0; goal_dim < goal_size; goal_dim++) {
-//           std::function<double(const sample&)> get = [goal_dim](const sample&  s) {
-//             return s.goal_achieved_unnormed[goal_dim];
-//           };
-//           varsum += bib::Utils::variance<>(trajectory.cbegin() + beg, trajectory.cbegin() + end, get);
-//         }
-//       } else
-//         varsum = 0.f;
-//       
-//       //goal_achieved hasn't change at all during the trajectory
-//       if (varsum <= 1e-8) {
-// //      if (!(varsum <= 1e-8)) {
-// //remove
-//         if (trajectory[beg].r >= -0.0001) {
-//           LOG_INFO("erase");
-//           trajectory.erase(trajectory.begin() + beg, trajectory.begin() + end);
-//           for (uint i=traj+1;i< trajectory_end_points.size(); i++)
-//             trajectory_end_points[i] -= (end - beg);
-//           trajectory_end_points.erase(trajectory_end_points.begin() + traj);
-//           traj--;
-//         }
-// //or tag
-// //        for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++)
-// //            it->interest=false;
-//       }
-//     }
-//     
-//     if (trajectory.size() == 0) {
-//       nb_sample_update = 0;
-//       ASSERT(trajectory_end_points.size() == 0, "");
-//       return;
-//     }
+    for (int traj = 0 ; traj < trajectory_end_points.size() ; traj++) {
+      double varsum = 0;
+      int beg = traj == 0 ? 0 : trajectory_end_points[traj-1];
+      int end = trajectory_end_points[traj];
+      if (end - beg > 1) {
+        for (int goal_dim=0; goal_dim < goal_size; goal_dim++) {
+          std::function<double(const sample&)> get = [goal_dim](const sample&  s) {
+            return s.goal_achieved_unnormed[goal_dim];
+          };
+          varsum += bib::Utils::variance<>(trajectory.cbegin() + beg, trajectory.cbegin() + end, get);
+        }
+      } else
+        varsum = 0.f;
+      
+      //goal_achieved hasn't change at all during the trajectory
+      if (varsum <= 1e-8) {
+        // remove already achieved task
+        if (trajectory[beg].r >= -0.0001) {
+          LOG_INFO("erase traj " << traj);
+          trajectory.erase(trajectory.begin() + beg, trajectory.begin() + end);
+          for (uint i=traj+1;i< trajectory_end_points.size(); i++)
+            trajectory_end_points[i] -= (end - beg);
+          trajectory_end_points.erase(trajectory_end_points.begin() + traj);
+          traj--;
+        }
+//or tag
+//        for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++)
+//            it->interest=false;
+      }
+    }
+    
+    if (trajectory.size() == 0) {
+      nb_sample_update = 0;
+      ASSERT(trajectory_end_points.size() == 0, "");
+      return;
+    }
     
 //     LOG_DEBUG("#############");
 //     for (int i=0;i<trajectory.size(); i++) {
@@ -875,7 +874,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
   void load(const std::string& path) override {
     ann->load(path+".actor");
+#ifndef PARALLEL_INTERACTION
     vnn->load(path+".critic");
+#else
+    if (world.rank() == 0)
+      vnn->load(path+".critic");
+#endif
     bib::XMLEngine::load<>(normalizer, "normalizer", path+".normalizer.data");
   }
   
