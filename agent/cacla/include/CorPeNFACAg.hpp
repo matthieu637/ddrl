@@ -118,12 +118,15 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //         bib::Logger::PRINT_ELEMENTS(*next_action, " mu ");
         
         //adapt mu
-        std::vector<double> diff(this->nb_motors*correlation_history);
-        caffe::caffe_sub(this->nb_motors * correlation_history, ttmg_a->data(), ttmg_mu->data(), diff.data());
-        caffe::caffe_cpu_gemv(CblasNoTrans, this->nb_motors * correlation_history, this->nb_motors, (double) 1.f, sub_mu_matrix->data(), diff.data(), (double) 1.f, next_action->data());
+        if(bib::Utils::rand01() > 0.3) { //cut time depency sometimes in else
+          std::vector<double> diff(this->nb_motors*correlation_history);
+          caffe::caffe_sub(this->nb_motors * correlation_history, ttmg_a->data(), ttmg_mu->data(), diff.data());
+          caffe::caffe_cpu_gemv(CblasNoTrans, this->nb_motors * correlation_history, this->nb_motors, (double) 1.f, sub_mu_matrix->data(), diff.data(), (double) 1.f, next_action->data());
 //         bib::Logger::PRINT_ELEMENTS(*next_action, "debug_mu_bar ");
         //assume cholesky upper triangular matrix
-        caffe::caffe_cpu_gemv(CblasTrans, this->nb_motors, this->nb_motors, (double)1.f, sub_cov_matrix->data(), randomized_action->data(), (double)1.f, next_action->data());
+          caffe::caffe_cpu_gemv(CblasTrans, this->nb_motors, this->nb_motors, (double)1.f, sub_cov_matrix->data(), randomized_action->data(), (double)1.f, next_action->data());
+        } else
+          caffe::caffe_cpu_gemv(CblasTrans, this->nb_motors, this->nb_motors, (double)1.f, correlation_matrix->data(), randomized_action->data(), (double)1.f, next_action->data());
 //         bib::Logger::PRINT_ELEMENTS(*next_action, " a ");
 //         if(step == 1)
 //           exit(1);
@@ -241,11 +244,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     std::vector<double> sub_mu_matrix_hf = {0.635967,  0.269137, -0.017911, -0.04119 , -0.118911, -0.191117,  0.010798,  0.297436, -0.063885, -0.173187, -0.194343, -0.168051,  0.144704, -0.170834,  0.242392,  0.035187,  0.100098,  0.075194,  0.206764, -0.051221,  0.1261  ,  0.050088,  0.292403, -0.11432 , -0.106592, -0.102335, -0.036557,  0.218347,  0.105614,  0.143525, -0.174179, -0.031323, -0.011841, -0.126056,  0.154739,  0.090072};
 
 //     correlation_matrix = new std::vector<double>(this->nb_motors*this->nb_motors);
-    if (correlation_history == 0){
-      correlation_matrix = new std::vector<double>((this->nb_motors*(correlation_history+1))*(this->nb_motors*(correlation_history+1)));
+//     if (correlation_history == 0) {
+      correlation_matrix = new std::vector<double>((this->nb_motors*(correlation_history))*(this->nb_motors*(correlation_history)));
       ASSERT(correlation_matrix_hf.size() == correlation_matrix->size(), "pb size " << correlation_matrix_hf.size() << " " <<  correlation_matrix->size());
       std::copy(correlation_matrix_hf.begin(), correlation_matrix_hf.end(), correlation_matrix->begin());
-    }
+//     }
     
 //     upper_left = new std::vector<double>(this->nb_motors*this->nb_motors);
 //     ASSERT(upper_left_hf.size() == upper_left->size(), "pb size ");
