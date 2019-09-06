@@ -102,6 +102,8 @@ class Utils {
                                 double z1, double z2);
 
   static double euclidien_dist(const std::vector<double>& v1, const std::vector<double>& v2, double dmax);
+  
+  static double L1_dist(const std::vector<double>& v1, const std::vector<double>& v2, double dmax);
 
   static double euclidien_dist_ref(const std::vector<double>& v1, double refp);
 };

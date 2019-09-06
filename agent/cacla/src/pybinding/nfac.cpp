@@ -64,7 +64,7 @@ extern "C" {
 
     properties = new boost::property_tree::ptree;
     boost::property_tree::ini_parser::read_ini(config_file, *properties);
-    ag->unique_invoke(properties, command_args, false);
+    ag->unique_invoke(properties, command_args, true);
 
     delete properties;
     delete command_args;
@@ -89,7 +89,7 @@ extern "C" {
     //assume goal goal_achieved is at the begenning of the vector
     std::vector<double> goal_achieved(sensors, sensors+ag->getGoalSize());
     std::vector<double> state(sensors + ag->getGoalSize(), sensors+ag->getGoalSize()+ag->get_number_sensors());
-    const std::vector<double>& ac = ag->_run(reward, state, goal_achieved, learning, goal_reached, last);
+    const std::vector<double>& ac = ag->runf(reward, state, goal_achieved, learning, goal_reached, last);
 #endif
     return ac.data();
   }

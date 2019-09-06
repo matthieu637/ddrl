@@ -140,6 +140,7 @@ def run_episode(env, ag, learning, episode):
     return totalreward, transitions, undiscounted_rewards, sample_steps
 
 def run_episode_displ(env, ag):
+#    env.seed(0)
     observation = env.reset()
     if clparams['capture']: 
         envm = gym.wrappers.Monitor(env, 'test_monit', video_callable=lambda x: True, force=True)
@@ -309,6 +310,7 @@ elif not clparams['capture'] and not askrender:
     print(reward)
 else:
     #testing with display
-    run_episode_displ(env, ag)
+    while True:
+        run_episode_displ(env, ag)
 
 testing_monitor.close()

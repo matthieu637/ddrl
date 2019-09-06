@@ -99,13 +99,13 @@ def plot_exploratory_actions(observation, ag):
     plt.show()
 
 def run_episode(env, ag, learning, episode):
-#    env.seed(0)
 #    plot_exploratory_actions(observation, ag)
     sample_steps=0
     totalreward = 0
     undiscounted_rewards = 0
     transitions = []
     if rank != 0:
+#        env.seed(0)
         observation = env.reset()
         cur_gamma = 1.0
         max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
@@ -238,6 +238,13 @@ print("main algo : " + ag.name())
 if clparams['load'] is not None:
     ag.load(int(clparams['load']))
 
+
+max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
+if rank == 0:
+    env = None
+    import gc
+    gc.collect()
+
 start_time = time.time()
 episode=0
 testing_monitor = open(str(rank) + '.1.monitor.csv','w')
@@ -261,7 +268,6 @@ if not clparams['test_only']:
     else:
         training_monitor.write('r,l,t,g\n')
     
-    max_steps=env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
     bestTestingScore=float("-inf")
     while sample_steps_counter < total_max_steps + testing_each * max_steps:
         if rank == 0 and episode % display_log_each == 0:
@@ -331,3 +337,4 @@ else:
     run_episode_displ(env, ag)
 
 testing_monitor.close()
+
