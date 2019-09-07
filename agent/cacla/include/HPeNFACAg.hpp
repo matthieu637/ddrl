@@ -77,6 +77,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     if(vnn != nullptr)
       delete vnn;
     delete ann;
+    delete ann_noblob;
 
     delete hidden_unit_v;
     delete hidden_unit_a;
@@ -87,12 +88,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
                                   const std::vector<double>& goal_achieved, bool learning, bool as, bool) override {
-     std::vector<double> normed_sensors(nb_sensors);
-     normalizer.transform_with_double_clip(normed_sensors, sensors, false);
+    std::vector<double> normed_sensors(nb_sensors);
+    normalizer.transform_with_double_clip(normed_sensors, sensors, false);
     
     // protect batch norm from testing data and poor data
-     vector<double>* next_action = ann->computeOut(normed_sensors);
-//    vector<double>* next_action = ann->computeOut(sensors);
+    vector<double>* next_action = ann_noblob->computeOut(normed_sensors);
     if (last_action.get() != nullptr && learning) {
       double prob = bib::Proba<double>::truncatedGaussianDensity(*last_action, *last_pure_action, noise);
       bool gr = reward >= -0.0000001;
@@ -214,15 +214,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   
     LOG_INFO("dimensionality of NN " << nb_sensors << " (in) " << this->nb_motors << " (out).");
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, 0, true, momentum);
+    ann_noblob = new NN(*ann, false, ::caffe::Phase::TEST);
 
 #ifdef PARALLEL_INTERACTION
-      std::vector<double> weights(ann->number_of_parameters(false), 0.f);
-      if (world.rank() == 0)
-          ann->copyWeightsTo(weights.data(), false);
+    std::vector<double> weights(ann->number_of_parameters(false), 0.f);
+    if (world.rank() == 0)
+      ann->copyWeightsTo(weights.data(), false);
 
-      broadcast(world, weights, 0);
-      if (world.rank() != 0)
-          ann->copyWeightsFrom(weights.data(), false);
+    broadcast(world, weights, 0);
+    if (world.rank() != 0)
+      ann->copyWeightsFrom(weights.data(), false);
 #endif
 
 #ifdef PARALLEL_INTERACTION
@@ -243,6 +244,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     step = 0;
     if(gaussian_policy == 2)
       oun->reset();
+
+    double* weights = new double[ann->number_of_parameters(false)];
+    ann->copyWeightsTo(weights, false);
+    ann_noblob->copyWeightsFrom(weights, false);
+    delete[] weights;
   }
 
   void update_critic(const caffe::Blob<double>& all_states, const caffe::Blob<double>& all_next_states,
@@ -429,7 +435,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       if (varsum <= 1e-8) {
         // remove already achieved task
         if (trajectory[beg].r >= -0.0001) {
-          LOG_INFO("erase traj " << traj);
           trajectory.erase(trajectory.begin() + beg, trajectory.begin() + end);
           for (uint i=traj+1;i< trajectory_end_points.size(); i++)
             trajectory_end_points[i] -= (end - beg);
@@ -443,6 +448,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     }
     
     if (trajectory.size() == 0) {
+      LOG_INFO("no data left");
       nb_sample_update = 0;
       ASSERT(trajectory_end_points.size() == 0, "");
       return;
@@ -558,6 +564,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         trajectory[i].prob = bib::Proba<double>::truncatedGaussianDensity(trajectory[i].a, ac_out->cpu_data(), noise, li * this->nb_motors) / trajectory[i].prob;
         li++;
       }
+      delete ac_out;
     }
     
 //     LOG_DEBUG("#############");
@@ -714,8 +721,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       mean_beta += beta;
       
       if(n > 0) {
+        ann->increase_batchsize(trajectory.size());
         for(uint sia = 0; sia < stoch_iter_actor; sia++){
-          ann->increase_batchsize(trajectory.size());
           //learn BN
           auto ac_out = ann->computeOutBlob(all_states);
           ann->ZeroGradParameters();
@@ -970,6 +977,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   std::deque<int> trajectory_end_points;
 
   NN* ann;
+  NN* ann_noblob;
   NN* vnn = nullptr;
 
   std::vector<uint>* hidden_unit_v;
