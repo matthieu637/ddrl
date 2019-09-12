@@ -268,13 +268,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), v_target.cpu_data(), v_target.mutable_cpu_data());
 
         double *pv_target = v_target.mutable_cpu_data();
-//        double min_ = - (1.f/(1.f-this->gamma));
-//        for(int i=0;i<trajectory.size();i++){
-//            if(pv_target[i] > 0.0)
-//                pv_target[i] = 0.f;
-//            else if (pv_target[i] < min_)
-//                pv_target[i] = min_;
-//        }
+        double min_ = - (1.f/(1.f-this->gamma));
+        for(int i=0;i<trajectory.size();i++){
+            if(pv_target[i] > 0.0)
+                pv_target[i] = 0.f;
+            else if (pv_target[i] < min_)
+                pv_target[i] = min_;
+        }
 
         caffe::caffe_sub(trajectory.size(), v_target.cpu_data(), all_V->cpu_data(), v_target.mutable_cpu_data());
 //#else
@@ -417,6 +417,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //     
 // Remove junk data
 // 
+    std::deque<double> varsums(trajectory_end_points.size(), 0.f);
     for (int traj = 0 ; traj < trajectory_end_points.size() ; traj++) {
       double varsum = 0;
       int beg = traj == 0 ? 0 : trajectory_end_points[traj-1];
@@ -493,56 +494,67 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 // data augmentation part
 //
     int saved_trajsize=trajectory.size();
-//    auto goal_achieved_reward = [](const std::vector<double>&  a, const std::vector<double>&  b) {
-//      double sum = 0.f;
-//      for (int i=0;i<a.size();i++){
-//        double diff = a[i] - b[i];
-//        sum += diff*diff;
-//      }
-//      sum = std::sqrt(sum);
-//      return sum < 0.05f;
-//      return sum < 0.07f;
-//    };
-//    
-//    auto goal_reward_dense = [](const std::vector<double>&  a, const std::vector<double>&  b) {
-//      double sum = 0.f;
-//      for (int i=0;i<a.size();i++){
-//        double diff = a[i] - b[i];
-//        sum += diff*diff;
-//      }
-//      sum = std::sqrt(sum);
-//      return -sum;
-//    };
-//    
-//    int saved_tepsize=trajectory_end_points.size();
-//    for(int i=0;i < saved_tepsize; i++) {
-//        int min_index=0;
-//        if(i>0)
-//          min_index=trajectory_end_points[i-1];
+//   auto goal_achieved_reward = [](const std::vector<double>&  a, const std::vector<double>&  b) {
+//     double sum = 0.f;
+//     for (int i=0;i<a.size();i++){
+//       double diff = a[i] - b[i];
+//       sum += diff*diff;
+//     }
+//     sum = std::sqrt(sum);
+//     return sum < 0.05f;
+//   };
+//   
+//   auto goal_reward_dense = [](const std::vector<double>&  goal_achieved, const std::vector<double>&  desired_goal, 
+//                               const std::vector<double>&  next_goal_achieved, const std::vector<double>&  next_desired_goal, 
+//                               const std::vector<double>&  observation, const std::vector<double>&  next_observation) {
+//     
+//     std::vector<double> offset = {0.04, 0.04, 0};
+//     std::vector<double> mid_goal(3, 0.f);
+////     mid_goal = next_goal_achieved - sign(next_desired_goal-next_goal_achieved) * offset;
+////     mid_goal[2] += 0.07;
+//     
+//     
+//     
+//     double sum = 0.f;
 //
-//        for(int j=0;j<hindsight_nb_destination;j++) {
-//            uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
+//     return -sum;
+//   };
+//   
+//   int saved_tepsize=trajectory_end_points.size();
+//   for(int i=0;i < saved_tepsize; i++) {
 //
-//            for(int k=min_index;k<=destination;k++) {
-//              sample sa = trajectory[k];
-//              trajectory.push_back(sa);
-//              trajectory.back().artificial = true;
-//              std::copy(trajectory[destination].goal_achieved.begin(), 
-//                    trajectory[destination].goal_achieved.end(), 
-//                    trajectory.back().s.begin() + goal_start);
-//              std::copy(trajectory[destination].goal_achieved.begin(), 
-//                    trajectory[destination].goal_achieved.end(), 
-//                    trajectory.back().next_s.begin() + goal_start);
-//              
-//              if ( goal_achieved_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed)){
-//                trajectory.back().r = 0.f;
-//                trajectory_end_points.push_back(trajectory.size());
-//              }
-////                 trajectory.back().r = goal_reward_dense(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed);
-//            }
-////            trajectory_end_points.push_back(trajectory.size());
-//        }
-//    }
+////      don't generate trajectory where goal achieved hasn't changed
+//     if (varsums[i] <= 1e-8)
+//       continue;
+//       
+//      int min_index=0;
+//      if(i>0)
+//        min_index=trajectory_end_points[i-1];
+//
+//      for(int j=0;j<hindsight_nb_destination;j++) {
+//          uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
+//
+//          for(int k=min_index;k<=destination;k++) {
+//            sample sa = trajectory[k];
+//            trajectory.push_back(sa);
+//            trajectory.back().artificial = true;
+//            std::copy(trajectory[destination].goal_achieved.begin(), 
+//                  trajectory[destination].goal_achieved.end(), 
+//                  trajectory.back().s.begin() + goal_start);
+//            std::copy(trajectory[destination].goal_achieved.begin(), 
+//                  trajectory[destination].goal_achieved.end(), 
+//                  trajectory.back().next_s.begin() + goal_start);
+//            
+////              if ( goal_achieved_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed)){
+////                trajectory.back().r = 0.f;
+////                trajectory_end_points.push_back(trajectory.size());
+////              }
+////              trajectory.back().r = goal_reward_dense(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed);
+//          }
+//          trajectory_end_points.push_back(trajectory.size());
+//      }
+//   }
+   
 // 
 //  compute importance sampling ratio on artificial data
 // 
@@ -614,13 +626,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), deltas.cpu_data(), deltas.mutable_cpu_data());
 
       double *pv_target = deltas.mutable_cpu_data();
-//      double min_ = - (1.f/(1.f-this->gamma));
-//      for(int i=0;i<trajectory.size();i++){
-//          if(pv_target[i] > 0.0)
-//              pv_target[i] = 0.f;
-//          else if (pv_target[i] < min_)
-//              pv_target[i] = min_;
-//      }
+     double min_ = - (1.f/(1.f-this->gamma));
+     for(int i=0;i<trajectory.size();i++){
+         if(pv_target[i] > 0.0)
+             pv_target[i] = 0.f;
+         else if (pv_target[i] < min_)
+             pv_target[i] = min_;
+     }
 
 
       caffe::caffe_sub(trajectory.size(), deltas.cpu_data(), all_mine->cpu_data(), deltas.mutable_cpu_data());
