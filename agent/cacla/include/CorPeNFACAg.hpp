@@ -221,6 +221,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 #endif
   
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true, momentum);
+
+    aux = new NN(this->nb_motors * (1 + correlation_history), {20}, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true, momentum);
     
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);
     
@@ -411,6 +413,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     }
     
     caffe::Blob<double> all_states(trajectory.size(), nb_sensors, 1, 1);
+    caffe::Blob<double> all_deter_action(trajectory.size(), nb_motors, 1, 1);
+    caffe::Blob<double> all_deter_action_in(trajectory.size(), nb_motors * (1 + correlation_history), 1, 1);
+
     caffe::Blob<double> all_next_states(trajectory.size(), nb_sensors, 1, 1);
     //store reward in data and gamma coef in diff
     caffe::Blob<double> r_gamma_coef(trajectory.size(), 1, 1, 1);
@@ -778,6 +783,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   std::deque<int> trajectory_end_points;
 
   NN* ann;
+  NN* aux;
   NN* vnn;
   NN* ann_testing;
   NN* ann_testing_blob;
