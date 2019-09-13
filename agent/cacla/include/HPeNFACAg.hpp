@@ -445,7 +445,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
     if (world.rank() == 0) {
 #endif
-    
    
     if (trajectory.size() == 0) {
       LOG_INFO("no data left");
@@ -521,6 +520,18 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //   
 //   int saved_tepsize=trajectory_end_points.size();
 //   for(int i=0;i < saved_tepsize; i++) {
+//
+////      don't generate trajectory where goal achieved hasn't changed
+//     if (varsums[i] <= 1e-8)
+//       continue;
+//       
+//      int min_index=0;
+//      if(i>0)
+//        min_index=trajectory_end_points[i-1];
+//
+//      for(int j=0;j<hindsight_nb_destination;j++) {
+//          uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
+//
 //
 ////      don't generate trajectory where goal achieved hasn't changed
 //     if (varsums[i] <= 1e-8)
