@@ -380,17 +380,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       
       //goal_achieved hasn't change at all during the trajectory
       if (varsums[traj] <= 1e-8) {
-        // remove already achieved task
-//        if (trajectory[beg].r >= -0.0001) {
-//          trajectory.erase(trajectory.begin() + beg, trajectory.begin() + end);
-//          for (uint i=traj+1;i< trajectory_end_points.size(); i++)
-//            trajectory_end_points[i] -= (end - beg);
-//          trajectory_end_points.erase(trajectory_end_points.begin() + traj);
-//          varsums.erase(varsums.begin() + traj);
-//        }
-//or tag
-        for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++)
-            it->interest=false;
+        // tag already achieved task where actor won't be update
+        if (trajectory[beg].r >= -0.0001) {
+          for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++)
+              it->interest=false;
+		}
       }
     }
  
@@ -503,9 +497,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 // 
 // data augmentation part
 //
-    int saved_trajsize=trajectory.size();
+   int saved_trajsize=trajectory.size();
+   int saved_trajend_point=trajectory_end_points.size();
  
-//   for(int i=0;i < saved_trajsize; i++) {
+//   for(int i=0;i < saved_trajend_point; i++) {
 ////      don't generate trajectory where goal achieved hasn't changed
 //     if (varsums[i] <= 1e-8)
 //       continue;
@@ -513,6 +508,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //      int min_index=0;
 //      if(i>0)
 //        min_index=trajectory_end_points[i-1];
+//
+//	  if(trajectory_end_points[i]-1 == min_index)
+//		continue;
 //
 //      for(int j=0;j<hindsight_nb_destination;j++) {
 //          uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
@@ -548,10 +546,36 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //
 //            //should remove junk data after data
 //          }
-//          trajectory_end_points.push_back(trajectory.size());
+//     	  if (trajectory_end_points.back() != trajectory.size())
+//          	trajectory_end_points.push_back(trajectory.size());
 //      }
 //   }
-   
+////
+//// tag artificial junk data
+////
+//    for (int traj = trajectory_end_points.size() - 1 ; traj >= saved_trajend_point ; traj--) {
+//      int beg = traj == 0 ? 0 : trajectory_end_points[traj-1];
+//      int end = trajectory_end_points[traj];
+//	  double varsum = 0.f;
+//      if (end - beg > 1) {
+//        for (int goal_dim=0; goal_dim < goal_size; goal_dim++) {
+//          std::function<double(const sample&)> get = [goal_dim](const sample&  s) {
+//            return s.goal_achieved_unnormed[goal_dim];
+//          };
+//          varsum += bib::Utils::variance<>(trajectory.cbegin() + beg, trajectory.cbegin() + end, get);
+//        }
+//      }
+//      
+//      //goal_achieved hasn't change at all during the trajectory
+//      if (varsum <= 1e-8) {
+//        for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++){
+//			if(it->interest)
+//				LOG_DEBUG("nex TAG");
+//            it->interest=false;
+//		}
+//      }
+//    }
+ 
 // 
 //  compute importance sampling ratio on artificial data
 // 
