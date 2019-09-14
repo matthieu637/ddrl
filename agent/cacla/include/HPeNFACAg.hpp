@@ -500,81 +500,79 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
    int saved_trajsize=trajectory.size();
    int saved_trajend_point=trajectory_end_points.size();
  
-//   for(int i=0;i < saved_trajend_point; i++) {
-////      don't generate trajectory where goal achieved hasn't changed
-//     if (varsums[i] <= 1e-8)
-//       continue;
-//       
-//      int min_index=0;
-//      if(i>0)
-//        min_index=trajectory_end_points[i-1];
-//
-//	  if(trajectory_end_points[i]-1 == min_index)
-//		continue;
-//
-//      for(int j=0;j<hindsight_nb_destination;j++) {
-//          uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
-//
-//          for(int k=min_index;k<=destination;k++) {
-//            sample sa = trajectory[k];
-//            trajectory.push_back(sa);
-//            trajectory.back().artificial = true;
-//            std::copy(trajectory[destination].goal_achieved.begin(), 
-//                  trajectory[destination].goal_achieved.end(), 
-//                  trajectory.back().s.begin() + goal_start);
-//            std::copy(trajectory[destination].goal_achieved.begin(), 
-//                  trajectory[destination].goal_achieved.end(), 
-//                  trajectory.back().next_s.begin() + goal_start);
-//            
-//// //           sparse reward
-////              if ( goal_achieved_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed)){
-////                trajectory.back().r = 0.f;
-////                trajectory.back().goal_reached = true;
-////                trajectory_end_points.push_back(trajectory.size());
-////              }
-//// //           --
-//
-////           dense reward
-//            trajectory.back().r = dense_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed,
-//                                                    sa.next_goal_achieved_unnormed, trajectory[destination].next_goal_achieved_unnormed,
-//                                                    sa.s, sa.next_s);
-//            if ( trajectory.back().r >= -0.0000001 ) {
-//                trajectory_end_points.push_back(trajectory.size());
-//                trajectory.back().goal_reached = true;
-//            }
-////          --
-//
-//            //should remove junk data after data
+   for(int i=0;i < saved_trajend_point; i++) {
+//      don't generate trajectory where goal achieved hasn't changed
+     if (varsums[i] <= 1e-8)
+       continue;
+       
+      int min_index=0;
+      if(i>0)
+        min_index=trajectory_end_points[i-1];
+
+	  if(trajectory_end_points[i]-1 == min_index)
+		continue;
+
+      for(int j=0;j<hindsight_nb_destination;j++) {
+          uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
+
+          for(int k=min_index;k<=destination;k++) {
+            sample sa = trajectory[k];
+            trajectory.push_back(sa);
+            trajectory.back().artificial = true;
+            std::copy(trajectory[destination].goal_achieved.begin(), 
+                  trajectory[destination].goal_achieved.end(), 
+                  trajectory.back().s.begin() + goal_start);
+            std::copy(trajectory[destination].goal_achieved.begin(), 
+                  trajectory[destination].goal_achieved.end(), 
+                  trajectory.back().next_s.begin() + goal_start);
+            
+ //         sparse reward
+            if ( sparse_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed)) {
+              trajectory.back().r = 0.f;
+              trajectory.back().goal_reached = true;
+              trajectory_end_points.push_back(trajectory.size());
+            }
+ //         --
+
+//          dense reward
+//          trajectory.back().r = dense_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed,
+//                                                  sa.next_goal_achieved_unnormed, trajectory[destination].next_goal_achieved_unnormed,
+//                                                  sa.s, sa.next_s);
+//          if ( trajectory.back().r >= -0.0000001 ) {
+//              trajectory_end_points.push_back(trajectory.size());
+//              trajectory.back().goal_reached = true;
 //          }
-//     	  if (trajectory_end_points.back() != trajectory.size())
-//          	trajectory_end_points.push_back(trajectory.size());
-//      }
-//   }
-////
-//// tag artificial junk data
-////
-//    for (int traj = trajectory_end_points.size() - 1 ; traj >= saved_trajend_point ; traj--) {
-//      int beg = traj == 0 ? 0 : trajectory_end_points[traj-1];
-//      int end = trajectory_end_points[traj];
-//	  double varsum = 0.f;
-//      if (end - beg > 1) {
-//        for (int goal_dim=0; goal_dim < goal_size; goal_dim++) {
-//          std::function<double(const sample&)> get = [goal_dim](const sample&  s) {
-//            return s.goal_achieved_unnormed[goal_dim];
-//          };
-//          varsum += bib::Utils::variance<>(trajectory.cbegin() + beg, trajectory.cbegin() + end, get);
-//        }
-//      }
-//      
-//      //goal_achieved hasn't change at all during the trajectory
-//      if (varsum <= 1e-8) {
-//        for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++){
-//			if(it->interest)
-//				LOG_DEBUG("nex TAG");
-//            it->interest=false;
-//		}
-//      }
-//    }
+//        --
+
+            //should remove junk data after data
+          }
+     	  if (trajectory_end_points.back() != trajectory.size())
+          	trajectory_end_points.push_back(trajectory.size());
+      }
+   }
+//
+// tag artificial junk data
+//
+    for (int traj = trajectory_end_points.size() - 1 ; traj >= saved_trajend_point ; traj--) {
+      int beg = traj == 0 ? 0 : trajectory_end_points[traj-1];
+      int end = trajectory_end_points[traj];
+	  double varsum = 0.f;
+      if (end - beg > 1) {
+        for (int goal_dim=0; goal_dim < goal_size; goal_dim++) {
+          std::function<double(const sample&)> get = [goal_dim](const sample&  s) {
+            return s.goal_achieved_unnormed[goal_dim];
+          };
+          varsum += bib::Utils::variance<>(trajectory.cbegin() + beg, trajectory.cbegin() + end, get);
+        }
+      }
+      
+      //goal_achieved hasn't change at all during the trajectory
+      if (varsum <= 1e-8 && trajectory[beg].r >= -0.0001) {
+        for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++){
+            it->interest=false;
+		}
+      }
+    }
  
 // 
 //  compute importance sampling ratio on artificial data
