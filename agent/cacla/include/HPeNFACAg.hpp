@@ -77,6 +77,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     if(vnn != nullptr)
       delete vnn;
     delete ann;
+    delete ann_noblob;
 
     delete hidden_unit_v;
     delete hidden_unit_a;
@@ -87,19 +88,23 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
   const std::vector<double>& _run(double reward, const std::vector<double>& sensors,
                                   const std::vector<double>& goal_achieved, bool learning, bool as, bool) override {
-     std::vector<double> normed_sensors(nb_sensors);
-     normalizer.transform_with_double_clip(normed_sensors, sensors, false);
+    std::vector<double> normed_sensors(nb_sensors);
+    normalizer.transform_with_double_clip(normed_sensors, sensors, false);
     
     // protect batch norm from testing data and poor data
-     vector<double>* next_action = ann->computeOut(normed_sensors);
-//    vector<double>* next_action = ann->computeOut(sensors);
+    vector<double>* next_action = ann_noblob->computeOut(normed_sensors);
     if (last_action.get() != nullptr && learning) {
       double prob = bib::Proba<double>::truncatedGaussianDensity(*last_action, *last_pure_action, noise);
       bool gr = reward >= -0.0000001;
-      gr = as;
       trajectory.push_back( {last_state, last_goal_achieved, last_goal_achieved, *last_pure_action, *last_action, sensors, goal_achieved, reward, gr, prob, false, true});
       if (gr)
         trajectory_end_points.push_back(trajectory.size());
+      
+//      auto sa = trajectory.back();
+//      double nr = dense_reward(sa.goal_achieved_unnormed, sa.s,
+//                                                    sa.next_goal_achieved_unnormed, sa.next_s,
+//                                                    sa.s, sa.next_s);
+//      LOG_DEBUG(reward << " " << nr);
     }
 
     last_pure_action.reset(new std::vector<double>(*next_action));
@@ -214,15 +219,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   
     LOG_INFO("dimensionality of NN " << nb_sensors << " (in) " << this->nb_motors << " (out).");
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, 0, true, momentum);
+    ann_noblob = new NN(*ann, false, ::caffe::Phase::TEST);
 
 #ifdef PARALLEL_INTERACTION
-      std::vector<double> weights(ann->number_of_parameters(false), 0.f);
-      if (world.rank() == 0)
-          ann->copyWeightsTo(weights.data(), false);
+    std::vector<double> weights(ann->number_of_parameters(false), 0.f);
+    if (world.rank() == 0)
+      ann->copyWeightsTo(weights.data(), false);
 
-      broadcast(world, weights, 0);
-      if (world.rank() != 0)
-          ann->copyWeightsFrom(weights.data(), false);
+    broadcast(world, weights, 0);
+    if (world.rank() != 0)
+      ann->copyWeightsFrom(weights.data(), false);
 #endif
 
 #ifdef PARALLEL_INTERACTION
@@ -243,6 +249,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     step = 0;
     if(gaussian_policy == 2)
       oun->reset();
+
+    double* weights = new double[ann->number_of_parameters(false)];
+    ann->copyWeightsTo(weights, false);
+    ann_noblob->copyWeightsFrom(weights, false);
+    delete[] weights;
   }
 
   void update_critic(const caffe::Blob<double>& all_states, const caffe::Blob<double>& all_next_states,
@@ -262,13 +273,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), v_target.cpu_data(), v_target.mutable_cpu_data());
 
         double *pv_target = v_target.mutable_cpu_data();
-//        double min_ = - (1.f/(1.f-this->gamma));
-//        for(int i=0;i<trajectory.size();i++){
-//            if(pv_target[i] > 0.0)
-//                pv_target[i] = 0.f;
-//            else if (pv_target[i] < min_)
-//                pv_target[i] = min_;
-//        }
+        double min_ = - (1.f/(1.f-this->gamma));
+        for(int i=0;i<trajectory.size();i++){
+            if(pv_target[i] > 0.0)
+                pv_target[i] = 0.f;
+            else if (pv_target[i] < min_)
+                pv_target[i] = min_;
+        }
 
         caffe::caffe_sub(trajectory.size(), v_target.cpu_data(), all_V->cpu_data(), v_target.mutable_cpu_data());
 //#else
@@ -351,16 +362,48 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     if (episode % update_each_episode != 0)
       return;
 
+//     
+// Remove junk data
+// 
+    std::deque<double> varsums(trajectory_end_points.size(), 0.f);
+    for (int traj = trajectory_end_points.size() - 1 ; traj >= 0 ; traj--) {
+      int beg = traj == 0 ? 0 : trajectory_end_points[traj-1];
+      int end = trajectory_end_points[traj];
+      if (end - beg > 1) {
+        for (int goal_dim=0; goal_dim < goal_size; goal_dim++) {
+          std::function<double(const sample&)> get = [goal_dim](const sample&  s) {
+            return s.goal_achieved_unnormed[goal_dim];
+          };
+          varsums[traj] += bib::Utils::variance<>(trajectory.cbegin() + beg, trajectory.cbegin() + end, get);
+        }
+      }
+      
+      //goal_achieved hasn't change at all during the trajectory
+      if (varsums[traj] <= 1e-8) {
+        // tag already achieved task where actor won't be update
+        if (trajectory[beg].r >= -0.0001) {
+          for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++)
+              it->interest=false;
+		}
+      }
+    }
+ 
 #ifdef PARALLEL_INTERACTION
     if (world.rank() == 0) {
       trajectory_end_points.clear();
+      varsums.clear();
       
       std::vector<std::deque<sample>> all_traj;
       std::vector<std::deque<int>> all_traj_ep;
+      std::vector<std::deque<double>> all_varsums;
       gather(world, trajectory, all_traj, 0);
       gather(world, trajectory_end_points, all_traj_ep, 0);
+      gather(world, varsums, all_varsums, 0);
 
       ASSERT(all_traj.size() == all_traj_ep.size(), "pb");
+      for (auto it : all_varsums)
+        for (auto it2 : it)
+            varsums.push_back(it2);
       for (int i=0; i < all_traj.size() ; i++) {
         for (auto d2 : all_traj_ep[i])
           trajectory_end_points.push_back(trajectory.size() + d2);
@@ -370,6 +413,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     } else {
       gather(world, trajectory, 0);
       gather(world, trajectory_end_points, 0);
+      gather(world, varsums, 0);
     }
     
     if (world.rank() == 0) {
@@ -407,47 +451,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
     if (world.rank() == 0) {
 #endif
-    
-//     
-// Remove junk data
-// 
-//     for (int traj = 0 ; traj < trajectory_end_points.size() ; traj++) {
-//       double varsum = 0;
-//       int beg = traj == 0 ? 0 : trajectory_end_points[traj-1];
-//       int end = trajectory_end_points[traj];
-//       if (end - beg > 1) {
-//         for (int goal_dim=0; goal_dim < goal_size; goal_dim++) {
-//           std::function<double(const sample&)> get = [goal_dim](const sample&  s) {
-//             return s.goal_achieved_unnormed[goal_dim];
-//           };
-//           varsum += bib::Utils::variance<>(trajectory.cbegin() + beg, trajectory.cbegin() + end, get);
-//         }
-//       } else
-//         varsum = 0.f;
-//       
-//       //goal_achieved hasn't change at all during the trajectory
-//       if (varsum <= 1e-8) {
-// //      if (!(varsum <= 1e-8)) {
-// //remove
-//         if (trajectory[beg].r >= -0.0001) {
-//           LOG_INFO("erase");
-//           trajectory.erase(trajectory.begin() + beg, trajectory.begin() + end);
-//           for (uint i=traj+1;i< trajectory_end_points.size(); i++)
-//             trajectory_end_points[i] -= (end - beg);
-//           trajectory_end_points.erase(trajectory_end_points.begin() + traj);
-//           traj--;
-//         }
-// //or tag
-// //        for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++)
-// //            it->interest=false;
-//       }
-//     }
-//     
-//     if (trajectory.size() == 0) {
-//       nb_sample_update = 0;
-//       ASSERT(trajectory_end_points.size() == 0, "");
-//       return;
-//     }
+   
+    if (trajectory.size() == 0) {
+      LOG_INFO("no data left");
+      nb_sample_update = 0;
+      ASSERT(trajectory_end_points.size() == 0, "");
+      return;
+    }
     
 //     LOG_DEBUG("#############");
 //     for (int i=0;i<trajectory.size(); i++) {
@@ -487,57 +497,83 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 // 
 // data augmentation part
 //
-    int saved_trajsize=trajectory.size();
-//    auto goal_achieved_reward = [](const std::vector<double>&  a, const std::vector<double>&  b) {
-//      double sum = 0.f;
-//      for (int i=0;i<a.size();i++){
-//        double diff = a[i] - b[i];
-//        sum += diff*diff;
-//      }
-//      sum = std::sqrt(sum);
-//      return sum < 0.05f;
-//      return sum < 0.07f;
-//    };
-//    
-//    auto goal_reward_dense = [](const std::vector<double>&  a, const std::vector<double>&  b) {
-//      double sum = 0.f;
-//      for (int i=0;i<a.size();i++){
-//        double diff = a[i] - b[i];
-//        sum += diff*diff;
-//      }
-//      sum = std::sqrt(sum);
-//      return -sum;
-//    };
-//    
-//    int saved_tepsize=trajectory_end_points.size();
-//    for(int i=0;i < saved_tepsize; i++) {
-//        int min_index=0;
-//        if(i>0)
-//          min_index=trajectory_end_points[i-1];
+   int saved_trajsize=trajectory.size();
+   int saved_trajend_point=trajectory_end_points.size();
+ 
+   for(int i=0;i < saved_trajend_point; i++) {
+//      don't generate trajectory where goal achieved hasn't changed
+     if (varsums[i] <= 1e-8)
+       continue;
+       
+      int min_index=0;
+      if(i>0)
+        min_index=trajectory_end_points[i-1];
+
+	  if(trajectory_end_points[i]-1 == min_index)
+		continue;
+
+      for(int j=0;j<hindsight_nb_destination;j++) {
+          uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
+
+          for(int k=min_index;k<=destination;k++) {
+            sample sa = trajectory[k];
+            trajectory.push_back(sa);
+            trajectory.back().artificial = true;
+            std::copy(trajectory[destination].goal_achieved.begin(), 
+                  trajectory[destination].goal_achieved.end(), 
+                  trajectory.back().s.begin() + goal_start);
+            std::copy(trajectory[destination].goal_achieved.begin(), 
+                  trajectory[destination].goal_achieved.end(), 
+                  trajectory.back().next_s.begin() + goal_start);
+            
+ //         sparse reward
+            if ( sparse_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed)) {
+              trajectory.back().r = 0.f;
+              trajectory.back().goal_reached = true;
+              trajectory_end_points.push_back(trajectory.size());
+            }
+ //         --
+
+//          dense reward
+//          trajectory.back().r = dense_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed,
+//                                                  sa.next_goal_achieved_unnormed, trajectory[destination].next_goal_achieved_unnormed,
+//                                                  sa.s, sa.next_s);
+//          if ( trajectory.back().r >= -0.0000001 ) {
+//              trajectory_end_points.push_back(trajectory.size());
+//              trajectory.back().goal_reached = true;
+//          }
+//        --
+
+            //should remove junk data after data
+          }
+     	  if (trajectory_end_points.back() != trajectory.size())
+          	trajectory_end_points.push_back(trajectory.size());
+      }
+   }
 //
-//        for(int j=0;j<hindsight_nb_destination;j++) {
-//            uint destination = bib::Seed::unifRandInt(min_index, trajectory_end_points[i]-1);
+// tag artificial junk data
 //
-//            for(int k=min_index;k<=destination;k++) {
-//              sample sa = trajectory[k];
-//              trajectory.push_back(sa);
-//              trajectory.back().artificial = true;
-//              std::copy(trajectory[destination].goal_achieved.begin(), 
-//                    trajectory[destination].goal_achieved.end(), 
-//                    trajectory.back().s.begin() + goal_start);
-//              std::copy(trajectory[destination].goal_achieved.begin(), 
-//                    trajectory[destination].goal_achieved.end(), 
-//                    trajectory.back().next_s.begin() + goal_start);
-//              
-//              if ( goal_achieved_reward(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed)){
-//                trajectory.back().r = 0.f;
-//                trajectory_end_points.push_back(trajectory.size());
-//              }
-////                 trajectory.back().r = goal_reward_dense(sa.goal_achieved_unnormed, trajectory[destination].goal_achieved_unnormed);
-//            }
-////            trajectory_end_points.push_back(trajectory.size());
-//        }
-//    }
+    for (int traj = trajectory_end_points.size() - 1 ; traj >= saved_trajend_point ; traj--) {
+      int beg = traj == 0 ? 0 : trajectory_end_points[traj-1];
+      int end = trajectory_end_points[traj];
+	  double varsum = 0.f;
+      if (end - beg > 1) {
+        for (int goal_dim=0; goal_dim < goal_size; goal_dim++) {
+          std::function<double(const sample&)> get = [goal_dim](const sample&  s) {
+            return s.goal_achieved_unnormed[goal_dim];
+          };
+          varsum += bib::Utils::variance<>(trajectory.cbegin() + beg, trajectory.cbegin() + end, get);
+        }
+      }
+      
+      //goal_achieved hasn't change at all during the trajectory
+      if (varsum <= 1e-8 && trajectory[beg].r >= -0.0001) {
+        for (auto it = trajectory.begin() + beg; it != trajectory.begin() + end; it++){
+            it->interest=false;
+		}
+      }
+    }
+ 
 // 
 //  compute importance sampling ratio on artificial data
 // 
@@ -559,6 +595,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         trajectory[i].prob = bib::Proba<double>::truncatedGaussianDensity(trajectory[i].a, ac_out->cpu_data(), noise, li * this->nb_motors) / trajectory[i].prob;
         li++;
       }
+      delete ac_out;
     }
     
 //     LOG_DEBUG("#############");
@@ -608,13 +645,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), deltas.cpu_data(), deltas.mutable_cpu_data());
 
       double *pv_target = deltas.mutable_cpu_data();
-//      double min_ = - (1.f/(1.f-this->gamma));
-//      for(int i=0;i<trajectory.size();i++){
-//          if(pv_target[i] > 0.0)
-//              pv_target[i] = 0.f;
-//          else if (pv_target[i] < min_)
-//              pv_target[i] = min_;
-//      }
+     double min_ = - (1.f/(1.f-this->gamma));
+     for(int i=0;i<trajectory.size();i++){
+         if(pv_target[i] > 0.0)
+             pv_target[i] = 0.f;
+         else if (pv_target[i] < min_)
+             pv_target[i] = min_;
+     }
 
 
       caffe::caffe_sub(trajectory.size(), deltas.cpu_data(), all_mine->cpu_data(), deltas.mutable_cpu_data());
@@ -715,8 +752,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       mean_beta += beta;
       
       if(n > 0) {
+        ann->increase_batchsize(trajectory.size());
         for(uint sia = 0; sia < stoch_iter_actor; sia++){
-          ann->increase_batchsize(trajectory.size());
           //learn BN
           auto ac_out = ann->computeOutBlob(all_states);
           ann->ZeroGradParameters();
@@ -875,7 +912,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
   void load(const std::string& path) override {
     ann->load(path+".actor");
+#ifndef PARALLEL_INTERACTION
     vnn->load(path+".critic");
+#else
+    if (world.rank() == 0)
+      vnn->load(path+".critic");
+#endif
     bib::XMLEngine::load<>(normalizer, "normalizer", path+".normalizer.data");
   }
   
@@ -900,6 +942,64 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   uint getGoalSize(){
     return goal_size;
   }
+
+  bool sparse_reward(const std::vector<double>&  a, const std::vector<double>&  b) {
+    double sum = 0.f;
+    for (int i=0;i<a.size();i++){
+      double diff = a[i] - b[i];
+      sum += diff*diff;
+    }
+    sum = std::sqrt(sum);
+    return sum < 0.05f;
+  };
+ 
+  double dense_reward(const std::vector<double>&  goal_achieved, const std::vector<double>&  desired_goal, 
+                               const std::vector<double>&  next_goal_achieved, const std::vector<double>&  next_desired_goal, 
+                               const std::vector<double>&  observation, const std::vector<double>&  next_observation) {
+     
+     if (sparse_reward(goal_achieved, desired_goal))
+        return 0.f;
+
+     std::vector<double> mid_goal(3, 0.f);
+     mid_goal[0] = next_goal_achieved[0] - (next_desired_goal[0] - next_goal_achieved[0] > 0.f ? 1.f : -1.f)*0.04f;
+     mid_goal[1] = next_goal_achieved[1] - (next_desired_goal[1] - next_goal_achieved[1] > 0.f ? 1.f : -1.f)*0.04f;
+     mid_goal[2] = next_goal_achieved[2] + 0.07f;
+     
+     double dist_obj_hand;
+     {
+       std::vector<double> diff(3, 0.f);
+       std::transform(mid_goal.begin(), mid_goal.end(), observation.begin() + 3, diff.begin(), std::minus<double>());
+       dist_obj_hand = bib::Utils::euclidien_dist_ref(diff, 0.f)*3.f;
+     }
+     {
+       std::vector<double> diff(3, 0.f);
+       std::transform(mid_goal.begin(), mid_goal.end(), next_observation.begin() + 3, diff.begin(), std::minus<double>());
+       dist_obj_hand -= bib::Utils::euclidien_dist_ref(diff, 0.f)*3.f;
+     }
+ 
+     double dist_goal;
+     {
+       std::vector<double> diff(3, 0.f);
+       std::transform(goal_achieved.begin(), goal_achieved.end(), desired_goal.begin(), diff.begin(), std::minus<double>());
+       dist_goal = bib::Utils::euclidien_dist_ref(diff, 0.f)*3.f;
+     }
+     {
+       std::vector<double> diff(3, 0.f);
+       std::transform(next_goal_achieved.begin(), next_goal_achieved.end(), next_desired_goal.begin(), diff.begin(), std::minus<double>());
+       dist_goal -= bib::Utils::euclidien_dist_ref(diff, 0.f)*3.f;
+     }
+     if(dist_goal < 0.00005 and dist_goal >= 0.000000001)
+        dist_goal = 0.f;
+
+     double r = dist_obj_hand + 100*dist_goal;
+     if (r > 0.5)
+        r = 0.5;
+     else if (r < -0.5)
+        r = -0.5;
+
+     return -1. + 0.5 + r;
+   }
+ 
 
 #ifdef PARALLEL_INTERACTION
   int getMPIrank() {
@@ -966,6 +1066,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   std::deque<int> trajectory_end_points;
 
   NN* ann;
+  NN* ann_noblob;
   NN* vnn = nullptr;
 
   std::vector<uint>* hidden_unit_v;

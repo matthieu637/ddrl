@@ -402,6 +402,8 @@ class MLP {
   }
   
   void increase_batchsize(uint new_batch_size) {
+    if(new_batch_size == kMinibatchSize)
+        return;
     kMinibatchSize = new_batch_size;
 
     neural_net->blob_by_name(MLP::states_blob_name)->Reshape(kMinibatchSize, size_sensors, kFixedDim, kFixedDim);
