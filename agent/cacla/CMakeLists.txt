@@ -146,6 +146,14 @@ add_library(${LIBRARY_NAME8} SHARED ${all_include} src/pybinding/nfac.cpp)
 target_compile_definitions(${LIBRARY_NAME8} PUBLIC WANT_CORRELATION)
 target_link_libraries(${LIBRARY_NAME8} ${BASE_LIBRARIES} )
 
+if(${MPI_FOUND})
+    set(LIBRARY_NAME88 "ddrl-corpenfac-para")
+    rename_buildtype(LIBRARY_NAME88)
+    add_library(${LIBRARY_NAME88} SHARED ${all_include} src/pybinding/nfac.cpp)
+    target_compile_definitions(${LIBRARY_NAME88} PUBLIC WANT_CORRELATION PARALLEL_INTERACTION)
+    target_link_libraries(${LIBRARY_NAME88} ${BASE_LIBRARIES} ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES} boost_mpi)
+endif()
+
 # add_executable(ada-nfac src/test/AdaNFAC.cpp ${all_include} ${all_sources} )
 # target_link_libraries(ada-nfac ${ADVANCED_ACROBOT_LIBRARY} ${CARTPOLE_LIBRARY} ${BASE_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
 
