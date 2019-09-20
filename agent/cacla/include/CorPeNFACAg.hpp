@@ -157,6 +157,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     disable_cac                 = pt->get<bool>("agent.disable_cac");
     correlation_importance = pt->get<double>("agent.correlation_importance");
     correlation_history = pt->get<uint>("agent.correlation_history");
+    update_aux_before   = pt->get<bool>("agent.update_aux_before");
     gae                     = false;
     update_each_episode = 1;
     normalizer_type = 0;
@@ -232,15 +233,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       if (world.rank() != 0)
           ann->copyWeightsFrom(weights.data(), false);
     }
-    {
-      std::vector<double> weights(aux->number_of_parameters(false), 0.f);
-      if (world.rank() == 0)
-          aux->copyWeightsTo(weights.data(), false);
-
-      broadcast(world, weights, 0);
-      if (world.rank() != 0)
-          aux->copyWeightsFrom(weights.data(), false);
-    }
 #endif
     
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);
@@ -279,17 +271,22 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
       //remove trace of old policy
       auto iter = [&]() {
-        decltype(vnn_testing->computeOutVFBlob(all_next_states, empty_action)) all_nextV;
-        if(batch_norm_critic != 0)
-        {
+        decltype(vnn->computeOutVFBlob(all_states, empty_action)) all_nextV, all_V;
+        if(batch_norm_critic != 0) {
+          //learn BN
+          all_V = vnn->computeOutVFBlob(all_states, empty_action);
           double* weights = new double[vnn->number_of_parameters(false)];
           vnn->copyWeightsTo(weights, false);
           vnn_testing->copyWeightsFrom(weights, false);
           delete[] weights;
           all_nextV = vnn_testing->computeOutVFBlob(all_next_states, empty_action);
-        } else 
+          delete all_V;
+          all_V = vnn_testing->computeOutVFBlob(all_states, empty_action);
+        } else {
           all_nextV = vnn->computeOutVFBlob(all_next_states, empty_action);
-        auto all_V = vnn->computeOutVFBlob(all_states, empty_action);
+          all_V = vnn->computeOutVFBlob(all_states, empty_action);
+          //all_V must be computed after all_nextV to use learn_blob_no_full_forward
+        }
 
 #ifdef CAFFE_CPU_ONLY
         caffe::caffe_mul(trajectory.size(), r_gamma_coef.cpu_diff(), all_nextV->cpu_data(), v_target.mutable_cpu_data());
@@ -341,7 +338,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         break;
       }
 #endif
-        vnn->learn_blob(all_states, empty_action, v_target, stoch_iter_critic);
+        if (stoch_iter_critic == 1)
+          vnn->learn_blob_no_full_forward(all_states, empty_action, v_target);
+        else
+          vnn->learn_blob(all_states, empty_action, v_target, stoch_iter_critic);
 
         delete all_V;
         delete all_nextV;
@@ -349,6 +349,60 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
       for(uint i=0; i<number_fitted_iteration; i++)
         iter();
+    }
+  }
+  
+  void update_aux() {
+    caffe::Blob<double> all_deter_action_out(trajectory.size() - (correlation_history * trajectory_end_points.size()), this->nb_motors, 1, 1);
+    caffe::Blob<double> all_deter_action_in(trajectory.size() - (correlation_history * trajectory_end_points.size()), this->nb_motors * (1 + correlation_history), 1, 1);
+    int li=0;
+    int li2=0;
+    double* pall_deter_action_out = all_deter_action_out.mutable_cpu_data();
+    double* pall_deter_action_in = all_deter_action_in.mutable_cpu_data();
+    for (int i=0; i < trajectory_end_points.size(); i++){
+        int beg = 0;
+        int end = trajectory_end_points[i];
+        if (i - 1 >= 0)
+          beg += trajectory_end_points[i-1];
+        
+        for (int j=beg; j < end; j++) {
+          if (j+correlation_history < end){
+            std::copy(trajectory[j+correlation_history].pure_a.begin(), trajectory[j+correlation_history].pure_a.end(), pall_deter_action_out + li * this->nb_motors);
+            li++;
+          }
+          
+          if (j + correlation_history < end) {
+            for(int k=0;k< 1 + correlation_history ; k++) {
+              std::copy(trajectory[j+k].pure_a.begin(), trajectory[j+k].pure_a.end(), pall_deter_action_in + li2 * this->nb_motors);
+              li2++;
+            }
+          }
+        }
+    }
+    ASSERT(li == (int) ((double)all_deter_action_out.count() / this->nb_motors), "pb size " << li << " " << (int) ((double)all_deter_action_out.count() / this->nb_motors));
+    ASSERT(li2 == (int) ((double)all_deter_action_in.count() / this->nb_motors), "pb size " << li2 << " " << (int) ((double)all_deter_action_in.count() / this->nb_motors));
+    
+//     bib::Logger::PRINT_ELEMENTS(trajectory_end_points);
+//     li=0;
+//     for (auto it : trajectory) {
+//       bib::Logger::PRINT_ELEMENTS(it.pure_a, std::to_string(li).c_str());
+//       li++;
+//     }
+//     
+//     bib::Logger::PRINT_ELEMENTS(pall_deter_action_out, all_deter_action_out.count() , " out ");
+//     bib::Logger::PRINT_ELEMENTS(pall_deter_action_in,  all_deter_action_in.count(), " in ");
+
+    aux->increase_batchsize(trajectory.size() - (correlation_history * trajectory_end_points.size()));
+    for (int i=0; i  < stoch_iter_aux; i++) {
+      aux->learn_blob(all_deter_action_in, empty_action, all_deter_action_out, 1);
+
+      //enforce diag to be null (or solution is obvious)
+      double* weights = aux->getNN()->learnable_params()[0]->mutable_cpu_data();
+      for (int i=0; i < this->nb_motors ;i++)
+          weights[i+ i * this->nb_motors] = 0.0f;
+      
+//       if( i% 100 == 0)
+//         LOG_DEBUG(i << " " << std::setprecision(12) << aux->error() );
     }
   }
 
@@ -441,9 +495,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     }
     
     caffe::Blob<double> all_states(trajectory.size(), nb_sensors, 1, 1);
-    caffe::Blob<double> all_deter_action_out(trajectory.size() - (correlation_history * trajectory_end_points.size()), this->nb_motors, 1, 1);
-    caffe::Blob<double> all_deter_action_in(trajectory.size() - (correlation_history * trajectory_end_points.size()), this->nb_motors * (1 + correlation_history), 1, 1);
-
     caffe::Blob<double> all_next_states(trajectory.size(), nb_sensors, 1, 1);
     //store reward in data and gamma coef in diff
     caffe::Blob<double> r_gamma_coef(trajectory.size(), 1, 1, 1);
@@ -462,55 +513,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       li++;
     }
     
-    li=0;
-    int li2=0;
-    double* pall_deter_action_out = all_deter_action_out.mutable_cpu_data();
-    double* pall_deter_action_in = all_deter_action_in.mutable_cpu_data();
-    for (int i=0; i < trajectory_end_points.size(); i++){
-        int beg = 0;
-        int end = trajectory_end_points[i];
-        if (i - 1 >= 0)
-          beg += trajectory_end_points[i-1];
-        
-        for (int j=beg; j < end; j++) {
-          if (j+correlation_history < end){
-            std::copy(trajectory[j+correlation_history].pure_a.begin(), trajectory[j+correlation_history].pure_a.end(), pall_deter_action_out + li * this->nb_motors);
-            li++;
-          }
-          
-          if (j + correlation_history < end) {
-            for(int k=0;k< 1 + correlation_history ; k++) {
-              std::copy(trajectory[j+k].pure_a.begin(), trajectory[j+k].pure_a.end(), pall_deter_action_in + li2 * this->nb_motors);
-              li2++;
-            }
-          }
-        }
-    }
-    ASSERT(li == (int) ((double)all_deter_action_out.count() / this->nb_motors), "pb size " << li << " " << (int) ((double)all_deter_action_out.count() / this->nb_motors));
-    ASSERT(li2 == (int) ((double)all_deter_action_in.count() / this->nb_motors), "pb size " << li2 << " " << (int) ((double)all_deter_action_in.count() / this->nb_motors));
-    
-//     bib::Logger::PRINT_ELEMENTS(trajectory_end_points);
-//     li=0;
-//     for (auto it : trajectory) {
-//       bib::Logger::PRINT_ELEMENTS(it.pure_a, std::to_string(li).c_str());
-//       li++;
-//     }
-//     
-//     bib::Logger::PRINT_ELEMENTS(pall_deter_action_out, all_deter_action_out.count() , " out ");
-//     bib::Logger::PRINT_ELEMENTS(pall_deter_action_in,  all_deter_action_in.count(), " in ");
-
-    aux->increase_batchsize(trajectory.size() - (correlation_history * trajectory_end_points.size()));
-    for (int i=0; i  < stoch_iter_aux; i++) {
-      aux->learn_blob(all_deter_action_in, empty_action, all_deter_action_out, 1);
-
-      //enforce diag to be null (or solution is obvious)
-      double* weights = aux->getNN()->learnable_params()[0]->mutable_cpu_data();
-      for (int i=0; i < this->nb_motors ;i++)
-          weights[i+ i * this->nb_motors] = 0.0f;
-      
-//       if( i% 100 == 0)
-//         LOG_DEBUG(i << " " << std::setprecision(12) << aux->error() );
-    }
+    if (update_aux_before)
+      update_aux();
     
     update_critic(all_states, all_next_states, r_gamma_coef);
 
@@ -682,7 +686,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           
           //correlation cost
           li = 0;
-          li2 = 0;
+          int li2 = 0;
           const double* pac_out = ac_out->cpu_data();
           caffe::Blob<double> aux_in(trajectory.size() - (correlation_history * trajectory_end_points.size()), this->nb_motors * (1 + correlation_history), 1, 1);
           caffe::Blob<double> aux_out(trajectory.size() - (correlation_history * trajectory_end_points.size()), this->nb_motors, 1, 1);
@@ -695,8 +699,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               beg += trajectory_end_points[i-1];
             
             for (int j=beg; j < end; j++) {
-              if (j+correlation_history < end){
-                std::copy(paux_out + (j+correlation_history) *  this->nb_motors, paux_out + (j+correlation_history+1) *  this->nb_motors, paux_out + li * this->nb_motors);
+              if (j+correlation_history < end) {
+                std::copy(pac_out + (j+correlation_history) *  this->nb_motors, pac_out + (j+correlation_history+1) *  this->nb_motors, paux_out + li * this->nb_motors);
                 li++;
               }
               
@@ -713,6 +717,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //          bib::Logger::PRINT_ELEMENTS(trajectory_end_points, "tep ");
           ASSERT(li == (int) ((double)aux_out.count() / this->nb_motors), "pb size " << li << " " << (int) ((double)aux_out.count() / this->nb_motors));
           ASSERT(li2 == (int) ((double)aux_in.count() / this->nb_motors), "pb size " << li2 << " " << (int) ((double)aux_in.count() / this->nb_motors));
+          aux->increase_batchsize(trajectory.size() - (correlation_history * trajectory_end_points.size()));
           auto aux_out2 = aux->computeOutBlob(aux_in);
           const double* paux_out2 = aux_out2->cpu_data();
           const auto aux_output_blob = aux->getNN()->blob_by_name(MLP::actions_blob_name);
@@ -733,7 +738,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           
           int index_ep = 0;
           int removed_i = 0;
-          std::vector<int> counter(aux_input_blob->count() / this->nb_motors, 0);
+          std::vector<int> counter(trajectory.size(), 0);
           for(int i=0; i < aux_input_blob->count() / this->nb_motors; i++){
               int adapted_i = i - removed_i;
               int sample_index = (adapted_i / (1+correlation_history)) + (adapted_i %(1+correlation_history));
@@ -753,8 +758,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           }
           ASSERT(index_ep == trajectory_end_points.size(), index_ep << " " <<  trajectory_end_points.size());
           for(int i=0; i < trajectory.size(); i++){
-            for (int k=0; k < this->nb_motors; k++)
+            for (int k=0; k < this->nb_motors; k++) {
               pdiff_corr[i*this->nb_motors + k] *= correlation_importance * (1.f / (double) counter[i]);
+//               if(std::fabs(pdiff_corr[i*this->nb_motors + k] ) >= 10)
+//                 LOG_DEBUG("catch");
+            }
           }
           delete aux_out2;
           
@@ -830,6 +838,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         ann_testing->increase_batchsize(1);
     }
     
+    if (!update_aux_before)
+      update_aux();
+    
 #ifdef PARALLEL_INTERACTION
     }
     {
@@ -840,15 +851,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       broadcast(world, weights, 0);
       if (world.rank() != 0)
           ann->copyWeightsFrom(weights.data(), false);
-    }
-    {
-      std::vector<double> weights(aux->number_of_parameters(false), 0.f);
-      if (world.rank() == 0)
-          aux->copyWeightsTo(weights.data(), false);
-
-      broadcast(world, weights, 0);
-      if (world.rank() != 0)
-          aux->copyWeightsFrom(weights.data(), false);
     }
 #endif
     
@@ -874,6 +876,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 #endif
       ann->save(path+".actor");
       vnn->save(path+".critic");
+      aux->save(path+".aux");
+        if (normalizer_type > 0)
+            bib::XMLEngine::save<>(*normalizer, "normalizer", path+".normalizer.data");
 #ifdef PARALLEL_INTERACTION
       }
 #endif
@@ -890,6 +895,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   void load(const std::string& path) override {
     ann->load(path+".actor");
     vnn->load(path+".critic");
+    aux->load(path+".aux");
+    if (normalizer_type > 0){
+        delete normalizer;
+        normalizer = bib::XMLEngine::load<bib::OnlineNormalizer>("normalizer", path+".normalizer.data");
+    }
+
   }
   
   void load_previous_run() override {
@@ -939,7 +950,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
   double noise, noise2, noise3;
   uint gaussian_policy;
-  bool gae, ignore_poss_ac, conserve_beta, disable_trust_region, disable_cac;
+  bool gae, ignore_poss_ac, conserve_beta, disable_trust_region, disable_cac, update_aux_before;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic, stoch_iter_aux;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
