@@ -148,9 +148,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     lambda                  = pt->get<double>("agent.lambda");
     momentum                = pt->get<uint>("agent.momentum");
     beta_target             = pt->get<double>("agent.beta_target");
-    ignore_poss_ac          = pt->get<bool>("agent.ignore_poss_ac");
-    conserve_beta           = pt->get<bool>("agent.conserve_beta");
-    disable_trust_region = pt->get<bool>("agent.disable_trust_region");
     disable_cac                 = pt->get<bool>("agent.disable_cac");
     gae                     = false;
     update_each_episode = 1;
@@ -515,22 +512,23 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       posdelta_mean=0.f;
       //store target in data, and disable in diff
       caffe::Blob<double> target_cac(trajectory.size(), this->nb_motors, 1, 1);
-      caffe::Blob<double> target_treg(trajectory.size(), this->nb_motors, 1, 1);
       caffe::caffe_set(target_cac.count(), static_cast<double>(1.f), target_cac.mutable_cpu_diff());
-      caffe::caffe_set(target_treg.count(), static_cast<double>(1.f), target_treg.mutable_cpu_diff());
       caffe::Blob<double> deltas_blob(trajectory.size(), this->nb_motors, 1, 1);
       caffe::caffe_set(deltas_blob.count(), static_cast<double>(1.f), deltas_blob.mutable_cpu_data());
 
       double* pdisable_back_cac = target_cac.mutable_cpu_diff();
-      double* pdisable_back_treg = target_treg.mutable_cpu_diff();
       double* pdeltas_blob = deltas_blob.mutable_cpu_data();
       double* ptarget_cac = target_cac.mutable_cpu_data();
-      double* ptarget_treg = target_treg.mutable_cpu_data();
       const double* pdeltas = deltas.cpu_data();
       li=0;
       //cacla cost
+      // (mu(s) - a) A(s,a) H(A(s,a))
+      // clip(mu(s) - a, mu_old(s) - c, mu_old(s) + c) A(s,a) H(A(s,a)) clip only direction not target
+      // mu(s) - clip(a, mu_old(s) - c, mu_old(s) + c) A(s,a) H(A(s,a))
+
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-        std::copy(it->a.begin(), it->a.end(), ptarget_cac + li * this->nb_motors);
+        for(int j=0; j < this->nb_motors; j++)
+            ptarget_cac[li * this->nb_motors + j] = std::min( std::min(it->pure_a[j] + beta_target, (double) 1.f), std::max(it->a[j], std::max(it->pure_a[j] - beta_target, (double) -1.f) ) );
         if(pdeltas[li] > 0.) {
           posdelta_mean += pdeltas[li];
           n++;
@@ -541,25 +539,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
             std::fill(pdeltas_blob + li * this->nb_motors, pdeltas_blob + (li+1) * this->nb_motors, pdeltas[li]);
         li++;
       }
-      //penalty cost
-      li=0;
-      for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-        std::copy(it->pure_a.begin(), it->pure_a.end(), ptarget_treg + li * this->nb_motors);
-        if(ignore_poss_ac && pdeltas[li] > 0.) {
-            std::copy(disable_back_ac.begin(), disable_back_ac.end(), pdisable_back_treg + li * this->nb_motors);
-        }
-        li++;
-      }
 
       ratio_valid_advantage = ((float)n) / ((float) trajectory.size());
       posdelta_mean = posdelta_mean / ((float) trajectory.size());
       int size_cost_cacla=trajectory.size()*this->nb_motors;
-      
-      double beta=0.0001f;
-      mean_beta=0.f;
-      if(conserve_beta)
-        beta=conserved_beta;
-      mean_beta += beta;
       
       if(n > 0) {
         for(uint sia = 0; sia < stoch_iter_actor; sia++){
@@ -578,60 +561,15 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           }
           ann->ZeroGradParameters();
           
-          number_effective_actor_update = sia;
-          if(disable_trust_region)
-              beta=0.f;
-          else if (sia > 0) {
-            //compute deter distance(pi, pi_old)
-            caffe::Blob<double> diff_treg(trajectory.size(), this->nb_motors, 1, 1);
-            double l2distance = 0.f;
-#ifdef CAFFE_CPU_ONLY
-            caffe::caffe_sub(size_cost_cacla, target_treg.cpu_data(), ac_out->cpu_data(), diff_treg.mutable_cpu_data());
-            caffe::caffe_mul(size_cost_cacla, diff_treg.cpu_data(), diff_treg.cpu_data(), diff_treg.mutable_cpu_data());
-            l2distance = caffe::caffe_cpu_asum(size_cost_cacla, diff_treg.cpu_data());
-#else
-          switch (caffe::Caffe::mode()) {
-          case caffe::Caffe::CPU:
-            caffe::caffe_sub(size_cost_cacla, target_treg.cpu_data(), ac_out->cpu_data(), diff_treg.mutable_cpu_data());
-            caffe::caffe_mul(size_cost_cacla, diff_treg.cpu_data(), diff_treg.cpu_data(), diff_treg.mutable_cpu_data());
-            l2distance = caffe::caffe_cpu_asum(size_cost_cacla, diff_treg.cpu_data());
-            break;
-          case caffe::Caffe::GPU:
-            caffe::caffe_gpu_sub(size_cost_cacla, target_treg.gpu_data(), ac_out->gpu_data(), diff_treg.mutable_gpu_data());
-            caffe::caffe_gpu_mul(size_cost_cacla, diff_treg.gpu_data(), diff_treg.gpu_data(), diff_treg.mutable_gpu_data());
-            caffe::caffe_gpu_asum(size_cost_cacla, diff_treg.gpu_data(), &l2distance);
-            break;
-          }
-#endif
-            l2distance = std::sqrt(l2distance/((double) trajectory.size()*this->nb_motors));
-
-            if (l2distance < beta_target/1.5)
-                beta = beta/2.;
-            else if (l2distance > beta_target*1.5)
-                beta = beta*2.;
-
-            beta=std::max(std::min((double)20.f, beta), (double) 0.01f);
-            mean_beta += beta;
-            conserved_l2dist = l2distance;
-            //LOG_DEBUG(std::setprecision(7) << l2distance << " " << beta << " " << beta_target << " " << sia);
-          }
-          
           const auto actor_actions_blob = ann->getNN()->blob_by_name(MLP::actions_blob_name);
           
           caffe::Blob<double> diff_cac(trajectory.size(), this->nb_motors, 1, 1);
-          caffe::Blob<double> diff_treg(trajectory.size(), this->nb_motors, 1, 1);
           double * ac_diff = nullptr;
 #ifdef CAFFE_CPU_ONLY
           ac_diff = actor_actions_blob->mutable_cpu_diff();
           caffe::caffe_sub(size_cost_cacla, target_cac.cpu_data(), ac_out->cpu_data(), diff_cac.mutable_cpu_data());
           caffe::caffe_mul(size_cost_cacla, diff_cac.cpu_data(), deltas_blob.cpu_data(), diff_cac.mutable_cpu_data());
-          caffe::caffe_mul(size_cost_cacla, target_cac.cpu_diff(), diff_cac.cpu_data(), diff_cac.mutable_cpu_data());
-          
-          caffe::caffe_sub(size_cost_cacla, target_treg.cpu_data(), ac_out->cpu_data(), diff_treg.mutable_cpu_data());
-          caffe::caffe_scal(size_cost_cacla, beta, diff_treg.mutable_cpu_data());
-          caffe::caffe_mul(size_cost_cacla, target_treg.cpu_diff(), diff_treg.cpu_data(), diff_treg.mutable_cpu_data());
-          
-          caffe::caffe_add(size_cost_cacla, diff_cac.cpu_data(), diff_treg.cpu_data(), ac_diff);
+          caffe::caffe_mul(size_cost_cacla, target_cac.cpu_diff(), diff_cac.cpu_data(), ac_diff);
           caffe::caffe_scal(size_cost_cacla, (double) -1.f, ac_diff);
 #else
           switch (caffe::Caffe::mode()) {
@@ -639,26 +577,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
             ac_diff = actor_actions_blob->mutable_cpu_diff();
             caffe::caffe_sub(size_cost_cacla, target_cac.cpu_data(), ac_out->cpu_data(), diff_cac.mutable_cpu_data());
             caffe::caffe_mul(size_cost_cacla, diff_cac.cpu_data(), deltas_blob.cpu_data(), diff_cac.mutable_cpu_data());
-            caffe::caffe_mul(size_cost_cacla, target_cac.cpu_diff(), diff_cac.cpu_data(), diff_cac.mutable_cpu_data());
-            
-            caffe::caffe_sub(size_cost_cacla, target_treg.cpu_data(), ac_out->cpu_data(), diff_treg.mutable_cpu_data());
-            caffe::caffe_scal(size_cost_cacla, beta, diff_treg.mutable_cpu_data());
-            caffe::caffe_mul(size_cost_cacla, target_treg.cpu_diff(), diff_treg.cpu_data(), diff_treg.mutable_cpu_data());
-            
-            caffe::caffe_add(size_cost_cacla, diff_cac.cpu_data(), diff_treg.cpu_data(), ac_diff);
+            caffe::caffe_mul(size_cost_cacla, target_cac.cpu_diff(), diff_cac.cpu_data(), ac_diff);
             caffe::caffe_scal(size_cost_cacla, (double) -1.f, ac_diff);
             break;
           case caffe::Caffe::GPU:
             ac_diff = actor_actions_blob->mutable_gpu_diff();
             caffe::caffe_gpu_sub(size_cost_cacla, target_cac.gpu_data(), ac_out->gpu_data(), diff_cac.mutable_gpu_data());
             caffe::caffe_gpu_mul(size_cost_cacla, diff_cac.gpu_data(), deltas_blob.gpu_data(), diff_cac.mutable_gpu_data());
-            caffe::caffe_gpu_mul(size_cost_cacla, target_cac.gpu_diff(), diff_cac.gpu_data(), diff_cac.mutable_gpu_data());
-            
-            caffe::caffe_gpu_sub(size_cost_cacla, target_treg.gpu_data(), ac_out->gpu_data(), diff_treg.mutable_gpu_data());
-            caffe::caffe_gpu_scal(size_cost_cacla, beta, diff_treg.mutable_gpu_data());
-            caffe::caffe_gpu_mul(size_cost_cacla, target_treg.gpu_diff(), diff_treg.gpu_data(), diff_treg.mutable_gpu_data());
-            
-            caffe::caffe_gpu_add(size_cost_cacla, diff_cac.gpu_data(), diff_treg.gpu_data(), ac_diff);
+            caffe::caffe_gpu_mul(size_cost_cacla, target_cac.gpu_diff(), diff_cac.gpu_data(), ac_diff);
             caffe::caffe_gpu_scal(size_cost_cacla, (double) -1.f, ac_diff);
             break;
           }
@@ -677,9 +603,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         delete ann->computeOutBlob(all_states);
       }
       
-      conserved_beta = beta;
-      mean_beta /= (double) number_effective_actor_update;
-
       delete all_nextV;
       delete all_mine;
       
@@ -777,9 +700,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   void _dump(std::ostream& out) const override {
     out << std::setw(25) << std::fixed << std::setprecision(22) << this->sum_weighted_reward/this->gamma << " " << 
     this->sum_reward << " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << 
-    nb_sample_update << " " << std::setprecision(3) << ratio_valid_advantage << " " << std::setprecision(10) << 
-    mean_beta << " " << conserved_l2dist << " " << std::setprecision(3) << vnn->weight_l1_norm() << " " << 
-    ann->weight_l1_norm(true) << " " << std::setprecision(6)  << posdelta_mean << " " << number_effective_actor_update;
+    nb_sample_update << " " << std::setprecision(3) << ratio_valid_advantage << " " << conserved_l2dist << " " << 
+    std::setprecision(3) << vnn->weight_l1_norm() << " " << ann->weight_l1_norm(true) << " " << posdelta_mean;
   }
   
  private:
@@ -789,14 +711,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
   double noise, noise2, noise3;
   uint gaussian_policy;
-  bool gae, ignore_poss_ac, conserve_beta, disable_trust_region, disable_cac;
+  bool gae, disable_cac;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, beta_target;
-  double conserved_beta= 0.0001f;
-  double mean_beta= 0.f;
   double conserved_l2dist= 0.f;
-  int number_effective_actor_update = 0;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
