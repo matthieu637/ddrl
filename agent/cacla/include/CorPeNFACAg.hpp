@@ -51,6 +51,15 @@ typedef struct _sample {
 } sample;
 #endif
 
+typedef struct _ftrajectoryJ {
+  std::deque<sample> trajectory;
+  double J;
+  
+  bool operator< (const _ftrajectoryJ& b) const {
+    return J > b.J;
+  }
+} ftrajectoryJ;
+
 template<typename NN = MLP>
 class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
  public:
@@ -158,6 +167,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     correlation_importance = pt->get<double>("agent.correlation_importance");
     correlation_history = pt->get<uint>("agent.correlation_history");
     update_aux_before   = pt->get<bool>("agent.update_aux_before");
+    keep_n_best   = pt->get<uint>("agent.keep_n_best");
     gae                     = false;
     update_each_episode = 1;
     normalizer_type = 0;
@@ -353,27 +363,35 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   }
   
   void update_aux() {
-    caffe::Blob<double> all_deter_action_out(trajectory.size() - (correlation_history * trajectory_end_points.size()), this->nb_motors, 1, 1);
-    caffe::Blob<double> all_deter_action_in(trajectory.size() - (correlation_history * trajectory_end_points.size()), this->nb_motors * (1 + correlation_history), 1, 1);
+    std::deque<sample> btrajectory;
+    std::deque<int> btrajectory_end_points;
+    for (auto c : best_trajectories){
+        for ( auto s : c.trajectory)
+            btrajectory.push_back(s);
+        btrajectory_end_points.push_back(btrajectory.size());
+    }
+
+    caffe::Blob<double> all_deter_action_out(btrajectory.size() - (correlation_history * btrajectory_end_points.size()), this->nb_motors, 1, 1);
+    caffe::Blob<double> all_deter_action_in(btrajectory.size() - (correlation_history * btrajectory_end_points.size()), this->nb_motors * (1 + correlation_history), 1, 1);
     int li=0;
     int li2=0;
     double* pall_deter_action_out = all_deter_action_out.mutable_cpu_data();
     double* pall_deter_action_in = all_deter_action_in.mutable_cpu_data();
-    for (int i=0; i < trajectory_end_points.size(); i++){
+    for (int i=0; i < btrajectory_end_points.size(); i++){
         int beg = 0;
-        int end = trajectory_end_points[i];
+        int end = btrajectory_end_points[i];
         if (i - 1 >= 0)
-          beg += trajectory_end_points[i-1];
+          beg += btrajectory_end_points[i-1];
         
         for (int j=beg; j < end; j++) {
           if (j+correlation_history < end){
-            std::copy(trajectory[j+correlation_history].pure_a.begin(), trajectory[j+correlation_history].pure_a.end(), pall_deter_action_out + li * this->nb_motors);
+            std::copy(btrajectory[j+correlation_history].a.begin(), btrajectory[j+correlation_history].a.end(), pall_deter_action_out + li * this->nb_motors);
             li++;
           }
           
           if (j + correlation_history < end) {
             for(int k=0;k< 1 + correlation_history ; k++) {
-              std::copy(trajectory[j+k].pure_a.begin(), trajectory[j+k].pure_a.end(), pall_deter_action_in + li2 * this->nb_motors);
+              std::copy(btrajectory[j+k].a.begin(), btrajectory[j+k].a.end(), pall_deter_action_in + li2 * this->nb_motors);
               li2++;
             }
           }
@@ -392,7 +410,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //     bib::Logger::PRINT_ELEMENTS(pall_deter_action_out, all_deter_action_out.count() , " out ");
 //     bib::Logger::PRINT_ELEMENTS(pall_deter_action_in,  all_deter_action_in.count(), " in ");
 
-    aux->increase_batchsize(trajectory.size() - (correlation_history * trajectory_end_points.size()));
+    aux->increase_batchsize(btrajectory.size() - (correlation_history * btrajectory_end_points.size()));
     for (int i=0; i  < stoch_iter_aux; i++) {
       aux->learn_blob(all_deter_action_in, empty_action, all_deter_action_out, 1);
 
@@ -411,6 +429,25 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     if(!learning){
       return;
     }
+    
+    auto it = best_trajectories.end();
+    if (best_trajectories.size() > 0 )
+      --it;
+    if (best_trajectories.size() <= 4 || this->sum_reward > it->J) {
+      std::deque<sample> traj(trajectory.begin() +(trajectory_end_points.size() > 0 ? trajectory_end_points.back() : 0 ) , trajectory.end());
+      best_trajectories.insert({traj, this->sum_reward});
+    }
+    
+    if(best_trajectories.size() > keep_n_best) {
+        it = best_trajectories.end();
+        --it;
+       //remove smallest
+       best_trajectories.erase(it);
+     }
+
+//     for (auto i : best_trajectories){
+//        LOG_DEBUG(i.J);
+//     }
     
     //learning phase
     trajectory_end_points.push_back(trajectory.size());
@@ -740,6 +777,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
             }
           }
           delete aux_out2;
+//           bib::Logger::PRINT_ELEMENTS(pdiff_corr, diff_corr.count());
           
           caffe::Blob<double> diff_cac(trajectory.size(), this->nb_motors, 1, 1);
           caffe::Blob<double> diff_treg(trajectory.size(), this->nb_motors, 1, 1);
@@ -964,6 +1002,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   
   double correlation_importance;
   uint correlation_history;
+  int keep_n_best;
+  
+  std::multiset<ftrajectoryJ> best_trajectories;
 
 #ifdef PARALLEL_INTERACTION
   boost::mpi::communicator world;
