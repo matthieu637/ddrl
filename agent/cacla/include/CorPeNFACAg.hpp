@@ -221,7 +221,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true, momentum);
 
-    aux = new NN(this->nb_motors * (1 + correlation_history), {}, this->nb_motors, alpha_aux, 1, hidden_layer_type, 0, 0, true, momentum);
+    aux = new NN(this->nb_motors * (1 + correlation_history), {32}, this->nb_motors, alpha_aux, 1, hidden_layer_type, 0, 0, true, momentum);
 
 #ifdef PARALLEL_INTERACTION
     {
@@ -689,9 +689,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           int li2 = 0;
           const double* pac_out = ac_out->cpu_data();
           caffe::Blob<double> aux_in(trajectory.size() - (correlation_history * trajectory_end_points.size()), this->nb_motors * (1 + correlation_history), 1, 1);
-          caffe::Blob<double> aux_out(trajectory.size() - (correlation_history * trajectory_end_points.size()), this->nb_motors, 1, 1);
           double* paux_in = aux_in.mutable_cpu_data();
-          double* paux_out = aux_out.mutable_cpu_data();
           for (int i=0; i < trajectory_end_points.size(); i++) {
             int beg = 0;
             int end = trajectory_end_points[i];
@@ -699,11 +697,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               beg += trajectory_end_points[i-1];
             
             for (int j=beg; j < end; j++) {
-              if (j+correlation_history < end) {
-                std::copy(pac_out + (j+correlation_history) *  this->nb_motors, pac_out + (j+correlation_history+1) *  this->nb_motors, paux_out + li * this->nb_motors);
-                li++;
-              }
-              
               if (j + correlation_history < end) {
                 for(int k=0;k< 1 + correlation_history ; k++) {
                   std::copy(pac_out + (j+k) * this->nb_motors, pac_out + (j+k+1) * this->nb_motors, paux_in + li2 * this->nb_motors);
@@ -715,51 +708,33 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //          bib::Logger::PRINT_ELEMENTS(pac_out, ac_out->count(), "in");
 //          bib::Logger::PRINT_ELEMENTS(paux_in, aux_in.count(), "in adapt");
 //          bib::Logger::PRINT_ELEMENTS(trajectory_end_points, "tep ");
-          ASSERT(li == (int) ((double)aux_out.count() / this->nb_motors), "pb size " << li << " " << (int) ((double)aux_out.count() / this->nb_motors));
           ASSERT(li2 == (int) ((double)aux_in.count() / this->nb_motors), "pb size " << li2 << " " << (int) ((double)aux_in.count() / this->nb_motors));
           aux->increase_batchsize(trajectory.size() - (correlation_history * trajectory_end_points.size()));
           auto aux_out2 = aux->computeOutBlob(aux_in);
           const double* paux_out2 = aux_out2->cpu_data();
-          const auto aux_output_blob = aux->getNN()->blob_by_name(MLP::actions_blob_name);
-          double* aux_diff = aux_output_blob->mutable_cpu_diff();
-          for (int i=0;i < aux_output_blob->count(); i++)
-            aux_diff[i] = - (paux_out2[i] - paux_out[i]);
-//          bib::Logger::PRINT_ELEMENTS(aux_diff, aux_output_blob->count());
-          aux->actor_backward();
-          const auto aux_input_blob = aux->getNN()->blob_by_name(MLP::states_blob_name);
-          
-//          LOG_DEBUG(aux_input_blob->count() << " " << actor_actions_blob->count());
           
           caffe::Blob<double> diff_corr(trajectory.size(), this->nb_motors, 1, 1);
           caffe::caffe_set(diff_corr.count(), static_cast<double>(0.0f), diff_corr.mutable_cpu_data());
           li = 0;
           double* pdiff_corr = diff_corr.mutable_cpu_data();
-          const double* pdiff_aux_in = aux_input_blob->cpu_diff();
-          
-          int index_ep = 0;
-          int removed_i = 0;
-          std::vector<int> counter(trajectory.size(), 0);
-          for(int i=0; i < aux_input_blob->count() / this->nb_motors; i++){
-              int adapted_i = i - removed_i;
-              int sample_index = (adapted_i / (1+correlation_history)) + (adapted_i %(1+correlation_history));
+          for (int i=0; i < trajectory_end_points.size(); i++){
+              int beg = 0;
+              int end = trajectory_end_points[i];
+              if (i - 1 >= 0)
+                beg += trajectory_end_points[i-1];
  
-              if (index_ep - 1 >= 0)
-                sample_index += trajectory_end_points[index_ep-1];
-              
-              if (sample_index + 1 == trajectory_end_points[index_ep]){
-                index_ep ++;
-                removed_i = i + 1;
-              }
-             
-//              LOG_DEBUG(i << " " << sample_index);
-              for (int k=0; k < this->nb_motors; k++)
-                pdiff_corr[ sample_index*this->nb_motors + k ] += pdiff_aux_in[ i*this->nb_motors+k ];
-              counter[sample_index] ++;
+			  for (int j=beg; j < end; j++) {
+				if (j+correlation_history < end){
+              	  for (int k=0; k < this->nb_motors; k++)
+					pdiff_corr[(j+correlation_history)*this->nb_motors + k] = paux_out2[li*this->nb_motors+k] - pac_out[(j+correlation_history)*this->nb_motors+k];
+                  li++;
+				}
+			  }
           }
-          ASSERT(index_ep == trajectory_end_points.size(), index_ep << " " <<  trajectory_end_points.size());
+          ASSERT(li == trajectory.size() - (correlation_history * trajectory_end_points.size()),"pb ");
           for(int i=0; i < trajectory.size(); i++){
             for (int k=0; k < this->nb_motors; k++) {
-              pdiff_corr[i*this->nb_motors + k] *= correlation_importance * (1.f / (double) counter[i]);
+              pdiff_corr[i*this->nb_motors + k] *= correlation_importance ;
 //               if(std::fabs(pdiff_corr[i*this->nb_motors + k] ) >= 10)
 //                 LOG_DEBUG("catch");
             }
