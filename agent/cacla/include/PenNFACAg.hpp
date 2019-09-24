@@ -18,6 +18,7 @@
 #include "bib/IniParser.hpp"
 #include "bib/OnlineNormalizer.hpp"
 #include "nn/MLP.hpp"
+#include "kdtree++/kdtree.hpp"
 
 #ifdef PARALLEL_INTERACTION
 #include <mpi.h>
@@ -26,13 +27,15 @@
 
 #ifndef SAASRG_SAMPLE
 #define SAASRG_SAMPLE
-typedef struct _sample {
+struct sample {
   std::vector<double> s;
   std::vector<double> pure_a;
   std::vector<double> a;
   std::vector<double> next_s;
   double r;
   bool goal_reached;
+  std::vector<double> unnormed_s;
+  std::vector<double> unnormed_next_s;
 
   friend class boost::serialization::access;
   template <typename Archive>
@@ -43,9 +46,34 @@ typedef struct _sample {
     ar& BOOST_SERIALIZATION_NVP(next_s);
     ar& BOOST_SERIALIZATION_NVP(r);
     ar& BOOST_SERIALIZATION_NVP(goal_reached);
+    ar& BOOST_SERIALIZATION_NVP(unnormed_s);
+    ar& BOOST_SERIALIZATION_NVP(unnormed_next_s);
   }
 
-} sample;
+  typedef double value_type;
+
+  inline double operator[](size_t N) const {
+    return unnormed_s[N];
+  }
+  
+//   double operator()(const std::vector<double>&, size_t const){
+//     return 1.;
+//   }
+// 
+//   double distance(const std::vector<sample>&){
+//     return 1.;
+//   }
+
+  bool operator< (const sample& b) const {
+    for (uint i = 0; i < unnormed_s.size(); i++) {
+      if(fabs(unnormed_s[i] - b.unnormed_s[i]) >= 1e-6)
+        return unnormed_s[i] < b.unnormed_s[i];
+    }
+
+    return true;
+  }
+
+};
 #endif
 
 template<typename NN = MLP>
@@ -97,8 +125,10 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       next_action = ann_testing->computeOut(sensors);
     }
     
-    if (last_action.get() != nullptr && learning)
-      trajectory.push_back( {last_state, *last_pure_action, *last_action, sensors_, reward, goal_reached});
+    if (last_action.get() != nullptr && learning) {
+      sample sa = {last_state, *last_pure_action, *last_action, sensors_, reward, goal_reached, last_state, sensors_};
+      trajectory.push_back(sa);
+    }
 
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
@@ -148,7 +178,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     lambda                  = pt->get<double>("agent.lambda");
     momentum                = pt->get<uint>("agent.momentum");
     beta_target             = pt->get<double>("agent.beta_target");
-    disable_cac                 = pt->get<bool>("agent.disable_cac");
+    disable_cac             = pt->get<bool>("agent.disable_cac");
+    state_close_threshold   = pt->get<double>("agent.state_close_threshold");
     gae                     = false;
     update_each_episode = 1;
     
@@ -211,7 +242,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 #endif
   
     ann = new NN(nb_sensors, *hidden_unit_a, this->nb_motors, alpha_a, 1, hidden_layer_type, actor_output_layer_type, batch_norm_actor, true, momentum);
-
+    
+    lipschitz_approx = new NN(nb_sensors, *hidden_unit_v, 1, alpha_v, 1, hidden_layer_type, 0, batch_norm_critic, true, momentum);
+    
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);
 
 #ifdef PARALLEL_INTERACTION
@@ -232,6 +265,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       vnn_testing = new NN(*vnn, false, ::caffe::Phase::TEST);
     
     bestever_score = std::numeric_limits<double>::lowest();
+
+    kdtree_s = new kdtree_sample(nb_sensors);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool) override {
@@ -427,23 +462,64 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         vnn_testing->increase_batchsize(trajectory.size());
     }
     
+    for(auto it : trajectory) {
+      auto it2 = kdtree_s->insert(it);
+      kdtree_iterator.push_back(it2);
+    }
+    
+    while(kdtree_iterator.size() > 100000) {
+        kdtree_s->erase(kdtree_iterator.front());
+        kdtree_iterator.pop_front();
+    }
+    
     caffe::Blob<double> all_states(trajectory.size(), nb_sensors, 1, 1);
     caffe::Blob<double> all_next_states(trajectory.size(), nb_sensors, 1, 1);
     //store reward in data and gamma coef in diff
     caffe::Blob<double> r_gamma_coef(trajectory.size(), 1, 1, 1);
+    caffe::Blob<double> lipschitz(trajectory.size(), 1, 1, 1);
     
     double* pall_states = all_states.mutable_cpu_data();
     double* pall_states_next = all_next_states.mutable_cpu_data();
     double* pr_all = r_gamma_coef.mutable_cpu_data();
     double* pgamma_coef = r_gamma_coef.mutable_cpu_diff();
+    double* plipschitz = lipschitz.mutable_cpu_data();
+    bool exactLipschitz = bib::Utils::rand01() > 0.9;
 
     int li=0;
+    double l2_const = std::sqrt((double)this->nb_motors) / std::sqrt((double)this->nb_sensors);
     for (auto it : trajectory) {
       std::copy(it.s.begin(), it.s.end(), pall_states + li * nb_sensors);
       std::copy(it.next_s.begin(), it.next_s.end(), pall_states_next + li * nb_sensors);
       pr_all[li]=it.r;
       pgamma_coef[li]= it.goal_reached ? 0.000f : this->gamma;
+
+      if(exactLipschitz) {
+        std::deque<sample> closest_states;
+        double lthreshold = state_close_threshold;
+        kdtree_s->find_within_range(it, lthreshold, std::back_insert_iterator<std::deque<sample> >(closest_states));
+        
+        double lipt = 0.f;
+  //       LOG_DEBUG(closest_states.size()<< " " << lthreshold);
+        for (int i=0;i<closest_states.size();i++) {
+          for (int j=i+1;j<closest_states.size();j++) {
+            double div = bib::Utils::euclidien_dist(closest_states[i].a, closest_states[j].a, this->nb_motors);
+            if(std::fabs(div) >= 1e-6)
+              lipt = std::max(lipt, bib::Utils::euclidien_dist(closest_states[i].unnormed_next_s, closest_states[j].unnormed_next_s, this->nb_sensors) / div );
+          }
+        }
+        lipt *= l2_const;
+        plipschitz[li] = std::exp(-1.f * lipt);
+      }
       li++;
+    }
+    
+    lipschitz_approx->increase_batchsize(trajectory.size());
+    if(exactLipschitz)
+      lipschitz_approx->learn_blob(all_states, empty_action, lipschitz, 10);
+    else {
+        auto out =  lipschitz_approx->computeOutBlob(all_states);
+        caffe::caffe_copy(trajectory.size(), out->cpu_data(), lipschitz.mutable_cpu_data());
+        delete out;
     }
 
     update_critic(all_states, all_next_states, r_gamma_coef);
@@ -486,7 +562,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       }
 #endif
  
-      if(gae){
+      if(gae) {
         //        Simple computation for lambda return
         //        move deltas from GPU to CPU
         double * diff = deltas.mutable_cpu_diff();
@@ -520,15 +596,21 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       double* pdeltas_blob = deltas_blob.mutable_cpu_data();
       double* ptarget_cac = target_cac.mutable_cpu_data();
       const double* pdeltas = deltas.cpu_data();
+      const double* cplipschitz = lipschitz.cpu_data();
       li=0;
       //cacla cost
       // (mu(s) - a) A(s,a) H(A(s,a))
       // clip(mu(s) - a, mu_old(s) - c, mu_old(s) + c) A(s,a) H(A(s,a)) clip only direction not target
       // mu(s) - clip(a, mu_old(s) - c, mu_old(s) + c) A(s,a) H(A(s,a))
 
+//       LOG_DEBUG(kdtree_s->size());
+//       bib::Logger::PRINT_ELEMENTS_FT(lipschitz, std::to_string(kdtree_s->size()).c_str(), 4, 1);
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-        for(int j=0; j < this->nb_motors; j++)
-            ptarget_cac[li * this->nb_motors + j] = std::min( std::min(it->pure_a[j] + beta_target, (double) 1.f), std::max(it->a[j], std::max(it->pure_a[j] - beta_target, (double) -1.f) ) );
+        double lclip = beta_target * cplipschitz[li];
+//         LOG_DEBUG(lclip);
+        for(int j=0; j < this->nb_motors; j++) {
+            ptarget_cac[li * this->nb_motors + j] = std::min( std::min(it->pure_a[j] + lclip, (double) 1.f), std::max(it->a[j], std::max(it->pure_a[j] - lclip, (double) -1.f) ) );
+        }
         if(pdeltas[li] > 0.) {
           posdelta_mean += pdeltas[li];
           n++;
@@ -730,6 +812,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   NN* ann_testing;
   NN* ann_testing_blob;
   NN* vnn_testing;
+  NN* lipschitz_approx;
 
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
@@ -740,9 +823,36 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   float ratio_valid_advantage=0;
   int nb_sample_update = 0;
   double posdelta_mean = 0;
+  double state_close_threshold;
   
   uint normalizer_type;
   bib::OnlineNormalizer* normalizer = nullptr;
+
+  struct L1_distance {
+    typedef double distance_type;
+
+    double operator() (const double& __a, const double& __b) const {
+      double d = std::fabs(__a - __b);
+      return d;
+    }   
+  };  
+
+  struct L2_distance {
+    typedef double distance_type;
+
+    double operator() (const double& __a, const double& __b) const {
+      double d = (__a - __b);
+      d = sqrt(d*d);
+      return d;
+    }
+  };  
+
+ typedef KDTree::KDTree<sample, KDTree::_Bracket_accessor<sample>, L1_distance> kdtree_sample;
+ typedef KDTree::_Iterator<sample, sample const&, sample const*> const_iterator_kd;
+ 
+//   typedef KDTree::KDTree<sample> kdtree_sample;
+  kdtree_sample* kdtree_s;
+  std::deque<const_iterator_kd> kdtree_iterator;
 
 #ifdef PARALLEL_INTERACTION
   boost::mpi::communicator world;

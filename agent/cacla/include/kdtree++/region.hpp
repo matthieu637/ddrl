@@ -8,7 +8,7 @@
 #define INCLUDE_KDTREE_REGION_HPP
 
 #include <cstddef>
-#include <vector>
+
 #include "node.hpp"
 
 namespace KDTree
@@ -18,7 +18,6 @@ namespace KDTree
             typename _Acc, typename _Cmp>
     struct _Region
     {
-      const size_t  __K;
       typedef _Val value_type;
       typedef _SubVal subvalue_type;
 
@@ -28,12 +27,14 @@ namespace KDTree
       typedef std::pair<_Region,_SubVal> _CenterPt;
 
       _Region(size_t __k, _Acc const& __acc=_Acc(), const _Cmp& __cmp=_Cmp())
-	: __K(__k), _M_low_bounds(__k), _M_high_bounds(__k), _M_cmp(__cmp), _M_acc(__acc) {}
+	: _M_low_bounds(new subvalue_type[__k]), _M_high_bounds(new subvalue_type[__k]),
+	_M_cmp(__cmp), _M_acc(__acc), __K(__k) {}
 
       template <typename Val>
       _Region(size_t __k, Val const& __V,
 	      _Acc const& __acc=_Acc(), const _Cmp& __cmp=_Cmp())
-	: __K(__k), _M_low_bounds(__k), _M_high_bounds(__k), _M_acc(__acc), _M_cmp(__cmp)
+	: _M_low_bounds(new subvalue_type[__k]), _M_high_bounds(new subvalue_type[__k]),
+	_M_acc(__acc), _M_cmp(__cmp), __K(__k)
       {
         for (size_t __i = 0; __i != __K; ++__i)
           {
@@ -44,7 +45,8 @@ namespace KDTree
       template <typename Val>
       _Region(size_t __k, Val const& __V, subvalue_type const& __R,
 	      _Acc const& __acc=_Acc(), const _Cmp& __cmp=_Cmp())
-	:  __K(__k), _M_low_bounds(__k), _M_high_bounds(__k), _M_acc(__acc), _M_cmp(__cmp)
+	: _M_low_bounds(new subvalue_type[__k]), _M_high_bounds(new subvalue_type[__k]),
+	_M_acc(__acc), _M_cmp(__cmp), __K(__k)
       {
         for (size_t __i = 0; __i != __K; ++__i)
           {
@@ -52,6 +54,35 @@ namespace KDTree
              _M_high_bounds[__i] = _M_acc(__V,__i) + __R;
           }
       }
+      
+      _Region(const _Region& __x)
+	: _M_low_bounds(new subvalue_type[__x.__K]), _M_high_bounds(new subvalue_type[__x.__K]),
+	_M_acc(__x._M_acc), _M_cmp(__x._M_cmp), __K(__x.__K)
+	  {
+          std::copy(__x._M_low_bounds, __x._M_low_bounds + __x.__K, _M_low_bounds);
+		  std::copy(__x._M_high_bounds, __x._M_high_bounds + __x.__K, _M_high_bounds);
+      }
+      
+      _Region&
+      operator=(const _Region& __x)
+	  {
+	      if (__x.__K != __K)
+		  {
+			_M_low_bounds = new subvalue_type[__x.__K];
+			_M_high_bounds = new subvalue_type[__x.__K];
+		  }
+		  std::copy(__x._M_low_bounds, __x._M_low_bounds + __x.__K, _M_low_bounds);
+		  std::copy(__x._M_high_bounds, __x._M_high_bounds + __x.__K, _M_high_bounds);
+		  _M_acc = __x._M_acc;
+		  _M_cmp = __x._M_cmp;
+		  __K = __x.__K;
+      }
+      
+      ~_Region()
+	  {
+		  delete[] _M_low_bounds;
+		  delete[] _M_high_bounds;
+	  }
 
       bool
       intersects_with(_CenterPt const& __THAT) const
@@ -109,10 +140,10 @@ namespace KDTree
         return *this;
       }
 
-      //subvalue_type _M_low_bounds[__K], _M_high_bounds[__K];
-      std::vector<subvalue_type> _M_low_bounds, _M_high_bounds;
+      subvalue_type *_M_low_bounds, *_M_high_bounds;
       _Acc _M_acc;
       _Cmp _M_cmp;
+      size_t __K;
     };
 
 } // namespace KDTree

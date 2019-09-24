@@ -140,7 +140,7 @@ namespace KDTree
 		    const _Dist& __dist, const _Acc& __acc,
 		    const _ValA& __a, const _ValB& __b)
   {
-    return __dist(__acc(__a, __dim), __acc(__b, __dim), __dim);
+    return __dist(__acc(__a, __dim), __acc(__b, __dim));
   }
 
   /*! Compute the distance between two values and accumulate the result for all
@@ -159,7 +159,7 @@ namespace KDTree
   {
     typename _Dist::distance_type d = 0;
     for (size_t i=0; i<__dim; ++i)
-      d += __dist(__acc(__a, i), __acc(__b, i), __dim);
+      d += __dist(__acc(__a, i), __acc(__b, i));
     return d;
   }
 
