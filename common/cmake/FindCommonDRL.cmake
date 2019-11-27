@@ -1,8 +1,6 @@
 include(${ROOT_DRL_PATH}/common/cmake/Callable.cmake)
+include(${ROOT_DRL_PATH}/common/cmake/BoostConfig.cmake)
 include(${ROOT_DRL_PATH}/common/cmake/CaffeConfig.cmake)
-find_package(TBB)
-find_package(Threads)
-find_package(Boost 1.54 COMPONENTS serialization filesystem system program_options thread REQUIRED)
 
 set(COMMON_DRL_INCLUDE_DIRS ${ROOT_DRL_PATH}/common/include)
 

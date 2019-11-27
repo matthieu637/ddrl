@@ -8,18 +8,14 @@ if(NOT DEFINED ROOT_DRL_PATH)
 endif()
 
 include(${ROOT_DRL_PATH}/common/cmake/Config.cmake)
+include(${ROOT_DRL_PATH}/common/cmake/BoostConfig.cmake)
 
 #Boost library
-find_package(Boost COMPONENTS serialization filesystem system program_options thread mpi REQUIRED)
 find_package(CommonDRL)
 find_package(AdvancedAcrobot)
 find_package(Cartpole)
 find_package(HalfCheetah)
 find_package(Humanoid)
-find_package(MPI)
-# find_package(TBB)
-# find_package(OPTPP)
-find_package(Threads REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${COMMON_DRL_INCLUDE_DIRS} 
   ${ADVANCED_ACROBOT_INCLUDE_DIRS} ${CARTPOLE_INCLUDE_DIRS} ${HALF_CHEETAH_INCLUDE_DIRS}
