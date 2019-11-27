@@ -1,4 +1,3 @@
-find_package(Boost 1.54 COMPONENTS serialization filesystem system program_options thread REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(GLOG)
 find_package(CUDA)

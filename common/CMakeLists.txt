@@ -9,11 +9,8 @@ endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/Config.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/GTest.cmake) #GTest must be before Caffe (depedency)
+include(${CMAKE_SOURCE_DIR}/cmake/BoostConfig.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/CaffeConfig.cmake)
-
-#Boost library
-find_package(Boost 1.54 COMPONENTS serialization program_options thread system filesystem REQUIRED)
-find_package(Threads REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${Boost_INCLUDE_DIRS} ${GTEST_INCLUDE_DIRS})
 
