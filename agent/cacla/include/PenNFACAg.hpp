@@ -56,6 +56,17 @@ struct sample {
     return unnormed_s[N];
   }
   
+  inline bool operator==(const sample& sa) const {
+    return sa.unnormed_s == unnormed_s && sa.a == a;
+  }
+  
+  inline double getStAc(size_t N) const {
+    if(N < unnormed_s.size())
+      return unnormed_s[N];
+    else
+      return a[N];
+  }
+  
 //   double operator()(const std::vector<double>&, size_t const){
 //     return 1.;
 //   }
@@ -75,6 +86,57 @@ struct sample {
 
 };
 #endif
+
+struct L1_distance {
+  typedef double distance_type;
+
+  double operator() (const double& __a, const double& __b) const {
+    double d = std::fabs(__a - __b);
+    return d;
+  }   
+};  
+
+struct L2_distance {
+  typedef double distance_type;
+
+  double operator() (const double& __a, const double& __b) const {
+    double d = (__a - __b);
+    d = sqrt(d*d);
+    return d;
+  }
+};
+
+typedef KDTree::_Iterator<sample, sample const&, sample const*> const_iterator_kd;
+typedef KDTree::KDTree<sample, KDTree::_Bracket_accessor<sample>, L1_distance> kdtree_sample;
+
+template <typename _Val>
+struct Bracket_accessorStAc
+{
+  typedef typename _Val::value_type result_type;
+
+  result_type
+  operator()(_Val const& V, size_t const N) const
+  {
+    return V.getStAc(N);
+  }
+};
+  
+typedef KDTree::KDTree<sample, Bracket_accessorStAc<sample>, L1_distance> kdtree_sample_stac;
+
+template<typename Accumulator>
+struct Predicate
+{
+   Predicate(Accumulator* _catched){
+     catched = _catched;
+   }
+  
+   bool operator()(sample const& t ) const {
+       return catched->find_exact(t) == catched->end();
+   }
+   
+   Accumulator* catched;
+}; 
+
 
 template<typename NN = MLP>
 class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
@@ -180,6 +242,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     beta_target             = pt->get<double>("agent.beta_target");
     disable_cac             = pt->get<bool>("agent.disable_cac");
     state_close_threshold   = pt->get<double>("agent.state_close_threshold");
+    lipsch_exp_coef   = pt->get<double>("agent.lipsch_exp_coef");
     gae                     = false;
     update_each_episode = 1;
     
@@ -467,7 +530,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       kdtree_iterator.push_back(it2);
     }
     
-    while(kdtree_iterator.size() > 100000) {
+    while(kdtree_iterator.size() > 50000) {
         kdtree_s->erase(kdtree_iterator.front());
         kdtree_iterator.pop_front();
     }
@@ -483,7 +546,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     double* pr_all = r_gamma_coef.mutable_cpu_data();
     double* pgamma_coef = r_gamma_coef.mutable_cpu_diff();
     double* plipschitz = lipschitz.mutable_cpu_data();
+    caffe::caffe_set(lipschitz.count(), static_cast<double>(0.f), plipschitz);
     bool exactLipschitz = bib::Utils::rand01() > 0.9;
+    exactLipschitz=true;
 
     int li=0;
     double l2_const = std::sqrt((double)this->nb_motors) / std::sqrt((double)this->nb_sensors);
@@ -492,37 +557,21 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       std::copy(it.next_s.begin(), it.next_s.end(), pall_states_next + li * nb_sensors);
       pr_all[li]=it.r;
       pgamma_coef[li]= it.goal_reached ? 0.000f : this->gamma;
-
-      if(exactLipschitz) {
-        std::deque<sample> closest_states;
-        double lthreshold = state_close_threshold;
-        kdtree_s->find_within_range(it, lthreshold, std::back_insert_iterator<std::deque<sample> >(closest_states));
-        
-        double lipt = 0.f;
-  //       LOG_DEBUG(closest_states.size()<< " " << lthreshold);
-        for (int i=0;i<closest_states.size();i++) {
-          for (int j=i+1;j<closest_states.size();j++) {
-            double div = bib::Utils::euclidien_dist(closest_states[i].a, closest_states[j].a, this->nb_motors);
-            if(std::fabs(div) >= 1e-6)
-              lipt = std::max(lipt, bib::Utils::euclidien_dist(closest_states[i].unnormed_next_s, closest_states[j].unnormed_next_s, this->nb_sensors) / div );
-          }
-        }
-        lipt *= l2_const;
-        plipschitz[li] = std::exp(-1.f * lipt);
-      }
       li++;
     }
     
-    lipschitz_approx->increase_batchsize(trajectory.size());
-    if(exactLipschitz)
-      lipschitz_approx->learn_blob(all_states, empty_action, lipschitz, 10);
-    else {
-        auto out =  lipschitz_approx->computeOutBlob(all_states);
-        caffe::caffe_copy(trajectory.size(), out->cpu_data(), lipschitz.mutable_cpu_data());
-        delete out;
-    }
+//     lipschitz_approx->increase_batchsize(trajectory.size());
+//     if(exactLipschitz)
+//        lipschitz_approx->learn_blob(all_states, empty_action, lipschitz, 10);
+//     else {
+//         auto out =  lipschitz_approx->computeOutBlob(all_states);
+//         caffe::caffe_copy(trajectory.size(), out->cpu_data(), lipschitz.mutable_cpu_data());
+//         delete out;
+//     }
 
     update_critic(all_states, all_next_states, r_gamma_coef);
+    
+//     LOG_DEBUG("kdtree size:" << kdtree_s->size());
 
     if (trajectory.size() > 0) {
       const std::vector<double> disable_back_ac(this->nb_motors, 0.00f);
@@ -596,7 +645,6 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       double* pdeltas_blob = deltas_blob.mutable_cpu_data();
       double* ptarget_cac = target_cac.mutable_cpu_data();
       const double* pdeltas = deltas.cpu_data();
-      const double* cplipschitz = lipschitz.cpu_data();
       li=0;
       //cacla cost
       // (mu(s) - a) A(s,a) H(A(s,a))
@@ -606,21 +654,55 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //       LOG_DEBUG(kdtree_s->size());
 //       bib::Logger::PRINT_ELEMENTS_FT(lipschitz, std::to_string(kdtree_s->size()).c_str(), 4, 1);
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
-        double lclip = beta_target * cplipschitz[li];
-//         LOG_DEBUG(lclip);
-        for(int j=0; j < this->nb_motors; j++) {
-            ptarget_cac[li * this->nb_motors + j] = std::min( std::min(it->pure_a[j] + lclip, (double) 1.f), std::max(it->a[j], std::max(it->pure_a[j] - lclip, (double) -1.f) ) );
-        }
+
         if(pdeltas[li] > 0.) {
+//           only compute lipschitz on needed sample
           posdelta_mean += pdeltas[li];
           n++;
+          
+          if(exactLipschitz) {
+            std::deque<sample> closest_states;
+    //         implementation within a range
+    //         kdtree_s->find_within_range(*it, state_close_threshold, std::back_insert_iterator<std::deque<sample> >(closest_states));
+            
+    //         implementation with k closest
+            kdtree_sample_stac catched(nb_sensors + this->nb_motors);
+// //             std::deque<sample> catched;
+            Predicate<kdtree_sample_stac> pred(&catched);
+            catched.insert(*it);
+            for (int i=0;i<(int) state_close_threshold;i++){
+              std::pair<kdtree_sample::const_iterator, double> found = kdtree_s->find_nearest_if(*it, 10000, pred);
+              catched.insert(*found.first);
+//               catched.push_back(*found.first);
+              closest_states.push_back(*found.first);
+            }
+            closest_states.push_back(*it);
+
+            double lipt = 0.f;
+      //       LOG_DEBUG(closest_states.size()<< " " << lthreshold);
+            for (int i=0;i<closest_states.size();i++) {
+              for (int j=i+1;j<closest_states.size();j++) {
+                double div = bib::Utils::euclidien_dist(closest_states[i].a, closest_states[j].a, this->nb_motors);
+                if(std::fabs(div) >= 1e-6)
+                  lipt = std::max(lipt, bib::Utils::euclidien_dist(closest_states[i].unnormed_next_s, closest_states[j].unnormed_next_s, this->nb_sensors) / div );
+              }
+            }
+            lipt *= l2_const;
+            plipschitz[li] = std::exp(-1.f * lipsch_exp_coef * lipt);
+          }
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), pdisable_back_cac + li * this->nb_motors);
         }
         if(!disable_cac)
             std::fill(pdeltas_blob + li * this->nb_motors, pdeltas_blob + (li+1) * this->nb_motors, pdeltas[li]);
+        
+        double lclip = beta_target * plipschitz[li];
+        for(int j=0; j < this->nb_motors; j++) {
+            ptarget_cac[li * this->nb_motors + j] = std::min( std::min(it->pure_a[j] + lclip, (double) 1.f), std::max(it->a[j], std::max(it->pure_a[j] - lclip, (double) -1.f) ) );
+        }
         li++;
       }
+//       bib::Logger::PRINT_ELEMENTS(plipschitz, lipschitz.count());
 
       ratio_valid_advantage = ((float)n) / ((float) trajectory.size());
       posdelta_mean = posdelta_mean / ((float) trajectory.size());
@@ -775,7 +857,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << this->sum_weighted_reward/this->gamma << " " << this->sum_reward << 
         " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << nb_sample_update <<
-          " " << std::setprecision(3) << ratio_valid_advantage << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm(true);
+          " " << std::setprecision(3) << ratio_valid_advantage << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm(true) << " " << kdtree_s->size();
   }
 
 //clear all; close all; wndw = 10; X=load('0.learning.data'); X=filter(ones(wndw,1)/wndw, 1, X); startx=0; starty=800; width=350; height=350; figure('position',[startx,starty,width,height]); plot(X(:,3), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('sum rewards', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]); plot(X(:,9), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('beta', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,8), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('valid adv', "fontsize", 16); ylim([0, 1]); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,11), "linewidth", 2); hold on; plot(X(:,12), "linewidth", 2, "color", "red"); legend("critic", "actor"); xlabel('learning episode', "fontsize", 16); ylabel('||\theta||_1', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,10), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\mu_{old}-\mu||_2', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,14), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('effective actor. upd.', "fontsize", 16); 
@@ -824,32 +906,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   int nb_sample_update = 0;
   double posdelta_mean = 0;
   double state_close_threshold;
+  double lipsch_exp_coef;
   
   uint normalizer_type;
   bib::OnlineNormalizer* normalizer = nullptr;
-
-  struct L1_distance {
-    typedef double distance_type;
-
-    double operator() (const double& __a, const double& __b) const {
-      double d = std::fabs(__a - __b);
-      return d;
-    }   
-  };  
-
-  struct L2_distance {
-    typedef double distance_type;
-
-    double operator() (const double& __a, const double& __b) const {
-      double d = (__a - __b);
-      d = sqrt(d*d);
-      return d;
-    }
-  };  
-
- typedef KDTree::KDTree<sample, KDTree::_Bracket_accessor<sample>, L1_distance> kdtree_sample;
- typedef KDTree::_Iterator<sample, sample const&, sample const*> const_iterator_kd;
- 
+  
 //   typedef KDTree::KDTree<sample> kdtree_sample;
   kdtree_sample* kdtree_s;
   std::deque<const_iterator_kd> kdtree_iterator;
