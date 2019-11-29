@@ -18,7 +18,9 @@
 #include "bib/IniParser.hpp"
 #include "bib/OnlineNormalizer.hpp"
 #include "nn/MLP.hpp"
-#include "kdtree++/kdtree.hpp"
+#include "panene/progressive_kd_tree_index.h"
+#include "panene/dist.h"
+#include "panene/data_source/array_data_source.h"
 
 #ifdef PARALLEL_INTERACTION
 #include <mpi.h>
@@ -36,7 +38,7 @@ struct sample {
   bool goal_reached;
   std::vector<double> unnormed_s;
   std::vector<double> unnormed_next_s;
-
+  
   friend class boost::serialization::access;
   template <typename Archive>
   void serialize(Archive& ar, const unsigned int) {
@@ -49,8 +51,12 @@ struct sample {
     ar& BOOST_SERIALIZATION_NVP(unnormed_s);
     ar& BOOST_SERIALIZATION_NVP(unnormed_next_s);
   }
+};
 
-  typedef double value_type;
+struct sample_kdtree {
+  std::vector<double> a;
+  std::vector<double> unnormed_s;
+  std::vector<double> unnormed_next_s;
 
   inline double operator[](size_t N) const {
     return unnormed_s[N];
@@ -59,21 +65,6 @@ struct sample {
   inline bool operator==(const sample& sa) const {
     return sa.unnormed_s == unnormed_s && sa.a == a;
   }
-  
-  inline double getStAc(size_t N) const {
-    if(N < unnormed_s.size())
-      return unnormed_s[N];
-    else
-      return a[N];
-  }
-  
-//   double operator()(const std::vector<double>&, size_t const){
-//     return 1.;
-//   }
-// 
-//   double distance(const std::vector<sample>&){
-//     return 1.;
-//   }
 
   bool operator< (const sample& b) const {
     for (uint i = 0; i < unnormed_s.size(); i++) {
@@ -84,59 +75,12 @@ struct sample {
     return true;
   }
 
+  typedef size_t IDType;
+  typedef double ElementType;
+  typedef panene::L2<ElementType> Distance;
+  typedef panene::L2<ElementType>::ResultType DistanceType;
 };
 #endif
-
-struct L1_distance {
-  typedef double distance_type;
-
-  double operator() (const double& __a, const double& __b) const {
-    double d = std::fabs(__a - __b);
-    return d;
-  }   
-};  
-
-struct L2_distance {
-  typedef double distance_type;
-
-  double operator() (const double& __a, const double& __b) const {
-    double d = (__a - __b);
-    d = sqrt(d*d);
-    return d;
-  }
-};
-
-typedef KDTree::_Iterator<sample, sample const&, sample const*> const_iterator_kd;
-typedef KDTree::KDTree<sample, KDTree::_Bracket_accessor<sample>, L1_distance> kdtree_sample;
-
-template <typename _Val>
-struct Bracket_accessorStAc
-{
-  typedef typename _Val::value_type result_type;
-
-  result_type
-  operator()(_Val const& V, size_t const N) const
-  {
-    return V.getStAc(N);
-  }
-};
-  
-typedef KDTree::KDTree<sample, Bracket_accessorStAc<sample>, L1_distance> kdtree_sample_stac;
-
-template<typename Accumulator>
-struct Predicate
-{
-   Predicate(Accumulator* _catched){
-     catched = _catched;
-   }
-  
-   bool operator()(sample const& t ) const {
-       return catched->find_exact(t) == catched->end();
-   }
-   
-   Accumulator* catched;
-}; 
-
 
 template<typename NN = MLP>
 class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
@@ -145,7 +89,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   friend class FusionOOAg;
 
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(), last_state(_nb_sensors, 0.f) {
+    : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(), last_state(_nb_sensors, 0.f), indexParam(4), treeweight(0.75, 0.25) {
       
   }
 
@@ -241,7 +185,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     momentum                = pt->get<uint>("agent.momentum");
     beta_target             = pt->get<double>("agent.beta_target");
     disable_cac             = pt->get<bool>("agent.disable_cac");
-    state_close_threshold   = pt->get<double>("agent.state_close_threshold");
+    lipsch_min_data   = pt->get<int>("agent.lipsch_min_data");
+    lipsch_n_closest   = pt->get<int>("agent.lipsch_n_closest");
     lipsch_exp_coef   = pt->get<double>("agent.lipsch_exp_coef");
     gae                     = false;
     update_each_episode = 1;
@@ -329,7 +274,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     
     bestever_score = std::numeric_limits<double>::lowest();
 
-    kdtree_s = new kdtree_sample(nb_sensors);
+    
+    kdtree_datasource = new ArraySource(1200000, nb_sensors, &all_transitions);
+    kdtree_s = new panene::ProgressiveKDTreeIndex<ArraySource>(kdtree_datasource, indexParam, treeweight);
   }
 
   void _start_episode(const std::vector<double>& sensors, bool) override {
@@ -524,16 +471,23 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       if(batch_norm_critic != 0)
         vnn_testing->increase_batchsize(trajectory.size());
     }
-    
-    for(auto it : trajectory) {
-      auto it2 = kdtree_s->insert(it);
-      kdtree_iterator.push_back(it2);
+  
+    size_t before = all_transitions.size();
+    for(auto it : trajectory)
+      all_transitions.push_back({it.a, it.unnormed_s, it.unnormed_next_s});
+    kdtree_s->run(1+(all_transitions.size() - before)*(1.f/treeweight.addPointWeight));
+    if(all_transitions.size() > 1000000){
+//       cut it in half
+      LOG_DEBUG("big kdtree changes");
+      all_transitions.erase(all_transitions.begin(), all_transitions.begin() + 1000000/2);
+      delete kdtree_s;
+      delete kdtree_datasource;
+      kdtree_datasource = new ArraySource(1200000, nb_sensors, &all_transitions);
+      kdtree_s = new panene::ProgressiveKDTreeIndex<ArraySource>(kdtree_datasource, indexParam, treeweight);
+      kdtree_s->run(1+all_transitions.size()*(1.f/treeweight.addPointWeight));
+      LOG_DEBUG("end kdtree changes");
     }
     
-    while(kdtree_iterator.size() > 50000) {
-        kdtree_s->erase(kdtree_iterator.front());
-        kdtree_iterator.pop_front();
-    }
     
     caffe::Blob<double> all_states(trajectory.size(), nb_sensors, 1, 1);
     caffe::Blob<double> all_next_states(trajectory.size(), nb_sensors, 1, 1);
@@ -546,9 +500,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     double* pr_all = r_gamma_coef.mutable_cpu_data();
     double* pgamma_coef = r_gamma_coef.mutable_cpu_diff();
     double* plipschitz = lipschitz.mutable_cpu_data();
-    caffe::caffe_set(lipschitz.count(), static_cast<double>(0.f), plipschitz);
-    bool exactLipschitz = bib::Utils::rand01() > 0.9;
-    exactLipschitz=true;
+    caffe::caffe_set(lipschitz.count(), static_cast<double>(1.f), plipschitz);
+    bool computeLipschitz = all_transitions.size() >= lipsch_min_data;
 
     int li=0;
     double l2_const = std::sqrt((double)this->nb_motors) / std::sqrt((double)this->nb_sensors);
@@ -561,7 +514,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     }
     
 //     lipschitz_approx->increase_batchsize(trajectory.size());
-//     if(exactLipschitz)
+//     if(computeLipschitz)
 //        lipschitz_approx->learn_blob(all_states, empty_action, lipschitz, 10);
 //     else {
 //         auto out =  lipschitz_approx->computeOutBlob(all_states);
@@ -571,7 +524,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
     update_critic(all_states, all_next_states, r_gamma_coef);
     
-//     LOG_DEBUG("kdtree size:" << kdtree_s->size());
+     LOG_DEBUG("kdtree size:" << all_transitions.size() << " " << kdtree_datasource->size() << " " << kdtree_s->getSize());
 
     if (trajectory.size() > 0) {
       const std::vector<double> disable_back_ac(this->nb_motors, 0.00f);
@@ -653,6 +606,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
 //       LOG_DEBUG(kdtree_s->size());
 //       bib::Logger::PRINT_ELEMENTS_FT(lipschitz, std::to_string(kdtree_s->size()).c_str(), 4, 1);
+      panene::SearchParams searchParam(16384);
+//       panene::SearchParams searchParam(all_transitions.size() * 2);
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
 
         if(pdeltas[li] > 0.) {
@@ -660,31 +615,18 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           posdelta_mean += pdeltas[li];
           n++;
           
-          if(exactLipschitz) {
-            std::deque<sample> closest_states;
-    //         implementation within a range
-    //         kdtree_s->find_within_range(*it, state_close_threshold, std::back_insert_iterator<std::deque<sample> >(closest_states));
-            
-    //         implementation with k closest
-            kdtree_sample_stac catched(nb_sensors + this->nb_motors);
-// //             std::deque<sample> catched;
-            Predicate<kdtree_sample_stac> pred(&catched);
-            catched.insert(*it);
-            for (int i=0;i<(int) state_close_threshold;i++){
-              std::pair<kdtree_sample::const_iterator, double> found = kdtree_s->find_nearest_if(*it, 10000, pred);
-              catched.insert(*found.first);
-//               catched.push_back(*found.first);
-              closest_states.push_back(*found.first);
-            }
-            closest_states.push_back(*it);
+          if(computeLipschitz) {
+            panene::ResultSet<sample_kdtree::IDType, sample_kdtree::ElementType> knn_results(lipsch_n_closest);
+            kdtree_s->knnSearch(it->unnormed_s, knn_results, lipsch_n_closest, searchParam);
 
+//             bib::Logger::PRINT_ELEMENTS(knn_results.distances);
+//             bib::Logger::PRINT_ELEMENTS(knn_results.ids);
             double lipt = 0.f;
-      //       LOG_DEBUG(closest_states.size()<< " " << lthreshold);
-            for (int i=0;i<closest_states.size();i++) {
-              for (int j=i+1;j<closest_states.size();j++) {
-                double div = bib::Utils::euclidien_dist(closest_states[i].a, closest_states[j].a, this->nb_motors);
+            for (int i=0;i<knn_results.ids.size();i++) {
+              for (int j=i+1;j<knn_results.ids.size();j++) {
+                double div = bib::Utils::euclidien_dist(all_transitions[knn_results.ids[i]].a, all_transitions[knn_results.ids[j]].a, 1.f);
                 if(std::fabs(div) >= 1e-6)
-                  lipt = std::max(lipt, bib::Utils::euclidien_dist(closest_states[i].unnormed_next_s, closest_states[j].unnormed_next_s, this->nb_sensors) / div );
+                  lipt = std::max(lipt, bib::Utils::euclidien_dist(all_transitions[knn_results.ids[i]].unnormed_next_s, all_transitions[knn_results.ids[j]].unnormed_next_s, 1.f) / div );
               }
             }
             lipt *= l2_const;
@@ -857,7 +799,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   void _display(std::ostream& out) const override {
     out << std::setw(12) << std::fixed << std::setprecision(10) << this->sum_weighted_reward/this->gamma << " " << this->sum_reward << 
         " " << std::setw(8) << std::fixed << std::setprecision(5) << vnn->error() << " " << noise << " " << nb_sample_update <<
-          " " << std::setprecision(3) << ratio_valid_advantage << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm(true) << " " << kdtree_s->size();
+          " " << std::setprecision(3) << ratio_valid_advantage << " " << vnn->weight_l1_norm() << " " << ann->weight_l1_norm(true);
   }
 
 //clear all; close all; wndw = 10; X=load('0.learning.data'); X=filter(ones(wndw,1)/wndw, 1, X); startx=0; starty=800; width=350; height=350; figure('position',[startx,starty,width,height]); plot(X(:,3), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('sum rewards', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]); plot(X(:,9), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('beta', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,8), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('valid adv', "fontsize", 16); ylim([0, 1]); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,11), "linewidth", 2); hold on; plot(X(:,12), "linewidth", 2, "color", "red"); legend("critic", "actor"); xlabel('learning episode', "fontsize", 16); ylabel('||\theta||_1', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,10), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('||\mu_{old}-\mu||_2', "fontsize", 16); startx+=width; figure('position',[startx,starty,width,height]) ; plot(X(:,14), "linewidth", 2); xlabel('learning episode', "fontsize", 16); ylabel('effective actor. upd.', "fontsize", 16); 
@@ -905,15 +847,19 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   float ratio_valid_advantage=0;
   int nb_sample_update = 0;
   double posdelta_mean = 0;
-  double state_close_threshold;
+  int lipsch_min_data;
+  int lipsch_n_closest;
   double lipsch_exp_coef;
   
   uint normalizer_type;
   bib::OnlineNormalizer* normalizer = nullptr;
   
-//   typedef KDTree::KDTree<sample> kdtree_sample;
-  kdtree_sample* kdtree_s;
-  std::deque<const_iterator_kd> kdtree_iterator;
+  using ArraySource = panene::ArrayDataSource<sample_kdtree::IDType, sample_kdtree::Distance, sample_kdtree>;
+  panene::ProgressiveKDTreeIndex<ArraySource>* kdtree_s;
+  ArraySource* kdtree_datasource;
+  std::deque<sample_kdtree> all_transitions;
+  const panene::IndexParams indexParam;
+  const panene::TreeWeight treeweight;
 
 #ifdef PARALLEL_INTERACTION
   boost::mpi::communicator world;
