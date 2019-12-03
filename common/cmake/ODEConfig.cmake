@@ -1,6 +1,6 @@
 find_package(ODE QUIET)
 
-if( NOT ODE_FOUND )
+if( NOT ODE_FOUND AND NOT PYTHON_ONLY)
 	if(NOT EXISTS ${ROOT_DRL_PATH}/environment/ode-env/build/${build_dir_type}/ode-src/ode/src/.libs/)
 	        configure_file(${ROOT_DRL_PATH}/common/cmake/ODE.in ode-download/CMakeLists.txt)
 	        execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
