@@ -412,12 +412,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
     aux->increase_batchsize(btrajectory.size() - (correlation_history * btrajectory_end_points.size()));
     for (int i=0; i  < stoch_iter_aux; i++) {
+      double* weights = aux->getNN()->learnable_params()[0]->mutable_cpu_data();
+      for (int i=0; i < this->nb_motors ;i++)
+          weights[this->nb_motors * correlation_history + i + (i*(correlation_history+1)* this->nb_motors)] = 0.0f;
+
       aux->learn_blob(all_deter_action_in, empty_action, all_deter_action_out, 1);
 
       //enforce diag to be null (or solution is obvious)
-      double* weights = aux->getNN()->learnable_params()[0]->mutable_cpu_data();
+      weights = aux->getNN()->learnable_params()[0]->mutable_cpu_data();
       for (int i=0; i < this->nb_motors ;i++)
-          weights[i+ i * this->nb_motors] = 0.0f;
+          weights[this->nb_motors * correlation_history + i + (i*(correlation_history+1)* this->nb_motors)] = 0.0f;
       
 //       if( i% 100 == 0)
 //         LOG_DEBUG(i << " " << std::setprecision(12) << aux->error() );
