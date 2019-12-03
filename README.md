@@ -89,7 +89,7 @@ Do not enable anaconda during compilation.
 ```
 sudo apt-get update
 #base
-sudo apt-get install git libtool libboost-serialization-dev libboost-thread-dev libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libtbb-dev libglew-dev python cmake libgtest-dev automake unzip libfreeimage-dev liblapacke-dev
+sudo apt-get install git libtool libboost-serialization-dev libboost-thread-dev libboost-system-dev libboost-program-options-dev libboost-filesystem-dev libboost-mpi-dev libopenmpi-dev libtbb-dev libglew-dev python cmake libgtest-dev automake unzip libfreeimage-dev liblapacke-dev g++
 #caffe
 sudo apt-get install nvidia-cuda-dev nvidia-cuda-toolkit libprotobuf-dev libleveldb-dev libsnappy-dev protobuf-compiler libopenblas-dev libgflags-dev libgoogle-glog-dev liblmdb-dev libhdf5-serial-dev
 #optional for developer
