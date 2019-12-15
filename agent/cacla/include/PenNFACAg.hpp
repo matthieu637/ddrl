@@ -89,7 +89,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   friend class FusionOOAg;
 
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(), last_state(_nb_sensors, 0.f), indexParam(4), treeweight(0.75, 0.25) {
+    : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(), last_state(_nb_sensors, 0.f), indexParam(8), treeweight(0.75, 0.25) {
       
   }
 
@@ -187,7 +187,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     disable_cac             = pt->get<bool>("agent.disable_cac");
     lipsch_min_data   = pt->get<int>("agent.lipsch_min_data");
     lipsch_n_closest   = pt->get<int>("agent.lipsch_n_closest");
-    lipsch_exp_coef   = pt->get<double>("agent.lipsch_exp_coef");
+    lipsch_debug_each   = pt->get<double>("agent.lipsch_debug_each");
     gae                     = false;
     update_each_episode = 1;
     
@@ -275,7 +275,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     bestever_score = std::numeric_limits<double>::lowest();
 
     
-    kdtree_datasource = new ArraySource(1200000, nb_sensors, &all_transitions);
+    kdtree_datasource = new ArraySource(2000000, nb_sensors, &all_transitions);
     kdtree_s = new panene::ProgressiveKDTreeIndex<ArraySource>(kdtree_datasource, indexParam, treeweight);
   }
 
@@ -476,13 +476,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     for(auto it : trajectory)
       all_transitions.push_back({it.a, it.unnormed_s, it.unnormed_next_s});
     kdtree_s->run(1+(all_transitions.size() - before)*(1.f/treeweight.addPointWeight));
-    if(all_transitions.size() > 1000000){
+    if(all_transitions.size() > 2000000){
 //       cut it in half
       LOG_DEBUG("big kdtree changes");
-      all_transitions.erase(all_transitions.begin(), all_transitions.begin() + 1000000/2);
+      all_transitions.erase(all_transitions.begin(), all_transitions.begin() + 2000000/2);
       delete kdtree_s;
       delete kdtree_datasource;
-      kdtree_datasource = new ArraySource(1200000, nb_sensors, &all_transitions);
+      kdtree_datasource = new ArraySource(2000000, nb_sensors, &all_transitions);
       kdtree_s = new panene::ProgressiveKDTreeIndex<ArraySource>(kdtree_datasource, indexParam, treeweight);
       kdtree_s->run(1+all_transitions.size()*(1.f/treeweight.addPointWeight));
       LOG_DEBUG("end kdtree changes");
@@ -500,7 +500,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     double* pr_all = r_gamma_coef.mutable_cpu_data();
     double* pgamma_coef = r_gamma_coef.mutable_cpu_diff();
     double* plipschitz = lipschitz.mutable_cpu_data();
-    caffe::caffe_set(lipschitz.count(), static_cast<double>(1.f), plipschitz);
+    caffe::caffe_set(lipschitz.count(), static_cast<double>(50.f), plipschitz);
     bool computeLipschitz = all_transitions.size() >= lipsch_min_data;
 
     int li=0;
@@ -524,7 +524,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
     update_critic(all_states, all_next_states, r_gamma_coef);
     
-     LOG_DEBUG("kdtree size:" << all_transitions.size() << " " << kdtree_datasource->size() << " " << kdtree_s->getSize());
+    LOG_DEBUG("kdtree size:" << all_transitions.size() << " " << kdtree_datasource->size() << " " << kdtree_s->getSize());
 
     if (trajectory.size() > 0) {
       const std::vector<double> disable_back_ac(this->nb_motors, 0.00f);
@@ -630,7 +630,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
               }
             }
             lipt *= l2_const;
-            plipschitz[li] = std::exp(-1.f * lipsch_exp_coef * lipt);
+            plipschitz[li] = lipt;
           }
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), pdisable_back_cac + li * this->nb_motors);
@@ -638,11 +638,18 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         if(!disable_cac)
             std::fill(pdeltas_blob + li * this->nb_motors, pdeltas_blob + (li+1) * this->nb_motors, pdeltas[li]);
         
-        double lclip = beta_target * plipschitz[li];
+        double lclip = beta_target / plipschitz[li];
         for(int j=0; j < this->nb_motors; j++) {
             ptarget_cac[li * this->nb_motors + j] = std::min( std::min(it->pure_a[j] + lclip, (double) 1.f), std::max(it->a[j], std::max(it->pure_a[j] - lclip, (double) -1.f) ) );
         }
         li++;
+      }
+      
+       if (episode % lipsch_debug_each == 0) {
+        LOG_FILE_NNL("lipschitz.data", episode << " " );
+        for(int i=0; i < lipschitz.count() ; i++)
+          LOG_FILE_NNL("lipschitz.data", plipschitz[i] << " " );
+        LOG_FILE_NNL("lipschitz.data", "\n" << std::flush );
       }
 //       bib::Logger::PRINT_ELEMENTS(plipschitz, lipschitz.count());
 
@@ -849,7 +856,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   double posdelta_mean = 0;
   int lipsch_min_data;
   int lipsch_n_closest;
-  double lipsch_exp_coef;
+  int lipsch_debug_each;
   
   uint normalizer_type;
   bib::OnlineNormalizer* normalizer = nullptr;
