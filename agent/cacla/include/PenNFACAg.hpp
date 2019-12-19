@@ -89,7 +89,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   friend class FusionOOAg;
 
   OfflineCaclaAg(unsigned int _nb_motors, unsigned int _nb_sensors)
-    : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(), last_state(_nb_sensors, 0.f), indexParam(8), treeweight(0.75, 0.25) {
+    : arch::AACAgent<NN, arch::AgentGPUProgOptions>(_nb_motors, _nb_sensors), nb_sensors(_nb_sensors), empty_action(), last_state(_nb_sensors, 0.f), indexParam(3), treeweight(0.75, 0.25) {
       
   }
 
@@ -188,6 +188,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     lipsch_min_data   = pt->get<int>("agent.lipsch_min_data");
     lipsch_n_closest   = pt->get<int>("agent.lipsch_n_closest");
     lipsch_debug_each   = pt->get<double>("agent.lipsch_debug_each");
+    lipsch_mean   = pt->get<bool>("agent.lipsch_mean");
     gae                     = false;
     update_each_episode = 1;
     
@@ -275,7 +276,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     bestever_score = std::numeric_limits<double>::lowest();
 
     
-    kdtree_datasource = new ArraySource(2000000, nb_sensors, &all_transitions);
+    kdtree_datasource = new ArraySource(1000000+1000000*0.1, nb_sensors, &all_transitions);
     kdtree_s = new panene::ProgressiveKDTreeIndex<ArraySource>(kdtree_datasource, indexParam, treeweight);
   }
 
@@ -476,13 +477,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     for(auto it : trajectory)
       all_transitions.push_back({it.a, it.unnormed_s, it.unnormed_next_s});
     kdtree_s->run(1+(all_transitions.size() - before)*(1.f/treeweight.addPointWeight));
-    if(all_transitions.size() > 2000000){
+    if(all_transitions.size() > 1000000){
 //       cut it in half
       LOG_DEBUG("big kdtree changes");
-      all_transitions.erase(all_transitions.begin(), all_transitions.begin() + 2000000/2);
+      all_transitions.erase(all_transitions.begin(), all_transitions.begin() + 1000000/2);
       delete kdtree_s;
       delete kdtree_datasource;
-      kdtree_datasource = new ArraySource(2000000, nb_sensors, &all_transitions);
+      kdtree_datasource = new ArraySource(1000000+1000000*0.1, nb_sensors, &all_transitions);
       kdtree_s = new panene::ProgressiveKDTreeIndex<ArraySource>(kdtree_datasource, indexParam, treeweight);
       kdtree_s->run(1+all_transitions.size()*(1.f/treeweight.addPointWeight));
       LOG_DEBUG("end kdtree changes");
@@ -622,14 +623,23 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //             bib::Logger::PRINT_ELEMENTS(knn_results.distances);
 //             bib::Logger::PRINT_ELEMENTS(knn_results.ids);
             double lipt = 0.f;
+            int lipt_count=0;
             for (int i=0;i<knn_results.ids.size();i++) {
               for (int j=i+1;j<knn_results.ids.size();j++) {
                 double div = bib::Utils::euclidien_dist(all_transitions[knn_results.ids[i]].a, all_transitions[knn_results.ids[j]].a, 1.f);
-                if(std::fabs(div) >= 1e-6)
-                  lipt = std::max(lipt, bib::Utils::euclidien_dist(all_transitions[knn_results.ids[i]].unnormed_next_s, all_transitions[knn_results.ids[j]].unnormed_next_s, 1.f) / div );
+                if(std::fabs(div) >= 1e-6) {
+                  if(lipsch_mean) {
+                    lipt += bib::Utils::euclidien_dist(all_transitions[knn_results.ids[i]].unnormed_next_s, all_transitions[knn_results.ids[j]].unnormed_next_s, 1.f) / div;
+                    lipt_count++;
+                  } else
+                    lipt = std::max(lipt, bib::Utils::euclidien_dist(all_transitions[knn_results.ids[i]].unnormed_next_s, all_transitions[knn_results.ids[j]].unnormed_next_s, 1.f) / div );
+                }
               }
             }
             lipt *= l2_const;
+            if(lipsch_mean)
+                lipt /=((double) lipt_count);
+
             plipschitz[li] = lipt;
           }
         } else {
@@ -857,6 +867,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   int lipsch_min_data;
   int lipsch_n_closest;
   int lipsch_debug_each;
+  bool lipsch_mean;
   
   uint normalizer_type;
   bib::OnlineNormalizer* normalizer = nullptr;
