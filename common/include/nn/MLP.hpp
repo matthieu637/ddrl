@@ -1155,8 +1155,11 @@ protected:
       blob->CopyFrom(*states_input);
     }
     if (actions_input != nullptr) {
-      LOG_ERROR("not implemented");
-      exit(1);
+      auto blob = neural_net->blob_by_name(actions_blob_name);
+      CHECK(blob);
+      ASSERT(actions_input->shape() == blob->shape(), "pb size " << actions_input->shape()[0] << " " << 
+                    actions_input->shape()[1] << " " << blob->shape()[0] << " " << blob->shape()[1] );
+      blob->CopyFrom(*actions_input);
     }
     if (target_input != nullptr ) {
       auto blob = neural_net->blob_by_name(targets_blob_name);
