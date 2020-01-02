@@ -157,6 +157,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     beta_target             = pt->get<double>("agent.beta_target");
     disable_cac             = pt->get<bool>("agent.disable_cac");
     learn_q_mu              = pt->get<bool>("agent.learn_q_mu");
+    double decay_q          = pt->get<bool>("agent.decay_q");
     gae                     = false;
     update_each_episode = 1;
     
@@ -230,7 +231,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
     vnn = new NN(nb_sensors, nb_sensors, *hidden_unit_v, alpha_v, 1, -1, hidden_layer_type, batch_norm_critic, false, momentum);
 
-    qnn = new NN(nb_sensors + this->nb_motors, nb_sensors, *hidden_unit_q, alpha_v, 1, -1.f, hidden_layer_type, batch_norm_critic, false, momentum);
+    qnn = new NN(nb_sensors + this->nb_motors, nb_sensors, *hidden_unit_q, alpha_v, 1, decay_q, hidden_layer_type, batch_norm_critic, false, momentum);
 
 #ifdef PARALLEL_INTERACTION
       std::vector<double> weights(ann->number_of_parameters(false), 0.f);
@@ -697,7 +698,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), pdisable_back_cac + li * this->nb_motors);
         }
         if(!disable_cac)
-            std::fill(pdeltas_blob + li * this->nb_motors, pdeltas_blob + (li+1) * this->nb_motors, pdeltas[li]);
+            std::fill(pdeltas_blob + li * this->nb_motors, pdeltas_blob + (li+1) * this->nb_motors, pdeltasQ[li]);
         li++;
       }
 
