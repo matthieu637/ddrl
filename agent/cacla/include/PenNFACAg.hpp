@@ -157,7 +157,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     beta_target             = pt->get<double>("agent.beta_target");
     disable_cac             = pt->get<bool>("agent.disable_cac");
     learn_q_mu              = pt->get<bool>("agent.learn_q_mu");
-    double decay_q          = pt->get<bool>("agent.decay_q");
+    double decay_q          = pt->get<double>("agent.decay_q");
     gae                     = false;
     update_each_episode = 1;
     
