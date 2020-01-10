@@ -15,6 +15,8 @@ source=("git+https://github.com/matthieu637/caffe.git")
 sha256sums=('SKIP')
 
 build() {
+    #boost must be compiled with the same gcc version
+    sed -i 's/1[.]54 /1.69 EXACT /' $srcdir/caffe/cmake/Dependencies.cmake
     cd "$srcdir/caffe"
     mkdir build
     cd build
@@ -29,6 +31,4 @@ build() {
 package() {
         cd "$srcdir/caffe/build"
         make install
-        cd "$pkgdir/usr/"
-        mv lib64 lib
 }
