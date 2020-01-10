@@ -157,6 +157,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     beta_target             = pt->get<double>("agent.beta_target");
     disable_cac             = pt->get<bool>("agent.disable_cac");
     learn_q_mu              = pt->get<bool>("agent.learn_q_mu");
+    q_use_v_next_target                     = pt->get<bool>("agent.q_use_v_next_target");
+    q_use_v_current                     = pt->get<bool>("agent.q_use_v_current");
     double decay_q          = pt->get<double>("agent.decay_q");
     gae                     = false;
     update_each_episode = 1;
@@ -278,7 +280,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       caffe::Blob<double> q_target(trajectory.size(), 1, 1, 1);
 
       auto iter = [&]() {
-        auto all_nextQ = qnn->computeOutVFBlob(all_next_states, deter_next_actions);
+        decltype(qnn->computeOutVFBlob(all_next_states, deter_next_actions)) all_nextQ;
+        if(! q_use_v_next_target)
+          all_nextQ = qnn->computeOutVFBlob(all_next_states, deter_next_actions);
         auto all_Q = qnn->computeOutVFBlob(all_states, taken_actions);
         //all_Q must be computed after all_nextQ to use learn_blob_no_full_forward
 
@@ -298,6 +302,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
           all_V = vnn->computeOutVFBlob(all_states, empty_action);
           //all_V must be computed after all_nextV to use learn_blob_no_full_forward
         }
+        
+        if(q_use_v_next_target)
+          all_nextQ = all_nextV;
 
 #ifdef CAFFE_CPU_ONLY
         caffe::caffe_mul(trajectory.size(), r_gamma_coef.cpu_diff(), all_nextV->cpu_data(), v_target.mutable_cpu_data());
@@ -385,7 +392,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         delete all_nextV;
 
         delete all_Q;
-        delete all_nextQ;
+        if(! q_use_v_next_target)
+          delete all_nextQ;
       };
 
       for(uint i=0; i<number_fitted_iteration; i++)
@@ -586,8 +594,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
       caffe::caffe_copy(trajectory.size(), taken_actions.cpu_diff(), taken_actions.mutable_cpu_data());
       //taken actions now contains deter_actions
+
       auto all_nextQ = qnn->computeOutVFBlob(all_next_states, deter_next_actions);
-      auto all_Q = qnn->computeOutVFBlob(all_states, taken_actions);
+      decltype(qnn->computeOutVFBlob(all_states, taken_actions)) all_Q;
+      if(! q_use_v_current)
+        all_Q = qnn->computeOutVFBlob(all_states, taken_actions);
 
       decltype(vnn->computeOutVFBlob(all_next_states, empty_action)) all_nextV, all_mine;
       if(batch_norm_critic != 0)
@@ -603,7 +614,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         all_mine = vnn->computeOutVFBlob(all_states, empty_action);
       }
 
-     
+      if(q_use_v_current)
+        all_Q = all_mine;
+
 #ifdef CAFFE_CPU_ONLY
       caffe::caffe_mul(trajectory.size(), r_gamma_coef.cpu_diff(), all_nextV->cpu_data(), deltas.mutable_cpu_data());
       caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), deltas.cpu_data(), deltas.mutable_cpu_data());
@@ -679,7 +692,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       double* pdisable_back_cac = target_cac.mutable_cpu_diff();
       double* pdeltas_blob = deltas_blob.mutable_cpu_data();
       double* ptarget_cac = target_cac.mutable_cpu_data();
-      const double* pdeltas = deltas.cpu_data();
+//       const double* pdeltas = deltas.cpu_data();
       const double* pdeltasQ = deltasQ.cpu_data();
       li=0;
       //cacla cost
@@ -692,7 +705,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
             ptarget_cac[li * this->nb_motors + j] = std::min( std::min(it->pure_a[j] + beta_target, (double) 1.f), std::max(it->a[j], std::max(it->pure_a[j] - beta_target, (double) -1.f) ) );
 //        if(pdeltas[li] > 0.) {
         if(pdeltasQ[li] > 0.) {
-          posdelta_mean += pdeltas[li];
+          posdelta_mean += pdeltasQ[li];
           n++;
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), pdisable_back_cac + li * this->nb_motors);
@@ -769,7 +782,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       delete all_mine;
 
       delete all_nextQ;
-      delete all_Q;
+      if(! q_use_v_current)
+        delete all_Q;
       
       if(batch_norm_actor != 0)
         ann_testing->increase_batchsize(1);
@@ -876,7 +890,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
   double noise, noise2, noise3;
   uint gaussian_policy;
-  bool gae, disable_cac, learn_q_mu;
+  bool gae, disable_cac, learn_q_mu, q_use_v_next_target, q_use_v_current;
   uint number_fitted_iteration, stoch_iter_actor, stoch_iter_critic;
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, lambdaQ, beta_target;
