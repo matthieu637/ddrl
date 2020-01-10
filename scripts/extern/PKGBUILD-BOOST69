@@ -1,0 +1,32 @@
+pkgname=boost-69-compat-p7-gcc7
+pkgver=1.69.0
+pkgrel=1
+pkgdesc="Free peer-reviewed portable C++ source libraries - compat version"
+arch=('i686' 'x86_64')
+url="http://www.boost.org/"
+license=('Boost Software License, Version 1.0.')
+depends=('python' 'icu')
+makedepends=('make')
+options=()
+source=("https://dl.bintray.com/boostorg/release/1.69.0/source/boost_1_69_0.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    export CPLUS_INCLUDE_PATH="$CPLUS_INCLUDE_PATH:/usr/include/python3.7m/"
+    cd "${srcdir}/boost_1_69_0"
+    export CC=/usr/bin/gcc-7
+    export CPP="/usr/bin/gcc -E"
+    export CXX=/usr/bin/g++-7
+    export CXXCPP="/usr/bin/g++-7 -E"
+    ./bootstrap.sh --with-python=/usr/bin/python3.7 
+    sed -i 's|using gcc|using gcc : : /usr/bin/g++-7|' ./project-config.jam
+    echo 'using mpi ;' >> ./project-config.jam
+    ./b2 variant=release link=shared runtime-link=shared stage
+}
+
+package() {
+    cd "${srcdir}/boost_1_69_0"
+    mkdir -p ${pkgdir}/usr/local/lib
+
+    ./b2 install --prefix=${pkgdir}/usr/local
+}
