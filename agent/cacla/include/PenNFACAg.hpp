@@ -88,11 +88,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
                                   bool learning, bool goal_reached, bool) override {
 
     // protect batch norm from testing data and poor data
+    std::vector<double> sensors(nb_sensors);
     vector<double>* next_action = nullptr;
     if(normalizer_type == 0) {
       next_action = ann_testing->computeOut(sensors_);
     } else {
-      std::vector<double> sensors(nb_sensors);
       if (normalizer_type == 1)
         normalizer->transform(sensors, sensors_, false);
       else if (normalizer_type == 2)
@@ -108,9 +108,42 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     last_pure_action.reset(new vector<double>(*next_action));
     if(learning) {
       if(gaussian_policy == 1) {
-        vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+        vector<double>* best_randomized_action = nullptr;
+        double badv = -1;
+        for (int i=0;i < 10; i++) {
+          vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*next_action, noise);
+          double adv = qnn_testing->computeOutVF(sensors, *randomized_action) - vnn_testing->computeOutVF(sensors, empty_action_nblob);
+          
+          if(deeper_search){
+            if (badv < adv && adv > 0.f) {
+              if (best_randomized_action != nullptr)
+                delete best_randomized_action;
+              best_randomized_action = randomized_action;
+              badv = adv;
+            } else if (i != 9)
+              delete randomized_action;
+            else if (i == 9 && badv < -0.5)
+              best_randomized_action = randomized_action;
+            else if (i == 9)
+              delete randomized_action;
+              
+          } else { //catch first good action
+            if(adv > 0.f) {
+              best_randomized_action = randomized_action;
+              break;
+            } else  if (i != 9)
+              delete randomized_action;
+            else if(i == 9)
+              best_randomized_action = randomized_action;
+          }
+        }
         delete next_action;
-        next_action = randomized_action;
+        if (double_gauss) {
+          vector<double>* randomized_action = bib::Proba<double>::multidimentionnalTruncatedGaussian(*best_randomized_action, noise);
+          delete best_randomized_action;
+          best_randomized_action = randomized_action;
+        }
+        next_action = best_randomized_action;
       } else if(gaussian_policy == 2) {
         oun->step(*next_action);
       } else if(gaussian_policy == 3 && bib::Utils::rand01() < noise2) {
@@ -159,6 +192,9 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     learn_q_mu              = pt->get<bool>("agent.learn_q_mu");
     q_use_v_next_target                     = pt->get<bool>("agent.q_use_v_next_target");
     q_use_v_current                     = pt->get<bool>("agent.q_use_v_current");
+    double_gauss                     = pt->get<bool>("agent.double_gauss");
+    deeper_search                     = pt->get<bool>("agent.deeper_search");
+    
     double decay_q          = pt->get<double>("agent.decay_q");
     gae                     = false;
     update_each_episode = 1;
@@ -247,10 +283,12 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 
     ann_testing = new NN(*ann, false, ::caffe::Phase::TEST);
     
+    vnn_testing = new NN(*vnn, false, ::caffe::Phase::TEST);
+    
+    qnn_testing = new NN(*qnn, false, ::caffe::Phase::TEST);
+    
     if(batch_norm_actor != 0)
       ann_testing_blob = new NN(*ann, false, ::caffe::Phase::TEST);
-    if(batch_norm_critic != 0)
-      vnn_testing = new NN(*vnn, false, ::caffe::Phase::TEST);
     
     bestever_score = std::numeric_limits<double>::lowest();
   }
@@ -269,6 +307,16 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
     ann->copyWeightsTo(weights, false);
     ann_testing->copyWeightsFrom(weights, false);
     delete[] weights;
+    
+    weights = new double[vnn->number_of_parameters(false)];
+    vnn->copyWeightsTo(weights, false);
+    vnn_testing->copyWeightsFrom(weights, false);
+    delete[] weights;
+    
+    weights = new double[qnn->number_of_parameters(false)];
+    qnn->copyWeightsTo(weights, false);
+    qnn_testing->copyWeightsFrom(weights, false);
+    delete[] weights;
   }
 
   void update_critic(const caffe::Blob<double>& all_states, const caffe::Blob<double>& all_next_states,
@@ -279,12 +327,14 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       caffe::Blob<double> v_target(trajectory.size(), 1, 1, 1);
       caffe::Blob<double> q_target(trajectory.size(), 1, 1, 1);
 
-      auto iter = [&]() {
-        decltype(qnn->computeOutVFBlob(all_next_states, deter_next_actions)) all_nextQ;
-        if(! q_use_v_next_target)
-          all_nextQ = qnn->computeOutVFBlob(all_next_states, deter_next_actions);
-        auto all_Q = qnn->computeOutVFBlob(all_states, taken_actions);
-        //all_Q must be computed after all_nextQ to use learn_blob_no_full_forward
+      auto iter = [&](bool updateQ) {
+        decltype(qnn->computeOutVFBlob(all_next_states, deter_next_actions)) all_nextQ, all_Q;
+        if(updateQ) {
+          if(! q_use_v_next_target)
+            all_nextQ = qnn->computeOutVFBlob(all_next_states, deter_next_actions);
+          all_Q = qnn->computeOutVFBlob(all_states, taken_actions);
+          //all_Q must be computed after all_nextQ to use learn_blob_no_full_forward
+        }
 
         decltype(vnn->computeOutVFBlob(all_states, empty_action)) all_nextV, all_V;
         if(batch_norm_critic != 0) {
@@ -311,9 +361,11 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), v_target.cpu_data(), v_target.mutable_cpu_data());
         caffe::caffe_sub(trajectory.size(), v_target.cpu_data(), all_V->cpu_data(), v_target.mutable_cpu_data());
 
-        caffe::caffe_mul(trajectory.size(), r_gamma_coef.cpu_diff(), all_nextQ->cpu_data(), q_target.mutable_cpu_data());
-        caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), q_target.cpu_data(), q_target.mutable_cpu_data());
-        caffe::caffe_sub(trajectory.size(), q_target.cpu_data(), all_Q->cpu_data(), q_target.mutable_cpu_data());
+        if(updateQ) {
+          caffe::caffe_mul(trajectory.size(), r_gamma_coef.cpu_diff(), all_nextQ->cpu_data(), q_target.mutable_cpu_data());
+          caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), q_target.cpu_data(), q_target.mutable_cpu_data());
+          caffe::caffe_sub(trajectory.size(), q_target.cpu_data(), all_Q->cpu_data(), q_target.mutable_cpu_data());
+        }
 #else
       switch (caffe::Caffe::mode()) {
       case caffe::Caffe::CPU:
@@ -321,18 +373,22 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
         caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), v_target.cpu_data(), v_target.mutable_cpu_data());
         caffe::caffe_sub(trajectory.size(), v_target.cpu_data(), all_V->cpu_data(), v_target.mutable_cpu_data());
 
-        caffe::caffe_mul(trajectory.size(), r_gamma_coef.cpu_diff(), all_nextQ->cpu_data(), q_target.mutable_cpu_data());
-        caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), q_target.cpu_data(), q_target.mutable_cpu_data());
-        caffe::caffe_sub(trajectory.size(), q_target.cpu_data(), all_Q->cpu_data(), q_target.mutable_cpu_data());
+        if(updateQ) {
+          caffe::caffe_mul(trajectory.size(), r_gamma_coef.cpu_diff(), all_nextQ->cpu_data(), q_target.mutable_cpu_data());
+          caffe::caffe_add(trajectory.size(), r_gamma_coef.cpu_data(), q_target.cpu_data(), q_target.mutable_cpu_data());
+          caffe::caffe_sub(trajectory.size(), q_target.cpu_data(), all_Q->cpu_data(), q_target.mutable_cpu_data());
+        }
         break;
       case caffe::Caffe::GPU:
         caffe::caffe_gpu_mul(trajectory.size(), r_gamma_coef.gpu_diff(), all_nextV->gpu_data(), v_target.mutable_gpu_data());
         caffe::caffe_gpu_add(trajectory.size(), r_gamma_coef.gpu_data(), v_target.gpu_data(), v_target.mutable_gpu_data());
         caffe::caffe_gpu_sub(trajectory.size(), v_target.gpu_data(), all_V->gpu_data(), v_target.mutable_gpu_data());
 
-        caffe::caffe_gpu_mul(trajectory.size(), r_gamma_coef.gpu_diff(), all_nextQ->gpu_data(), q_target.mutable_gpu_data());
-        caffe::caffe_gpu_add(trajectory.size(), r_gamma_coef.gpu_data(), q_target.gpu_data(), q_target.mutable_gpu_data());
-        caffe::caffe_gpu_sub(trajectory.size(), q_target.gpu_data(), all_Q->gpu_data(), q_target.mutable_gpu_data());
+        if(updateQ) {
+          caffe::caffe_gpu_mul(trajectory.size(), r_gamma_coef.gpu_diff(), all_nextQ->gpu_data(), q_target.mutable_gpu_data());
+          caffe::caffe_gpu_add(trajectory.size(), r_gamma_coef.gpu_data(), q_target.gpu_data(), q_target.mutable_gpu_data());
+          caffe::caffe_gpu_sub(trajectory.size(), q_target.gpu_data(), all_Q->gpu_data(), q_target.mutable_gpu_data());
+        }
         break;
       }
 #endif
@@ -366,38 +422,44 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
 //         move diff to GPU
 #ifdef CAFFE_CPU_ONLY
         caffe::caffe_add(trajectory.size(), v_target.cpu_diff(), all_V->cpu_data(), v_target.mutable_cpu_data());
-        caffe::caffe_add(trajectory.size(), q_target.cpu_diff(), all_Q->cpu_data(), q_target.mutable_cpu_data());
+        if(updateQ)
+          caffe::caffe_add(trajectory.size(), q_target.cpu_diff(), all_Q->cpu_data(), q_target.mutable_cpu_data());
 #else
       switch (caffe::Caffe::mode()) {
       case caffe::Caffe::CPU:
         caffe::caffe_add(trajectory.size(), v_target.cpu_diff(), all_V->cpu_data(), v_target.mutable_cpu_data());
-        caffe::caffe_add(trajectory.size(), q_target.cpu_diff(), all_Q->cpu_data(), q_target.mutable_cpu_data());
+        if(updateQ)
+          caffe::caffe_add(trajectory.size(), q_target.cpu_diff(), all_Q->cpu_data(), q_target.mutable_cpu_data());
         break;
       case caffe::Caffe::GPU:
         caffe::caffe_gpu_add(trajectory.size(), v_target.gpu_diff(), all_V->gpu_data(), v_target.mutable_gpu_data());
-        caffe::caffe_gpu_add(trajectory.size(), q_target.gpu_diff(), all_Q->gpu_data(), q_target.mutable_gpu_data());
+        if(updateQ)
+          caffe::caffe_gpu_add(trajectory.size(), q_target.gpu_diff(), all_Q->gpu_data(), q_target.mutable_gpu_data());
         break;
       }
 #endif
-        if (stoch_iter_critic == 1){
+        if (stoch_iter_critic == 1) {
           vnn->learn_blob_no_full_forward(all_states, empty_action, v_target);
-          qnn->learn_blob_no_full_forward(all_states, taken_actions, q_target);
-        }
-        else {
+          if(updateQ)
+            qnn->learn_blob(all_states, taken_actions, q_target, stoch_iter_critic * 10);
+        } else {
           vnn->learn_blob(all_states, empty_action, v_target, stoch_iter_critic);
-          qnn->learn_blob(all_states, taken_actions, q_target, stoch_iter_critic);
+          if(updateQ)
+            qnn->learn_blob(all_states, taken_actions, q_target, stoch_iter_critic * 10);
         }
 
         delete all_V;
         delete all_nextV;
 
-        delete all_Q;
-        if(! q_use_v_next_target)
-          delete all_nextQ;
+        if(updateQ) {
+          delete all_Q;
+          if(! q_use_v_next_target)
+            delete all_nextQ;
+        }
       };
 
       for(uint i=0; i<number_fitted_iteration; i++)
-        iter();
+        iter(i == number_fitted_iteration - 1);
     }
   }
 
@@ -692,8 +754,8 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       double* pdisable_back_cac = target_cac.mutable_cpu_diff();
       double* pdeltas_blob = deltas_blob.mutable_cpu_data();
       double* ptarget_cac = target_cac.mutable_cpu_data();
-//       const double* pdeltas = deltas.cpu_data();
-      const double* pdeltasQ = deltasQ.cpu_data();
+      const double* pdeltas = deltas.cpu_data();
+//       const double* pdeltasQ = deltasQ.cpu_data();
       li=0;
       //cacla cost
       // (mu(s) - a) A(s,a) H(A(s,a))
@@ -703,15 +765,15 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
       for(auto it = trajectory.begin(); it != trajectory.end() ; ++it) {
         for(int j=0; j < this->nb_motors; j++)
             ptarget_cac[li * this->nb_motors + j] = std::min( std::min(it->pure_a[j] + beta_target, (double) 1.f), std::max(it->a[j], std::max(it->pure_a[j] - beta_target, (double) -1.f) ) );
-//        if(pdeltas[li] > 0.) {
-        if(pdeltasQ[li] > 0.) {
-          posdelta_mean += pdeltasQ[li];
+       if(pdeltas[li] > 0.) {
+//         if(pdeltasQ[li] > 0.) {
+          posdelta_mean += pdeltas[li];
           n++;
         } else {
           std::copy(disable_back_ac.begin(), disable_back_ac.end(), pdisable_back_cac + li * this->nb_motors);
         }
         if(!disable_cac)
-            std::fill(pdeltas_blob + li * this->nb_motors, pdeltas_blob + (li+1) * this->nb_motors, pdeltasQ[li]);
+            std::fill(pdeltas_blob + li * this->nb_motors, pdeltas_blob + (li+1) * this->nb_motors, pdeltas[li]);
         li++;
       }
 
@@ -895,6 +957,7 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   uint batch_norm_actor, batch_norm_critic, actor_output_layer_type, hidden_layer_type, momentum;
   double lambda, lambdaQ, beta_target;
   double conserved_l2dist= 0.f;
+  bool double_gauss, deeper_search;
 
   std::shared_ptr<std::vector<double>> last_action;
   std::shared_ptr<std::vector<double>> last_pure_action;
@@ -910,11 +973,13 @@ class OfflineCaclaAg : public arch::AACAgent<NN, arch::AgentGPUProgOptions> {
   NN* ann_testing_blob;
   NN* vnn_testing;
   NN* qnn;
+  NN* qnn_testing;
 
   std::vector<uint>* hidden_unit_q;
   std::vector<uint>* hidden_unit_v;
   std::vector<uint>* hidden_unit_a;
   caffe::Blob<double> empty_action; //dummy action cause c++ cannot accept null reference
+  std::vector<double> empty_action_nblob;
   double bestever_score;
   int update_each_episode;
   bib::OrnsteinUhlenbeckNoise<double>* oun = nullptr;
