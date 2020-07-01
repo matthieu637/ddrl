@@ -257,7 +257,7 @@ done
 
 
 echo "INFO : $CPU CPU used"
-echo "INFO : cmake well founded. Look what following to know if you need other software."
+echo "INFO : cmake well found. Look what following to know if you need other software."
 
 if [[ "$FORCE_REMOVE" == '' && $CLEAR -eq 0 ]]  ; then
 	echo "QUESTION : if a subdirectory already contains a build, should I remove it ? (y/n) [y]:"
